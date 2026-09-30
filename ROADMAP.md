@@ -18,7 +18,7 @@
 
 **Status:** Recovering
 
-**Summary:** Established execution and roadmap systems now have a concrete QoL direction. Four implementation passes cover validation recovery, priority fairness, cooperating-writer persistence, evidence isolation, and clearer roadmap/task activity views. A reproducible local mixed-I/O baseline is recorded; broader task-state UX and real workflow latency remain open.
+**Summary:** Established execution and roadmap systems now have a concrete QoL direction. Six QoL passes cover validation recovery, priority fairness, cooperating-writer persistence, evidence isolation, truthful task activity, bounded audit freshness, native approval review, durable checkpoint integrity and composer restoration. Local mixed-I/O and content-observation costs are recorded; full keyboard/accessibility, long-turn retention and real workflow latency remain open.
 
 **Why This Status:**
 - Root ROADMAP.md now directs a small, evidence-backed active queue and rolls at meaningful checkpoints.
@@ -53,9 +53,9 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 
 **Why It Matters:** Clear state reduces repeated status requests and unnecessary intervention.
 
-**Current State:** The roadmap cockpit leads with status and one next action. The task activity timeline now separates tool calls from verification, preserves unreported child outcomes at turn completion, sanitizes metadata, and offers one evidence-based follow-up. Recovery actions reach the existing autocomplete path; stale suggestions clear at the next turn. Approval states and a live keyboard walkthrough still need review.
+**Current State:** The roadmap cockpit leads with status and one next action. The task activity timeline now separates tool calls from verification, preserves unreported child outcomes at turn completion, sanitizes metadata, and offers one evidence-based follow-up. Recovery actions reach the existing autocomplete path; stale suggestions clear at the next turn. The native desktop now presents bounded parallel approval requests in order, keeps each review bound to its operation, and exposes full details through Review Request (Command–5). Saving, stale, disconnected and stopping reviews cannot submit another decision. Native layout and real-pipe regression evidence are recorded; a physical keyboard/VoiceOver and terminal approval walkthrough remains open.
 
-**Next Concrete Action:** Trace approval/waiting surfaces to lifecycle authority and exercise full-screen keyboard navigation; review timeline retention cost for very long turns without losing unresolved activity evidence.
+**Next Concrete Action:** Review long-turn activity retention while preserving unresolved evidence. Exercise the existing terminal approval flow and native Review Request using keyboard/IME/VoiceOver when assistive access is available; include Stop during a real provider approval. Do not infer those interactions from synthetic peer captures.
 
 **Success Signal:** At 80- and 120-column widths, each state shows a plain-language label and actionable recovery without truncating the primary action; keyboard-only navigation reaches its details.
 
@@ -73,9 +73,9 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 
 **Why It Matters:** Stale readiness misleads the agent even when the underlying gate detects the change.
 
-**Current State:** Session briefs share the service cache. Snapshot identity now includes the observed document text, covering preserved timestamps and explicit drafts. Snapshot and validation caches isolate producer/consumer objects; both retain at most 128 entries. The audit now maps broader completion evidence ownership and records the Git-status digest and age-renewal gaps.
+**Current State:** Session briefs share the service cache. Snapshot identity now includes the observed document text, covering preserved timestamps and explicit drafts. Snapshot and validation caches isolate producer/consumer objects; both retain at most 128 entries. The diagnostic pipeline now hashes changed/untracked bytes plus index and policy inputs, bypasses reuse when observation is incomplete, captures before/after audit identity, preserves original evidence age, checks advisory graph revisions and isolates retained metadata. Regressions cover same-size/same-mtime dirty edits, policy expiry and in-flight changes. The sixth pass reproduces and repairs durable checkpoint drift: attempts retain their evaluated identity through evidence and commit, reject observed content changes, validate incoming records, fence cancellation in the transaction and recover committed facts without asking again. Ten earlier repository observations measured p50 91.54 ms / p95 95.78 ms; no task-latency improvement is claimed.
 
-**Next Concrete Action:** Reproduce repeated edits to an already-dirty file through the general completion audit. Replace status-only identity with a measured, bounded content/freshness contract, and reconcile age renewal with CompletionFunnel TTL semantics. Preserve advisory versus terminal authority boundaries.
+**Next Concrete Action:** Audit remaining synchronous readiness consumers against the strict advisory observation contract. Exercise non-Git, over-budget and content-unobserved durable attempts explicitly; record their coverage and cost before expanding cache reuse. Keep external-editor atomicity limits visible. Process-kill recovery now has its own QOL-09 continuation.
 
 **Success Signal:** Affected gates rerun, unaffected evidence remains reusable, and callers cannot mutate retained evidence.
 
@@ -86,6 +86,26 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 **Entropy Risk:** Medium
 
 **Risk / Mitigation:** Removing duplicate caches adds freshness-check I/O; use the existing service cache and measure end-to-end tasks before tuning.
+
+### 3. QOL-09 — Resume interrupted work with a clear recovery preview
+
+**Goal:** Restore unfinished input and show the last confirmed runtime state with a safe next action.
+
+**Why It Matters:** A reopened draft must not silently replay a request that may already have been accepted.
+
+**Current State:** Native composer drafts now survive close/reopen, preserve newer edits during an in-flight submission, and save request identity before dispatch. Reopening reconciles acceptance through task.lookup without resubmitting. Failed saves keep the window open. Durable completion now preserves identity through commit/recovery; stale proposal recovery retains its causal lifecycle boundary.
+
+**Next Concrete Action:** Add process-kill fixtures at evidence dispatch, proposal suspension and the terminal-commit/lifecycle-settlement gap. Then build one native interrupted-run preview from recorded evidence: last confirmed state, available output and an explicit next action. Preserve unsent input; never retry mutations automatically.
+
+**Success Signal:** Reopening neither loses a saved draft nor duplicates an accepted request; the recovery preview distinguishes interrupted work from verified completion and cannot infer missing outcomes.
+
+**Gravity Impact:** Strengthens
+
+**Centralization Effect:** Centralizes
+
+**Entropy Risk:** Medium
+
+**Risk / Mitigation:** Presentation recovery can become a second job authority. Keep draft storage local to Swift presentation and route all acceptance/history decisions through the existing runtime.
 
 ## 5. Next
 
@@ -107,23 +127,27 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 
 **Entropy Risk:** Low
 
-## 6. Later
+### 2. QOL-10 — Reconcile legacy documentation and verification scope
 
-### 1. QOL-09 — Resume interrupted work with a clear recovery preview
+**Opportunity:** Make repository-wide documentation checks reflect owned source documentation while retaining explicit historical/provenance limits.
 
-**Direction:** Show the last verified result, interrupted operation, and safe next action on resume.
+**Why Soon:** The current agent link checker now checks today's wiki/desktop contracts and passes. A broader standalone validator reports 76 findings in unchanged legacy/source docs and copied build assets; this remains separate from the existing provenance release gate.
 
-**Potential Upside:** Less rereading and fewer repeated tool calls after disconnects or restarts.
+**Dependency:** None for source navigation and generated/vendor scan-boundary review. Human provenance decisions retain their existing owner and review requirements.
 
-**Why Not Now:** Requires stable evidence freshness and conflict-aware state ownership.
+**First Validation Step:** Use the [captured findings](docs/desktop/evidence/2026-09-29-approval-review/legacy-documentation-findings.json) to separate real source links, historical measurement claims and copied distribution documents. Prove the validator still rejects a broken owned-source link before narrowing generated/vendor traversal. Preserve legal/provenance findings.
 
-**Promotion Trigger:** QOL-04 and QOL-08 pass interruption/restart scenarios with no lost or falsely completed work.
+**Confidence:** High
 
 **Gravity Impact:** Strengthens
 
 **Centralization Effect:** Centralizes
 
-**Entropy Risk:** Medium
+**Entropy Risk:** Low
+
+## 6. Later
+
+No additional work is promoted until a current recovery or clarity slice has evidence. Preserve historical candidates in the audit; keep the active queue at three items.
 
 ## 7. Discovery
 
@@ -144,8 +168,8 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 | Area | Symptom | Risk | Recommended Action |
 |---|---|---|---|
 | Roadmap persistence | External editors can bypass the shared lock | Medium | Document the compare/rename window; use the service for cooperating mutations |
-| Completion evidence | General audit uses Git status as a content proxy and can renew old evidence | Medium | QOL-08 establish content freshness and age semantics through public consumers |
-| Task surfaces | Timeline truth repaired; approval flows and long-turn retention remain | Medium | Finish QOL-05 with live keyboard and retention evidence |
+| Completion evidence | Frozen durable identity is verified; unobservable content and synchronous readiness still have narrower guarantees | Medium | QOL-08 audit remaining consumers; QOL-09 process-kill the remaining transaction gaps |
+| Task surfaces | Native review ownership repaired; long-turn retention and physical keyboard remain | Medium | QOL-05 measure retained activities and exercise real approval navigation |
 | Reference docs | Docs-index guard and audit runner repaired; historical claims still need curation | Low | Keep navigation checks aligned with current evidence |
 
 ### Repeated Friction
@@ -156,7 +180,7 @@ Familiar references guide behavior: [Linear cycles](https://linear.app/docs/use-
 
 ### Documentation Gaps
 
-Local mixed-I/O measurements are in the audit record. End-to-end task latency, roadmap persistence cost, and a terminal task-state walkthrough remain unmeasured/unreviewed.
+Local mixed-I/O and audit-observation measurements are in the audit record. End-to-end task latency, roadmap persistence cost and a terminal task-state walkthrough remain unmeasured/unreviewed. Native approval evidence distinguishes deterministic peers from real provider execution.
 
 ### Agent Confusion Points
 
@@ -196,27 +220,25 @@ Keep service mutations and coordinator commits inside the existing governed pers
 
 **Impact:** Future sessions have a bounded continuation policy; user authorization remains separate from planning promotion.
 
-**Follow-up:** QOL-05 and QOL-08; retain current capacity until end-to-end evidence justifies a change.
+**Follow-up:** QOL-05, QOL-08 and the promoted QOL-09 recovery slice; retain current capacity until end-to-end evidence justifies a change.
 
 ## 11. Recent Checkpoint
 
 **Date:** 2026-09-29
 
-**Checkpoint Summary:** Repaired task timeline evidence: ordinary tools no longer imply verification, URL mentions do not imply live previews, and turn settlement does not manufacture child success. Added bounded, relevant follow-up suggestions, metadata isolation/sanitization, and autocomplete recovery wiring. Roadmap caches now include observed document content, isolate retained objects, and cap validation retention.
+**Checkpoint Summary:** Reproduced and repaired mismatched durable completion identities, acceptance of changed content, incorrect state-version reporting and blocked saga outcomes reported as Done. Terminal commits now validate their record and the persisted proposal/cancellation boundary. Native composer drafts restore exact text after reopening and reconcile uncertain requests without replay; failed saves retain the window and text.
 
-**Moved:** QOL-05 and QOL-08 remain active with narrower, evidence-backed next steps. QOL-07 retains broader completion-receipt work; the timeline now supplies a truthful foundation.
+**Moved:** QOL-09 is promoted from Later to Now after the scoped checkpoint/recovery regressions passed. Now contains three items: long-turn clarity, remaining evidence consumers and interrupted-work recovery. QOL-07 and QOL-10 remain Next. No broad item is declared complete on partial evidence.
 
-**Added:** Regression cases for same-mtime edits, producer/consumer mutation, cache retention, terminal states, metadata controls, 1,000 activities, terminal widths, and autocomplete action application.
+**Added:** Public-path completion regressions, real-pipe lost-acknowledgement/reopen coverage, draft storage/Unicode/isolation/failure tests and one native restoration visual batch.
 
-**Updated:** [Audit evidence and cache ownership map](docs/QOL_ROLLING_AUDIT.md). No concurrency or execution-authority expansion.
+**Updated:** [Rolling audit](docs/QOL_ROLLING_AUDIT.md), [ADR-149](.wiki/adr/ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md), and [native release evidence](docs/desktop/RELEASE-EVIDENCE.md). Existing runtime execution and lifecycle authorities remain in place.
 
-**Verification:** Focused suite: 362 passing. Full unit, type, build, rendered-output review and audit results are recorded in the audit.
+**Verification:** See the sixth-pass checks and raw native evidence in the linked audit. The broader documentation validator's 76 earlier legacy/generated findings remain open; no unmeasured latency or full accessibility claim is made.
 
-**Archived:** No open roadmap item was declared complete based on partial coverage; previous archive evidence remains intact.
+**Archived:** Fifth-pass checks remain in the rolling audit and approval-review evidence directory. No historical composition manifest or pass number changed.
 
-**Code Soup Risk:** Medium — general audit content identity and full-screen approval UX remain open.
-
-**Recommended Next Move:** Reproduce the general audit's already-dirty-file freshness gap, then finish the approval/keyboard review.
+**Code Soup Risk:** Medium — process-kill recovery, long-turn retention and physical keyboard/accessibility still require bounded follow-ups.
 
 ## 12. Archive
 

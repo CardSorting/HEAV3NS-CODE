@@ -42,6 +42,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Changes", action: #selector(showChanges), keyEquivalent: "2").target = self
         view.addItem(withTitle: "Sessions", action: #selector(showSessions), keyEquivalent: "3").target = self
         view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
+        view.addItem(withTitle: "Review Request…", action: #selector(showApprovalReview), keyEquivalent: "5").target = self
         view.addItem(.separator())
         view.addItem(withTitle: "Back in Inspector", action: #selector(inspectBack), keyEquivalent: "[").target = self
         view.addItem(withTitle: "Forward in Inspector", action: #selector(inspectForward), keyEquivalent: "]").target = self
@@ -109,6 +110,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showChanges() { current?.showChanges() }
     @objc private func showSessions() { current?.showSessions() }
     @objc private func showQueue() { current?.showQueue() }
+    @objc private func showApprovalReview() { current?.showApprovalReview() }
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
     @objc private func findInInspection() { current?.findInInspection() }
@@ -121,11 +123,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
         if menuItem.action == #selector(findInInspection) { return current?.canFindInInspection == true }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
+        if menuItem.action == #selector(showApprovalReview) { return current?.canReviewApproval == true }
         if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue)].contains(menuItem.action) { return current != nil }
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if workspaces.isEmpty { return .terminateNow }
+        for workspace in workspaces.values where !workspace.prepareToClose() {
+            workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil)
+            return .terminateCancel
+        }
         let activeCount = workspaces.values.filter { $0.hasWork }.count
         if activeCount > 0 {
             let alert = NSAlert(); alert.messageText = "Stop work in \(activeCount) workspace\(activeCount == 1 ? "" : "s") and quit?"

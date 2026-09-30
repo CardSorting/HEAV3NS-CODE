@@ -345,6 +345,91 @@ describe("desktop runtime boundary", () => {
 		await waitFor(() => events.some((e) => e.payload?.response === "deny"))
 		await assert.rejects(request("approval.resolve", { run: run.run.id, operation, decision: "allow" }), /STALE_APPROVAL/)
 	})
+	it("presents parallel approval requests in order without replacing the operation under review", async () => {
+		const decisions: string[] = []
+		execute = async () => {
+			const responses = await Promise.all(
+				["first", "second", "third"].map((name) =>
+					bridge.approve({
+						toolName: "fixture",
+						args: { name },
+						promptMessage: name,
+						safetyAssessment: {
+							toolName: "fixture",
+							riskTier: "MUTATING",
+							riskScore: 50,
+							requiresConfirmation: true,
+							warnings: [],
+							allowedInDryRun: false,
+						},
+					}),
+				),
+			)
+			decisions.push(...responses.map((response) => response.decision))
+			return completed("All reviews settled")
+		}
+		const accepted = await request("task.submit", { text: "Review parallel operations" })
+		for (let index = 0; index < 3; index++) {
+			await waitFor(() => events.filter((e) => e.type === "approval.requested").length === index + 1)
+			const prompts = events.filter((e) => e.type === "approval.requested")
+			assert.equal(prompts[index].payload.approval.reason, ["first", "second", "third"][index])
+			const snapshot = await request("snapshot", {})
+			assert.equal(
+				snapshot.runs.find((run: any) => run.id === accepted.run.id).approval.operation,
+				prompts[index].payload.approval.operation,
+			)
+			await request("approval.resolve", {
+				run: accepted.run.id,
+				operation: prompts[index].payload.approval.operation,
+				decision: index === 1 ? "deny" : "allow",
+			})
+		}
+		await waitFor(() => decisions.length === 3)
+		assert.deepEqual(decisions, ["allow", "deny", "allow"])
+	})
+	it("bounds pending reviews and denies every waiting operation when stopped", async () => {
+		let settled = 0
+		const responses: string[] = []
+		execute = async (input) => {
+			await Promise.all(
+				Array.from({ length: 12 }, (_, index) =>
+					bridge
+						.approve({
+							toolName: "fixture",
+							args: { index },
+							promptMessage: `Operation ${index}`,
+							safetyAssessment: {
+								toolName: "fixture",
+								riskTier: "MUTATING",
+								riskScore: 50,
+								requiresConfirmation: true,
+								warnings: [],
+								allowedInDryRun: false,
+							},
+						})
+						.then((response) => {
+							responses.push(response.decision)
+							settled++
+						}),
+				),
+			)
+			return { ...completed(), outcome: input.signal?.aborted ? "cancelled" : "completed" }
+		}
+		const accepted = await request("task.submit", { text: "Stop pending reviews" })
+		await waitFor(() => events.some((e) => e.type === "approval.requested") && settled === 4)
+		await request("task.cancelAll", {})
+		await waitFor(() => settled === 12)
+		assert.deepEqual(responses, Array(12).fill("deny"))
+		assert.equal(events.filter((e) => e.type === "approval.requested").length, 1)
+		const operation = events.find((e) => e.type === "approval.requested").payload.approval.operation
+		await assert.rejects(
+			request("approval.resolve", { run: accepted.run.id, operation, decision: "allow" }),
+			/STALE_APPROVAL/,
+		)
+		execute = async () => completed("New instruction works")
+		await request("task.submit", { text: "Continue after stopping" })
+		await waitFor(() => events.some((e) => e.payload?.response === "New instruction works"))
+	})
 	it("serializes simultaneous delivery and reconciles acceptance without another execution", async () => {
 		const accepts = await Promise.all(
 			Array.from({ length: 20 }, () => request("task.submit", { text: "One instruction" }, "same-request")),

@@ -82,7 +82,7 @@ Queue time dominates this deliberately bursty workload; the bounded search scan 
 
 Reviewed completed, failed and cancelled terminal output together at 80/120 columns; automated wrapping also covers 48 columns and 1,000 activities. Recorded checks describe progress events, not independently rerun tests. The existing engine turn outcome stays authoritative. Autocomplete coverage verifies applying the suggested text and cursor position; it does not replace a live full-screen keyboard walkthrough.
 
-### Completion evidence ownership map
+### Completion evidence ownership map — fourth-pass findings
 
 | Owner / consumer | Identity and lifetime | Current boundary / next action |
 |---|---|---|
@@ -94,7 +94,60 @@ Reviewed completed, failed and cancelled terminal output together at 80/120 colu
 
 No new cache or competing completion authority was added. General audit content hashing and age policy are intentionally recorded as unresolved, with a concrete public-path reproduction next, rather than declared fixed by the roadmap-specific work.
 
-## Verification
+## Fifth pass: bounded audit freshness and native approval ownership
+
+| Finding | Root cause and fix | Evidence |
+|---|---|---|
+| Repeated dirty-file edits reused old audit evidence | Status identifies changed paths, not their current bytes. Hash the index and changed/untracked content plus policy files; incomplete coverage disables reuse | Public gate regression proves unchanged status after a same-size, restored-mtime edit and observes a new audit |
+| Old evidence renewed its own age | Removed secondary renewal and duplicate outer lookup; promotion retains observation time; pipeline and funnel share nonnegative five-minute age semantics | Expired and future-dated cases rerun; promotion does not renew age |
+| An edit during an asynchronous audit could acquire the wrong identity | Capture before the audit, compare after it, and require the original graph revision | In-flight file/revision changes cannot create a reusable entry |
+| Policy expiry and caller mutation bypassed freshness | Always observe ignored policy/baseline/suppression inputs and expiry state; clone retained and returned metadata | Expiry, producer/public mutation, index changes, nested Unicode/newline names, over-budget/hidden/unreadable coverage |
+| Parallel confirmations replaced the visible request | Bound the review admission to eight, serialize presentation, retain the original run/controller, and deny overflow or cancelled requests | Ordered allow/deny/allow; all twelve requests settle on overflow plus Stop; later work still runs |
+| Native review controls could be re-enabled before acknowledgement | Track the deciding operation across snapshots; each review sheet retains an immutable request | Real-pipe native test keeps the first review disabled when the second request appears |
+| Documentation verification required a removed docs tree | Migrate the agent link checker to current wiki/desktop contracts; repair four source links and label historical SDK mapping | Required-document and relative-link scan, plus a deliberately broken fixture |
+| Full approval context was hard to inspect in a 58-point viewport | Review Request sheet exposes complete scope, reason and arguments; Command–5, Workspace menu and Actions share that path | Long Unicode details, one wide/light and compact/light/dark capture batch; no default Allow or Return binding |
+
+The current cache owner is `completionGatePipeline`, using `captureAuditCacheObservation` and `workspaceAuditFingerprint`. Inputs include complete result/description, checkpoint, graph revision, Git index/status, changed/untracked bytes, and three explicit policy files. Limits are 512 paths, 16 MiB file bytes, 4 MiB per Git output and a two-second observation deadline. Non-Git, modified submodule/symlink, hidden index paths, unreadable, changing or over-budget inputs receive fresh diagnostics rather than cached results. Ignored non-policy content is outside this contract. The deadline is enforced between filesystem operations; these observations are not atomic filesystem snapshots or an OS I/O cancellation guarantee.
+
+Advisory reuse remains separate from terminal authority. The durable decision identity explicitly marks unavailable content observation and retains the checkpoint/lifecycle identity. QOL-08 remains active to trace preparation → evidence execution → terminal commit; this pass does not claim complete freshness for every consumer or an external-editor transaction.
+
+[Raw local observation samples](desktop/evidence/2026-09-29-approval-review/fingerprint-observations.json): ten samples in the dirty repository on Node v26.8.1, darwin arm64, all reusable and identical. Content-observation p50 **91.54 ms**, p95 **95.78 ms**, nearest-rank percentiles; no warmup was excluded. These measure the cost of observing content, without a model call, and establish neither a speedup nor end-to-end task latency.
+
+The native review uses the existing AppKit presentation and LUMI approval authority. [Apple button guidance](https://developer.apple.com/design/human-interface-guidelines/buttons) informs explicit action labels and visible saving state; [Git's documented porcelain format](https://git-scm.com/docs/git-status) supplies machine-readable path/rename framing. These are scoped adaptations, not feature-parity or compliance claims.
+
+Review [ADR-147](../.wiki/adr/ADR-147-audit-freshness-and-operation-bound-approval-review.md), [native validation](desktop/evidence/2026-09-29-approval-review/validation.json), [light review](desktop/evidence/2026-09-29-approval-review/review-light.png) and [dark review](desktop/evidence/2026-09-29-approval-review/review-dark.png).
+
+### Fifth-pass verification
+
+- Full `npm test`: **2,579 unit tests** and **5/5** flight scenarios.
+- Desktop bridge/inspection/scheduling: **33 passing**. Native AppKit/transport: **27 passing**.
+- `npm run check`, `npm run lint`, production bundle and native app build, and **9/9** runtime smoke checks pass. The smoke run required its normal workspace ownership directory outside the sandbox.
+- One batched visual review: wide 1280 × 731; compact light 720 × 480; dark 720 × 500 after the appearance switch. Actions fit; minimum-height dark, physical keyboard/IME and VoiceOver remain unverified. Captures use a deterministic peer and run no provider or command.
+- `npm run roadmap:audit`, `docs:check-docs-readme`, `docs:check-root-readme-links`, `docs:check-agent-links`, and `git diff --check` pass. The freshly packaged runtime also passes the isolated queue/cancellation/history/inspection fixture.
+
+The broader `scripts/validate-documentation.ts` check was also run and **fails with 76 findings** in unchanged historical/source docs and copied build/downloaded-runtime documentation. None of its reported source files was edited by this pass. [The complete findings](desktop/evidence/2026-09-29-approval-review/legacy-documentation-findings.json) are carried into QOL-10; passing the focused agent link check does not clear that repository-wide check or the separate provenance release gate.
+
+## Sixth pass: durable completion identity and native draft restoration
+
+Public-path regressions first failed on two concrete cases: a completion-created checkpoint produced a stored decision digest that could not be read back, and an external edit after preparation still returned terminal success. Both now pass through the existing completion funnel and real BroccoliDB persistence.
+
+- Attempts persist the evaluated checkpoint, workspace version and optional observed content digest. Completion publication cannot replace that identity. Changes before proposal, during review or during checkpoint publication invalidate the attempt; recovery returns to the matching lifecycle through its causal rejection transition.
+- Incoming records undergo the same digest validation as recovered records. The terminal transaction checks persisted proposal generation/revision/cause and cancellation before writing success. State-version reporting uses the evaluated workspace version, not the lifecycle revision. The saga carries blocked results instead of reporting Done.
+- Eleven regressions cover checkpoint publication, external edits at multiple boundaries, immutable command evidence, older records without checkpoint capture, wrong generations, cancellation during review, restart recovery of committed/invalidated proposals, and rejection of corrupt incoming records. A valid terminal fact remains authoritative on reopen without a second approval.
+- Native composer drafts save exact Unicode/whitespace per canonical workspace. Atomic local files have a 1 MiB encoded-record bound; saving is debounced 300 ms while typing and flushed before send/close/quit. Failed saves keep the window and text available. This is presentation state outside the repository, not another execution queue.
+- The request identity is persisted before dispatch. A real-pipe test drops the acknowledgement, edits a newer draft, closes/reopens, and verifies that acceptance is looked up with the original ID, no submission is replayed, and the newer text survives. Storage tests cover workspace isolation, clearing, corrupt/foreign records, byte limits, owner-only permissions and failed-save close protection.
+
+The recovery interaction follows [VS Code's hot-exit pattern](https://code.visualstudio.com/docs/editing/codebasics#_hot-exit), adapted to explicit agent submission and reconciliation. [ADR-149](../.wiki/adr/ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md) records the authority and storage boundaries. QOL-09 is now an active, bounded recovery slice alongside QOL-05 and QOL-08; the next step is process-kill evidence and an interrupted-run preview. QOL-07 and QOL-10 stay Next.
+
+### Sixth-pass verification
+
+- Full `npm test`: **2,590 unit tests** and **5/5 flight scenarios**, including the compile/typecheck and lint prerequisites.
+- Desktop bridge/inspection/scheduling: **33 passing**. Native AppKit/transport: **32 passing**. Worker TypeScript check passes.
+- Native production build and ad-hoc signing, **9/9** runtime smoke, the rebuilt packaged-runtime fixture, roadmap audit, current agent links, docs index, root README links and `git diff --check` pass.
+- One AppKit visual batch confirms restored Unicode text, its notice and composer actions at **1280 × 731** (light), **720 × 480** (light) and **720 × 500** (dark). All reported controls fit and the peer records no `task.submit` on restore. No correction batch was needed. Minimum-height dark remains unverified. [Raw layouts, captures and checks](desktop/evidence/2026-09-29-draft-recovery/validation.json).
+- Earlier fifth-pass measurements and 76 broader documentation findings remain historical evidence, not new benchmarks or cleared gates. No end-to-end latency, atomic whole-workspace snapshot, physical keyboard/IME/VoiceOver or distributable-alpha claim is made.
+
+## Fourth-pass verification
 
 - Fourth-pass full repository unit run: **2,524 passing** in 59 seconds.
 - Fourth-pass `npm run test:qol`: **362 passing**, including timeline evidence, autocomplete, same-mtime edits and cache isolation/retention.
@@ -116,6 +169,6 @@ npm run docs:check-root-readme-links
 
 - Cooperating roadmap writers share a lock. Arbitrary external editors do not: a changed base is checked immediately before rename, but an uncooperative writer can still race that check/rename window. This is not a transactional filesystem or a cross-file crash-atomic commit.
 - Process death while holding a governed lock uses the existing lease-expiry/recovery behavior. A contender waits up to five seconds and reports a busy/recovery error; this pass adds no new crash-recovery guarantee.
-- Approval/waiting states and live full-screen keyboard navigation remain QOL-05. The activity receipt is evidence-based; broader final-response presentation remains QOL-07.
+- Native approval ownership and review presentation now have regression/visual evidence. Physical keyboard, terminal approval navigation and long-turn retention remain QOL-05. Broader final-response presentation remains QOL-07.
 - The mixed-load fixture baseline is complete (QOL-06). Production backend, coalescing, cross-process persistence and end-to-end task latency remain unmeasured.
-- QOL-08 now has an ownership map. General audit content identity and age renewal remain unresolved; roadmap snapshot isolation does not establish freshness for every completion subsystem.
+- QOL-08 now has public-path checkpoint/edit/recovery evidence as well as bounded advisory freshness. Remaining synchronous consumers and initially unobservable content retain narrower guarantees. No all-consumer freshness claim is made. QOL-09 still needs process-kill coverage across all saga phases and a native interrupted-run preview; composer drafts do not persist queued-edit sheets or the last keystrokes inside the debounce interval.

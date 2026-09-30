@@ -9,6 +9,7 @@ final class IntegrationProbe {
     let perWorkspace: Bool
     let navigationPass: Bool
     let steps: [String]
+    let draftRoot: URL?
     private var submitted = false
     private var finished = false
     init?() {
@@ -22,6 +23,7 @@ final class IntegrationProbe {
         perWorkspace = config["perWorkspace"] as? Bool ?? false
         navigationPass = config["navigationPass"] as? Bool ?? false
         steps = config["steps"] as? [String] ?? ["files", "changes", "narrow", "dark", "palette"]
+        draftRoot = (config["draftRoot"] as? String).map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
     func connected(_ workspace: WorkspaceWindow) {
         guard !submitted else { return }; submitted = true

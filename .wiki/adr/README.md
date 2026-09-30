@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADRs)
 
+- [ADR-149: Completion checkpoint integrity and native draft recovery](ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md) — sixth rolling QoL pass.
+
 These are historical engineering records. Their measurements, design labels,
 and “accepted” status do not create product warranties, service-level
 agreements, patent conclusions, or ownership statements. The repository legal
@@ -15,6 +17,8 @@ This index lists all Architecture Decision Records (ADRs) for the LUMI-NEW works
 ADRs preserve decision-time context and acceptance evidence; their embedded commands and fixed measurements are historical unless a document explicitly labels a current refinement. For current verification, use `npm run check`, `npm test`, `npm run build`, and the feature-specific commands in the [Contributing Guide](../../CONTRIBUTING.md). [`docs/LIVE_BASELINE.json`](../../docs/LIVE_BASELINE.json) is the current measurement authority, with [`docs/BENCHMARK_REPORT.md`](../../docs/BENCHMARK_REPORT.md) and [`docs/GRAND_ARCHITECTURAL_AUDIT.md`](../../docs/GRAND_ARCHITECTURAL_AUDIT.md) as synchronized generated views.
 
 ## Active ADR Index
+
+- **[ADR-147](ADR-147-audit-freshness-and-operation-bound-approval-review.md)**: Bounded advisory content freshness, original evidence age, and ordered operation-bound native approval review (2026-09-29).
 
 | ADR | Title | Status | Date | Target / Category |
 |---|---|---|---|---|

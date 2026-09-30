@@ -41,6 +41,127 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testLostAcknowledgmentRestoresRequestIdentityAndPreservesANewerDraftWithoutReplay() throws {
+        _ = NSApplication.shared
+        let drafts = WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts"))
+        let pathLiteral = String(data: try JSONEncoder().encode(drafts.file.path), encoding: .utf8)!
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'task.submit') {
+          const saved = JSON.parse(require('node:fs').readFileSync(\(pathLiteral), 'utf8'));
+          send({ kind: 'event', workspace: 'ws', session: 'session', runtime: 'runtime', type: 'fixture.saved', seq: 1, payload: { persisted: saved.submission.id === request.id && saved.submission.text === request.params.text } });
+        }
+        """, timeout: 0.2)
+        let first = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: drafts)
+        func composer(_ workspace: WorkspaceWindow) -> ComposerView? {
+            func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+            return workspace.window?.contentView.map(descendants)?.compactMap { $0 as? ComposerView }.first
+        }
+        let persisted = expectation(description: "request identity saved before dispatch")
+        let disconnected = expectation(description: "lost acknowledgment disconnects")
+        let connection = client.onConnection, event = client.onEvent
+        var sent = false, expired = false
+        client.onConnection = { value in
+            connection?(value)
+            if client.isReady, !sent { sent = true; first.submitProbe("original instruction") }
+            else if sent, !client.isReady, !expired { expired = true; disconnected.fulfill() }
+        }
+        client.onEvent = { value in
+            event?(value)
+            if value["type"] as? String == "fixture.saved" {
+                XCTAssertEqual((value["payload"] as? [String: Any])?["persisted"] as? Bool, true)
+                composer(first)?.string = "A newer draft 🌱"
+                XCTAssertTrue(first.prepareToClose()); persisted.fulfill()
+            }
+        }
+        first.attach(); wait(for: [persisted, disconnected], timeout: 3)
+        let submission = try XCTUnwrap(drafts.load()?.submission)
+        XCTAssertEqual(submission.text, "original instruction")
+        client.onConnection = nil; client.onEvent = nil; client.forceStop(); first.window?.close()
+
+        let recovery = try peer(hello + snapshot + """
+        globalThis.submits ??= 0;
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'task.submit') globalThis.submits++;
+        if (request.method === 'task.lookup') {
+          reply(request, { found: true, run: { id: 'recorded', request: request.params.request, text: 'original instruction', state: 'interrupted', session: 'session', createdAt: 1, revision: 1 } });
+          send({ kind: 'event', workspace: 'ws', session: 'session', runtime: 'runtime', type: 'fixture.reconciled', seq: 1, payload: { request: request.params.request, submits: globalThis.submits } });
+        }
+        """, timeout: 1)
+        let reopened = WorkspaceWindow(folder: directory, runtimeClient: recovery, draftStore: drafts)
+        defer { recovery.onEvent = nil; recovery.onConnection = nil; reopened.window?.close() }
+        XCTAssertEqual(composer(reopened)?.string, "A newer draft 🌱")
+        let reconciled = expectation(description: "reopen looks up the original request without replaying it")
+        let recoveryEvent = recovery.onEvent
+        recovery.onEvent = { value in
+            recoveryEvent?(value)
+            if value["type"] as? String == "fixture.reconciled" {
+                let payload = value["payload"] as? [String: Any]
+                XCTAssertEqual(payload?["request"] as? String, submission.id)
+                XCTAssertEqual(payload?["submits"] as? Int, 0)
+                XCTAssertEqual(composer(reopened)?.string, "A newer draft 🌱")
+                XCTAssertEqual(try? drafts.load()?.text, "A newer draft 🌱")
+                XCTAssertNil(try? drafts.load()?.submission)
+                reconciled.fulfill()
+            }
+        }
+        reopened.attach(); wait(for: [reconciled], timeout: 3)
+    }
+    func testApprovalDecisionStaysPendingAcrossSnapshotsAndCannotApplyToTheNextRequest() throws {
+        _ = NSApplication.shared
+        let behavior = """
+        if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime', capabilities: ['approval'] }); continue; }
+        globalThis.run ??= { id: 'review', text: 'Review operations', state: 'awaiting_approval', session: 'session', createdAt: 1, revision: 1, approval: { operation: 'one', tool: 'fixture', scope: '/workspace', args: 'Original arguments', reason: 'Review first' } };
+        globalThis.decisions ??= 0;
+        if (request.method === 'snapshot') reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [globalThis.run] });
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'approval.resolve') {
+          globalThis.decisions++;
+          setTimeout(() => {
+            globalThis.run.revision++; globalThis.run.approval.operation = 'two'; globalThis.run.approval.args = 'New arguments';
+            send({ kind: 'event', workspace: 'ws', session: 'session', runtime: 'runtime', run: 'review', type: 'approval.requested', seq: 1, payload: globalThis.run });
+            reply(request, { resolved: true });
+          }, 300);
+        }
+        if (request.method === 'history.read') reply(request, { run: { ...globalThis.run, text: String(globalThis.decisions) }, outputAvailable: false });
+        """
+        let client = try peer(behavior, timeout: 1)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        defer {
+            if let parent = workspace.window, let sheet = parent.attachedSheet { parent.endSheet(sheet); sheet.orderOut(nil) }
+            client.onEvent = nil; client.onConnection = nil; workspace.window?.close()
+        }
+        let checked = expectation(description: "pending and stale reviews cannot send another decision")
+        let connection = client.onConnection
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, !requested else { return }; requested = true
+            client.requestSnapshot {
+                workspace.showApprovalReview()
+                func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+                let views = workspace.window?.attachedSheet?.contentView.map(descendants) ?? []
+                let allow = views.compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" }
+                XCTAssertNotNil(allow); allow?.performClick(nil)
+                client.requestSnapshot {
+                    XCTAssertEqual(allow?.isEnabled, false)
+                    allow?.performClick(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        XCTAssertEqual(allow?.isEnabled, false)
+                        XCTAssertTrue(views.compactMap { $0 as? NSTextView }.first?.string.contains("Original arguments") == true)
+                        XCTAssertTrue(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("no longer waiting") })
+                        allow?.performClick(nil)
+                        client.request("history.read", params: ["run": "review"]) { result in
+                            if case .success(let data) = result { XCTAssertEqual((data["run"] as? [String: Any])?["text"] as? String, "1") }
+                            else { XCTFail("Could not inspect decision count") }
+                            checked.fulfill()
+                        }
+                    }
+                }
+            }
+        }
+        client.start(folder: directory); wait(for: [checked], timeout: 4)
+    }
     func testQueueEditorRespondsWhenItsInstructionStarts() throws {
         _ = NSApplication.shared
         let behavior = """
@@ -57,7 +178,7 @@ final class RuntimeClientTests: XCTestCase {
         }
         """
         let client = try peer(behavior, timeout: 1)
-        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
         defer {
             if let parent = workspace.window, let sheet = parent.attachedSheet { parent.endSheet(sheet); sheet.orderOut(nil) }
             client.onEvent = nil; client.onConnection = nil; workspace.window?.close()
@@ -98,7 +219,7 @@ final class RuntimeClientTests: XCTestCase {
         if (request.method === 'history.read') reply(request, { run: { id: request.params.run, text: 'Preserved cancelled instruction', state: 'cancelled', session: 'session', createdAt: 1, verification: 'not_run' }, outputAvailable: false, outputMessage: 'No output was recorded for this run.' });
         """
         let client = try peer(behavior, timeout: 1)
-        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
         defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
         let checked = expectation(description: "late replies cannot replace run details or missing-content recovery")
         let connection = client.onConnection
@@ -273,7 +394,7 @@ final class RuntimeClientTests: XCTestCase {
         } else if (request.method === 'files.list') { reply(request, { entries: [] }); }
         """
         let client = try peer(behavior, timeout: 2)
-        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
         defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
         let checked = expectation(description: "old cancellation deadline cannot change the next run")
         let originalConnection = client.onConnection, originalEvent = client.onEvent
@@ -312,7 +433,7 @@ final class RuntimeClientTests: XCTestCase {
         } else if (request.method === 'files.list') { reply(request, { entries: [] }); }
         """
         let client = try peer(behavior, timeout: 1)
-        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
         defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
         let checked = expectation(description: "atomic stop includes work missing from the client's last snapshot")
         let connection = client.onConnection, event = client.onEvent

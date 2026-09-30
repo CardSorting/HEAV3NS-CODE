@@ -180,7 +180,7 @@ export class CompletionSagaCoordinator {
 					taskDescription: getInitialTaskPreview(config) || "",
 				})
 
-				if (finalOutcome.kind === "rejected" || finalOutcome.kind === "settlement_failed") {
+				if (finalOutcome.kind !== "terminal") {
 					const structuredError = JSON.stringify(finalOutcome.decision, null, 2)
 					return (await import("@core/prompts/responses")).formatResponse.toolError(
 						structuredError + (failureMessage ? `\n\nCommand execution details:\n${failureMessage}` : ""),
@@ -200,7 +200,7 @@ export class CompletionSagaCoordinator {
 				taskDescription: getInitialTaskPreview(config) || "",
 			})
 
-			if (finalOutcome.kind === "rejected" || finalOutcome.kind === "settlement_failed") {
+			if (finalOutcome.kind !== "terminal") {
 				const structuredError = JSON.stringify(finalOutcome.decision, null, 2)
 				return (await import("@core/prompts/responses")).formatResponse.toolError(structuredError)
 			}
@@ -208,7 +208,7 @@ export class CompletionSagaCoordinator {
 		}
 
 		// 5. If phase is proposal_pending, run the continueCompletionAttempt flow directly (no command)
-		if (attempt.phase === "proposal_pending") {
+		if (attempt.phase === "proposal_pending" || attempt.phase === "stale") {
 			const finalOutcome = await continueCompletionAttempt(config, {
 				completionAttemptId: attempt.completionAttemptId,
 				evidenceExecutionEventId: undefined,
@@ -216,7 +216,7 @@ export class CompletionSagaCoordinator {
 				taskDescription: getInitialTaskPreview(config) || "",
 			})
 
-			if (finalOutcome.kind === "rejected" || finalOutcome.kind === "settlement_failed") {
+			if (finalOutcome.kind !== "terminal") {
 				const structuredError = JSON.stringify(finalOutcome.decision, null, 2)
 				return (await import("@core/prompts/responses")).formatResponse.toolError(structuredError)
 			}
@@ -252,7 +252,7 @@ export class CompletionSagaCoordinator {
 			const rawDb = await getCoordinationRawDb()
 			const attempts = rawDb
 				.prepare(
-					"SELECT * FROM completion_attempts WHERE taskId = ? AND phase IN ('prepared', 'evidence_pending', 'evidence_dispatching', 'proposal_pending')",
+					"SELECT * FROM completion_attempts WHERE taskId = ? AND phase IN ('prepared', 'evidence_pending', 'evidence_dispatching', 'proposal_pending', 'stale')",
 				)
 				.all(config.taskId) as CompletionAttemptRecord[]
 
@@ -264,6 +264,14 @@ export class CompletionSagaCoordinator {
 				const authority = getTaskLifecycleAuthority(config.taskState)
 				const currentLifecycle =
 					authority.readProjection(config.taskState) ?? (await authority.restore(config.taskState, config.taskId))
+				// Recover a crash between invalidating a proposal and reactivating its
+				// generation. Historical stale attempts have no work left to replay.
+				if (
+					attempt.phase === "stale" &&
+					(currentLifecycle?.state !== "suspended" ||
+						currentLifecycle.cause.reason !== `awaiting_completion_decision:${attempt.completionAttemptId}`)
+				)
+					continue
 
 				if (!currentLifecycle || currentLifecycle.generationId !== attempt.generationId) {
 					Logger.info(

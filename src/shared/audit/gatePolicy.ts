@@ -28,6 +28,16 @@ export const SUBAGENT_IO_LANE_RESULT_MIN_LENGTH = 20
 /** Reuse completion audit metadata when result unchanged (mirrors HTTP cache TTL). */
 export const COMPLETION_AUDIT_CACHE_TTL_MS = 5 * 60 * 1000
 
+/** Evidence age starts when observation begins; reads never renew it. */
+export function isCompletionAuditFresh(observedAt: number | undefined, now = Date.now()): boolean {
+	return (
+		observedAt !== undefined &&
+		Number.isFinite(observedAt) &&
+		now >= observedAt &&
+		now - observedAt < COMPLETION_AUDIT_CACHE_TTL_MS
+	)
+}
+
 /** First N gate blocks use critical-only audit threshold before full hardening bar. */
 export const PARENT_PROGRESSIVE_GATE_BLOCK_LIMIT = 2
 

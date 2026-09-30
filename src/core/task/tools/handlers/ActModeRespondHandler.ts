@@ -5,7 +5,7 @@ import { applyWorkspaceAuditPolicy } from "@shared/audit/auditGatePolicyLoader"
 import { buildAdvisoryAuditEventSummary, runAdvisoryAudit } from "@shared/audit/completionAudit"
 import { Logger } from "@shared/services/Logger"
 import { DietCodeDefaultTool } from "@shared/tools"
-import { recordAdvisoryAuditCache } from "../completionGatePipeline"
+import { captureAuditCacheObservation, recordAdvisoryAuditCache } from "../completionGatePipeline"
 import type { TaskConfig } from "../types/TaskConfig"
 import { declareNoConsentIntent, type IPartialBlockHandler, type IToolHandler, type ToolResponse } from "../types/ToolContracts"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
@@ -88,10 +88,11 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 				const taskPreview = getInitialTaskPreview(config) || ""
 				void (async () => {
 					try {
+						const observation = await captureAuditCacheObservation(config)
 						let advisoryMetadata = await runAdvisoryAudit(config.taskId, taskPreview, response, taskPreview)
 						advisoryMetadata = await applyWorkspaceAuditPolicy(config.cwd, advisoryMetadata, config)
 						const previousAdvisory = config.taskState.lastAdvisoryAudit
-						await recordAdvisoryAuditCache(config, response, taskPreview, advisoryMetadata)
+						await recordAdvisoryAuditCache(config, response, taskPreview, advisoryMetadata, observation)
 						if (shouldEmitAdvisoryAuditChatEvent(advisoryMetadata, previousAdvisory)) {
 							try {
 								await config.callbacks.say(

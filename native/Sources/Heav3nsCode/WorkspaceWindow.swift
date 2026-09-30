@@ -51,15 +51,18 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let navigation = NavigationSidebar()
     private let approval = NSStackView()
     private let approvalText = NSTextView()
-    private let allowButton = NSButton(title: "Allow Once", target: nil, action: nil)
+    private let reviewApprovalButton = NSButton(title: "Review Request…", target: nil, action: nil)
     private let denyButton = NSButton(title: "Deny", target: nil, action: nil)
+    private var approvalReview: ApprovalReview?
+    private var decidingApproval: String?
+    private var approvalFailure: String?
     private let surfaces = NSSegmentedControl(labels: ["Agent", "Inspect"], trackingMode: .selectOne, target: nil, action: nil)
     private var rows = [TranscriptRow]()
     private var runs = [[String: Any]]()
     private var sequence = 0
     private var active: String?
     private var pendingRequest: String?
-    private var currentApproval: (run: String, operation: String)?
+    private var currentApproval: ApprovalRequest?
     private var forceAvailable = false
     private var closing = false
     private var stopped = false
@@ -97,6 +100,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var inspectedDiff: String?
     private var expandedActions = Set<String>()
     private var uncertainSubmission: (id: String, text: String)?
+    private let draftStore: WorkspaceDraftStore
+    private var recoverySubmission: WorkspaceDraft.Submission?
+    private var draftTimer: Timer?
+    private var savedDraftText = ""
+    private var savedSubmission: WorkspaceDraft.Submission?
+    private var draftSaveFailed = false
     private var stopThenSend: (text: String, runs: Set<String>)?
     private var elapsedTimer: Timer?
     private var palette: ActionPalette?
@@ -115,9 +124,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var canInspectBack: Bool { inspectionHistory.canGoBack && window?.attachedSheet == nil }
     var canInspectForward: Bool { inspectionHistory.canGoForward && window?.attachedSheet == nil }
     var canFindInInspection: Bool { showingInspector && !inspector.isHidden && window?.attachedSheet == nil }
+    var canReviewApproval: Bool { currentApproval != nil && window?.attachedSheet == nil && !closing }
 
-    init(folder: URL, runtimeClient: RuntimeClient? = nil) {
+    init(folder: URL, runtimeClient: RuntimeClient? = nil, draftStore: WorkspaceDraftStore? = nil) {
         self.folder = folder
+        self.draftStore = draftStore ?? WorkspaceDraftStore(folder: folder, root: IntegrationProbe()?.draftRoot)
         if let runtimeClient { client = runtimeClient }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "\(folder.lastPathComponent) — HEAV3NS-CODE"
@@ -128,6 +139,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         super.init(window: window)
         window.delegate = self
         build()
+        restoreDraft()
         configureClient()
         window.center()
     }
@@ -282,15 +294,17 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         approvalTitle.font = .systemFont(ofSize: 13, weight: .semibold)
         approval.addArrangedSubview(approvalTitle)
         approvalText.isEditable = false; approvalText.isSelectable = true; approvalText.isRichText = false
-        approvalText.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        approvalText.font = .systemFont(ofSize: 12)
+        approvalText.setAccessibilityLabel("Operation awaiting your review")
         let approvalScroll = NSScrollView(); approvalScroll.documentView = approvalText; approvalScroll.hasVerticalScroller = true
         approvalText.isVerticallyResizable = true; approvalText.autoresizingMask = [.width]
         approval.addArrangedSubview(approvalScroll)
-        approvalScroll.heightAnchor.constraint(equalToConstant: 58).isActive = true
+        approvalScroll.heightAnchor.constraint(equalToConstant: 42).isActive = true
         approvalScroll.widthAnchor.constraint(equalTo: approval.widthAnchor).isActive = true
-        allowButton.target = self; allowButton.action = #selector(allow); allowButton.bezelStyle = .rounded
+        reviewApprovalButton.target = self; reviewApprovalButton.action = #selector(showApprovalReview); reviewApprovalButton.bezelStyle = .rounded
+        reviewApprovalButton.toolTip = "Review the full operation before deciding (⌘5)"
         denyButton.target = self; denyButton.action = #selector(deny); denyButton.bezelStyle = .rounded
-        approval.addArrangedSubview(stack([denyButton, allowButton]))
+        approval.addArrangedSubview(stack([denyButton, reviewApprovalButton]))
 
         composer.font = .systemFont(ofSize: 14); composer.isRichText = false; composer.delegate = self
         composer.isAutomaticQuoteSubstitutionEnabled = false; composer.isAutomaticDashSubstitutionEnabled = false
@@ -373,6 +387,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             WorkspaceAction(title: "Refresh Current Destination", shortcut: "") { [weak self] in self?.refreshNavigation() }
         ]
         if hasWork { actions.insert(WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
+        if canReviewApproval { actions.insert(WorkspaceAction(title: "Review Request…", shortcut: "⌘5") { [weak self] in self?.showApprovalReview() }, at: 1) }
         if showingInspector { actions.append(WorkspaceAction(title: "Reload Inspected Content", shortcut: "") { [weak self] in self?.refreshInspection() }) }
         if canInspectBack { actions.append(WorkspaceAction(title: "Back in Inspector", shortcut: "⌘[") { [weak self] in self?.inspectBack() }) }
         if canInspectForward { actions.append(WorkspaceAction(title: "Forward in Inspector", shortcut: "⌘]") { [weak self] in self?.inspectForward() }) }
@@ -380,7 +395,37 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         palette = ActionPalette(actions: actions); palette?.present(for: window)
     }
     @objc func focusComposer() { surfaces.selectedSegment = 0; adapt(); window?.makeFirstResponder(composer) }
-    func textDidChange(_ notification: Notification) { updateStatus() }
+    func textDidChange(_ notification: Notification) {
+        draftTimer?.invalidate()
+        draftTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in self?.saveDraft() }
+        updateStatus()
+    }
+    private func restoreDraft() {
+        do {
+            guard let draft = try draftStore.load() else { return }
+            composer.string = draft.text; savedDraftText = draft.text
+            recoverySubmission = draft.submission; savedSubmission = draft.submission
+            if let submission = draft.submission {
+                uncertainSubmission = (submission.id, submission.text)
+                showNotice("Draft restored. Checking whether LUMI recorded the previous instruction before you can send again.")
+            } else { showNotice("Draft restored. Review it when you’re ready to send.") }
+        } catch { showNotice("Could not restore the saved draft: \(error.localizedDescription) The saved file is retained at \(draftStore.file.path).") }
+    }
+    @discardableResult private func saveDraft() -> Bool {
+        draftTimer?.invalidate(); draftTimer = nil
+        guard composer.string != savedDraftText || recoverySubmission != savedSubmission || draftSaveFailed else { return true }
+        do {
+            try draftStore.save(text: composer.string, submission: recoverySubmission)
+            savedDraftText = composer.string; savedSubmission = recoverySubmission; draftSaveFailed = false
+            updateStatus(); return true
+        } catch {
+            draftSaveFailed = true
+            showNotice("Draft could not be saved. \(error.localizedDescription) Keep this window open and copy your text before quitting.")
+            updateStatus(); return false
+        }
+    }
+    /// Flush every workspace before Quit starts stopping workers.
+    @discardableResult func prepareToClose() -> Bool { saveDraft() }
     @objc func submit() {
         guard !composer.hasMarkedText() else { return }
         submitInstruction(composer.string.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -391,11 +436,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         guard client.isReady, uncertainSubmission == nil, !closing else { showNotice("Reconnect to check the last confirmed state before sending. Your draft is preserved."); return }
         guard !cancelRequested else { showNotice("LUMI is still cancelling. Wait for its confirmed stopping boundary."); return }
         guard runs.filter({ $0["state"] as? String == "queued" }).count < client.queueLimit else { showNotice("The queue is full. Your draft is preserved until a slot opens. Review waiting instructions in Up Next."); return }
-        let id = UUID().uuidString; pendingRequest = id; updateStatus()
+        let id = UUID().uuidString
+        recoverySubmission = WorkspaceDraft.Submission(id: id, text: text)
+        guard saveDraft() else { recoverySubmission = nil; return }
+        pendingRequest = id; updateStatus()
         client.request("task.submit", params: ["text": text, "attachments": []], id: id) { [weak self] result in
             guard let self else { return }; self.pendingRequest = nil
             switch result {
             case .success(let data):
+                self.recoverySubmission = nil
                 if let run = data["run"] as? [String: Any] { self.mergeRun(run) }
                 if self.cancelRequested, !self.client.capabilities.contains("workspace-stop"), let run = data["run"] as? [String: Any], let runID = run["id"] as? String {
                     self.client.request("task.cancel", params: ["run": runID]) { [weak self] result in
@@ -408,8 +457,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 if (error as? RuntimeFailure)?.acceptanceUnknown == true {
                     self.uncertainSubmission = (id, text)
                     self.showNotice("Acceptance is unknown. Reconnect to check whether LUMI recorded this instruction. Your draft is preserved.")
-                } else { self.showNotice(error.localizedDescription) }
+                } else { self.recoverySubmission = nil; self.showNotice(error.localizedDescription) }
             }
+            self.saveDraft()
             self.updateStatus()
         }
     }
@@ -420,12 +470,14 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             switch result {
             case .success(let data):
                 self.uncertainSubmission = nil
+                self.recoverySubmission = nil
                 if data["found"] as? Bool == true, let run = data["run"] as? [String: Any] {
                     self.mergeRun(run)
                     if self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == uncertain.text { self.composer.string = "" }
                     self.showNotice("LUMI recorded the instruction. Its recovered state is shown below; it was not resubmitted.")
                     self.rebuildRows()
                 } else { self.showNotice("LUMI has no acceptance record for that instruction. Review your draft and send it when ready.") }
+                self.saveDraft()
             case .failure(let error): self.showNotice(error.localizedDescription)
             }
             self.updateStatus()
@@ -460,6 +512,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "light": window?.appearance = NSAppearance(named: .aqua)
         case "palette": showActions()
         case "queue": showQueue()
+        case "approval", "approval-wide", "approval-light", "approval-dark": showApprovalReview()
+        case "approval-close": approvalReview?.cancelOperation(nil)
         case "queue-edit":
             if let run = runs.first(where: { $0["state"] as? String == "queued" }), let id = run["id"] as? String {
                 editQueued(QueuedInstruction(id: id, text: run["text"] as? String ?? "", revision: run["revision"] as? Int ?? 0))
@@ -470,13 +524,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("allow", allowButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
+        for (name, view) in [("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable]
+        return ["windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
@@ -535,9 +589,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 next.append(TranscriptRow(id: "\(id)-result", title: "LUMI · \(state.capitalized) · \(evidence) · Not reviewed", text: response, activity: false))
             }
             if !terminalStates.contains(state), state != "queued" { active = id }
-            if state == "awaiting_approval", let a = run["approval"] as? [String: Any], let operation = a["operation"] as? String {
-                currentApproval = (id, operation)
-                approvalText.string = "\(a["tool"] as? String ?? "Operation")\nScope: \(a["scope"] as? String ?? folder.path)\n\(a["args"] as? String ?? "")\n\(a["reason"] as? String ?? "")"
+            if state == "awaiting_approval", let a = run["approval"] as? [String: Any], a["decision"] == nil, let operation = a["operation"] as? String {
+                currentApproval = ApprovalRequest(run: id, operation: operation, tool: a["tool"] as? String ?? "Operation", scope: a["scope"] as? String ?? folder.path, reason: a["reason"] as? String ?? "", arguments: a["args"] as? String ?? "")
             }
         }
         next = Array(next.suffix(200))
@@ -555,10 +608,21 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if following { jumpLatest() }
             else { transcriptScroll.contentView.scroll(to: origin); transcriptScroll.reflectScrolledClipView(transcriptScroll.contentView); jumpButton.isHidden = false }
         }
-        approval.isHidden = currentApproval == nil; allowButton.isEnabled = currentApproval != nil && client.isReady; denyButton.isEnabled = allowButton.isEnabled
         updateStatus()
     }
+    private func updateApproval() {
+        if let decidingApproval, decidingApproval != currentApproval?.identity { self.decidingApproval = nil; approvalFailure = nil }
+        approval.isHidden = currentApproval == nil
+        reviewApprovalButton.isEnabled = canReviewApproval
+        denyButton.isEnabled = currentApproval != nil && client.isReady && decidingApproval == nil && !cancelRequested && !closing
+        let summary = currentApproval.map { "\($0.tool)\n\($0.scope)" } ?? ""
+        if approvalText.string != summary { approvalText.string = summary }
+        if let review = approvalReview {
+            review.update(isCurrent: currentApproval?.identity == review.request.identity, connected: client.isReady, submitting: decidingApproval == review.request.identity, stopping: cancelRequested || closing, error: approvalFailure)
+        }
+    }
     private func updateStatus() {
+        updateApproval()
         if !hasWork && !closing && stopAcknowledged { forceAvailable = false; cancelRequested = false; cancellationToken = nil; stopButton.title = "Stop" }
         let queued = runs.filter { $0["state"] as? String == "queued" }.count
         let draft = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -568,12 +632,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         let state = run?["state"] as? String
         let elapsed = (run?["startedAt"] as? Double).map { " · \(Int(max(0, Date().timeIntervalSince1970 - $0 / 1000)))s" } ?? ""
         let condition = client.isReady ? "Connected" : connection == "Connecting to LUMI…" ? "Connecting…" : connection == "Preparing" ? "Preparing…" : "Disconnected"
-        status.stringValue = pendingRequest != nil ? "Submitting…" : "\(condition)\(cancelRequested ? " · Cancelling" : state.map { " · " + $0.replacingOccurrences(of: "_", with: " ").capitalized } ?? "")\(elapsed)\(queued > 0 ? " · \(queued) queued" : "")"
+        let activity = decidingApproval != nil ? "Saving decision…" : state == "awaiting_approval" ? "Waiting for your review" : state?.replacingOccurrences(of: "_", with: " ").capitalized
+        status.stringValue = pendingRequest != nil ? "Submitting…" : "\(condition)\(cancelRequested ? " · Cancelling" : activity.map { " · " + $0 } ?? "")\(elapsed)\(queued > 0 ? " · \(queued) queued" : "")"
         status.toolTip = status.stringValue
         sendButton.title = hasWork ? "Queue" : "Send"
         stopSendButton.isHidden = !hasWork || draft.isEmpty
         stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
-        hint.stringValue = draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : "Enter to send · Shift–Enter for a new line"
+        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : "Enter to send · Shift–Enter for a new line"
         queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
         queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
         updateQueue()
@@ -694,13 +759,24 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             }
         }
     }
-    @objc private func allow() { resolveApproval("allow") }
-    @objc private func deny() { resolveApproval("deny") }
-    private func resolveApproval(_ decision: String) {
-        guard let approval = currentApproval else { return }
-        allowButton.isEnabled = false; denyButton.isEnabled = false
+    @objc func showApprovalReview() {
+        guard canReviewApproval, let request = currentApproval, let window else { return }
+        approvalReview = ApprovalReview(request: request, decide: { [weak self] request, decision in
+            self?.resolveApproval(request, decision: decision)
+        }, didClose: { [weak self] in self?.approvalReview = nil; self?.updateApproval() })
+        approvalReview?.present(for: window); updateApproval()
+    }
+    @objc private func deny() { if let request = currentApproval { resolveApproval(request, decision: "deny") } }
+    private func resolveApproval(_ approval: ApprovalRequest, decision: String) {
+        guard currentApproval?.identity == approval.identity, client.isReady, decidingApproval == nil, !cancelRequested, !closing else { return }
+        decidingApproval = approval.identity; approvalFailure = nil; updateStatus()
         client.request("approval.resolve", params: ["operation": approval.operation, "run": approval.run, "decision": decision]) { [weak self] result in
-            if case .failure(let error) = result { self?.showNotice(error.localizedDescription); self?.client.requestSnapshot() }
+            guard let self else { return }
+            if case .failure(let error) = result, self.decidingApproval == approval.identity {
+                self.decidingApproval = nil; self.approvalFailure = error.localizedDescription
+                self.showNotice(error.localizedDescription)
+            }
+            self.client.requestSnapshot(); self.updateStatus()
         }
     }
     @objc private func jumpLatest() { if !rows.isEmpty { transcript.scrollRowToVisible(rows.count - 1) }; jumpButton.isHidden = true }
@@ -949,6 +1025,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady { client.requestSnapshot() } }
     func windowDidChangeOcclusionState(_ notification: Notification) { if needsRebuild && window?.occlusionState.contains(.visible) == true { rebuildRows() }; updateElapsedTimer() }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard prepareToClose() else { return false }
         if stopped || client.process == nil { return true }
         if closing { return false }
         if hasWork {
@@ -961,10 +1038,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     func stopAndClose() {
         guard !closing else { return }
+        guard prepareToClose() else { return }
         if stopped || client.process == nil { window?.close(); return }
-        closing = true; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
+        closing = true; composer.isEditable = false; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
     }
-    func windowWillClose(_ notification: Notification) { layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
+    func windowWillClose(_ notification: Notification) { saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         guard rows.indices.contains(row) else { return 40 }

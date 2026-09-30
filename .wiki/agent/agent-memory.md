@@ -25,7 +25,7 @@ This document defines non-negotiable architectural and syntax constraints for al
    - Perception logic belongs under [`src/tooling/extensions/perception/`](../../src/tooling/extensions/perception/).
    - Action and line-anchored mutation logic belongs under [`src/tooling/extensions/hashline/`](../../src/tooling/extensions/hashline/).
    - Protocol telemetry belongs under [`src/tooling/extensions/telemetry/`](../../src/tooling/extensions/telemetry/), including `ProtocolEars`.
-   - Provider turn activity is not protocol telemetry. The public contract belongs in [`src/core/contracts/agent.contracts.ts`](../../src/core/contracts/agent.contracts.ts), provider mapping belongs beside execution in [`CodexProgressAdapter`](../../src/agents/extensions/execution/codex-progress-adapter.ts), and presentation belongs in [`AgentActivityTimeline`](../../src/tui/components/agent-activity-timeline.ts).
+   - Provider turn activity is not protocol telemetry. The public contract belongs in [`src/core/contracts/agent.contracts.ts`](../../src/core/contracts/agent.contracts.ts), provider mapping belongs beside execution in [`AgentEngine`](../../src/agents/extensions/execution/agent-engine.ts), and presentation belongs in [`AgentActivityTimeline`](../../src/tui/components/agent-activity-timeline.ts).
 
 6. **Structured Progress Safety**:
    - Reuse stable activity IDs and monotonically increasing sequence numbers.

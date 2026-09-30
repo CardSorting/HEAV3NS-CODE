@@ -114,6 +114,8 @@ export class DesktopSession {
 	private closing = false
 	private pumping?: Promise<void>
 	private approvalResolvers = new Map<string, (value: ConfirmationResponse) => void>()
+	private approvalTurns: Promise<unknown> = Promise.resolve()
+	private pendingApprovals = 0
 	private commits: Promise<unknown> = Promise.resolve()
 	private runs
 	private metadata
@@ -550,6 +552,13 @@ export class DesktopSession {
 				if (executionStarted || !controller.signal.aborted)
 					run.response = shortText(error instanceof Error ? error.message : String(error))
 			}
+			// A tool that abandons its confirmation must not leave a resolver that
+			// can approve work after this run settles or leak into the next run.
+			for (const [operation, resolve] of this.approvalResolvers) {
+				this.approvals.put(operation, { ...this.approvals.get(operation), decision: "cancelled", resolvedAt: Date.now() })
+				resolve({ decision: "deny", feedback: "The run ended before this operation was approved." })
+			}
+			this.approvalResolvers.clear()
 			run.approval = undefined
 			await this.commit(run, "run.state")
 			this.active = undefined
@@ -608,12 +617,47 @@ export class DesktopSession {
 	}
 	async approve(request: ConfirmationRequest): Promise<ConfirmationResponse> {
 		const run = this.active
-		if (!run || this.closing || this.controller?.signal.aborted) return { decision: "deny" }
-		const operation = randomUUID()
+		const controller = this.controller
+		if (!run || !controller || this.closing || controller.signal.aborted || terminalStates.has(run.state))
+			return { decision: "deny" }
+		if (this.pendingApprovals >= 8)
+			return {
+				decision: "deny",
+				feedback: "Too many operations are awaiting review. Wait for the pending decisions before requesting another.",
+			}
+		// Own and bound each prompt at admission. Parallel tools share one review
+		// surface; a later request must never replace the operation being reviewed.
+		const ownedRequest = { toolName: request.toolName, promptMessage: request.promptMessage }
 		const argsText = JSON.stringify(request.args, null, 2)
-		// Never ask for approval while hiding part of the operation.
 		if (Buffer.byteLength(argsText) > 48_000)
 			return { decision: "deny", feedback: "Operation exceeds the review limit. Split it into smaller operations." }
+		if (Buffer.byteLength(ownedRequest.toolName) + Buffer.byteLength(ownedRequest.promptMessage ?? "") > 12_000)
+			return { decision: "deny", feedback: "Operation description exceeds the review limit." }
+		this.pendingApprovals++
+		const turn = this.approvalTurns.then(async () => {
+			if (
+				this.active !== run ||
+				this.controller !== controller ||
+				this.closing ||
+				controller.signal.aborted ||
+				terminalStates.has(run.state)
+			)
+				return { decision: "deny", feedback: "Operation cancelled before review." } as ConfirmationResponse
+			return this.presentApproval(run, ownedRequest, argsText)
+		})
+		this.approvalTurns = turn.catch(() => undefined)
+		try {
+			return await turn
+		} finally {
+			this.pendingApprovals--
+		}
+	}
+	private async presentApproval(
+		run: Run,
+		request: Pick<ConfirmationRequest, "toolName" | "promptMessage">,
+		argsText: string,
+	): Promise<ConfirmationResponse> {
+		const operation = randomUUID()
 		const approval = {
 			operation,
 			tool: request.toolName,

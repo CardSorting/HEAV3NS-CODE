@@ -199,6 +199,7 @@ export class TaskState {
 	/** Cache key for advisory audits (act-mode, command output) — reused at completion. */
 	lastAdvisoryAuditCacheKey?: string
 	lastAdvisoryAuditCachedAt?: number
+	lastAdvisoryAuditGraphRevision?: number
 	/** Deferred plan-mode audit — used as completion gate baseline when message metadata is absent. */
 	lastPlanAuditMetadata?: TaskAuditMetadata
 	/** Cache key for last completion audit — avoids redundant auditTask on unchanged results. */

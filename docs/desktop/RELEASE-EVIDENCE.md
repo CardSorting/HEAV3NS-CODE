@@ -6,6 +6,27 @@ The implementation starts from CLI revision `4930239eb4257d5060fa17753ceae9a81ef
 
 Build with `npm run desktop:build`, then open `build/HEAV3NS-CODE.app`. The [integration guide](INTEGRATION.md) documents the exact composition boundary, protocol, reproducible commands and limits. The app bundles Node and the CLI; it does not require an installed Node merely to launch.
 
+## Rolling QoL pass: composer restoration and terminal integrity — 2026-09-29
+
+The sixth pass restores composer drafts per workspace, atomically saves request identity before dispatch, and reconciles uncertain submissions after reopening without replay. A newer draft survives acceptance of the previous instruction. Storage errors block normal send/close/quit while preserving text. This is local presentation recovery; runtime jobs and evidence remain in LUMI/BroccoliDB.
+
+Eleven new public-path completion regressions reproduce and fix checkpoint identity drift, changed-content acceptance and blocked saga outcomes reported as Done. Incoming records and persisted proposal/cancellation state are checked by the success transaction. Full unit/flight checks pass (**2,590 / 5**), as do desktop tests (**33**), native tests (**32**) and worker typechecking. See [the evidence record](evidence/2026-09-29-draft-recovery/validation.json) for packaged and visual checks and [ADR-149](../../.wiki/adr/ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md) for limitations.
+
+Composer recovery does not cover queued-edit sheets or guarantee the latest keystrokes inside its 300 ms debounce, disk power-loss durability, or full saga process-kill recovery. Physical keyboard/IME/VoiceOver and provider-connected approval workflows remain separate unverified work. QOL-09 now owns the process-kill fixtures and an explicit interrupted-run preview.
+
+## Rolling QoL pass: approval review and evidence freshness — 2026-09-29
+
+Parallel tool confirmations previously replaced the single visible approval while leaving an earlier resolver pending. The desktop adapter now bounds and serializes reviews, ties waiting requests to their originating run, and denies all waiting operations on Stop. The native review sheet preserves the complete operation and disables decisions during saving, cancellation, disconnection or replacement. Command–5 and Actions open the same review. Close leaves it waiting; Return is not an approval shortcut.
+
+- **Verified:** 2,579 repository unit tests; 5/5 flight scenarios; 33 desktop tests; 27 native tests; typecheck, lint, production app build, and 9/9 runtime smoke checks.
+- **Regression evidence:** concurrent reviews resolve in order; overflow and Stop settle every waiter; late/duplicate decisions reject; an open native sheet stays bound to its original operation across a fresh snapshot and the next request.
+- **Visual evidence:** one AppKit inspection batch with a deterministic stdio peer, full long Unicode arguments, wide/light and compact/light/dark. Light minimum window is 720 × 480. Dark appearance changed the window to 720 × 500; minimum-height dark remains unverified. All reported parent controls stayed within their window. The screenshots do not establish physical keyboard or VoiceOver behavior and execute no real command.
+- **Audit evidence:** repeated dirty-file edits invalidate reuse; expiry is fixed at observation time; policy expiry, producer/consumer isolation and changes during an audit have regressions. Ten content-observation samples in the dirty repository were reusable and stable: p50 91.54 ms, p95 95.78 ms. These measure freshness I/O only.
+
+The focused current-agent documentation links pass, including a deliberately broken-link regression. The broader documentation validator still reports **76 findings** in historical/source docs and copied build assets; [the captured findings](evidence/2026-09-29-approval-review/legacy-documentation-findings.json) remain open. This is separate from the existing provenance release gate.
+
+Review the [validation record](evidence/2026-09-29-approval-review/validation.json), [wide review](evidence/2026-09-29-approval-review/review-wide.png), [minimum light layout](evidence/2026-09-29-approval-review/review-light.png), [dark review](evidence/2026-09-29-approval-review/review-dark.png), and [raw freshness observations](evidence/2026-09-29-approval-review/fingerprint-observations.json). Earlier sections retain their checkpoint-specific results and limitations.
+
 ## September 29 follow-up audit
 
 This pass builds on `39be048` and keeps the existing engine, permissions, credentials and BroccoliDB. It addresses concrete navigation and failure cases found through source review, native captures, controlled pipe peers and the authentic provider fixture. The [integration guide](INTEGRATION.md#native-navigation-and-recovery) records the implemented interaction model and primary Apple/VS Code references.
@@ -179,7 +200,7 @@ An earlier attempt launched two independent GUI probes concurrently and observed
 | Quiescent CPU — measured miss | Follow-up aggregate is 1.13% of one core (GUI 0.0203%, workers 1.1093%), versus the original 1.56%. Profile the remaining runtime cost before accepting <1%. Sixty seconds does not establish long-term memory stabilization. |
 | Latency acceptance | At least 30 samples for launcher, warm window, submit/stop feedback and event-to-view p95. None of these latency budgets is claimed to pass. |
 | Environment failures | Exhaustive missing-tool, credential denial, network loss, sleep/wake, actual disk-full and flush failure scenarios. The acceptance-flush failure is injected; it is not a full filesystem exhaustion test. |
-| Native usability | Physical keyboard/focus/VoiceOver and complete approval, selection, minimum-height dark and deliberately scrolled transcript matrix. CUA was unavailable; macOS denied assistive-access automation. These are unverified, not inferred from source. |
+| Native usability | Physical keyboard/focus/VoiceOver and complete selection, minimum-height dark and deliberately scrolled transcript matrix. Approval presentation is now reviewed with a deterministic peer; authentic provider/approval interaction remains open. CUA was unavailable; macOS denied assistive-access automation. These are unverified, not inferred from source. |
 | Distribution — blocked on external credentials | No valid Developer ID signing identity was available. Developer ID signing, notarization, Gatekeeper and clean-machine installation remain unverified. Local ad-hoc signing does not satisfy distribution acceptance. |
 | Existing repository release gate | The repository's source-release manifest still requires human provenance review of historical material. This preview preserves that gate; packaging the existing CLI does not clear it. |
 | Existing validation tooling | The missing package-boundary checker and `legal:check` command are repaired. Licensing, IP and npm artifact checks pass. `legal:check` reaches the existing provenance gate and fails on 96 historical source markers and eight localized files awaiting review. |

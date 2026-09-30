@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import "should"
 import type { TaskAuditMetadata } from "@shared/ExtensionMessage"
@@ -7,7 +9,12 @@ import * as path from "path"
 import sinon from "sinon"
 import { setRoadmapConfigOverride } from "@/services/roadmap/RoadmapConfig"
 import { TaskState } from "../../TaskState"
-import { completionGateRuntime, evaluateCompletionAuditGate, recordAdvisoryAuditCache } from "../completionGatePipeline"
+import {
+	captureAuditCacheObservation,
+	completionGateRuntime,
+	evaluateCompletionAuditGate,
+	recordAdvisoryAuditCache,
+} from "../completionGatePipeline"
 import type { TaskConfig } from "../types/TaskConfig"
 
 const VALID_RESULT =
@@ -33,6 +40,7 @@ describe("audit invalidation and false-positive prevention", () => {
 		taskState = new TaskState()
 		setRoadmapConfigOverride({ enabled: false })
 		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "audit-invalidation-"))
+		await promisify(execFile)("git", ["init", "--quiet"], { cwd: tmpDir })
 	})
 
 	afterEach(async () => {
@@ -58,7 +66,7 @@ describe("audit invalidation and false-positive prevention", () => {
 			violations: [],
 			blockCount: 0,
 		} as TaskAuditMetadata
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory, await captureAuditCacheObservation(config))
 
 		// Stub to ensure it's NOT called (cache hit)
 		const auditStub = sinon.stub(completionGateRuntime, "runCompletionAudit").rejects(new Error("should not run"))
@@ -134,14 +142,14 @@ describe("audit invalidation and false-positive prevention", () => {
 		;(config as unknown as { messageState: { getDietCodeMessages: () => unknown[] } }).messageState = {
 			getDietCodeMessages: () => [],
 		}
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory, await captureAuditCacheObservation(config))
 		const keyWithoutHash = taskState.lastAdvisoryAuditCacheKey
 
 		// Record advisory with a checkpoint hash
 		;(config as unknown as { messageState: { getDietCodeMessages: () => unknown[] } }).messageState = {
 			getDietCodeMessages: () => [{ lastCheckpointHash: "chk-1" }],
 		}
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory, await captureAuditCacheObservation(config))
 		const keyWithHash = taskState.lastAdvisoryAuditCacheKey
 
 		// Keys should differ — checkpoint hash is part of the cache key

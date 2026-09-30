@@ -14,7 +14,7 @@ import { isPidAlive, UnifiedLockAuthority } from "@/core/governance/LockAuthorit
 
 import { TaskState } from "../../TaskState"
 import { computeWorkspaceContentDigest, transitionFinding, updateFindingLifecycle } from "../attemptCompletionUtils"
-import { evaluateCompletionAuditGate, recordAdvisoryAuditCache } from "../completionGatePipeline"
+import { captureAuditCacheObservation, evaluateCompletionAuditGate, recordAdvisoryAuditCache } from "../completionGatePipeline"
 import { isRetryableSubagentFailure } from "../subagent/ParentAgentFlowControl"
 import type { TaskConfig } from "../types/TaskConfig"
 
@@ -138,13 +138,13 @@ describe("Sovereign Integrity and Liveness Hardening Test Suite", () => {
 
 			// 1. Memory version increment changes digest
 			const digest2 = await computeWorkspaceContentDigest(tmpDir, 1)
-			digest1.should.not.equal(digest2)
+			digest1!.should.not.equal(digest2)
 
 			// 2. Creating a new file in workspace changes git status -> changes digest
 			const testFile = path.join(tmpDir, "newfile.txt")
 			await fs.writeFile(testFile, "hello")
 			const digest3 = await computeWorkspaceContentDigest(tmpDir, 1)
-			digest2.should.not.equal(digest3)
+			digest2!.should.not.equal(digest3)
 
 			// 3. Creating/modifying policy file changes digest
 			const auditDir = path.join(tmpDir, ".audit")
@@ -152,7 +152,7 @@ describe("Sovereign Integrity and Liveness Hardening Test Suite", () => {
 			const policyFile = path.join(auditDir, "gate-policy.json")
 			await fs.writeFile(policyFile, JSON.stringify({ threshold: 80 }))
 			const digest4 = await computeWorkspaceContentDigest(tmpDir, 1)
-			digest3.should.not.equal(digest4)
+			digest3!.should.not.equal(digest4)
 		})
 
 		it("evaluateCompletionAuditGate revalidates cache when state version/files change", async () => {
@@ -164,7 +164,13 @@ describe("Sovereign Integrity and Liveness Hardening Test Suite", () => {
 				violations: [],
 				blockCount: 0,
 			} as TaskAuditMetadata
-			await recordAdvisoryAuditCache(config, "result content", "task description", advisory)
+			await recordAdvisoryAuditCache(
+				config,
+				"result content",
+				"task description",
+				advisory,
+				await captureAuditCacheObservation(config),
+			)
 
 			// Verify cache hit under identical state
 			const _res1 = await evaluateCompletionAuditGate(config, {

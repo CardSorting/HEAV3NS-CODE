@@ -4,6 +4,20 @@ All notable changes to the **LUMI-JOY** Deterministic Game Engine Agent Framewor
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to Semantic Versioning and conventional commit standards.
 
+## [Unreleased]
+
+### Fixed — rolling QoL pass, 2026-09-29
+
+- Completion attempts retain their evaluated checkpoint through evidence, commit and recovery. Observed content changes invalidate the proposal; incoming record validation and a transactional lifecycle/cancellation check prevent inconsistent terminal success. Blocked saga outcomes no longer report Done.
+
+- Completion diagnostics now invalidate cached evidence after repeated dirty-file edits, retain original evidence age, detect changes during asynchronous audits, and isolate retained metadata. Bounded incomplete observations bypass reuse.
+- Parallel desktop approval requests now wait in order with an eight-request bound; Stop denies every waiting operation. Stale and duplicate decisions cannot approve a later operation.
+
+### Added
+
+- Native composer draft restoration across close/reopen, with atomic local storage, pre-dispatch request identity, acceptance lookup without replay, and save-failure protection. See [ADR-149](.wiki/adr/ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md).
+- Native **Review Request…** sheet with full operation details, Command–5/menu/Actions navigation, visible saving/recovery state, and no default approval shortcut. See [ADR-147](.wiki/adr/ADR-147-audit-freshness-and-operation-bound-approval-review.md) and the [rolling audit](docs/QOL_ROLLING_AUDIT.md) for checks and remaining limits.
+
 ## [1.0.11] - 2026-08-28
 
 ### Added (Pass 201 Centennial Evolution — 21-Engine Distributed Database Kernel — Pass 201 / ADR-139)

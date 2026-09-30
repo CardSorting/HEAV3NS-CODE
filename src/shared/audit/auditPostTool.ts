@@ -1,5 +1,5 @@
 import type { DietCodeToolResponseContent } from "@shared/messages/content"
-import { recordAdvisoryAuditCache } from "@/core/task/tools/completionGatePipeline"
+import { captureAuditCacheObservation, recordAdvisoryAuditCache } from "@/core/task/tools/completionGatePipeline"
 import type { TaskConfig } from "@/core/task/tools/types/TaskConfig"
 import { detectVerificationOutputFailures } from "./auditFileWrite"
 import type { AuditGateSettingsSource } from "./auditGateOptions"
@@ -77,12 +77,13 @@ export async function deferCommandOutputAdvisoryAudit(
 		return undefined
 	}
 	const excerpt = output.slice(0, 3000)
+	const observation = config ? await captureAuditCacheObservation(config) : undefined
 	let metadata = await runAdvisoryAudit(taskId, taskDescription, excerpt, taskDescription)
 	if (policyContext) {
 		metadata = await applyWorkspaceAuditPolicy(policyContext.cwd, metadata, policyContext.settings)
 	}
-	if (config) {
-		await recordAdvisoryAuditCache(config, excerpt, taskDescription, metadata)
+	if (config && observation) {
+		await recordAdvisoryAuditCache(config, excerpt, taskDescription, metadata, observation)
 	}
 	return metadata
 }

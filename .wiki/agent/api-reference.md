@@ -114,21 +114,13 @@ See [Agent Activity Streaming Strategy](streaming-activity-strategy.md) and [ADR
 
 ## Provider activity adapter
 
-### `CodexProgressAdapter`
+### `AgentEngine` progress emission
 
-Source: [`src/agents/extensions/execution/codex-progress-adapter.ts`](../../src/agents/extensions/execution/codex-progress-adapter.ts)
+Source: [`src/agents/extensions/execution/agent-engine.ts`](../../src/agents/extensions/execution/agent-engine.ts)
 
-Converts `@openai/codex-sdk` thread events into `EngineProgressEvent` values.
+The engine emits bounded, sanitized `EngineProgressEvent` request, tool and outcome updates through `reportProgress`. Its OAuth route consumes `OpenAiCodexHandler.createMessage` stream chunks; it does not instantiate the historical `CodexProgressAdapter` module. The current provider handler is [`src/core/api/providers/openai-codex.ts`](../../src/core/api/providers/openai-codex.ts). Keep transport chunks, tool execution records and public progress labels distinct.
 
-- `start()` emits the initial connection activity.
-- `handle(event: ThreadEvent)` maps thread, turn, and item lifecycle events.
-- `cancel(message?)`, `timeout(message?)`, and `fail(message, detail?)` emit explicit terminal outcomes.
-
-SDK item IDs are namespaced by retry attempt and become stable activity IDs within that attempt. Started, updated, and completed events therefore occupy one timeline row without colliding with a later retry. Supported item types include reasoning summaries, todo lists, commands, file changes, MCP tool calls, web searches, agent messages, and errors.
-
-The adapter sanitizes and bounds all displayed text, reduces paths to workspace-relative names, deduplicates identical updates, and treats `item.completed` as authoritative for that item only. A completed `agent_message` becomes the latest response candidate; it cannot terminate the turn. LUMI publishes turn success only after a later `turn.completed` and non-empty candidate validation.
-
-These names are the dot-form event discriminants in the pinned `@openai/codex-sdk` `0.147.0`. The official App Server protocol documents the analogous slash-form JSON-RPC methods (`item/completed`, `turn/completed`) and places the final App Server status on `turn/completed`.
+[ADR-082](../adr/ADR-082-structured-agent-activity-streaming.md) preserves the earlier SDK item/turn design. Its removed module names and pinned SDK event mapping are historical, not current source navigation.
 
 ## Interactive activity timeline
 
@@ -155,11 +147,11 @@ Source: [`src/agents/extensions/execution/agent-engine.ts`](../../src/agents/ext
 
 | Authentication route | Dispatch | Activity fidelity |
 |---|---|---|
-| OpenAI Codex OAuth | `@openai/codex-sdk` thread `runStreamed()` | Full thread, turn, item, usage, failure, and cancellation lifecycle |
+| OpenAI Codex OAuth | `OpenAiCodexHandler.createMessage` | Engine-owned request/tool/outcome progress; handler stream chunks are not a native item timeline |
 | Provider API key | Provider HTTP endpoint | Coarse request started/completed/failed lifecycle |
 | No matching credentials | No live provider call | A failed outcome and setup guidance are returned immediately |
 
-All routes obey the same public rule: only `EngineTickResult.outcome === "completed"` is success. Codex requires a completed response candidate plus its provider turn terminal. The non-streaming API-key route requires an accepted HTTP response with non-empty assistant content. Missing credentials, empty successful bodies, premature stream EOF, timeouts, and exhausted retries are failed outcomes; caller abort is cancelled.
+All routes obey the same public rule: only `EngineTickResult.outcome === "completed"` is success. Provider success is interpreted by the installed handler and engine, rather than by the historical SDK event table. The non-streaming API-key route requires an accepted HTTP response with non-empty assistant content. Missing credentials, empty successful bodies, premature stream EOF, timeouts, and exhausted retries are failed outcomes; caller abort is cancelled.
 
 The complete Flappy Bird generator is an explicit local route: `flappy bird`, `flappy bird react vite`, or `/flappy` creates `flappy-bird-react-vite/` with 12 runnable React, TypeScript, Vite, Canvas, configuration, styling, and documentation files. The generated game includes deterministic seeded pipes, frame-rate-independent physics, collision and scoring, pause/resume, restart, keyboard/pointer controls, responsive styling, and accessibility affordances.
 
@@ -225,20 +217,11 @@ The standalone `lumi --setup` flow always prints the authorization URL and accep
 
 ## Authentication resolution
 
-### `CodexOAuthManager`
+### `OpenAiCodexOAuthService`
 
-Source: [`src/agents/extensions/resolution/codex-oauth-manager.ts`](../../src/agents/extensions/resolution/codex-oauth-manager.ts)
+Source: [`src/services/auth/OpenAiCodexOAuthService.ts`](../../src/services/auth/OpenAiCodexOAuthService.ts)
 
-- Generates S256 PKCE authorization URLs.
-- Exchanges and refreshes access tokens.
-- extracts `ChatGPT-Account-Id` from supported JWT claims.
-- Loads credentials from explicit paths, `~/.codex/auth.json`, `~/.pi/auth.json`, and LUMI configuration.
-
-### `CodexProviderBridge`
-
-Source: [`src/agents/extensions/resolution/codex-provider-bridge.ts`](../../src/agents/extensions/resolution/codex-provider-bridge.ts)
-
-Resolves OAuth, API-key, or unauthenticated mode for the selected model. Codex model families use the OAuth path when valid credentials are available.
+Owns the repository's sign-in, PKCE/callback flow, persisted credential refresh and model metadata helpers. `OpenAiCodexHandler` obtains credentials through this service. The former `CodexOAuthManager` and `CodexProviderBridge` modules are absent; use the service, handler and `AgentEngine` dispatch sources when tracing current behavior.
 
 ## CLI and interactive commands
 
@@ -264,7 +247,15 @@ Resolves OAuth, API-key, or unauthenticated mode for the selected model. Codex m
 - `lumi "flappy bird react vite"` or `lumi "/flappy"` materializes the runnable `flappy-bird-react-vite/` project in the active CWD and stages all 12 files in `SessionVfs`.
 - `npm run baseline:update` records all benchmark sub-assertions in the JSON and generated Markdown evidence.
 
+## Native desktop review
+
+`DesktopSession.approve(request)` retains a run/controller-bound review, with at most eight waiting/visible requests and one displayed operation. Overflow returns a denial with recovery feedback. Stop or run settlement denies remaining requests. `approval.resolve` requires the current run/operation pair and claims it before the durable write. Native Review Request (Command–5) presents full details without expanding execution authority; see the [bridge protocol](../../docs/desktop/INTEGRATION.md).
+
 ## Completion gates and attempt execution
+
+### Advisory audit cache
+
+`captureAuditCacheObservation(config)` captures content identity, lifecycle revision and observation time before an audit. `recordAdvisoryAuditCache(config, result, description, metadata, observation)` compares the observation again before retaining reusable evidence. The content helper returns no identity when Git/filesystem coverage is incomplete or over budget; diagnostics then rerun. Evidence age is never renewed by lookup or advisory promotion. This API is separate from terminal completion authority. [ADR-147](../adr/ADR-147-audit-freshness-and-operation-bound-approval-review.md) documents budgets and excluded inputs.
 
 ### `RoadmapCompletionGate`
 

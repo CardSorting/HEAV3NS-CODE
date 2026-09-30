@@ -1,10 +1,4 @@
 import { createHash } from "node:crypto"
-import * as fs from "node:fs/promises"
-import * as path from "node:path"
-import { exec } from "child_process"
-import { promisify } from "util"
-
-const execAsync = promisify(exec)
 
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
@@ -28,11 +22,7 @@ import { DietCodeDefaultTool } from "@shared/tools"
 
 import { AUTO_GOVERNANCE } from "@/services/roadmap/RoadmapAutoGovernance"
 import { getRoadmapConfig } from "@/services/roadmap/RoadmapConfig"
-import {
-	buildCompletionSnapshot,
-	hasWorkspaceProgress,
-	isDuplicateAttempt,
-} from "./completion/CompletionFunnel"
+import { buildCompletionSnapshot, hasWorkspaceProgress, isDuplicateAttempt } from "./completion/CompletionFunnel"
 
 import { parseFocusChainListCounts, sanitizeChecklistLabel } from "../focus-chain/utils"
 import {
@@ -42,6 +32,7 @@ import {
 } from "./subagent/CoordinatorExecutionAuthority"
 import type { TaskConfig } from "./types/TaskConfig"
 import type { ToolResponse } from "./types/ToolContracts"
+import { workspaceAuditFingerprint } from "./completion/workspaceAuditFingerprint"
 
 export type CompletionPreflightReason =
 	| "empty_result"
@@ -1766,29 +1757,37 @@ export function buildDoubleCheckReverifyMessage(extras?: { taskSection?: string;
 	)
 }
 
-export async function computeWorkspaceContentDigest(workspace: string, memoryVersion: number): Promise<string> {
-	let gitStatus = ""
-	try {
-		const { stdout } = await execAsync("git status --porcelain", { cwd: workspace, timeout: 2000 })
-		gitStatus = stdout.trim()
-	} catch {
-		// git command not found or not a repo
+export const computeWorkspaceContentDigest = workspaceAuditFingerprint
+
+export async function captureAuditWorkspaceState(config: TaskConfig): Promise<{
+	checkpoint: string
+	contentDigest: string | undefined
+	stateVersion: number
+}> {
+	const checkpointHash = getLatestCheckpointHashFromMessages(config) || ""
+	const stateVersion = config.taskState.workspaceStateVersion || 0
+	const contentDigest = await computeWorkspaceContentDigest(config.cwd, stateVersion)
+	return {
+		checkpoint: contentDigest
+			? `${checkpointHash}:${contentDigest}`
+			: JSON.stringify(["content-unobserved", config.cwd, checkpointHash, stateVersion]),
+		contentDigest,
+		stateVersion,
 	}
-
-	let policyContent = ""
-	try {
-		const policyPath = path.join(workspace, ".audit", "gate-policy.json")
-		policyContent = await fs.readFile(policyPath, "utf8").catch(() => "")
-	} catch {}
-
-	return createHash("sha256").update(gitStatus).update(policyContent).update(String(memoryVersion)).digest("hex")
 }
 
+export async function resolveAuditCacheStateIdentifier(config: TaskConfig): Promise<string | undefined> {
+	const observation = await captureAuditWorkspaceState(config)
+	return observation.contentDigest && observation.stateVersion === (config.taskState.workspaceStateVersion || 0)
+		? observation.checkpoint
+		: undefined
+}
+
+/** Durable decision identity is separate from permission to reuse advisory evidence.
+ * Without a complete file observation it still names the checkpoint/lifecycle
+ * version; the explicit marker must never be treated as a content fingerprint. */
 export async function resolveAuditStateIdentifier(config: TaskConfig): Promise<string> {
-	const checkpointHash = getLatestCheckpointHashFromMessages(config) || ""
-	const memoryVersion = config.taskState.workspaceStateVersion || 0
-	const contentDigest = await computeWorkspaceContentDigest(config.cwd, memoryVersion)
-	return `${checkpointHash}:${contentDigest}`
+	return (await captureAuditWorkspaceState(config)).checkpoint
 }
 
 export type FindingState = "ACTIVE" | "REMEDIATED" | "STALE" | "SUPERSEDED" | "REVALIDATED" | "WAIVED"

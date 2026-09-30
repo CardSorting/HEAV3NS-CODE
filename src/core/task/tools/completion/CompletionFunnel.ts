@@ -29,7 +29,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { formatResponse } from "@core/prompts/responses"
 import type { AuditGateDecision } from "@shared/audit/auditGateReport"
-import { COMPLETION_AUDIT_CACHE_TTL_MS } from "@shared/audit/gatePolicy"
+import { COMPLETION_AUDIT_CACHE_TTL_MS, isCompletionAuditFresh } from "@shared/audit/gatePolicy"
 import {
 	COMPLETION_FUNNEL_SCHEMA_VERSION,
 	type CompletionFunnelEvent,
@@ -47,10 +47,11 @@ import { SWARM_LOCK_PROTOCOL_VERSION, SwarmMutexService } from "@/core/swarm/Swa
 import { createTaskLifecycleIntentId, getTaskLifecycleAuthority } from "@/core/task/lifecycle/TaskLifecycleFunnel"
 import { getCachedStatement, getCoordinationRawDb } from "@/infrastructure/db/Config"
 import {
+	captureAuditWorkspaceState,
+	computeWorkspaceContentDigest,
 	getCompletionGraphRevision,
 	getLatestCheckpointHashFromMessages,
 	hashCompletionResult,
-	resolveAuditStateIdentifier,
 	validateCompletionDemoCommand,
 	validateCompletionResultExcludesChecklist,
 	validateCompletionResultMaxLength,
@@ -200,7 +201,7 @@ export function evaluateAuditValidity(snapshot: CompletionFunnelSnapshot): Audit
 	}
 
 	// Dimension 1: Cache key match
-	const cacheKeyMatches = snapshot.lastAuditCacheKey === snapshot.auditCacheKey
+	const cacheKeyMatches = Boolean(snapshot.lastAuditCacheKey) && snapshot.lastAuditCacheKey === snapshot.auditCacheKey
 	if (!cacheKeyMatches) {
 		stages.push(fail("audit_validity.cache_key", "Audit cache key mismatch — workspace fingerprint changed", true))
 		return { result: "invalidated", stages, gateActive: snapshot.auditGateEnabled }
@@ -222,7 +223,7 @@ export function evaluateAuditValidity(snapshot: CompletionFunnelSnapshot): Audit
 	stages.push(pass("audit_validity.graph_revision", "Graph revision matches audit cache revision"))
 
 	// Dimension 3: TTL valid
-	const ttlValid = snapshot.auditCachedAt !== undefined && snapshot.now - snapshot.auditCachedAt < COMPLETION_AUDIT_CACHE_TTL_MS
+	const ttlValid = isCompletionAuditFresh(snapshot.auditCachedAt, snapshot.now)
 	if (!ttlValid) {
 		stages.push(fail("audit_validity.ttl", "Audit cache TTL expired — stale pending reconciliation", true))
 		return { result: "stale_pending_reconciliation", stages, gateActive: snapshot.auditGateEnabled }
@@ -662,6 +663,7 @@ export interface CommitTaskCompletionInput {
 	record: TaskCompletionRecord
 	resourceKey: string
 	currentStateVersion: () => number
+	expectedLifecycle?: { generationId: string; revision: number; completionAttemptId: string }
 }
 
 export type CommitTaskCompletionResult = {
@@ -673,6 +675,9 @@ export function commitTaskCompletionTransaction(
 	rawDb: CompletionRawDatabase,
 	input: CommitTaskCompletionInput,
 ): CommitTaskCompletionResult {
+	// Reject inconsistent identities before they enter the durable store. Recovery
+	// must accept exactly the same record that the original commit accepted.
+	parseCompletionRecord(input.record)
 	rawDb.exec("BEGIN IMMEDIATE")
 	try {
 		const lease = getCachedStatement(rawDb, "SELECT * FROM swarm_locks WHERE resource = ?").get(input.resourceKey) as
@@ -714,6 +719,30 @@ export function commitTaskCompletionTransaction(
 				"Task state changed after completion evaluation.",
 				"abort_owner",
 			)
+		}
+		if (input.expectedLifecycle) {
+			const row = getCachedStatement(rawDb, "SELECT recordJson FROM task_lifecycle_records WHERE taskId = ?").get(
+				input.record.taskId,
+			) as { recordJson: string } | undefined
+			let lifecycle: unknown
+			try {
+				lifecycle = row && JSON.parse(row.recordJson)
+			} catch {}
+			if (
+				!isTaskLifecycleRecord(lifecycle) ||
+				lifecycle.generationId !== input.expectedLifecycle.generationId ||
+				lifecycle.lifecycleRevision !== input.expectedLifecycle.revision ||
+				lifecycle.state !== "suspended" ||
+				lifecycle.cancellation.status === "requested" ||
+				lifecycle.cause.reason !== `awaiting_completion_decision:${input.expectedLifecycle.completionAttemptId}` ||
+				lifecycle.cause.originatingOperationId !== input.record.decisionId
+			) {
+				throw new CoordinationError(
+					CoordinationErrorCode.OWNERSHIP_CHANGED,
+					"The completion proposal changed or was cancelled before its terminal commit.",
+					"abort_owner",
+				)
+			}
 		}
 
 		const existingRaw = getCachedStatement(rawDb, "SELECT * FROM task_completions WHERE taskId = ?").get(input.record.taskId)
@@ -1054,6 +1083,9 @@ export interface CompletionAttemptRecord {
 	commandDigest: string | null
 	expectedLifecycleRevision: number
 	evaluatedStateVersion: number | null
+	/** Absent on legacy attempts; those need a fresh evaluation before completion. */
+	evaluatedCheckpointJson?: string | null
+	evaluatedWorkspaceDigest?: string | null
 	proposalEventId: string | null
 	decisionId: string | null
 	version: number
@@ -1082,8 +1114,8 @@ export async function insertCompletionAttempt(record: CompletionAttemptRecord): 
 					completionAttemptId, taskId, generationId, originatingInvocationId,
 					phase, evidenceRequestId, evidenceInvocationId, evidenceExecutionEventId,
 					commandIntentJson, commandDigest, expectedLifecycleRevision, evaluatedStateVersion,
-					proposalEventId, decisionId, version, createdAt, updatedAt
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					evaluatedCheckpointJson, evaluatedWorkspaceDigest, proposalEventId, decisionId, version, createdAt, updatedAt
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		).run(
 			record.completionAttemptId,
 			record.taskId,
@@ -1097,6 +1129,8 @@ export async function insertCompletionAttempt(record: CompletionAttemptRecord): 
 			record.commandDigest,
 			record.expectedLifecycleRevision,
 			record.evaluatedStateVersion,
+			record.evaluatedCheckpointJson ?? null,
+			record.evaluatedWorkspaceDigest ?? null,
 			record.proposalEventId,
 			record.decisionId,
 			record.version,
@@ -1173,15 +1207,6 @@ export async function prepareCompletionAttempt(
 			)
 		}
 	}
-	const stateIdentifier = await resolveAuditStateIdentifier(config)
-	const evaluatedStateVersion = config.taskState.workspaceStateVersion || 0
-	const proposedDecisionId = canonicalDecisionId({
-		taskId: config.taskId,
-		evaluatedStateVersion,
-		checkpoint: stateIdentifier,
-		outcome: "succeeded",
-		decisionSchemaVersion: COMPLETION_DECISION_SCHEMA_VERSION,
-	})
 
 	if (existingCompletion) {
 		const decision: CompletionDecision = {
@@ -1222,6 +1247,17 @@ export async function prepareCompletionAttempt(
 			event,
 		}
 	}
+
+	const observation = await captureAuditWorkspaceState(config)
+	const stateIdentifier = observation.checkpoint
+	const evaluatedStateVersion = observation.stateVersion
+	const proposedDecisionId = canonicalDecisionId({
+		taskId: config.taskId,
+		evaluatedStateVersion,
+		checkpoint: stateIdentifier,
+		outcome: "succeeded",
+		decisionSchemaVersion: COMPLETION_DECISION_SCHEMA_VERSION,
+	})
 
 	// Check if a rejection record already exists for this decisionId
 	if (authorityMode === "broccoli") {
@@ -1323,6 +1359,8 @@ export async function prepareCompletionAttempt(
 			commandDigest,
 			expectedLifecycleRevision,
 			evaluatedStateVersion,
+			evaluatedCheckpointJson: canonicalCompletionJson({ checkpoint: stateIdentifier }),
+			evaluatedWorkspaceDigest: observation.contentDigest ?? null,
 			proposalEventId: null,
 			decisionId: proposedDecisionId,
 			version: 1,
@@ -1354,6 +1392,99 @@ export async function prepareCompletionAttempt(
 	}
 }
 
+async function completionAttemptStaleReason(config: TaskConfig, attempt: CompletionAttemptRecord): Promise<string | undefined> {
+	if (!attempt.evaluatedCheckpointJson || !Number.isInteger(attempt.evaluatedStateVersion)) {
+		return "This older completion attempt has no saved evaluation checkpoint. Review the current work and submit a fresh completion attempt."
+	}
+	let checkpoint: unknown
+	try {
+		checkpoint = JSON.parse(attempt.evaluatedCheckpointJson)?.checkpoint
+	} catch {}
+	if (
+		typeof checkpoint !== "string" ||
+		canonicalDecisionId({
+			taskId: attempt.taskId,
+			evaluatedStateVersion: attempt.evaluatedStateVersion!,
+			checkpoint,
+			outcome: "succeeded",
+			decisionSchemaVersion: COMPLETION_DECISION_SCHEMA_VERSION,
+		}) !== attempt.decisionId
+	) {
+		throw new CoordinationError(
+			CoordinationErrorCode.COORDINATION_STATE_CORRUPT,
+			"Completion attempt failed checkpoint identity validation.",
+			"fail_closed",
+		)
+	}
+	if (attempt.phase === "stale" || (config.taskState.workspaceStateVersion || 0) !== attempt.evaluatedStateVersion) {
+		return "The task changed after completion was evaluated. Review the current work and submit a fresh completion attempt."
+	}
+	// An unobservable workspace is not evidence of unchanged content. Preserve the
+	// existing lifecycle-only contract there; never promote it to an audit cache hit.
+	if (
+		attempt.evaluatedWorkspaceDigest != null &&
+		(await computeWorkspaceContentDigest(config.cwd, attempt.evaluatedStateVersion!)) !== attempt.evaluatedWorkspaceDigest
+	) {
+		return "Workspace content changed or could no longer be verified after completion was evaluated. Review the changes and submit a fresh completion attempt."
+	}
+	if ((config.taskState.workspaceStateVersion || 0) !== attempt.evaluatedStateVersion) {
+		return "The task changed while completion was being checked. Review the current work and submit a fresh completion attempt."
+	}
+	return undefined
+}
+
+async function blockStaleCompletion(
+	config: TaskConfig,
+	attempt: CompletionAttemptRecord,
+	reason: string,
+): Promise<CompletionFunnelAttemptResult> {
+	if (
+		!(await updateCompletionAttemptCAS(attempt.version, { completionAttemptId: attempt.completionAttemptId, phase: "stale" }))
+	) {
+		throw new Error("Completion attempt changed while invalidating its evaluation.")
+	}
+	const authority = getTaskLifecycleAuthority(config.taskState)
+	const lifecycle = authority.readProjection(config.taskState) ?? (await authority.restore(config.taskState, config.taskId))
+	if (lifecycle?.generationId === attempt.generationId && lifecycle.state === "suspended") {
+		const activated = await authority.submit(config.taskState, {
+			type: "ReactivateAfterCompletionRejection",
+			intentId: createTaskLifecycleIntentId(),
+			taskId: config.taskId,
+			generationId: attempt.generationId,
+			expectedRevision: lifecycle.lifecycleRevision,
+			completionAttemptId: attempt.completionAttemptId,
+			decisionId: attempt.decisionId || "",
+			cause: { source: "completion_funnel", reason, originatingOperationId: attempt.decisionId || "" },
+		})
+		if (activated.kind === "rejected") throw new Error(`Cannot resume changed completion: ${activated.reason}`)
+	}
+	const decision: CompletionDecision = {
+		status: "blocked_recoverable",
+		code: "AUDIT_REQUIRED",
+		nextTransition: "RETURN_TO_EXECUTION",
+		stateVersion: config.taskState.workspaceStateVersion || 0,
+		decisionId: attempt.decisionId || "",
+		details: { blocker: reason },
+	}
+	const event: CompletionFunnelEvent = {
+		schemaVersion: COMPLETION_FUNNEL_SCHEMA_VERSION,
+		taskId: config.taskId,
+		phase: "blocked",
+		kind: "soft_block",
+		terminal: false,
+		nextAllowedAction: "continue_execution",
+		forbiddenActions: ["attempt_completion"],
+		canonicalInstruction: reason,
+		reason,
+		stages: [fail("decision", reason, true)],
+		graphRevision: getCompletionGraphRevision(config),
+		evaluatedAt: Date.now(),
+		decisionId: attempt.decisionId || "",
+	}
+	await publishCompletionFunnelEvent(config, event)
+	return { kind: "blocked", decision, event }
+}
+
 export async function continueCompletionAttempt(
 	config: TaskConfig,
 	input: {
@@ -1374,6 +1505,19 @@ export async function continueCompletionAttempt(
 	if (!attempt) {
 		throw new Error(`Completion attempt ${input.completionAttemptId} not found.`)
 	}
+	if (attempt.taskId !== config.taskId) throw new Error("Completion attempt belongs to a different task.")
+	if (authorityMode === "broccoli" && (await durableGetTaskCompletion(config.taskId))) {
+		const recovered = await prepareCompletionAttempt(config, {
+			result: input.resultText,
+			taskDescription: input.taskDescription,
+			originatingInvocationId: attempt.originatingInvocationId,
+		})
+		if (recovered.kind !== "terminal" || !recovered.decision || !recovered.event)
+			throw new Error("Committed completion could not be recovered.")
+		return { kind: "terminal", decision: recovered.decision, event: recovered.event, record: recovered.record }
+	}
+	const staleReason = await completionAttemptStaleReason(config, attempt)
+	if (staleReason) return blockStaleCompletion(config, attempt, staleReason)
 
 	// 1. Verify and process evidence if requested
 	if (attempt.commandIntentJson) {
@@ -1466,16 +1610,19 @@ export async function continueCompletionAttempt(
 			phase: "evidence_succeeded",
 			evidenceExecutionEventId: input.evidenceExecutionEventId,
 		})
-		if (updated) {
-			attempt = (await getCompletionAttempt(attempt.completionAttemptId))!
-		}
+		if (!updated) throw new Error("Completion evidence was already advanced by another continuation.")
+		attempt = (await getCompletionAttempt(attempt.completionAttemptId))!
 	}
 
 	// 2. Perform the lifecycle suspension and proposal
 	const authority = getTaskLifecycleAuthority(config.taskState)
 	const currentLifecycle =
 		authority.readProjection(config.taskState) ?? (await authority.restore(config.taskState, config.taskId))
-	if (!currentLifecycle || currentLifecycle.lifecycleRevision !== attempt.expectedLifecycleRevision) {
+	if (
+		!currentLifecycle ||
+		currentLifecycle.generationId !== attempt.generationId ||
+		currentLifecycle.lifecycleRevision !== attempt.expectedLifecycleRevision
+	) {
 		throw new Error("Lifecycle generation has changed or revision mismatch.")
 	}
 
@@ -1486,9 +1633,8 @@ export async function continueCompletionAttempt(
 		phase: "proposal_pending",
 		proposalEventId,
 	})
-	if (updated) {
-		attempt = (await getCompletionAttempt(attempt.completionAttemptId))!
-	}
+	if (!updated) throw new Error("Completion proposal was already advanced by another continuation.")
+	attempt = (await getCompletionAttempt(attempt.completionAttemptId))!
 
 	const suspendResult = await authority.submit(config.taskState, {
 		type: "SuspendGeneration",
@@ -1507,7 +1653,7 @@ export async function continueCompletionAttempt(
 	let command: string | undefined
 	if (attempt.commandIntentJson) {
 		try {
-			command = JSON.parse(attempt.commandIntentJson)
+			command = JSON.parse(attempt.commandIntentJson).command
 		} catch {}
 	}
 
@@ -1516,7 +1662,7 @@ export async function continueCompletionAttempt(
 		input.resultText,
 		input.taskDescription,
 		attempt.decisionId || "",
-		attempt.expectedLifecycleRevision,
+		attempt.evaluatedStateVersion!,
 		config.taskState.currentFocusChainChecklist ?? undefined, // taskProgress
 		command,
 	)
@@ -1543,6 +1689,8 @@ export async function continueCompletionAttempt(
 
 	// Case A: Accepted
 	if (response === "yesButtonClicked") {
+		const changedWhileReviewing = await completionAttemptStaleReason(config, attempt)
+		if (changedWhileReviewing) return blockStaleCompletion(config, attempt, changedWhileReviewing)
 		const completionMessageTs = await config.callbacks.say(
 			"completion_result",
 			input.resultText,
@@ -1590,14 +1738,14 @@ export async function continueCompletionAttempt(
 						}
 						releaseOwnedCompletionLease = true
 					}
+					const changed = await completionAttemptStaleReason(config, attempt)
+					if (changed) return await blockStaleCompletion(config, attempt, changed)
 					const record: TaskCompletionRecord = {
 						taskId: config.taskId,
 						decisionId: attempt.decisionId || "",
 						status: "succeeded",
 						evaluatedStateVersion: attempt.evaluatedStateVersion ?? config.taskState.workspaceStateVersion ?? 0,
-						evaluatedCheckpointJson: canonicalCompletionJson({
-							checkpoint: await resolveAuditStateIdentifier(config),
-						}),
+						evaluatedCheckpointJson: attempt.evaluatedCheckpointJson!,
 						decisionJson: canonicalCompletionJson({ decision: evaluation.decision, result: input.resultText }),
 						ownerId: commitClaim.ownerId,
 						leaseEpoch: commitClaim.leaseEpoch,
@@ -1609,6 +1757,11 @@ export async function continueCompletionAttempt(
 						record,
 						resourceKey: commitClaim.resourceKey,
 						currentStateVersion: () => config.taskState.workspaceStateVersion || 0,
+						expectedLifecycle: {
+							generationId: attempt.generationId,
+							revision: suspendResult.record.lifecycleRevision,
+							completionAttemptId: attempt.completionAttemptId,
+						},
 					}).record
 				} finally {
 					if (releaseOwnedCompletionLease && commitClaim) {

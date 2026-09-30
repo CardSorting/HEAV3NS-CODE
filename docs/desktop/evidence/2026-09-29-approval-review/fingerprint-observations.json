@@ -1,0 +1,58 @@
+{
+  "scope": "Current dirty repository; content observation only, no audit provider or end-to-end task latency",
+  "node": "v26.8.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "limits": {
+    "files": 512,
+    "bytes": 16777216,
+    "gitBytes": 4194304,
+    "ms": 2000
+  },
+  "samples": [
+    {
+      "ms": 95.78124999999999,
+      "cacheable": true
+    },
+    {
+      "ms": 94.10254099999997,
+      "cacheable": true
+    },
+    {
+      "ms": 93.57125000000002,
+      "cacheable": true
+    },
+    {
+      "ms": 91.53920799999997,
+      "cacheable": true
+    },
+    {
+      "ms": 90.44195899999994,
+      "cacheable": true
+    },
+    {
+      "ms": 90.56595799999991,
+      "cacheable": true
+    },
+    {
+      "ms": 91.90420799999993,
+      "cacheable": true
+    },
+    {
+      "ms": 89.54199999999992,
+      "cacheable": true
+    },
+    {
+      "ms": 91.70425,
+      "cacheable": true
+    },
+    {
+      "ms": 91.38979099999995,
+      "cacheable": true
+    }
+  ],
+  "allCacheable": true,
+  "stable": true,
+  "p50": 91.53920799999997,
+  "p95": 95.78124999999999
+}

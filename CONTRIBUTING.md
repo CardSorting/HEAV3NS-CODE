@@ -53,6 +53,9 @@ license, required notices, and the release artifact that will contain it.
 
 Read the [Agent Activity Streaming Strategy](.wiki/agent/streaming-activity-strategy.md) before changing provider streaming, progress types, or terminal rendering.
 
+For completion-cache changes, exercise repeated edits to an already-dirty file, unchanged mtime/size, expired evidence, changes during an audit, policy expiry and producer/consumer mutation. Advisory reuse must not manufacture terminal authority. For desktop approval changes, run `npm run desktop:test` and `npm run desktop:test:native`; cover parallel requests, queue overflow, Stop, duplicate decisions and an open review whose operation changes. Keep physical keyboard/VoiceOver evidence separate from deterministic AppKit/pipe tests. See [the rolling audit](docs/QOL_ROLLING_AUDIT.md) for current limits.
+
+
 ---
 
 ## Development & Verification Workflow
@@ -133,3 +136,7 @@ pull request range; a missing or mismatched sign-off blocks the change.
 Before opening a pull request, run `npm run legal:check` and inspect the
 package-boundary output. Legal files, source provenance, claim wording, and
 third-party notices are part of the release surface.
+
+### Completion and native recovery regressions
+
+When changing terminal completion, run the public-path `completionCheckpoint.test.ts` cases: checkpoint publication, external edits, immutable evidence, cancellation and reopen must retain one valid identity. When changing native input or shutdown, run `npm run desktop:test:native`; preserve saved draft text and request identity without replay, and keep a failed save visible. The [sixth-pass audit](docs/QOL_ROLLING_AUDIT.md) records process-kill and physical interaction coverage still needed.

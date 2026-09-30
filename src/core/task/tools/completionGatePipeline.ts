@@ -9,7 +9,7 @@ import { resolvePlanBaselineMetadata } from "@shared/audit/auditMessages"
 import { buildPreCompletionChecklistBlock, buildPreCompletionChecklistSummary } from "@shared/audit/auditPreCompletionChecklist"
 import { buildCompletionGateMessage, runCompletionAudit } from "@shared/audit/completionAudit"
 import {
-	COMPLETION_AUDIT_CACHE_TTL_MS,
+	isCompletionAuditFresh,
 	parseIntentThresholdOverrides,
 	SUBAGENT_IO_LANE_RESULT_MIN_LENGTH,
 } from "@shared/audit/gatePolicy"
@@ -23,7 +23,7 @@ import {
 	detectDuplicateCompletionSubmission,
 	getCompletionGraphRevision,
 	getLatestCheckpointHashFromMessages,
-	resolveAuditStateIdentifier,
+	resolveAuditCacheStateIdentifier,
 	updateFindingLifecycle,
 	validateCompletionAttemptCooldown,
 	validateCompletionDemoCommand,
@@ -232,26 +232,46 @@ export async function runCompletionPreflightChecks(
 
 export function hashCompletionAuditInput(result: string, taskDescription: string, checkpointHash?: string): string {
 	return createHash("sha256")
-		.update(result.trim())
-		.update("|")
-		.update(taskDescription.slice(0, 500))
-		.update("|")
-		.update(checkpointHash ?? "")
+		.update(JSON.stringify([result.trim(), taskDescription, checkpointHash ?? ""]))
 		.digest("hex")
 }
 
-/** Record advisory audit for completion cache reuse (act-mode, deferred command audit). */
-/** Record advisory audit for completion cache reuse (act-mode, deferred command audit). */
+export type AuditCacheObservation = { stateIdentifier?: string; graphRevision: number; observedAt: number }
+
+/** Capture before an asynchronous audit, then compare again before retaining it. */
+export async function captureAuditCacheObservation(config: TaskConfig): Promise<AuditCacheObservation> {
+	const observedAt = Date.now()
+	const graphRevision = getCompletionGraphRevision(config)
+	const stateIdentifier = await resolveAuditCacheStateIdentifier(config)
+	return { stateIdentifier, graphRevision, observedAt }
+}
+
+async function observationStillCurrent(config: TaskConfig, observation: AuditCacheObservation): Promise<boolean> {
+	return (
+		Boolean(observation.stateIdentifier) &&
+		observation.stateIdentifier === (await resolveAuditCacheStateIdentifier(config)) &&
+		observation.graphRevision === getCompletionGraphRevision(config) &&
+		isCompletionAuditFresh(observation.observedAt)
+	)
+}
+
+/** Retain advisory evidence without relabelling changed inputs or renewing its age. */
 export async function recordAdvisoryAuditCache(
 	config: TaskConfig,
 	result: string,
 	taskDescription: string,
 	metadata: TaskAuditMetadata,
+	observation: AuditCacheObservation,
 ): Promise<void> {
-	config.taskState.lastAdvisoryAudit = metadata
-	const stateIdentifier = await resolveAuditStateIdentifier(config)
-	config.taskState.lastAdvisoryAuditCacheKey = hashCompletionAuditInput(result, taskDescription, stateIdentifier)
-	config.taskState.lastAdvisoryAuditCachedAt = Date.now()
+	const reusable = await observationStillCurrent(config, observation)
+	// An older background audit must not overwrite a newer observation.
+	if ((config.taskState.lastAdvisoryAuditCachedAt ?? -Infinity) > observation.observedAt) return
+	config.taskState.lastAdvisoryAudit = structuredClone(metadata)
+	config.taskState.lastAdvisoryAuditCacheKey = reusable
+		? hashCompletionAuditInput(result, taskDescription, observation.stateIdentifier)
+		: undefined
+	config.taskState.lastAdvisoryAuditCachedAt = observation.observedAt
+	config.taskState.lastAdvisoryAuditGraphRevision = observation.graphRevision
 	config.taskState.auditMetadataVersion = (config.taskState.auditMetadataVersion || 0) + 1
 }
 
@@ -260,48 +280,45 @@ async function resolveCompletionAuditMetadata(
 	params: { result: string; taskDescription: string },
 ): Promise<TaskAuditMetadata> {
 	const checkpointHash = getLatestCheckpointHashFromMessages(config)
-	const stateIdentifier = await resolveAuditStateIdentifier(config)
-	const cacheKey = hashCompletionAuditInput(params.result, params.taskDescription, stateIdentifier)
+	const observation = await captureAuditCacheObservation(config)
+	const cacheKey = observation.stateIdentifier
+		? hashCompletionAuditInput(params.result, params.taskDescription, observation.stateIdentifier)
+		: undefined
 	const cachedAt = config.taskState.lastCompletionAuditCachedAt
 	const cachedKey = config.taskState.lastCompletionAuditCacheKey
 	const cached = config.taskState.lastCompletionAudit
-	const currentRevision = getCompletionGraphRevision(config)
+	const currentRevision = observation.graphRevision
 
-	// Cache reuse requires BOTH cache key match AND graph revision match.
-	// The cache key includes the checkpoint hash (workspace fingerprint), and
-	// the graph revision tracks meaningful state transitions.  Requiring both
-	// prevents false-positive "passed" audits when the workspace changed but
-	// the checkpoint hash didn't (e.g. edits without a checkpoint save).
-	// TTL alone is insufficient — it only prevents redundant audit runs within
-	// the same stable state, not across state transitions.
+	// Reuse requires a complete content observation, the same lifecycle revision
+	// and the original evidence age. Every consumer receives its own copy.
 	if (
 		cached &&
+		cacheKey &&
 		cachedKey === cacheKey &&
 		config.taskState.lastCompletionAuditGraphRevision === currentRevision &&
-		cachedAt &&
-		Date.now() - cachedAt < COMPLETION_AUDIT_CACHE_TTL_MS
+		currentRevision === getCompletionGraphRevision(config) &&
+		isCompletionAuditFresh(cachedAt)
 	) {
-		return cached
-	}
-	// Secondary cache: same graph revision + key match without TTL check.
-	// This handles the edge case where the TTL expired but no meaningful
-	// state changed — the audit is still authoritative for this revision.
-	if (cached && cachedKey === cacheKey && config.taskState.lastCompletionAuditGraphRevision === currentRevision) {
-		// Refresh the timestamp to extend the TTL window — the audit is still valid.
-		config.taskState.lastCompletionAuditCachedAt = Date.now()
-		config.taskState.lastCompletionAuditCheckpointHash = checkpointHash
-		return cached
+		return structuredClone(cached)
 	}
 
 	const advisoryKey = config.taskState.lastAdvisoryAuditCacheKey
 	const advisoryAt = config.taskState.lastAdvisoryAuditCachedAt
 	const advisory = config.taskState.lastAdvisoryAudit
-	if (advisory && advisoryKey === cacheKey && advisoryAt && Date.now() - advisoryAt < COMPLETION_AUDIT_CACHE_TTL_MS) {
+	if (
+		advisory &&
+		cacheKey &&
+		advisoryKey === cacheKey &&
+		config.taskState.lastAdvisoryAuditGraphRevision === currentRevision &&
+		currentRevision === getCompletionGraphRevision(config) &&
+		isCompletionAuditFresh(advisoryAt)
+	) {
 		config.taskState.lastCompletionAuditCacheKey = cacheKey
-		config.taskState.lastCompletionAuditCachedAt = Date.now()
+		config.taskState.lastCompletionAuditCachedAt = advisoryAt
 		config.taskState.lastCompletionAuditCheckpointHash = checkpointHash
 		config.taskState.lastCompletionAuditGraphRevision = currentRevision
-		return advisory
+		config.taskState.lastCompletionAudit = structuredClone(advisory)
+		return structuredClone(advisory)
 	}
 
 	let auditMetadata = await completionGateRuntime.runCompletionAudit(
@@ -313,9 +330,11 @@ async function resolveCompletionAuditMetadata(
 		false,
 	)
 	auditMetadata = await applyWorkspaceAuditPolicy(config.cwd, auditMetadata, config)
-	config.taskState.pendingCompletionAuditPersistence = auditMetadata
-	config.taskState.lastCompletionAuditCacheKey = cacheKey
-	config.taskState.lastCompletionAuditCachedAt = Date.now()
+	const reusable = await observationStillCurrent(config, observation)
+	config.taskState.pendingCompletionAuditPersistence = structuredClone(auditMetadata)
+	config.taskState.lastCompletionAudit = structuredClone(auditMetadata)
+	config.taskState.lastCompletionAuditCacheKey = reusable ? cacheKey : undefined
+	config.taskState.lastCompletionAuditCachedAt = observation.observedAt
 	config.taskState.lastCompletionAuditCheckpointHash = checkpointHash
 	config.taskState.lastCompletionAuditGraphRevision = currentRevision
 	config.taskState.auditMetadataVersion = (config.taskState.auditMetadataVersion || 0) + 1
@@ -339,58 +358,6 @@ export async function evaluateCompletionAuditGate(
 ): Promise<CompletionAuditGateResult> {
 	if (!config.auditCompletionGateEnabled) {
 		return { status: "skipped" }
-	}
-
-	const checkpointHash = getLatestCheckpointHashFromMessages(config)
-	const stateIdentifier = await resolveAuditStateIdentifier(config)
-
-	// Fast-path: reuse cached audit ONLY when ALL of the following hold:
-	//   1. Cache key matches (includes checkpoint hash — workspace fingerprint)
-	//   2. Graph revision matches (meaningful state hasn't changed since cache)
-	//   3. Engineering is verified (latch active — finalization lane eligible)
-	//
-	// The graph revision check is AND'd, not OR'd with TTL.  A TTL-only match
-	// is insufficient for the fast-path because the agent may have made edits
-	// that didn't trigger a checkpoint save but DID change workspace state.
-	// Graph revision increments on every gate block and attempt finish, so it
-	// catches all meaningful transitions.
-	//
-	// Mirrors CDN cache validation: both ETag (cache key) AND Last-Modified
-	// (graph revision) must match before serving from cache without revalidation.
-	const cacheKey = hashCompletionAuditInput(params.result, params.taskDescription, stateIdentifier)
-	const cachedAt = config.taskState.lastCompletionAuditCachedAt
-	const cachedKey = config.taskState.lastCompletionAuditCacheKey
-	const cachedAudit = config.taskState.lastCompletionAudit
-	const currentRevision = getCompletionGraphRevision(config)
-	const isCacheValid =
-		cachedAudit &&
-		cachedKey === cacheKey &&
-		config.taskState.lastCompletionAuditGraphRevision === currentRevision &&
-		cachedAt !== undefined &&
-		Date.now() - cachedAt < COMPLETION_AUDIT_CACHE_TTL_MS
-
-	if (isCacheValid) {
-		// Re-evaluate the gate decision with the cached metadata to produce a
-		// fresh result object, but skip the expensive audit run and policy load.
-		try {
-			const gateContext = await resolveCompletionGateContext(config, config.cwd, {
-				lastAdvisoryAudit: config.taskState.lastAdvisoryAudit,
-			})
-			const gateOptions = gateContext.options
-			const gateDecision = evaluateAuditGate(cachedAudit, gateOptions)
-			if (!hasAuditGateFindings(gateDecision)) {
-				config.taskState.lastCompletionAuditCheckpointHash = checkpointHash
-				return {
-					status: "advisory_passed",
-					auditMetadata: cachedAudit,
-					gateDecision,
-					gateOptions,
-					policyProvenance: gateContext.policyProvenance,
-				}
-			}
-		} catch {
-			// Fall through to full evaluation if fast-path fails
-		}
 	}
 
 	try {

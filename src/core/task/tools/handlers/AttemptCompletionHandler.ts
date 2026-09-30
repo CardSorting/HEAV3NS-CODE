@@ -162,7 +162,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				auditGateResult.gateOptions,
 				auditGateResult.policyProvenance,
 			)
-			config.taskState.lastCompletionAudit = auditMetadata
+			config.taskState.lastCompletionAudit = structuredClone(auditMetadata)
 		}
 
 		let prepResult: Awaited<ReturnType<typeof prepareCompletionAttempt>>

@@ -97,6 +97,12 @@ Run `/health`, confirm the selected model/provider pair, and reconnect only when
 
 See [Agent Activity Streaming Strategy](streaming-activity-strategy.md) for the complete contract and [API Reference](api-reference.md) for integration examples.
 
+## Native workspace is waiting for review
+
+Choose **Review Request…** in the approval region, Workspace menu or Actions; Command–5 opens the same native sheet. Read the full workspace, reason and arguments, then choose Allow Once or Deny. Close leaves this request waiting. Return does not approve it. Parallel requests appear one at a time; Stop denies all requests waiting for that task.
+
+If the sheet says the request is no longer waiting, close it and inspect the current task before reviewing another operation. While a decision is saving, its controls remain disabled. After disconnection, use Reconnect in the workspace to reconcile state; a stale sheet cannot approve a new operation.
+
 ## Attempt completion gate diagnostics
 
 If an autonomous turn fails or circuit breakers trip:
@@ -105,6 +111,8 @@ If an autonomous turn fails or circuit breakers trip:
 2. **Review autonomous feedback & remediation directives**: Check `gateResult.autonomousFeedback` or `gateResult.remediationDirective` for prioritized action steps and root-cause diagnoses.
 3. **Check for anti-oscillation guards**: If `[ANTI_OSCILLATION_GUARD]` is flagged, the agent is repeating the same failing edits across attempts; pivot to structural refactoring instead of localized patching.
 4. **Reset or cool down circuit breakers**: If `circuitBreakerTripped` is true, wait for the configured cooldown period or call `gate.resetCircuitBreaker(gateId)`.
+
+Completion diagnostics may rerun when files change, evidence reaches five minutes, policy suppressions expire, or content observation is incomplete. Non-Git, over-budget and unreadable inputs deliberately bypass cache reuse. This is a freshness decision, not evidence that a task failed. See the [rolling audit](../../docs/QOL_ROLLING_AUDIT.md) for the contract and measured cost.
 
 ## Snapshot Time-Travel & State Rollback Diagnostics
 

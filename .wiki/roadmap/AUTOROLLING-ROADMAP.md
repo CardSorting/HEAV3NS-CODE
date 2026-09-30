@@ -25,6 +25,20 @@ A future pass must remain `[IN PROGRESS]` until code, composition, tests, and do
 
 ---
 
+## Current QoL checkpoint — 2026-09-29
+
+**[COMPLETE] Scoped sixth QoL pass:** durable checkpoint integrity and native composer restoration. Frozen evaluation identity survives evidence, checkpoint publication and recovery; content drift returns to execution, incoming records are validated, and cancellation fences success in the terminal transaction. Saved drafts restore locally and reconcile uncertain acceptance without replay. Verification: 2,590 unit tests, 5/5 flight cases, 33 desktop tests and 32 native tests. See [ADR-149](../adr/ADR-149-completion-checkpoint-integrity-and-native-draft-recovery.md) and the [rolling audit](../../docs/QOL_ROLLING_AUDIT.md).
+
+[Root ROADMAP.md](../../ROADMAP.md) keeps three Now items: QOL-05 clarity/retention, QOL-08 remaining evidence consumers and the promoted QOL-09 recovery slice. Next work targets process-kill gaps and a recorded-evidence recovery preview. Historical composition manifests and pass numbers are unchanged.
+
+### Previous scoped checkpoint
+
+**[COMPLETE] Scoped fifth QoL pass:** advisory audit freshness and native approval ownership. Changed-file bytes, bounded observation and original evidence age replace status-only cache reuse. Desktop approval requests are bounded and presented in order; native Review Request preserves operation identity and complete context. Verification: 2,579 unit tests, 5/5 flight cases, 33 desktop tests, 27 native tests, typecheck/lint/build and 9/9 smoke. One deterministic-peer visual batch records its accessibility/provider limits.
+
+[ADR-147](../adr/ADR-147-audit-freshness-and-operation-bound-approval-review.md) and the [rolling audit](../../docs/QOL_ROLLING_AUDIT.md) hold evidence. [Root ROADMAP.md](../../ROADMAP.md) owns Now/Next priorities. At that checkpoint, QOL-05 and QOL-08 remained open for long-turn/physical navigation and durable checkpoint-capture review. This checkpoint assigns no new historical pass number and changes no composition manifest.
+
+---
+
 ## 1. Auto-Rolling Evolution Pipeline
 
 ```

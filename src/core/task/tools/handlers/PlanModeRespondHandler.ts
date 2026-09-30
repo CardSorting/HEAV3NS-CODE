@@ -130,11 +130,12 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 		void (async () => {
 			try {
 				const taskPreview = getInitialTaskPreview(config) || "plan mode response"
+				const { captureAuditCacheObservation, recordAdvisoryAuditCache } = await import("../completionGatePipeline")
+				const observation = await captureAuditCacheObservation(config)
 				let planAuditMetadata = await runCompletionAudit(config.taskId, taskPreview, response, taskPreview)
 				planAuditMetadata = await applyWorkspaceAuditPolicy(config.cwd, planAuditMetadata, config)
 				config.taskState.lastPlanAuditMetadata = planAuditMetadata
-				const { recordAdvisoryAuditCache } = await import("../completionGatePipeline")
-				await recordAdvisoryAuditCache(config, response, taskPreview, planAuditMetadata)
+				await recordAdvisoryAuditCache(config, response, taskPreview, planAuditMetadata, observation)
 			} catch (error) {
 				Logger.warn("[PlanModeRespondHandler] Plan audit metadata generation failed:", error)
 			}

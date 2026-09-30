@@ -2,7 +2,7 @@
 
 This guide defines how LUMI reports a live model request from provider dispatch through completion, failure, timeout, or user cancellation. It is the canonical reference for the progress contract, Codex SDK adapter, terminal presentation, security boundary, and verification expectations.
 
-The implementation follows the item lifecycle described by the [official Codex SDK documentation](https://learn.chatgpt.com/docs/codex-sdk) and the richer event taxonomy documented for the [Codex App Server](https://learn.chatgpt.com/docs/app-server). LUMI consumes the event union exposed by its exactly pinned `@openai/codex-sdk` `0.147.0`; it does not infer events from the current App Server schema or invent unavailable deltas.
+The public lifecycle vocabulary and display boundaries below remain design guidance. **The SDK-specific mapping, sequence diagrams and `CodexProgressAdapter` examples are historical ADR-082 context.** The current source uses `AgentEngine` and `OpenAiCodexHandler`; consult the [current API reference](api-reference.md#provider-activity-adapter) before changing provider dispatch. No current SDK version or event-fidelity claim is established by the historical examples.
 
 ## Goals
 
@@ -189,6 +189,12 @@ Never add any of the following to a progress event:
 | No credentials | Immediate terminal `Live model is not connected` activity and setup guidance in the response. |
 
 Do not label a non-streaming API response as item-level streaming. The public contract can represent coarse and rich providers without pretending they have equal event fidelity.
+
+## Native approval presentation
+
+The desktop private bridge transports operation-bound confirmation requests separately from sanitized `EngineProgressEvent` activity. Full scope, reason and arguments belong in the explicit review surface; they must not leak into generic progress labels. At most eight reviews wait, presentation is serial, and cancellation denies pending reviews from the originating run. Native Review Request (Command–5) retains one operation across updates and disables decisions while saving, stopping, stale or disconnected. Closing review leaves it waiting.
+
+The [desktop integration contract](../../docs/desktop/INTEGRATION.md) and [ADR-147](../adr/ADR-147-audit-freshness-and-operation-bound-approval-review.md) describe the boundary and its regression/visual evidence. Physical keyboard and real-provider approval workflows remain separate acceptance work.
 
 ## Verification Checklist
 

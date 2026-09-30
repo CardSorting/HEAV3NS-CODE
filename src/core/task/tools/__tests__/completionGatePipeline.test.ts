@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import "should"
 import { COMPLETION_RESULT_MAX_LENGTH, MAX_COMPLETION_GATE_BLOCK_COUNT } from "@shared/audit/gatePolicy"
@@ -15,6 +17,7 @@ import {
 	validateCompletionResultQuality,
 } from "../attemptCompletionUtils"
 import {
+	captureAuditCacheObservation,
 	completionGateRuntime,
 	evaluateCompletionAuditGate,
 	evaluateGatePreflightReadiness,
@@ -48,6 +51,7 @@ describe("completionGatePipeline", () => {
 		taskState = new TaskState()
 		setRoadmapConfigOverride({ enabled: false })
 		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "completion-gate-"))
+		await promisify(execFile)("git", ["init", "--quiet"], { cwd: tmpDir })
 	})
 
 	afterEach(async () => {
@@ -132,9 +136,9 @@ describe("completionGatePipeline", () => {
 	})
 
 	it("recordAdvisoryAuditCache stores metadata for completion reuse", async () => {
-		const config = configWithState(taskState)
+		const config = { ...configWithState(taskState), cwd: tmpDir }
 		const metadata = { hardening_score: 92, violations: [] } as TaskAuditMetadata
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", metadata)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", metadata, await captureAuditCacheObservation(config))
 		const audit = config.taskState.lastAdvisoryAudit
 		if (audit && audit.hardening_score !== undefined) {
 			audit.hardening_score.should.equal(92)
@@ -159,7 +163,7 @@ describe("completionGatePipeline", () => {
 			violations: [],
 			blockCount: 0,
 		} as TaskAuditMetadata
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory, await captureAuditCacheObservation(config))
 		const completionStub = sinon.stub(completionGateRuntime, "runCompletionAudit").rejects(new Error("should not run"))
 
 		const result = await evaluateCompletionAuditGate(config, {
@@ -194,7 +198,7 @@ describe("completionGatePipeline", () => {
 			hardening_grade: "F",
 			violations: ["result_empty"],
 		} as TaskAuditMetadata
-		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory)
+		await recordAdvisoryAuditCache(config, VALID_RESULT, "task preview", advisory, await captureAuditCacheObservation(config))
 
 		const result = await evaluateCompletionAuditGate(config, {
 			result: VALID_RESULT,

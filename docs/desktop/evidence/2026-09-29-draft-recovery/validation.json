@@ -1,0 +1,99 @@
+{
+  "date": "2026-09-29",
+  "scope": "Sixth rolling QoL pass: completion checkpoint integrity and native composer restoration",
+  "checks": {
+    "unitTests": 2590,
+    "flightScenarios": {
+      "passed": 5,
+      "total": 5
+    },
+    "desktopTests": 33,
+    "nativeTests": 32,
+    "newCompletionRegressions": 11,
+    "newNativeRecoveryRegressions": 5,
+    "typescript": "root and worker passed",
+    "lint": "passed via npm test prerequisites",
+    "packagedBuild": "passed; ad-hoc development signature",
+    "runtimeSmoke": {
+      "passed": 9,
+      "total": 9
+    },
+    "packagedRuntimeFixture": "passed; isolated inspection, queue, cancellation, history and shutdown",
+    "focusedDocs": "roadmap audit, current agent links, docs index and root README links passed; git diff --check passed",
+    "packagedRuntimeFixtureDetails": {
+      "passed": true,
+      "providerCalls": 0,
+      "worker": "rebuilt packaged Node and CLI",
+      "workspace": "/Users/bozoegg/Desktop/LUMI-NEW/build/inspection-audit/runtime-workspace-il6cg7",
+      "unicodeFilePages": 5,
+      "stableDiffPages": 5,
+      "unicodeExact": true,
+      "diffRevisionStableAfterEdit": true,
+      "missingFileRecovered": true,
+      "accepted": 3,
+      "stopStates": [
+        "cancelled",
+        "cancelled",
+        "cancelled"
+      ],
+      "runDetails": true,
+      "recordedOutput": true,
+      "terminalEditRejected": true,
+      "resumedOutcome": "completed",
+      "cleanExit": {
+        "code": 0,
+        "signal": null
+      }
+    }
+  },
+  "visualReview": {
+    "batches": 1,
+    "correctionBatches": 0,
+    "confirmationBatches": 0,
+    "source": "Actual AppKit preview with a deterministic stdio peer and isolated draft root; restored fixture text, no provider or command execution",
+    "captures": [
+      {
+        "capture": "wide-light.png",
+        "layout": "wide-light.json",
+        "width": 1280,
+        "height": 731,
+        "sha256": "3e8d770fc9d59b8593f60e89debc750f0302430c603774cd44e89eeca6d25426"
+      },
+      {
+        "capture": "compact-light.png",
+        "layout": "compact-light.json",
+        "width": 720,
+        "height": 480,
+        "sha256": "564c47e44cbf44be5c913db39d0b862751db28823279476b7377865cda9a8687"
+      },
+      {
+        "capture": "compact-dark.png",
+        "layout": "compact-dark.json",
+        "width": 720,
+        "height": 500,
+        "sha256": "f64fa918a88c5fd2bdab9ae1707bdd7ec42a9b75a654c9777b65d8b1ba958ddc"
+      }
+    ],
+    "allReportedControlsWithinWindow": true,
+    "restoredComposerUTF16Count": 102,
+    "requestMethods": [
+      "hello",
+      "snapshot",
+      "files.list",
+      "snapshot"
+    ],
+    "submittedOnRestore": false,
+    "result": "Restored text and notice readable; composer and actions fit at wide and compact light/dark sizes."
+  },
+  "limits": [
+    "Dark appearance resized the frame to 720x500; minimum-height 720x480 dark is unverified.",
+    "Physical keyboard/IME/VoiceOver and provider-connected approval workflows remain unverified.",
+    "Draft recovery covers the composer; not queued-edit sheets or the last keystrokes within its 300ms debounce.",
+    "Atomic draft replacement does not guarantee power-loss durability.",
+    "Completion fingerprints are bounded observations, not an atomic filesystem snapshot.",
+    "Initially unobservable workspaces retain a lifecycle/checkpoint-only identity; no advisory reuse is authorized.",
+    "Full process-kill coverage across saga boundaries remains QOL-09 work.",
+    "The earlier broader documentation validator reported 76 historical/source/generated findings; these are not cleared by this pass.",
+    "Developer ID signing, notarization, same-worker SwiftTerm and four-active-workspace acceptance remain unverified."
+  ]
+}

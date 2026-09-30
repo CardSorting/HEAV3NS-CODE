@@ -1,0 +1,64 @@
+{
+  "date": "2026-09-29",
+  "scope": "Fifth rolling QoL pass: advisory audit freshness and operation-bound native approval review",
+  "checks": {
+    "unit": 2579,
+    "flightScenarios": 5,
+    "desktop": 33,
+    "native": 27,
+    "typecheck": "passed",
+    "lint": "passed",
+    "productionBuild": "passed via desktop:build",
+    "runtimeSmoke": 9,
+    "roadmapAudit": "passed",
+    "docsIndex": "passed",
+    "rootReadmeLinks": "passed",
+    "diffCheck": "passed",
+    "packagedRuntimeFixture": "passed",
+    "agentDocLinks": "passed, including deliberate broken-link fixture",
+    "repositoryWideDocumentation": {
+      "status": "failed",
+      "issues": 76,
+      "findings": "legacy-documentation-findings.json",
+      "reportedSourcesChangedInThisPass": false
+    }
+  },
+  "visual": {
+    "peer": "Deterministic local stdio peer; no provider response or real command execution",
+    "batchCount": 1,
+    "layouts": {
+      "ui-approval-wide": {
+        "width": 1280,
+        "height": 731,
+        "appearance": "NSAppearanceNameAqua",
+        "controlsWithinWindow": true
+      },
+      "ui-narrow": {
+        "width": 720,
+        "height": 480,
+        "appearance": "NSAppearanceNameAqua",
+        "controlsWithinWindow": true
+      },
+      "ui-approval-light": {
+        "width": 720,
+        "height": 480,
+        "appearance": "NSAppearanceNameAqua",
+        "controlsWithinWindow": true
+      },
+      "ui-approval-dark": {
+        "width": 720,
+        "height": 500,
+        "appearance": "NSAppearanceNameDarkAqua",
+        "controlsWithinWindow": true
+      }
+    },
+    "physicalKeyboard": false,
+    "voiceOver": false,
+    "minimumDarkHeightVerified": false
+  },
+  "limits": [
+    "Content observations are bounded reuse hints, not atomic filesystem snapshots or terminal completion authority.",
+    "Non-Git, unreadable, over-budget, changed submodule and symlink inputs bypass advisory cache reuse.",
+    "Physical keyboard, IME, VoiceOver, four-active-workspace stress and idle CPU target remain unverified in this pass."
+  ]
+}
