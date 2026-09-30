@@ -1,7 +1,8 @@
 import AppKit
 
 final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    private var launcher: NSWindow?
+    private var launcher: LauncherWindow?
+    private let projects = ProjectLibrary(persist: IntegrationProbe()?.launcherPass != true)
     private var workspaces = [String: WorkspaceWindow]()
     private var quitting = false
 
@@ -25,6 +26,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         applicationItem.submenu = applicationMenu; main.addItem(applicationItem)
         let fileItem = NSMenuItem(); fileItem.title = "File"; let file = NSMenu(title: "File")
         file.addItem(withTitle: "Open Workspace…", action: #selector(openFolder), keyEquivalent: "o").target = self
+        file.addItem(withTitle: "Open File…", action: #selector(openFile), keyEquivalent: "p").target = self
+        file.addItem(withTitle: "Project Library", action: #selector(showProjectLibrary), keyEquivalent: "").target = self
+        file.addItem(withTitle: "New Conversation", action: #selector(newConversation), keyEquivalent: "n").target = self
         file.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileItem.submenu = file; main.addItem(fileItem)
         let editItem = NSMenuItem(); editItem.title = "Edit"; let edit = NSMenu(title: "Edit")
@@ -38,9 +42,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Toggle Navigation", action: #selector(toggleNavigation), keyEquivalent: "b").target = self
         view.addItem(withTitle: "Focus Composer", action: #selector(focusComposer), keyEquivalent: "l").target = self
         view.addItem(.separator())
-        view.addItem(withTitle: "Files", action: #selector(showFiles), keyEquivalent: "1").target = self
+        view.addItem(withTitle: "Code", action: #selector(showFiles), keyEquivalent: "1").target = self
         view.addItem(withTitle: "Changes", action: #selector(showChanges), keyEquivalent: "2").target = self
-        view.addItem(withTitle: "Sessions", action: #selector(showSessions), keyEquivalent: "3").target = self
+        view.addItem(withTitle: "Recorded Runs", action: #selector(showSessions), keyEquivalent: "3").target = self
+        view.addItem(withTitle: "Walkthrough", action: #selector(showWalkthrough), keyEquivalent: "6").target = self
         view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
         view.addItem(withTitle: "Review Request…", action: #selector(showApprovalReview), keyEquivalent: "5").target = self
         view.addItem(.separator())
@@ -54,7 +59,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         windowItem.submenu = window; main.addItem(windowItem); NSApp.windowsMenu = window
         NSApp.mainMenu = main
     }
-    private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent } }
+    private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent || $0.window === NSApp.keyWindow?.parent } }
     @objc private func about() {
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HEAV3NS-CODE", .applicationVersion: "0.1 · Integration Preview", .credits: NSAttributedString(string: "A native workspace for LUMI.\nExecution and credentials remain in the CLI.")])
     }
@@ -64,8 +69,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
     private func open(_ url: URL) {
         let canonical = url.resolvingSymlinksInPath().standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard canonical.isFileURL, FileManager.default.fileExists(atPath: canonical.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            let alert = NSAlert(); alert.messageText = "This workspace folder is unavailable."
+            alert.informativeText = "It may have moved or been removed. Choose its current location to open it.\n\n\(canonical.path)"
+            alert.addButton(withTitle: "Choose Folder…"); alert.addButton(withTitle: "Cancel")
+            if alert.runModal() == .alertFirstButtonReturn { openFolder() }
+            return
+        }
         if let existing = workspaces[canonical.path] { existing.showWindow(nil); existing.window?.makeKeyAndOrderFront(nil); return }
         let workspace = WorkspaceWindow(folder: canonical)
+        workspace.onProjects = { [weak self] in self?.showLauncher() }
+        workspace.onAccount = { [weak self] in self?.showLauncher(account: true) }
         workspaces[canonical.path] = workspace
         workspace.onClosed = { [weak self] in
             guard let self else { return }
@@ -73,37 +88,30 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             if self.quitting && self.workspaces.isEmpty { NSApp.reply(toApplicationShouldTerminate: true) }
             else if self.workspaces.isEmpty { self.showLauncher() }
         }
-        launcher?.orderOut(nil)
+        launcher?.suspend()
         workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil); workspace.attach()
         if !ProcessInfo.processInfo.arguments.contains("--integration-probe") {
+            projects.opened(canonical)
             var recent = UserDefaults.standard.stringArray(forKey: "recentWorkspaces") ?? []
             recent.removeAll { $0 == canonical.path }; recent.insert(canonical.path, at: 0)
             UserDefaults.standard.set(Array(recent.prefix(12)), forKey: "recentWorkspaces")
         }
     }
-    private func showLauncher() {
-        let window = launcher ?? NSWindow(contentRect: NSRect(x: 0, y: 0, width: 780, height: 520), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "HEAV3NS-CODE"; window.minSize = NSSize(width: 720, height: 480); window.isReleasedWhenClosed = false
-        let content = NSStackView(); content.orientation = .vertical; content.alignment = .leading; content.spacing = 16; content.translatesAutoresizingMaskIntoConstraints = false
-        let title = NSTextField(labelWithString: "Open a workspace."); title.font = .systemFont(ofSize: 26, weight: .semibold)
-        let detail = NSTextField(wrappingLabelWithString: "Tell LUMI what you need. Follow the work, inspect the result, and stay in control.")
-        detail.font = .systemFont(ofSize: 14); detail.textColor = .secondaryLabelColor
-        let open = NSButton(title: "Open Folder…", target: self, action: #selector(openFolder)); open.bezelStyle = .rounded; open.keyEquivalent = "\r"
-        [title, detail, open].forEach(content.addArrangedSubview)
-        let recent = UserDefaults.standard.stringArray(forKey: "recentWorkspaces") ?? []
-        if !recent.isEmpty {
-            let label = NSTextField(labelWithString: "Recent Workspaces"); label.font = .systemFont(ofSize: 12, weight: .semibold); content.addArrangedSubview(label)
-            for path in recent.prefix(5) {
-                let button = NSButton(title: "\((path as NSString).lastPathComponent)   ·   \(path)", target: self, action: #selector(openRecent))
-                button.identifier = NSUserInterfaceItemIdentifier(path); button.bezelStyle = .inline; button.lineBreakMode = .byTruncatingMiddle
-                content.addArrangedSubview(button)
-            }
+    private func showLauncher(account: Bool = false) {
+        if launcher == nil {
+            if let probe = IntegrationProbe(), probe.launcherPass { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) }; if let first = projects.projects.first { projects.togglePin(first.path) } }
+            let controller = LauncherWindow(library: projects)
+            controller.onOpenFolder = { [weak self] in self?.openFolder() }
+            controller.onOpenProject = { [weak self] url in self?.open(url) }
+            controller.canChangeAccount = { [weak self] in self?.workspaces.isEmpty == true }
+            launcher = controller
         }
-        let root = NSView(); root.addSubview(content); window.contentView = root
-        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 64), content.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -48), content.centerYAnchor.constraint(equalTo: root.centerYAnchor)])
-        launcher = window; window.center(); window.makeKeyAndOrderFront(nil)
+        launcher?.present(account: account)
     }
-    @objc private func openRecent(_ sender: NSButton) { if let path = sender.identifier?.rawValue { open(URL(fileURLWithPath: path)) } }
+    @objc private func showProjectLibrary() { showLauncher() }
+    @objc private func newConversation() { current?.newConversation() }
+    @objc private func openFile() { current?.showQuickOpen() }
+    @objc private func showWalkthrough() { current?.showWalkthrough() }
     @objc private func toggleNavigation() { current?.toggleNavigation() }
     @objc private func focusComposer() { current?.focusComposer() }
     @objc private func showFiles() { current?.showFiles() }
@@ -119,12 +127,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if let current { current.showActions() } else { openFolder() }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(openFile) { return current?.canOpenFile == true }
+        if menuItem.action == #selector(newConversation) { return current?.canCreateConversation == true }
         if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
         if menuItem.action == #selector(findInInspection) { return current?.canFindInInspection == true }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
         if menuItem.action == #selector(showApprovalReview) { return current?.canReviewApproval == true }
-        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue)].contains(menuItem.action) { return current != nil }
+        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue), #selector(showWalkthrough)].contains(menuItem.action) { return current != nil }
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

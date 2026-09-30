@@ -1,0 +1,5 @@
+Use case: ui-mockup.
+Edit target: the supplied HEAV3NS-CODE approval screen.
+Preserve the entire layout, center conversation, left navigation, typography, palette, native controls, composer and neutral Close / Deny / Allow Once buttons exactly. The center chat remains dominant and the right panel supporting.
+Make ONE narrow correction to the RIGHT Task context panel below its five-step walkthrough. The screen is waiting for initial permission and no edits have occurred yet. Replace 'Files touched' with 'Files to inspect'. Keep the two filenames but REMOVE both M modification badges. Replace the whole 'Recent activity' section and both completed modification rows with a quiet heading 'No changes yet' and a single sentence 'LUMI is waiting for your decision.' Do not show edited files, completed spacing changes, timestamps, or previous activity in this lower panel.
+The upper right walkthrough remains: Read the request / Done; Waiting for approval / The requested command has not run.; Inspect current changes; Adjust navigation spacing; Review result. Preserve all other image details. No new content. In the center command keep exact ASCII text 'git diff --stat'.

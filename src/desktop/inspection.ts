@@ -4,6 +4,7 @@ import { constants } from "node:fs"
 import { open, opendir, realpath } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
+import { WorkspaceFileSearch } from "./file-search.js"
 
 const exec = promisify(execFile)
 const PAGE = 32 * 1024
@@ -28,12 +29,14 @@ function completeUtf8Prefix(bytes: Buffer): Buffer {
 
 /** Read-only inspection has one bounded diff cache per owned workspace. */
 export class WorkspaceInspection {
+	readonly fileSearch: WorkspaceFileSearch
 	private root: string
 	private diff?: { key: string; revision: string; bytes: Buffer; truncated: boolean; baseline: string }
 	private diffGeneration = 0
 	private readonly runDiff: typeof readGitDiff
 	constructor(root: string, runDiff = readGitDiff) {
 		this.root = root
+		this.fileSearch = new WorkspaceFileSearch(root)
 		this.runDiff = runDiff
 	}
 	async resolve(relative: string) {

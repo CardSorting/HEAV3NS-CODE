@@ -1,0 +1,84 @@
+{
+  "appPID" : 93132,
+  "capturedAt" : "2026-09-30T19:57:42Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : true
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "composerFocused" : true,
+    "composerUTF16Count" : 57,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 671,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 869,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1196,
+        "y" : 687
+      }
+    },
+    "conversation" : "walkthrough-fixture",
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "Choose a file, change, or recorded instruction to inspect.",
+    "inspectionTitle" : "Inspect",
+    "navigationVisible" : false,
+    "quickOpen" : {
+      "count" : 0,
+      "paths" : [
+
+      ],
+      "query" : "zzz-no-match",
+      "scope" : "Project files · Git ignore rules apply. File contents aren’t searched.",
+      "status" : "No matching files. Try a filename or part of its path.",
+      "visible" : false
+    },
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage" : "Response ready",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1312,
+    "workspaceKey" : true
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1312,
+  "workerPID" : 93134,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790798248709\/navigation\/Workspace"
+}

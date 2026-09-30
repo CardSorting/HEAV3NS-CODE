@@ -1,0 +1,14 @@
+{
+  "scope": "Native journey UI; synthetic recorded conversation and approval peer, real read-only file/diff bridge. No OAuth or model task executed.",
+  "output": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791995538",
+  "workspace": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791995538/Journey review fixture",
+  "completedAt": "2026-09-30T18:14:01.707Z",
+  "supplementalCaptures": {
+    "source": "build/desktop-journey-1790792150798/workspace",
+    "files": [
+      "workspace-ui-expanded-light.png",
+      "workspace-ui-collapsed-light.png"
+    ],
+    "reason": "Activity rows were above the compact viewport; these two states were recaptured at wide light size without implementation changes."
+  }
+}

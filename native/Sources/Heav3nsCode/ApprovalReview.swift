@@ -26,15 +26,27 @@ final class ApprovalReview: NSWindowController, NSWindowDelegate {
 
     init(request: ApprovalRequest, decide: @escaping (ApprovalRequest, String) -> Void, didClose: @escaping () -> Void) {
         self.request = request; self.decide = decide; self.didClose = didClose
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 340), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 380), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Review Request"; window.isReleasedWhenClosed = false
         super.init(window: window); window.delegate = self
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12
         root.translatesAutoresizingMaskIntoConstraints = false
-        let title = NSTextField(labelWithString: request.tool)
-        title.font = .systemFont(ofSize: 16, weight: .semibold); title.lineBreakMode = .byTruncatingMiddle; title.toolTip = request.tool
-        let text = NSTextView(); text.isEditable = false; text.isSelectable = true; text.isRichText = false
-        text.font = .monospacedSystemFont(ofSize: 12, weight: .regular); text.string = request.details
+        let title = NSTextField(labelWithString: "Allow this operation?")
+        title.font = .systemFont(ofSize: 20, weight: .semibold)
+        let operationName = request.tool.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ").capitalized
+        let operation = NSTextField(labelWithString: "")
+        let operationText = NSMutableAttributedString(string: operationName + "  ·  ", attributes: [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.labelColor])
+        operationText.append(NSAttributedString(string: request.tool, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]))
+        operation.attributedStringValue = operationText; operation.lineBreakMode = .byTruncatingMiddle; operation.toolTip = request.tool; operation.isSelectable = true
+        let heading = NSStackView(views: [title, operation]); heading.orientation = .vertical; heading.alignment = .leading; heading.spacing = 5
+        let text = NSTextView(); text.isEditable = false; text.isSelectable = true; text.isRichText = true
+        let details = NSMutableAttributedString()
+        for (label, value, monospace) in [("Workspace", request.scope, true), ("Reason", request.reason.isEmpty ? "Review this operation before it runs." : request.reason, false), ("Arguments", request.arguments, true)] {
+            if details.length > 0 { details.append(NSAttributedString(string: "\n\n")) }
+            details.append(NSAttributedString(string: label + "\n", attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.labelColor]))
+            details.append(NSAttributedString(string: value, attributes: [.font: monospace ? NSFont.monospacedSystemFont(ofSize: 12, weight: .regular) : NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.labelColor]))
+        }
+        text.textStorage?.setAttributedString(details)
         text.textContainerInset = NSSize(width: 10, height: 10)
         text.isVerticallyResizable = true; text.autoresizingMask = [.width]
         text.setAccessibilityLabel("Full operation details for \(request.tool)")
@@ -44,12 +56,12 @@ final class ApprovalReview: NSWindowController, NSWindowDelegate {
         for button in [closeButton, denyButton, allowButton] { button.bezelStyle = .rounded; button.target = self; button.setContentHuggingPriority(.required, for: .horizontal) }
         closeButton.action = #selector(dismiss); closeButton.keyEquivalent = "\u{1b}"
         denyButton.action = #selector(deny); allowButton.action = #selector(allow)
-        [title, scroll, message, buttons].forEach(root.addArrangedSubview)
+        [heading, scroll, message, buttons].forEach(root.addArrangedSubview)
         let content = NSView(); content.addSubview(root); window.contentView = content
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20), root.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             root.topAnchor.constraint(equalTo: content.topAnchor, constant: 18), root.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -18),
-            title.widthAnchor.constraint(equalTo: root.widthAnchor), scroll.widthAnchor.constraint(equalTo: root.widthAnchor),
+            heading.widthAnchor.constraint(equalTo: root.widthAnchor), title.widthAnchor.constraint(equalTo: heading.widthAnchor), operation.widthAnchor.constraint(equalTo: heading.widthAnchor), scroll.widthAnchor.constraint(equalTo: root.widthAnchor),
             message.widthAnchor.constraint(equalTo: root.widthAnchor), buttons.widthAnchor.constraint(equalTo: root.widthAnchor), scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120)
         ])
         window.initialFirstResponder = text

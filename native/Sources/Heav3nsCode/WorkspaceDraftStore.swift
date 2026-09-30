@@ -10,6 +10,8 @@ struct WorkspaceDraft: Codable, Equatable {
     let workspace: String
     let text: String
     let submission: Submission?
+    var conversation: String? = nil
+    var conversations: [String: String]? = nil
 }
 
 /// Presentation recovery only. A saved submission is looked up, never replayed.
@@ -41,15 +43,15 @@ final class WorkspaceDraftStore {
         return draft
     }
 
-    func save(text: String, submission: WorkspaceDraft.Submission?) throws {
-        if text.isEmpty && submission == nil {
+    func save(text: String, submission: WorkspaceDraft.Submission?, conversation: String? = nil, conversations: [String: String] = [:]) throws {
+        if text.isEmpty && submission == nil && conversations.values.allSatisfy({ $0.isEmpty }) {
             do { try FileManager.default.removeItem(at: file) }
             catch let error as CocoaError where error.code == .fileNoSuchFile { }
             return
         }
         // Refuse oversized drafts without truncating either the editor or its last backup.
         guard text.utf8.count <= Self.byteLimit else { throw DraftError.tooLarge }
-        let data = try JSONEncoder().encode(WorkspaceDraft(version: 1, workspace: workspace, text: text, submission: submission))
+        let data = try JSONEncoder().encode(WorkspaceDraft(version: 1, workspace: workspace, text: text, submission: submission, conversation: conversation, conversations: conversations.filter { !$0.value.isEmpty }))
         guard data.count <= Self.byteLimit else { throw DraftError.tooLarge }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try data.write(to: file, options: .atomic)

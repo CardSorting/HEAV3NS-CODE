@@ -65,9 +65,10 @@ final class RuntimeClient {
     private var closed = false
     private var failure: String?
     private var snapshotPending = false
+    private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
     private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown"]
-    private static let inspections: Set<String> = ["files.list", "files.read", "changes.list", "changes.read", "artifact.read", "history.read"]
+    private static let inspections: Set<String> = ["files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -193,14 +194,19 @@ final class RuntimeClient {
             }
         } catch { completion(.failure(error)) }
     }
-    func requestSnapshot(completion: (() -> Void)? = nil) {
+    func requestSnapshot(afterPending: Bool = false, completion: (() -> Void)? = nil) {
+        // A conversation mutation needs a snapshot requested after its acknowledgement.
+        // Joining an older in-flight snapshot can otherwise restore the prior thread.
+        if afterPending { snapshotGeneration += 1 }
         if let completion { snapshotCompletions.append(completion) }
         guard !snapshotPending else { return }; snapshotPending = true
+        let generation = snapshotGeneration
         request("snapshot") { [weak self] result in
             guard let self else { return }; self.snapshotPending = false
             switch result {
             case .success(let snapshot):
                 guard snapshot["workspace"] as? String == self.workspace, snapshot["session"] as? String == self.session, snapshot["runtime"] as? String == self.runtime else { self.fail("The snapshot belongs to another workspace. LUMI has been disconnected."); return }
+                guard generation == self.snapshotGeneration else { self.requestSnapshot(); return }
                 let completions = self.snapshotCompletions; self.snapshotCompletions.removeAll()
                 self.onEvent?(["kind": "snapshot", "payload": snapshot])
                 completions.forEach { $0() }
@@ -231,7 +237,7 @@ final class RuntimeClient {
                         }
                     } else if message["kind"] as? String == "event" {
                         guard message["workspace"] as? String == self.workspace, message["session"] as? String == self.session, message["runtime"] as? String == self.runtime else { continue }
-                        if let type = message["type"] as? String, ["run.state", "run.accepted", "approval.requested", "approval.resolved"].contains(type) {
+                        if let type = message["type"] as? String, ["run.state", "run.progress", "run.accepted", "approval.requested", "approval.resolved"].contains(type) {
                             guard let payload = message["payload"] as? [String: Any], self.validRun(payload), message["seq"] is NSNumber else { self.fail("LUMI sent an invalid state event. Reconnect to recover recorded state."); return }
                         }
                         self.onEvent?(message)
@@ -259,6 +265,9 @@ final class RuntimeClient {
         case "task.cancel", "task.cancelAll": return result["requested"] as? Bool == true
         case "task.edit": return result["updated"] as? Bool == true && (result["run"] as? [String: Any]).map(validRun) == true
         case "history.read": return (result["run"] as? [String: Any]).map(validRun) == true && result["outputAvailable"] is Bool
+        case "activity.list": return result["run"] is String && result["activities"] is [[String: Any]] && result["activitySequence"] is NSNumber && result["activityCount"] is NSNumber
+        case "conversation.create", "conversation.select": return (result["conversation"] as? String).map { !$0.isEmpty && $0.utf8.count <= 128 } == true
+        case "files.search": return result["entries"] is [[String: Any]] && result["matched"] is NSNumber && result["more"] is Bool && result["scanLimited"] is Bool && ["git", "workspace"].contains(result["scope"] as? String ?? "")
         case "approval.resolve": return result["resolved"] as? Bool == true
         case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
         case "files.list", "changes.list": return result["entries"] is [[String: Any]]

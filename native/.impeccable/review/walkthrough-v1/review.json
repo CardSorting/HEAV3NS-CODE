@@ -1,0 +1,58 @@
+{
+  "disposition": "ship",
+  "persistence": {
+    "status": "pass",
+    "basis": "PRODUCT.md and DESIGN.md preserve the approved journey-v3 native world; docs/desktop/WALKTHROUGH.md records the new interaction and event contract. This is a code-led extension with no new comp or concept-roll obligation.",
+    "evidence": "All eight required PNGs exist, were visually opened, and show their named states without malformed or blank capture regions. JSON diagnostics and provenance were inspected. No native design detector ran.",
+    "scope": "Wide captures are 1440×731 native frames; compact captures are 720×500, with approval at 720×504. Exact 720×480 light-window behavior is not certified. Review samples WalkthroughView.swift, WalkthroughState.swift, and their WorkspaceWindow/RuntimeClient integration. Backend and engine sources were not independently reviewed; reported tests were not rerun. Provider/OAuth, executed approval commands, production owner-lock recovery, full keyboard/IME/VoiceOver acceptance, and release readiness remain outside this review."
+  },
+  "fidelity": {
+    "matrix": [
+      {
+        "element": "TYPE",
+        "status": "match",
+        "evidence": "System prose, familiar control typography, and restrained size/weight hierarchy match the explicitly approved AppKit identity. Monospace stays in code evidence."
+      },
+      {
+        "element": "MATERIAL",
+        "status": "match",
+        "evidence": "Native chrome, semantic surfaces, SF Symbols, table disclosures, and standard controls carry the interface; no simulated physical material or decorative card system."
+      },
+      {
+        "element": "GROUND",
+        "status": "match",
+        "evidence": "Light and dark native grounds follow DESIGN.md's semantic AppKit appearance authority; no fixed-color comp governs this extension."
+      },
+      {
+        "element": "Workspace topology and first viewport",
+        "status": "match",
+        "evidence": "Wide views retain left navigation, dominant central conversation/composer, and secondary right context. Current stage and inspectable work are immediately recognizable."
+      },
+      {
+        "element": "Compact context",
+        "status": "adaptation",
+        "evidence": "As specified by the compact-window contract, the sidebar hides and secondary explanations yield to activity and actions. The persistent composer and approval actions remain visible at the captured native frames."
+      },
+      {
+        "element": "Follow, history, and file navigation",
+        "status": "match",
+        "evidence": "Live capture follows active work despite queued work; history capture pins the completed instruction. File capture opens the real read-only preview in Code while chat remains visible. Targeted source supports the selection rules and existing navigation callbacks."
+      },
+      {
+        "element": "State and evidence truth",
+        "status": "match",
+        "evidence": "Failure exposes literal Exit 1 and recovery guidance; approval says paused; recovery says interrupted with no completion recorded. Synthetic fixture text is explicit. Command evidence and human review remain separate from success claims."
+      },
+      {
+        "element": "Stage feedback and motion",
+        "status": "match",
+        "evidence": "Native indeterminate feedback has no invented percentage. Diagnostics show live animation and stopped history, reduced-motion, approval, failure, and recovered states; source also gates hidden/offline indicators. Static images do not certify animation timing or production behavior."
+      }
+    ],
+    "contract": "THESIS: conversation-led observation holds. OWN-WORLD: native AppKit conventions hold. STORY: follow, inspect, review, and recover remain legible. FIRST VIEWPORT: chat remains dominant with composer available. FORM: approved journey-v3 topology persists; no new visual-world seed is applicable.",
+    "floor": "No material native craft-floor violation in the reviewed inspector and integration."
+  },
+  "ceiling": "reached — the native quality bar is served by semantic controls, inspectable activity, explicit failure/approval states, and restrained functional motion; no additional decorative device is warranted.",
+  "material_fixes": [],
+  "keep": "Preserve the dominant chat/composer, explicit follow-versus-pinned selection, honest stage/evidence language, native semantics, and focus-preserving secondary inspector."
+}

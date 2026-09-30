@@ -3,6 +3,27 @@ import XCTest
 @testable import Heav3nsCode
 
 final class NavigationSidebarTests: XCTestCase {
+    func testFolderSelectionIsStableUntilActivatedAndKeyboardParentRemainsAvailable() {
+        _ = NSApplication.shared
+        let sidebar = NavigationSidebar(frame: NSRect(x: 0, y: 0, width: 250, height: 500))
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        let table = descendants(sidebar).compactMap { $0 as? KeyboardListView }.first!
+        var opened = [String](), parents = 0
+        sidebar.onOpen = { opened.append($0.id) }; sidebar.onBack = { parents += 1 }
+        sidebar.show([SidebarEntry(id: "src", title: "src", detail: "", symbol: "folder", value: ["directory": true]), SidebarEntry(id: "README.md", title: "README.md", detail: "", symbol: "doc", value: [:])], location: "Project", message: "", canGoBack: true)
+        table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        XCTAssertTrue(opened.isEmpty)
+        func key(_ code: UInt16) {
+            table.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!)
+        }
+        key(36); XCTAssertEqual(opened, ["src"])
+        key(123); XCTAssertEqual(parents, 1)
+        sidebar.previewsSelection = false
+        table.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+        XCTAssertEqual(opened, ["src"])
+        key(36); XCTAssertEqual(opened, ["src", "README.md"])
+        sidebar.loading("Loading…"); key(36); XCTAssertEqual(opened, ["src", "README.md"])
+    }
     func testChangingFolderScopeClearsTheQueryAndCancelsItsPendingFilter() {
         _ = NSApplication.shared
         let sidebar = NavigationSidebar(frame: .zero)

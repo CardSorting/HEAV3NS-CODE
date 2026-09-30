@@ -243,7 +243,15 @@ describe("CLI AgentEngine autonomous execution", () => {
 		assert.ok(progress.every((event, index) => index === 0 || event.sequence > progress[index - 1].sequence))
 		assert.equal(timeline.getTerminalStatus(), "completed")
 		const rendered = timeline.render(180).join("\n")
-		assert.equal((rendered.match(/Completed view_file/g) ?? []).length, 3)
+		assert.equal((rendered.match(/Read workspace/g) ?? []).length, 3)
+		assert.deepEqual(
+			starts.map((event) => event.metadata?.files),
+			[["slow.ts"], ["fast.ts"], ["later-round.ts"]],
+		)
+		assert.deepEqual(
+			completions.map((event) => event.metadata?.files),
+			[["fast.ts"], ["slow.ts"], ["later-round.ts"]],
+		)
 		assert.match(rendered, /Agent turn completed successfully/)
 	})
 

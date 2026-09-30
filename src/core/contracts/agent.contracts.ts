@@ -37,6 +37,8 @@ export interface EngineProgressMetadata {
   /** One-based provider attempt number when a turn is retried in place. */
   attempt?: number;
   itemType?: string;
+  /** Semantic operation from a known tool schema, not inferred from model prose. */
+  operation?: "read" | "search" | "edit" | "command";
   files?: readonly string[];
   exitCode?: number;
   completedSteps?: number;
@@ -59,6 +61,8 @@ export interface EngineProgressEvent {
   elapsedMs?: number;
   /** Monotonically increasing sequence number within a turn. */
   sequence: number;
+  /** Stable first-observed order, retained by activity projections across updates. */
+  startedSequence?: number;
   metadata?: EngineProgressMetadata;
 }
 

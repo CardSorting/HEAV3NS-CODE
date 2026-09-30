@@ -10,6 +10,10 @@ final class IntegrationProbe {
     let navigationPass: Bool
     let steps: [String]
     let draftRoot: URL?
+    let launcherPass: Bool
+    let projectPaths: [String]
+    private let captureWalkthroughStages: Bool
+    private var capturedStages = Set<String>()
     private var submitted = false
     private var finished = false
     init?() {
@@ -24,15 +28,45 @@ final class IntegrationProbe {
         navigationPass = config["navigationPass"] as? Bool ?? false
         steps = config["steps"] as? [String] ?? ["files", "changes", "narrow", "dark", "palette"]
         draftRoot = (config["draftRoot"] as? String).map { URL(fileURLWithPath: $0, isDirectory: true) }
+        launcherPass = config["launcherPass"] as? Bool ?? false
+        projectPaths = config["projectPaths"] as? [String] ?? []
+        captureWalkthroughStages = config["captureWalkthroughStages"] as? Bool ?? false
+    }
+    func connected(_ launcher: LauncherWindow) {
+        func step(_ index: Int) {
+            guard steps.indices.contains(index), let window = launcher.window else { return }
+            launcher.navigateProbe(steps[index])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+                window.contentView?.layoutSubtreeIfNeeded()
+                try? FileManager.default.createDirectory(at: self.destination, withIntermediateDirectories: true)
+                let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), self.destination.appendingPathComponent("launcher-\(self.steps[index]).png").path]
+                try? capture.run(); capture.waitUntilExit()
+                let report: [String: Any] = ["appPID": ProcessInfo.processInfo.processIdentifier, "harness": "Native launcher with isolated project fixture; no authentication performed", "width": window.frame.width, "height": window.frame.height]
+                if let data = try? JSONSerialization.data(withJSONObject: report) { try? data.write(to: self.destination.appendingPathComponent("launcher-\(self.steps[index]).json")) }
+                step(index + 1)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { step(0) }
     }
     func connected(_ workspace: WorkspaceWindow) {
         guard !submitted else { return }; submitted = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
             self.capture(workspace, suffix: "initial")
-            if self.navigationPass { self.navigationStep(workspace, index: 0); return }
             if let instruction = self.instruction { workspace.submitProbe(instruction) }
+            if self.navigationPass { self.navigationStep(workspace, index: 0); return }
             if let delay = self.cancelAfter { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak workspace] in workspace?.stop() } }
+        }
+    }
+    func walkthroughChanged(_ workspace: WorkspaceWindow, stage: String) {
+        guard captureWalkthroughStages, !stage.isEmpty, !capturedStages.contains(stage) else { return }
+        capturedStages.insert(stage)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak workspace] in
+            guard let self, let workspace, workspace.walkthroughStage == stage else { return }
+            let name = stage.lowercased().replacingOccurrences(of: " ", with: "-")
+            self.capture(workspace, suffix: "stage-\(name)")
         }
     }
     func outcome(_ workspace: WorkspaceWindow, state: String) {
@@ -60,6 +94,10 @@ final class IntegrationProbe {
         let destination = perWorkspace ? self.destination.appendingPathComponent(workspace.folder.lastPathComponent) : self.destination
         try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         view.layoutSubtreeIfNeeded()
+        // Capture must not manufacture the focus state a keyboard check asserts.
+        let beforeCapture = workspace.probeLayout
+        if NSApp.keyWindow?.parent !== workspace.window { workspace.window?.makeKeyAndOrderFront(nil) }
+        NSApp.activate(ignoringOtherApps: true)
         // View caching omits layer-backed AppKit controls. Capture the owned
         // window, including native chrome, rather than treating that as evidence.
         let capture = Process()
@@ -77,6 +115,7 @@ final class IntegrationProbe {
         if let pid = workspace.client.pid { report["workerPID"] = pid }
         if let state { report["state"] = state }
         report["layout"] = workspace.probeLayout
+        report["focusBeforeCapture"] = ["workspaceKey": beforeCapture["workspaceKey"] as? Bool ?? false, "composerFocused": beforeCapture["composerFocused"] as? Bool ?? false]
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: destination.appendingPathComponent("\(suffix).json")) }
     }
 }

@@ -41,6 +41,103 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testFreshSnapshotCannotJoinAReadFromBeforeAConversationMutation() throws {
+        let client = try peer(hello + """
+        if (request.method === 'snapshot') {
+          globalThis.snapshots = (globalThis.snapshots || 0) + 1;
+          const count = globalThis.snapshots;
+          const value = {workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[],conversation:count > 2 ? 'new' : 'old'};
+          if (count === 2) setTimeout(() => reply(request,value),80); else reply(request,value);
+        }
+        """, timeout: 2)
+        var conversations = [String](), started = false
+        let finished = expectation(description: "fresh snapshot follows the mutation")
+        client.onEvent = { if let payload = $0["payload"] as? [String: Any], let id = payload["conversation"] as? String { conversations.append(id) } }
+        client.onConnection = { _ in
+            guard client.isReady, !started else { return }; started = true
+            client.requestSnapshot()
+            client.requestSnapshot(afterPending: true) { finished.fulfill() }
+        }
+        client.start(folder: directory); wait(for: [finished], timeout: 3)
+        XCTAssertEqual(conversations, ["old", "new"])
+    }
+    func testConversationSwitchClearsInspectionHistoryAndKeepsDraftsDespiteLateReplies() throws {
+        _ = NSApplication.shared
+        let client = try peer("""
+        globalThis.selected ??= 'first';
+        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['conversations']});
+        if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[],conversation:globalThis.selected});
+        if (request.method === 'conversation.list') reply(request,{conversations:[{id:'second',title:'Second'},{id:'first',title:'First'}],more:false});
+        if (request.method === 'conversation.create') { globalThis.selected='second'; setTimeout(() => reply(request,{conversation:'second'}),20); }
+        if (request.method === 'conversation.select') { globalThis.selected=request.params.id; reply(request,{conversation:globalThis.selected}); }
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        if (request.method === 'files.read') setTimeout(() => reply(request,{text:'Delayed old preview',revision:'r',nextOffset:19,size:19}),200);
+        """, timeout: 2)
+        let drafts = WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts"))
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: drafts)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        let composer = descendants(workspace.window!.contentView!).compactMap { $0 as? ComposerView }.first!
+        let connected = client.onConnection, events = client.onEvent
+        let finished = expectation(description: "late inspection cannot revive the previous thread")
+        var started = false, checked = false
+        client.onConnection = { value in
+            connected?(value)
+            guard client.isReady, !started else { return }; started = true
+            composer.string = "Keep my first draft 🌙"; workspace.prepareToClose()
+            workspace.inspect(.file("slow.txt")); workspace.newConversation()
+            XCTAssertFalse(composer.isEditable)
+        }
+        client.onEvent = { value in
+            events?(value)
+            guard (value["payload"] as? [String: Any])?["conversation"] as? String == "second", !checked else { return }; checked = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                XCTAssertFalse(workspace.canInspectBack)
+                XCTAssertFalse(workspace.window?.isVisible == true, "An asynchronous conversation reply must not present a background workspace")
+                XCTAssertFalse((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("Delayed"))
+                XCTAssertEqual(composer.string, ""); XCTAssertTrue(composer.isEditable)
+                XCTAssertEqual(try? drafts.load()?.conversations?["first"], "Keep my first draft 🌙")
+                composer.string = "Keep second draft"; workspace.prepareToClose()
+                workspace.navigateProbe("previous-conversation")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    XCTAssertEqual(composer.string, "Keep my first draft 🌙")
+                    XCTAssertEqual(try? drafts.load()?.conversations?["second"], "Keep second draft")
+                    finished.fulfill()
+                }
+            }
+        }
+        workspace.attach(); wait(for: [finished], timeout: 4)
+        client.onConnection = nil; client.onEvent = nil; client.forceStop(); workspace.window?.close()
+    }
+    func testFocusComposerDismissesTheModelessFilePickerAndRestoresKeyboardTarget() throws {
+        _ = NSApplication.shared
+        let client = try peer("""
+        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['file-search-v1']});
+        if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[]});
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        if (request.method === 'files.search') reply(request,{entries:[],scope:'git',matched:0,more:false,scanLimited:false});
+        """, timeout: 2)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        let finished = expectation(description: "composer owns focus after the picker is dismissed")
+        let connected = client.onConnection
+        var started = false
+        client.onConnection = { value in
+            connected?(value)
+            guard client.isReady, !started else { return }; started = true
+            workspace.window?.makeKeyAndOrderFront(nil); workspace.showQuickOpen()
+            XCTAssertEqual((workspace.probeLayout["quickOpen"] as? [String: Any])?["visible"] as? Bool, true)
+            XCTAssertEqual(workspace.window?.childWindows?.count, 1)
+            workspace.focusComposer()
+            XCTAssertEqual((workspace.probeLayout["quickOpen"] as? [String: Any])?["visible"] as? Bool, false)
+            XCTAssertTrue(workspace.window?.childWindows?.isEmpty ?? true)
+            XCTAssertEqual(workspace.probeLayout["composerFocused"] as? Bool, true)
+            XCTAssertTrue(workspace.window?.isVisible == true)
+            // The command-line XCTest host is inactive. The activated native
+            // integration probe separately asserts the actual key window.
+            finished.fulfill()
+        }
+        workspace.attach(); wait(for: [finished], timeout: 3)
+        client.onConnection = nil; client.forceStop(); workspace.window?.close()
+    }
     func testLostAcknowledgmentRestoresRequestIdentityAndPreservesANewerDraftWithoutReplay() throws {
         _ = NSApplication.shared
         let drafts = WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts"))

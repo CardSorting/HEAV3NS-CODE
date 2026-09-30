@@ -596,7 +596,11 @@ export function hasOpenAiCodexOAuthCredentials(raw: string | undefined): boolean
 }
 
 export class OpenAiCodexOAuthService {
-	static async signIn(onManualBrowserOpen?: (authorizationLink: string) => void, signal?: AbortSignal): Promise<void> {
+	static async signIn(
+		onManualBrowserOpen?: (authorizationLink: string) => void,
+		signal?: AbortSignal,
+		browser: (url: string) => Promise<boolean> = openExternal,
+	): Promise<void> {
 		const { verifier, challenge } = createOpenAiCodexPkcePair()
 		const state = randomBytes(32).toString("base64url")
 		const callbackServer = await bindCallbackServer(state, signal)
@@ -622,7 +626,7 @@ export class OpenAiCodexOAuthService {
 		try {
 			if (signal?.aborted) throw new Error("OpenAI Codex sign-in was cancelled.")
 			const authorizationLink = authorizationUrl.toString()
-			if (!(await openExternal(authorizationLink))) {
+			if (!(await browser(authorizationLink))) {
 				if (!onManualBrowserOpen) {
 					throw new Error("Could not open a browser automatically. Try signing in again from a local terminal session.")
 				}

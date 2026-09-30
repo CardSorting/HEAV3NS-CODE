@@ -1,0 +1,85 @@
+{
+  "appPID" : 63531,
+  "capturedAt" : "2026-09-30T18:13:47Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : true,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 764,
+        "x" : 253,
+        "y" : 83
+      },
+      "inspection" : {
+        "height" : 189,
+        "visibleWithinWindow" : true,
+        "width" : 361,
+        "x" : 1065,
+        "y" : 50
+      },
+      "inspectionBack" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 34,
+        "x" : 1065,
+        "y" : 315
+      },
+      "inspectionFind" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 39.5,
+        "x" : 1303.5,
+        "y" : 315
+      },
+      "inspectionForward" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 34,
+        "x" : 1103,
+        "y" : 315
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 962,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1324,
+        "y" : 687
+      }
+    },
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–187 \/ 187 bytes · Read only",
+    "inspectionPreview" : "import AppKit\n\nfinal class WorkspaceExample: NSView {\n    private let conversation = NSTextView()\n\n    func focusConversation() {\n        window?.makeFirstResponder(conversation)\n    }\n}\n",
+    "inspectionTitle" : "WorkspaceExample.swift",
+    "navigationVisible" : true,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1440
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1440,
+  "workerPID" : 63539,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-journey-1790791995538\/Journey review fixture"
+}

@@ -1,0 +1,85 @@
+{
+  "disposition": "fix",
+  "input_notes": "No separate five-block direction contract or quality-bar card was supplied. The user-approved journey-v3 comps and native product direction are the authority. DESIGN.md is deferred to the documenter. Source review sampled LauncherWindow.swift, WorkspaceWindow.swift and JourneyStyle.swift; this is not a complete implementation audit.",
+  "persistence": {
+    "result": "pass",
+    "scope": "Implemented and captured Swift/AppKit macOS journey only.",
+    "evidence": "All 16 named native captures exist, show complete nonblank windows and match the states specified by the review brief. Reviewed all nine named approved comps. PRODUCT.md and JOURNEY-V3.md record the approved direction; hero-repro.png is present. Its native window dimensions are an accepted adaptation, not a pixel-reproduction claim.",
+    "capture_set": [
+      "hero-repro.png",
+      "workspace-ui-code.png",
+      "workspace-ui-changes.png",
+      "workspace-ui-new-conversation.png",
+      "workspace-ui-previous-conversation.png",
+      "workspace-ui-narrow.png",
+      "workspace-ui-light.png",
+      "workspace-ui-wide.png",
+      "launcher-launcher-splash.png",
+      "launcher-launcher-welcome.png",
+      "launcher-launcher-signin.png",
+      "launcher-launcher-projects.png",
+      "launcher-launcher-narrow-projects.png",
+      "launcher-launcher-light.png",
+      "approval-ui-approval-wide-overlay-0.png",
+      "approval-ui-approval-light-overlay-0.png"
+    ],
+    "provenance": "build/desktop-journey-1790791035828. The approval-light filename is a documented legacy name for compact dark appearance. Synthetic conversation and approval content are visibly identified; actual file/diff and conversation switching evidence uses the packaged runtime."
+  },
+  "fidelity": [
+    {"element": "Workspace topology and reading order", "classification": "match", "assessment": "Projects/conversations remain left, conversation dominates the center, and Walkthrough/Changes/Code remain secondary on the right."},
+    {"element": "Persistent composer and primary action", "classification": "contradicted", "assessment": "Position persists, but the empty square text well and detached action row lose the approved unified chat-entry treatment and visible prompt. J3-F01."},
+    {"element": "Project library", "classification": "contradicted", "assessment": "Search, folder opening, pins and rows exist, but the wide library occupies only the left portion of the available main pane; paths truncate and dates wrap while the right remains unused. J3-F02."},
+    {"element": "Approval", "classification": "adaptation / contradicted", "assessment": "A native sheet is an acceptable AppKit adaptation for a protected decision. A raw run_command title and monospaced prose contradict the reference's human-readable question and labeled command. J3-F03."},
+    {"element": "Recorded activity", "classification": "contradicted", "assessment": "Disclosure is present, but its dark-mode button stretches into a long pill and separates the chevron from its label. J3-F04."},
+    {"element": "Welcome and browser sign-in", "classification": "adaptation", "assessment": "Centered entry stages, a primary action and existing-setup route preserve the journey. Native buttons and truthful existing-provider wording follow PRODUCT.md and JOURNEY-V3.md; unsupported plan-usage claims are appropriately omitted."},
+    {"element": "Files, declarations, changes and previous conversations", "classification": "adaptation", "assessment": "Native folder browsing, a bounded declaration selector and read-only previews preserve supporting IDE clarity. Explicit diff baselines and recorded-history wording follow actual runtime authority; decorative timelines and unsupported project indexing are not required."},
+    {"element": "Compact layout", "classification": "adaptation", "assessment": "Conversation/Task context switching preserves the composer and avoids squeezing three panes; native macOS resizing requirements justify the reflow."},
+    {"element": "TYPE", "classification": "match", "assessment": "System sans-serif hierarchy and monospaced source inspection retain the reference's native character; approval prose is the local exception in J3-F03."},
+    {"element": "MATERIAL", "classification": "adaptation", "assessment": "AppKit panels, controls, separators and SF Symbols translate the reference's native surfaces without fake raster texture. The composer grouping remains unresolved in J3-F01."},
+    {"element": "GROUND", "classification": "adaptation", "assessment": "Sampled central grounds are reference RGB 24/28/34, native dark 36/41/43 and native light 255/255/255. The user's semantic light/dark requirement explicitly permits this appearance change."}
+  ],
+  "ceiling": {
+    "result": "Not reached until J3-F01 through J3-F04 are resolved; no rebuild condition is present.",
+    "assessment": "The approved native hierarchy is established. Remaining unused native devices are a cohesive input group, a fully constrained resizable library, a compact disclosure control and human-readable approval fields.",
+    "verification_limits": "Static native captures and sampled source only; no browser, rendering, UI interaction or test rerun occurred in this review. The parent reports 37 native, 38 desktop and four OAuth-helper tests passing plus type checks and workspace control-bounds checks. Subsequent transport/account changes were reported as nonvisual. No live OAuth/provider task, true light approval sheet, keyboard/IME, VoiceOver, motion, increased contrast, performance or release/distribution acceptance is established. No detector ran."
+  },
+  "material_fixes": [
+    {
+      "id": "J3-F01",
+      "check": "Fidelity: primary composer treatment",
+      "evidence": ["hero-repro.png", "workspace-ui-new-conversation.png", "workspace-ui-light.png"],
+      "source": "native/Sources/Heav3nsCode/WorkspaceWindow.swift:341",
+      "finding": "The primary chat input is an unlabelled empty rectangular editor, with its actions visually detached beneath it.",
+      "exact_fix": "Group the existing NSTextView scroll area and Send/Queue action row inside one modestly rounded semantic container with a single separator border. Remove the inner bezel border and add a visible Message LUMI… placeholder only while empty. Preserve native text editing, focus, IME, draft, send and queue behavior; do not add unsupported attachment or usage controls.",
+      "verify": "Check empty and populated input in wide dark and compact light captures; confirm the same native send/queue controls remain reachable."
+    },
+    {
+      "id": "J3-F02",
+      "check": "Fidelity: project-library density and resize behavior",
+      "evidence": ["launcher-launcher-projects.png", "launcher-launcher-narrow-projects.png", "launcher-launcher-light.png"],
+      "source": "native/Sources/Heav3nsCode/LauncherWindow.swift:146",
+      "finding": "The wide main column stops near the window midpoint, truncating the project path and wrapping the date despite substantial unused width.",
+      "exact_fix": "Constrain main to fill the width remaining after the 200-point sidebar, rather than relying on horizontal stack hugging. Keep its existing insets and make toolbar/table/footer use that width. Give the row date a single line with high horizontal compression resistance; let the project path absorb necessary truncation at the minimum width.",
+      "verify": "At 1100 and 720 points, the table and toolbar reach the main pane's trailing inset and the date stays on one line without clipping controls."
+    },
+    {
+      "id": "J3-F03",
+      "check": "Fidelity and clarity: approval decision",
+      "evidence": ["approval-ui-approval-wide-overlay-0.png", "approval-ui-approval-light-overlay-0.png"],
+      "source": "ApprovalReview presentation invoked by native/Sources/Heav3nsCode/WorkspaceWindow.swift:949",
+      "finding": "The approval sheet leads with the internal identifier run_command and presents workspace, reason and command as one undifferentiated monospaced block.",
+      "exact_fix": "Lead with Allow this operation? and a human-readable operation name, retaining the exact tool identifier as secondary detail. Use system-font Workspace and Reason fields, and reserve selectable monospace for the command/path or raw arguments. Preserve complete payload access, Close/Deny/Allow Once semantics and the one-operation scope statement.",
+      "verify": "Wide and compact approval captures show the purpose and requested command immediately, retain the full request through scrolling, and keep all decision buttons visible."
+    },
+    {
+      "id": "J3-F04",
+      "check": "Floor: disclosure geometry",
+      "evidence": ["hero-repro.png", "workspace-ui-code.png", "workspace-ui-previous-conversation.png"],
+      "source": "native/Sources/Heav3nsCode/WorkspaceWindow.swift:1279",
+      "finding": "The dark activity chevron button stretches across roughly half the transcript row instead of staying next to its label.",
+      "exact_fix": "Give the disclosure a fixed native control-sized width and height (approximately 20 points) plus required horizontal hugging/compression resistance, or use a native disclosure bezel. Let the title fill the remaining width with the existing small gap; keep the identifier, accessibility label and expand/collapse action.",
+      "verify": "Collapsed and expanded activity in dark and light keep a compact chevron adjacent to the title without a stretched pill."
+    }
+  ],
+  "keep": "Preserve the dominant central conversation, persistent composer, secondary read-only context, native controls and semantic appearances, explicit evidence labels, and LUMI's execution/permission authority."
+}

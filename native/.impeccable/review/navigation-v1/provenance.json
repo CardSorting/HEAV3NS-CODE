@@ -1,0 +1,47 @@
+{
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790798248709/navigation",
+  "kind": "Actual native app with explicitly scripted engine over production DesktopSession and inspection",
+  "providerInvoked": false,
+  "screenshots": "Raw native window captures, including the attached modeless file picker where visible; no generated UI imagery",
+  "binarySHA256": "d277185c15a7b41c1f86d88283d24fe08f590aae19e45659be790f0886d5f3d4",
+  "frames": {
+    "quick-open-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    },
+    "quick-open-compact": {
+      "windowFrameWidth": 720,
+      "windowFrameHeight": 500
+    },
+    "empty-search-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    },
+    "code-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    },
+    "code-compact": {
+      "windowFrameWidth": 720,
+      "windowFrameHeight": 500
+    },
+    "new-conversation-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    },
+    "draft-restored-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    },
+    "conversation-compact": {
+      "windowFrameWidth": 720,
+      "windowFrameHeight": 500
+    },
+    "composer-focused-wide": {
+      "windowFrameWidth": 1312,
+      "windowFrameHeight": 731
+    }
+  },
+  "scope": "Wide/compact navigation and conversation transitions. Physical VoiceOver and IME acceptance not established.",
+  "reviewCorrection": "Cmd-L dismisses Open File and restores the workspace key window and composer first responder. Focus is sampled before screenshot activation."
+}

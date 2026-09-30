@@ -1,0 +1,17 @@
+{
+  "output": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/workspace",
+  "draftRoot": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/workspace/drafts",
+  "navigationPass": true,
+  "steps": [
+    "dark",
+    "walkthrough",
+    "code",
+    "changes",
+    "new-conversation",
+    "previous-conversation",
+    "narrow",
+    "conversation",
+    "light",
+    "wide"
+  ]
+}

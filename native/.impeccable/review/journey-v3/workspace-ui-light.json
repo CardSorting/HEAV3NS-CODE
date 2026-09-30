@@ -1,0 +1,57 @@
+{
+  "appPID" : 63531,
+  "capturedAt" : "2026-09-30T18:13:33Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : true,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 654,
+        "x" : 33,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 33,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 632,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 604,
+        "y" : 456
+      }
+    },
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–187 \/ 187 bytes · Read only",
+    "inspectionPreview" : "import AppKit\n\nfinal class WorkspaceExample: NSView {\n    private let conversation = NSTextView()\n\n    func focusConversation() {\n        window?.makeFirstResponder(conversation)\n    }\n}\n",
+    "inspectionTitle" : "WorkspaceExample.swift",
+    "navigationVisible" : false,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "windowFrameHeight" : 500,
+    "windowFrameWidth" : 720
+  },
+  "windowHeight" : 448,
+  "windowWidth" : 720,
+  "workerPID" : 63539,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-journey-1790791995538\/Journey review fixture"
+}

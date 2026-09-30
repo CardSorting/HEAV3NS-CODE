@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-29",
+  "disposition": "ship",
+  "scope": "Offline generated-image review prototype only; not native implementation readiness or user design approval",
+  "approvedDesign": false,
+  "reviewMethod": "Independent file and screenshot inspection; no browser or second detector pass",
+  "inputLimits": [
+    "No approved comp exists for this user-pinned revision",
+    "No QUALITY BAR card supplied",
+    "Nonrequired full-size onboarding assets and individual prompt/sidecar bodies were not opened",
+    "Computed contrast and native interaction are not certified"
+  ],
+  "persistence": {
+    "status": "pass",
+    "details": "PRODUCT.md and existing native DESIGN.md retain AppKit product truth. The prototype README and manifest distinguish proposed capabilities, illustrative code, simulated actions, and pending user approval. All seven required full-page captures are valid, begin at the document top, match their named states, and contain provenance metadata. Supplied gallery verification reports 13 screens, 68 hotspots, and no failures."
+  },
+  "fidelity": [
+    {
+      "element": "THESIS / FIRST VIEWPORT / hierarchy",
+      "status": "match",
+      "evidence": "Central conversation and persistent composer dominate all revised workspace states; project and conversation navigation remain left; Walkthrough, Changes, and Code support them on the right."
+    },
+    {
+      "element": "TYPE",
+      "status": "match",
+      "evidence": "System sans hierarchy and monospaced code follow the explicitly pinned native macOS world."
+    },
+    {
+      "element": "MATERIAL",
+      "status": "match",
+      "evidence": "Visible raster concepts convey restrained native chrome, source-list selection, separators, and control surfaces; the gallery labels them generated approximations."
+    },
+    {
+      "element": "GROUND",
+      "status": "match",
+      "evidence": "Graphite concepts with restrained blue selections match OWN-WORLD; no approved comp establishes a pixel color target."
+    },
+    {
+      "element": "STORY / navigation clarity",
+      "status": "match",
+      "evidence": "Thirteen findable states cover launch, welcome, account handoff, projects, opening a workspace, conversation, decisions, progress, review, and returning history. Files and active-file Outline are readable in the supporting Code panel."
+    },
+    {
+      "element": "Evidence and decision states",
+      "status": "match",
+      "evidence": "Waiting, active, finished, checks not run, and not reviewed are distinct; approval is neutral; the diff states its comparison baseline and includes pre-existing edits."
+    },
+    {
+      "element": "FORM / mobile review surface",
+      "status": "adaptation",
+      "evidence": "The latest user correction supplies the hierarchy rather than a concept roll. README explicitly scopes mobile to reviewing desktop imagery, with full-size links, and leaves native implementation unchanged."
+    }
+  ],
+  "ceiling": "Suitable for user review at image-concept scope. Native live materials, resizing, motion, keyboard behavior, VoiceOver, and computed contrast remain implementation-stage or separate validation work.",
+  "material_fixes": [],
+  "keep": "Preserve the dominant conversation and composer, supporting right inspector, explicit evidence states, and visible simulation boundary."
+}

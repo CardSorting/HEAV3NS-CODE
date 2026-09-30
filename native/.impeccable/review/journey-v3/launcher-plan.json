@@ -1,0 +1,17 @@
+{
+  "output": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/launcher",
+  "draftRoot": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/launcher/drafts",
+  "launcherPass": true,
+  "projectPaths": [
+    "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/Journey review fixture"
+  ],
+  "steps": [
+    "dark",
+    "splash",
+    "welcome",
+    "signin",
+    "projects",
+    "narrow-projects",
+    "light"
+  ]
+}

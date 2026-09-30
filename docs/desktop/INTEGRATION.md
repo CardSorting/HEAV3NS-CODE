@@ -1,5 +1,7 @@
 # HEAV3NS-CODE integration preview
 
+The current native journey is documented in [JOURNEY-V3.md](JOURNEY-V3.md). The integrated activity stream, retention and recovery contract is in [WALKTHROUGH.md](WALKTHROUGH.md); it supersedes the original progress-display limits described below.
+
 Source baseline: `4930239` (`main`), CLI package `heav3ns@14.0.0`. Product specification: user-supplied v0.1, September 29, 2026. This implements the first integration proof and portions of the reliable native-session phase. It does **not** declare the v0.1 alpha complete.
 
 ## Build and run
@@ -71,22 +73,24 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `task.cancelAll` | `{}`; stop admission, include acceptances in progress, cancel active and waiting work, and acknowledge after settlement |
 | `approval.resolve` | `{run, operation, decision: "allow" \| "deny"}`; stale IDs rejected |
 | `history.list` | `{cursor?: {createdAt, id}, before?}`; six summaries and a stable `nextCursor`, including timestamp ties |
-| `history.read` | `{run}`; complete instruction, run details and recorded-output availability |
+| `history.read` | `{run}`; complete instruction, run details and recorded-output availability in the current conversation |
 | `artifact.read` | `{run, offset?, revision?}`; recorded output page |
 | `files.list` | `{path?, offset?, query?}`; 100 folder entries per page, case-insensitive filter, explicit 20,000-entry scan limit |
+| `files.search` | `{query?, refresh?}`; negotiated `file-search-v1`, up to 50 filename/path matches, explicit Git/plain-folder scope and partial-scan indicator; never searches file content |
+| `activity.list` | `{run}`; bounded retained activity and total observed count for the current conversation |
 | `files.read` | `{path, offset?, revision?}`; complete UTF-8 scalars, revision check, or binary metadata |
 | `changes.list` | Up to 500 changed paths, Git status, staged/untracked distinctions, branch and explicit limit flag |
 | `changes.read` | `{path?, staged?, offset?, revision?}`; paged read-only diff with named baseline |
 | `input.select` | Only `{surface:"native"}` is advertised/supported in this preview |
 | `shutdown` | Stop admission, cancel, flush, release ownership and exit |
 
-Durable updates carry increasing `seq`; Swift ignores duplicate cursors and requests a snapshot on a gap. Activity deltas have stable action IDs and are cosmetic, without a durable cursor. This implementation provides snapshot resynchronization, not a paged durable event-replay log. Unknown optional events are ignored; an incompatible major protocol fails visibly and disables input.
+Durable updates carry increasing `seq`; Swift ignores duplicate cursors and requests a snapshot on a gap. Activity batches have stable action IDs and a monotonic per-run clock. Their bounded projection is persisted by sequenced run.progress checkpoints; transient batches themselves have no durable cursor. This implementation provides snapshot resynchronization, not a paged durable event-replay log. Unknown optional events are ignored; an incompatible major protocol fails visibly and disables input.
 
 Native request callbacks have a 15-second deadline and a 64-request bound, with eight slots reserved for cancellation, approval, recovery snapshots and shutdown. File, diff, output and run-detail reads time out locally; their late replies are ignored without disconnecting active work. A missing mutation acknowledgment closes the private input pipe so the runtime begins cleanup. A timed-out submission is **acceptance unknown**, not rejected: the draft is preserved, and explicit Reconnect waits for the old worker to exit, takes a snapshot, then calls `task.lookup`. It never resubmits automatically. Force Stop can still leave an ambiguous ownership record that needs manual reconciliation.
 
 Pipe writes use DispatchIO independently of the draining reader; a blocked writer cannot block read processing. Diagnostics keep only a 16 KiB tail at receipt. The worker runs at most four inspection reads concurrently, bounds pending requests to 64 ordinary / 72 including controls, and reserves 64 KiB of its transport budget for controls. Cancellation and approval decisions bypass queued reads. Shutdown rejects waiting reads immediately. Approval resolution claims the pending operation before its durable write yields, and cancellation during that write denies execution. Protocol responses are validated before an acceptance can clear the composer.
 
-Limits enforced here: 256 KiB frame, 4 MiB queued transport data, three queued tasks, 16,000-character submissions, 200 loaded native transcript rows / 8 MiB, 40 recent runtime activities per run (eight in each bounded snapshot projection), 32 KiB file/output/diff pages, one 1 MiB diff snapshot per workspace, 128 previous-page offsets/cursors, 64 MiB recorded output per run with an explicit incomplete-evidence marker, and up to 30 Hz visible cosmetic presentation batching. JSON-encoded byte budgets account for escaped and multibyte text. Hidden windows keep draining; unnecessary activity repainting and elapsed timers stop while occluded. Canonical Broccoli history and the CLI's full transcript still need long-session growth work. No claim is made that every alpha resource bound is complete.
+Limits enforced here: 256 KiB frame, 4 MiB queued transport data, three queued tasks, 16,000-character submissions, 200 loaded native transcript rows / 8 MiB, 120 recent runtime activities per run (eight in each bounded snapshot projection; activity.list reads the retained window), 32 KiB file/output/diff pages, one 1 MiB diff snapshot per workspace, 128 previous-page offsets/cursors, 64 MiB recorded output per run with an explicit incomplete-evidence marker, and up to 10 Hz live presentation batching in the key window and 1 Hz in background. JSON-encoded byte budgets account for escaped and multibyte text. Hidden windows keep draining; unnecessary activity repainting and elapsed timers stop while occluded. Canonical Broccoli history and the CLI's full transcript still need long-session growth work. No claim is made that every alpha resource bound is complete.
 
 A file revision is checked before and after each read. Changed files require Reload; no stale offset is silently appended. Diff paging stays on one captured comparison until Reload, even if files change afterward. The most recently requested comparison owns the cache: a slower previous read cannot evict it, and shutdown prevents in-flight reads from repopulating it. An oversized diff is explicitly incomplete and ends at a complete UTF-8 scalar; unsupported encodings are reported rather than silently replaced. These are inspection protections, not mutation preconditions or a rollback feature.
 

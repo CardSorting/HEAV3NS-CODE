@@ -1,0 +1,66 @@
+{
+  "appPID" : 78680,
+  "capturedAt" : "2026-09-30T19:12:08Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 764,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 92.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 953,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1324,
+        "y" : 687
+      }
+    },
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "",
+    "inspectionTitle" : "Inspect",
+    "navigationVisible" : false,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "walkthrough" : {
+      "animating" : true,
+      "expandedActivities" : 1,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "865bbcf306b064dc7806f28df5055739543ce1dcdd6cf6ac7a31af44bf246ac8",
+      "stage" : "Updating workspace",
+      "visibleActivities" : 2
+    },
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1440
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1440,
+  "workerPID" : 78683,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790795519402\/live\/Workspace"
+}

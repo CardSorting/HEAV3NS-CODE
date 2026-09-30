@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>HEAV3NS-CODE · Conversation-first journey</title>
+  <link rel="stylesheet" href="gallery.css">
+  <script src="journey-data.js" defer></script>
+  <script src="gallery.js" defer></script>
+</head>
+<body>
+  <!-- THESIS: Human-agent conversation owns the workspace; code is supporting evidence.
+  OWN-WORLD: Graphite native macOS materials, system type, restrained blue selection, and familiar file/outline clarity inside a right inspector.
+  STORY: Start, connect, choose a project, talk to LUMI, follow observable progress, inspect evidence, and return to the conversation.
+  FIRST VIEWPORT: The active-work concept shows project/conversation navigation left, dominant chat and composer center, Walkthrough/Changes/Code right. Gallery controls review thirteen states.
+  FORM: User revised the hierarchy away from the editor-centered v2 and selected this direction for native implementation on 2026-09-30. This gallery preserves the generated concepts and simulated interactions; native source and verification live separately.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+  <header class="topbar">
+    <a class="brand" href="#splash">HEAV3NS-CODE</a>
+    <span>Conversation first · v3</span>
+    <nav aria-label="Review tools"><a href="storyboard.html">All screens</a><a href="README.md">Design notes</a></nav>
+  </header>
+  <div class="layout">
+    <aside class="journey-nav" aria-label="Journey navigation">
+      <h2>The journey</h2>
+      <nav id="steps" aria-label="Choose a screen"></nav>
+      <div class="shortcuts"><button type="button" data-go="working">Agent at work</button><button type="button" data-go="projects">Returning user</button><button type="button" data-go="splash">Start from launch</button></div>
+      <p class="nav-note">Generated screens. Sample project data. All actions are simulated.</p>
+    </aside>
+    <main id="main">
+      <div class="screen-heading"><div><h1 id="screen-title">Follow the agent’s work</h1><p id="screen-goal">Stay in the conversation while a clear walkthrough shows what is happening.</p></div><span id="count" class="count">11 / 13</span></div>
+      <div class="viewer-tools"><span id="phase">Work together</span><div><button type="button" id="toggle-hotspots" aria-pressed="false">Show hotspots</button><a id="full-size" href="assets/11-working.png" target="_blank" rel="noopener">Open full size</a></div></div>
+      <div class="image-stage" id="stage">
+        <img id="screen-image" src="assets/11-working.png" width="1586" height="992" alt="Generated native app concept: projects and conversations on the left, dominant user-agent chat and composer in the center, observable progress and files in the right inspector.">
+        <div id="hotspots" aria-label="Simulated screen actions"></div>
+      </div>
+      <div class="actionbar"><button type="button" id="previous">Previous screen</button><div id="branches"></div><button type="button" class="primary" id="primary">Preview the finished result</button></div>
+      <p class="feedback" id="feedback" aria-live="polite">Prototype only. Continue below or use Show hotspots to explore the image.</p>
+      <div class="screen-notes"><section><h2>Flow intent</h2><p id="screen-detail">The center carries intent, updates, and follow-up instructions. The right panel shows observable steps, touched files, and recent changes.</p></section><section><h2>Design boundary</h2><p>This direction was selected for native implementation. These images remain simulated concepts. See the <a href="../../docs/desktop/JOURNEY-V3.md">Swift/AppKit implementation record</a> for working behavior and verification.</p></section></div>
+      <details><summary>Recovery paths and implementation notes</summary><div class="recovery-actions"><button type="button" data-dialog="authFailed">Sign-in interrupted</button><button type="button" data-dialog="identityOnly">Plan access declined</button><button type="button" data-dialog="noProjects">No recent projects</button><button type="button" data-dialog="missingFolder">Project folder moved</button></div><p>These supplementary states explain recovery; thirteen full-size generated screens show the main journey. Only marked hotspots and gallery controls are interactive. Tabs preview example states; they do not control a live task.</p><p>Chat is the main workspace. Files and Outline live in the right Code panel. File paths, code, timestamps, and task content are illustrative, not exact source captures. Browsing changes inspection and does not silently attach model context. The walkthrough shows observable activity rather than hidden reasoning. Completion, checks, and human review remain distinct.</p><p>Pattern references: <a href="https://code.visualstudio.com/docs/editing/getting-started/userinterface" target="_blank" rel="noopener">VS Code file and symbol clarity</a>, <a href="https://developer.apple.com/documentation/xcode/managing-files-and-folders-in-your-xcode-project" target="_blank" rel="noopener">Xcode project navigation</a>, and <a href="https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt" target="_blank" rel="noopener">OpenAI browser sign-in</a>. This study borrows navigation details while keeping conversation central.</p></details>
+      <footer><span>Codex image generation · Image-based prototype</span><div><a id="prompt-link" href="prompts/11-working.txt" target="_blank" rel="noopener">This screen’s prompt</a><a href="manifest.json">Asset manifest</a><a href="../native-v1/index.html">Original workspace study</a></div></footer>
+    </main>
+  </div>
+  <dialog id="simulation-dialog" aria-labelledby="dialog-title"><form method="dialog"><button class="dialog-close" aria-label="Close explanation">Close</button></form><h2 id="dialog-title"></h2><p id="dialog-body"></p><pre id="dialog-output" hidden></pre><p class="dialog-note">Prototype state · no authentication, command execution, or file changes occur.</p><div id="dialog-actions"></div></dialog>
+  <noscript><p class="no-script">Enable JavaScript for the walkthrough, or open the generated images in the <a href="assets/">assets directory</a>.</p></noscript>
+</body>
+</html>

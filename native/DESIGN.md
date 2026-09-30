@@ -1,6 +1,6 @@
 ---
 name: HEAV3NS-CODE Native
-description: A restrained AppKit workspace for directing LUMI and inspecting its work.
+description: A native conversation workspace for directing LUMI and reviewing its work.
 ---
 
 # Design System: HEAV3NS-CODE Native
@@ -9,192 +9,171 @@ description: A restrained AppKit workspace for directing LUMI and inspecting its
 
 **Creative North Star: "A native workspace for LUMI"**
 
-The native client is a compact macOS operating surface. Familiar window chrome, system typography, semantic colors, and standard AppKit controls establish its character. The composer is the primary working input; conversation, tool activity, and read-only evidence carry the useful content.
+Human–agent conversation leads this macOS workspace. A quiet native shell gives the conversation room to breathe, keeps its composer available, and places project navigation and read-only evidence within reach. System typography, semantic appearance, SF Symbols, and familiar AppKit controls provide the visual character.
 
-This document records the integration preview after its native UX hardening pass. Its visual authority is [App.swift](Sources/Heav3nsCode/App.swift), [WorkspaceWindow.swift](Sources/Heav3nsCode/WorkspaceWindow.swift), [NavigationSidebar.swift](Sources/Heav3nsCode/NavigationSidebar.swift), and [ActionPalette.swift](Sources/Heav3nsCode/ActionPalette.swift), with state boundaries from [RuntimeClient.swift](Sources/Heav3nsCode/RuntimeClient.swift), capture behavior from [IntegrationProbe.swift](Sources/Heav3nsCode/IntegrationProbe.swift), and the confirmed direction in [PRODUCT.md](PRODUCT.md). Each workspace has an independent window and runtime client. This record applies only to `native/`; the root CLI design system remains separate.
+This records the built translation of [journey-v3](../ui-prototypes/journey-v3/), approved for implementation on September 30, 2026: projects and conversations on the left, a dominant central conversation with a unified composer, and secondary Walkthrough / Changes / Code on the right. The live Walkthrough extends that system with inspectable activity and explicit follow-current or pinned-history selection. Native filename/path search and deliberate file activation connect intent to read-only evidence; conversation changes preserve separate drafts and clear stale inspection. The same native system carries preparation, welcome, browser sign-in, and the project library. Generated concepts remain references; no raster concept ships inside the app UI.
 
-Implementation, captured appearance, and verified interaction are distinct evidence levels. The current review's ship disposition covers two corrected regressions only; it does not declare a distributable alpha or complete accessibility readiness. The component and review notes below state those boundaries.
-
-The portable frontmatter intentionally contains identity only. AppKit semantic color objects, font factories, standard control geometry, and layout points are recorded as native bindings in [.impeccable/design.json](.impeccable/design.json). No fixed CSS palette, web component preview, or synthetic tonal ramp is a source of truth for this app.
+Swift/AppKit remains the implementation. [PRODUCT.md](PRODUCT.md), [JOURNEY-V3.md](../docs/desktop/JOURNEY-V3.md), and the [Walkthrough contract](../docs/desktop/WALKTHROUGH.md) define product and runtime boundaries. This record applies only to native/. Identity-only portable frontmatter is extended by [.impeccable/design.json](.impeccable/design.json), which preserves native semantic bindings and point measurements without inventing CSS colors, web previews, or tonal ramps.
 
 **Key Characteristics:**
 
-- System typography and appearance, with restrained emphasis.
-- Selected Files / Changes / Sessions navigation in a native source list.
-- An immediately available composer and selectable, read-only inspection.
-- Plain-text task state, tool activity, and verification labels.
-- Standard native controls, searchable actions, and independent workspace windows.
+- A dominant human–agent conversation and persistent, unified native composer.
+- Projects and durable conversations on the left; secondary task context on the right.
+- Semantic light and dark appearance, system fonts, SF Symbols, and native chrome.
+- Readable activity and approval language with selectable technical evidence.
+- Explicit search scope, deliberate navigation, and a reliable return to the composer.
+- Runtime-owned execution, context, permissions, credentials, and task history.
 
 ## Colors
 
-The palette follows the active AppKit appearance. It is defined by semantic APIs and default native control rendering, not sampled screenshot colors.
+The palette follows semantic AppKit colors and window appearance. Captured shades are observations, not fixed palette tokens.
 
 ### Primary
 
-The accent is the user's system accent, expressed explicitly as `NSColor.controlAccentColor` on sidebar SF Symbols and inherited through native selection and control states. There is no fixed brand accent. Send is primary through its placement and task role; the source does not give it a bespoke filled accent treatment.
+NSColor.controlAccentColor marks entry actions, Open existing workspace…, Send / Queue, and folder symbols. Native selection and control states follow the system. The wide dark project-library capture includes inactive chrome; its muted controls do not establish a separate palette.
+
+### Secondary
+
+CodeOutline uses systemPurple for lexical keywords, systemRed for strings and removed diff lines, systemGreen for added lines, and systemBlue for hunk headers. Diff prefixes and labels preserve meaning beyond color. This is lexical highlighting, not semantic language analysis. Walkthrough uses systemOrange for issue symbols and approval state, systemRed for a failed instruction, and controlAccentColor for other stage symbols; labels and symbols carry the same meaning.
 
 ### Neutral
 
-| Binding | Current role |
-| --- | --- |
-| `NSColor.labelColor` | Conversation titles and response text. |
-| `NSColor.secondaryLabelColor` | Connection status, tool activity, sidebar details and messages, page metadata, action shortcuts, composer hint, and launcher supporting text. |
-| `NSColor.textBackgroundColor` | Transcript table background. |
-| `NSColor.clear` over `NSVisualEffectView.Material.sidebar` | Transparent source-list tables over the system sidebar material. |
-| AppKit defaults | Window and toolbar chrome, text views, button bezels, search fields, segmented controls, separators, disabled states, and selection/focus rendering. |
+NSColor.labelColor carries primary text; secondaryLabelColor carries activity, metadata, and supporting copy; placeholderTextColor carries the empty composer prompt. textBackgroundColor fills the transcript and composer; separatorColor outlines the composer. Source lists are clear over NSVisualEffectView sidebar material. AppKit supplies window grounds, text wells, separators, bezels, disabled states, selection, and focus.
 
-**The Semantic Appearance Rule.** Preserve semantic colors and the system sidebar material. Captures do not establish fixed white, gray, or accent tokens. Normal application use follows the system appearance; the development probe explicitly switches its owned window to Dark Aqua for capture.
+**The Semantic Appearance Rule.** Preserve semantic colors and native materials in both appearances. Do not convert screenshots or system accents into fixed brand colors or synthetic tonal ramps.
 
 ## Typography
 
-All explicit type uses `NSFont.systemFont` or `NSFont.monospacedSystemFont`. Standard button and menu typography remains under AppKit control. There is no bundled font, custom tracking, custom line-height scale, or rich Markdown renderer.
+NSFont.systemFont supplies interface and conversation text. NSFont.monospacedSystemFont supplies exact technical evidence. Standard controls retain AppKit typography; there are no bundled fonts or general tracking and line-height scales. All measurements are AppKit points.
 
-The following values are AppKit points, not CSS pixels.
+| Role | Source-backed size and weight |
+| --- | --- |
+| Welcome / other entry headings | 32 / 30 semibold |
+| Conversation title / approval question | 21 / 20 semibold |
+| Context heading and Walkthrough stage / project row title | 16 / 15 semibold |
+| Entry supporting copy | 16 or 15 regular |
+| Conversation body and composer / workspace label | 14 regular / 14 semibold |
+| Conversation rows and approval reason | 13 regular; selected row and operation name use medium |
+| Inspector headings | 13 semibold |
+| Transcript title / Walkthrough activity message / activity detail | 12 semibold / 12 medium / 12 regular |
+| Supporting state, paths, dates, hints, byte ranges | 12, 11, or 10 regular |
+| Code, diffs, exact approval path and arguments | 12 monospaced regular |
+| Secondary exact approval tool identifier | 11 monospaced regular |
 
-| Role | Factory and weight | Size | Use |
-| --- | --- | ---: | --- |
-| Launcher heading | System, semibold | 26 | “Open a workspace.” |
-| Conversation body | System, regular | 14 | User instructions, LUMI output, composer, launcher description. |
-| Section title | System, semibold | 13 | Inspector and approval headings. |
-| Row label | System, semibold | 12 | Transcript titles and recent-workspace label. |
-| Navigation and activity | System, regular | 12 | Sidebar row titles and expanded activity details. |
-| Location label | System, semibold | 11 | Sidebar folder or destination. |
-| Supporting text | System, regular | 11 | Connection state, persistent notice, sidebar message, action shortcut, and composer hint. |
-| Metadata | System, regular | 10 | Sidebar item details and inspection page label. |
-| Inspection | Monospaced system, regular | 12 | File content, diffs, and recorded output. |
-| Approval details | Monospaced system, regular | 11 | Tool, scope, arguments, and reason. |
+Walkthrough uses system prose for stage and activity, with selectable expanded details and 11-point status, duration, exit-code, and coverage captions. Transcript replies remain wrapping selectable plain text; Markdown fences remain literal.
 
-**The Evidence Type Rule.** Use readable system text for conversation and monospaced system text for inspection. Transcript responses are wrapping plain text; backticks and code fences remain literal characters in the current implementation.
+Open File rows use a medium system-font filename above a smaller secondary path. Both truncate in the middle and expose the full path in a tooltip. Search scope, result status, and keyboard hints stay secondary to the search field and selected result.
+
+**The Evidence Type Rule.** Use system prose for intent, explanation, and decisions. Reserve monospaced text for code, exact paths, arguments, and identifiers.
 
 ## Layout
 
-The workspace is an `NSWindow` with standard titled, closable, miniaturizable, and resizable styles. Its initial content size is 1280 × 800 points; its minimum **window frame** size is 720 × 480 points. Per-workspace frame autosave is configured. The launcher starts at 780 × 520 content points and uses the same minimum window size.
+The entry screens use a centered 490-point stack with 20-point gaps. The library fills the main pane beside a 200-point sidebar; its main insets are 36 top, 32 sides, and 28 bottom, with 18-point gaps and 78-point rows. Dates stay single-line with strong compression resistance while paths truncate in the middle.
 
-The workspace uses a unified `NSToolbar` in native window chrome; AppKit determines its height. A fixed 200-point navigation column sits beside the flexible working column. `NSStackView` containers and Auto Layout arrange the optional Agent / Inspect switch, transcript and inspector, approval region, persistent notice, composer, and composer action row. Jump to Latest is overlaid at the transcript's lower trailing edge.
+The workspace uses native unified toolbar chrome and Auto Layout. Its 220-point conversation sidebar has 14-point insets and 54-point rows. The flexible center has 20 top, 22 side, and 16 bottom insets, 10-point gaps, and a 20-point transcript inter-row gap. Context uses 20 top, 14 side, and 16 bottom insets. Its wide width is 27% of window-frame width, clamped to 330–400 points; the browser is 236 points high with 32-point rows.
 
-| Implemented measure | AppKit points |
-| --- | ---: |
-| Default stack gap; working-column vertical gap | 8; 6 |
-| Transcript / inspector gap | 12 |
-| Navigation stack gap | 10 |
-| Navigation insets | 12 top/bottom; 8 left/right |
-| Working-column insets | 12 top/left/bottom; 16 right |
-| Destination row; item row; destination scroll region | 30 high; 42 high; 94 high |
-| Transcript and inspector minimum width | 260 each |
-| Working area minimum height | 60 |
-| Composer scroll region | 64 high |
-| Composer text inset | 10 horizontal/vertical |
-| Inspection text inset | 12 horizontal/vertical |
-| Approval detail scroll region | 58 high |
-| Transcript cell inset | 16 left/right; 8 top |
-| Transcript title/body gap; inter-row gap | 5; 12 |
-| Action sheet content size | 500 × 340 |
-| Action sheet insets; stack gap; row height | 16; 12; 34 |
+Below 1000 points in frame width, the conversation sidebar starts hidden. Conversation / Task context governs the right panel: Conversation hides it; Task context reveals a 300-point panel beside the center. Transcript and composer remain present. Revealing compact navigation hides task context; the wide sidebar preference is separately retained in memory. Below 640 points in frame height, Code and Changes alternate browser and preview with Browse files / Browse changed files and Back to preview, releasing the fixed browser height. File selection waits for deliberate activation in this short layout, so arrow navigation keeps the browser visible. Walkthrough hides secondary stage explanation and evidence summary at that height, retaining its stage, activity, navigation, and review actions.
 
-When both transcript and inspector are visible at wider sizes, their horizontal stack uses equal distribution. Below a window-frame width of 1000 points, navigation starts hidden and an Agent / Inspect segmented control switches the working surface when inspection is open. The composer remains below the work area in either mode. Closing inspection restores Agent; Focus Composer also selects Agent.
+Open File is a modeless native child panel over its workspace. Scope and search lead; a flexible scrolling result list follows; status, keyboard guidance, and Refresh / Open Preview complete the panel. It inherits the workspace appearance and leaves the conversation and Stop available. Picker measurements are local component choices, not additions to a global spacing or sizing scale.
 
-The window keeps separate wide-sidebar preference and compact-sidebar visibility state. Toggle Navigation controls the relevant state; choosing Files, Changes, or Sessions reveals navigation. Widening restores the wide preference. This is per-window in-memory state, not a persisted preference across application launches.
+Walkthrough uses a vertical 9-point stack, 8-point horizontal control gaps, and a flexible scrolling native table. Collapsed activity rows are 58 points high; expanded rows grow with selectable detail and file links. Filtering and live updates preserve selected activity and earlier scroll origin; Latest activity returns to the end.
 
-Transcript rows recalculate their height after a resize. The scroll view records whether the reader was within 35 points of the bottom before resizing, then follows the latest row or restores the previous clip origin after layout. The earlier integration review covered the follow-latest resize correction. Deliberate earlier-position retention and selection continuity still need a physical interaction walkthrough.
+Initial content requests are 1440 × 880 for a workspace and 1100 × 740 for the launcher; both minimum window frames are 720 × 480. Actual frames depend on native chrome and display bounds. Prior journey captures include wide workspace 1440 × 731, compact dark workspace/Code 720 × 480, light draft 720 × 500, light approval parent 720 × 504, and launcher 1100 × 731 / 720 × 480. Walkthrough captures are 1440 × 731 and 720 × 500, with compact approval at 720 × 504. The requested 720 × 480 Walkthrough capture was constrained by the native minimum window size; exact 480-point acceptance is not established. Navigation follow-up captures use actual frames of 1312 × 731 and 720 × 500; these are evidence dimensions, not new layout breakpoints.
 
-The current light narrow capture records a 720 × 480-point window frame; the subsequent Dark Aqua capture records 720 × 500 points. Both report composer, Send, and Stop within the window. The dark capture does not verify the 480-point minimum height, and these idle inspection captures do not establish that approval controls fit at minimum size.
+Resize logic reflows transcript rows and retains the earlier reading origin or follows the latest row when already within 35 points of the bottom. Physical reading-position and selection continuity remain separate acceptance work.
 
 ## Elevation & Depth
 
-The sidebar uses `NSVisualEffectView` with `.sidebar` material and `.withinWindow` blending. Native unified window chrome, sheet presentation, source-list selection, and control bezels provide the remaining depth. The implementation defines no custom shadows, gradients, or raised cards. Content hierarchy comes from spacing, type weight, semantic text contrast, a navigation separator, and the composer's native bezel border. System-owned shadows and materials do not establish a custom shadow or blur scale.
+NSVisualEffectView sidebar material with within-window blending, native chrome, source-list selection, control bezels, sheets, and popovers provide depth. Spacing, separators, and type weight organize the panes. There are no application-authored shadows, gradients, textures, or glass effects.
 
-**The Native Depth Rule.** Use AppKit materials and control states for hierarchy. Do not reproduce their captured appearance as custom gradients, shadows, or fixed fills.
+**The Native Depth Rule.** Let AppKit render material, focus, control state, and modality. Native screenshot shadows and bezels do not establish application shadow or blur tokens.
+
+There is no decorative animation system. Native spinners communicate preparation, sign-in waiting, and live Walkthrough work. Walkthrough uses an indeterminate indicator for connected, visible running/cancelling work and a 180 ms stage-icon fade. Hidden, minimized, disconnected, approval-waiting, and terminal states stop the indicator. AppKit Reduce Motion stops it and removes the transition while retaining stage text and symbol. Fixture diagnostics exercise these states; static captures do not certify timing or physical accessibility acceptance. Filtering, draft-save delays, elapsed timers, and occlusion-aware updates schedule work rather than define animation.
 
 ## Shapes
 
-Use the established AppKit shapes: `.rounded` action buttons, `.texturedRounded` toolbar and sidebar controls, `.inline` recent-workspace buttons and activity disclosures, native search fields and source-list rows, `NSSegmentedControl` switches, an `NSBox` separator, and an `NSScrollView` with `.bezelBorder` around the composer. There is no explicit corner-radius scale or custom clipping geometry. Standard controls determine their own corners, hover, pressed, focus, and disabled appearance. SF Symbols provide interface icons.
+Rounded, textured-rounded, and inline NSButton styles, native search fields, segmented controls, source lists, and SF Symbols retain native state rendering. The unified composer is one custom NSBox with a 10-point radius, 1-point separator-color border, and text-background fill. Its borderless inner scroll area is 64 points high; the group has 10-point insets and an 8-point gap. Transcript activity chevrons are borderless inline controls fixed at 20 × 20 points beside their labels; Walkthrough has native table disclosures. Other native corners do not form a custom radius scale.
 
 ## Components
 
-### Launcher and workspace chrome
+### Entry and project library
 
-The launcher presents a system heading, one supporting sentence, Open Folder…, and up to five recent workspace buttons. Its vertical stack has a 16-point gap, a 64-point leading inset, at least 48 points at the trailing edge, and vertical centering. Open Folder… has the Return key equivalent. Recent entries use inline buttons with middle truncation.
+Preparation, welcome, browser sign-in, saved connection, and existing-setup routes use centered native controls and clear next actions. Sign-in has waiting, cancellation, and Open Browser recovery states. A private account process reuses the existing OpenAI Codex OAuth integration and protected runtime storage; Swift receives status, a restricted authorization URL, and catalog availability, never credentials. Account changes require closing workspace windows. Disconnect removes the local connection. The provider migration in JOURNEY-V3.md remains unresolved; connection status and catalog lookup do not establish billing, subscription, or inference entitlement.
 
-Workspace windows use the folder name in the title and the path in the subtitle. After Changes supplies Git metadata, the subtitle includes the branch. The unified toolbar contains navigation, connection/run state, Stop, and Actions. Runtime state can include elapsed seconds and the queue count; its full value is also a tooltip. Stop has native toolbar visibility priority. Opening the same canonical workspace focuses its existing window; distinct workspaces retain independent window, draft, navigation, and runtime state.
+The library provides Projects / Pinned / Account, search by name or path, Open existing workspace…, and a full-width native table. Rows show folder, name, pinned status, path, and date or Folder moved. Canonical paths, recency, and pins persist. Open selected or double-click opens a project; Remove from list never deletes files. Missing folders use a native alert and chooser. Opening an already-open canonical project focuses its window.
 
-### Buttons and navigation
+### Conversation navigation and composer
 
-Files, Changes, and Sessions occupy a headerless `.sourceList` `NSTableView` with a persistent selected destination. A second source-list table presents the current items. Each row uses an SF Symbol, a middle-truncating title, and optional smaller supporting text. AppKit owns row selection, focus, and control states. Folder location, parent control, search field, status message, Refresh, Previous, and a conditional next-page action supply wayfinding around the list.
+The left source list has New conversation, Find on this page, dated rows, earlier/latest paging, and Projects / Account. Search filters titles in the loaded conversation page and reports No matching conversations; it does not search all history. Selection changes durable isolated runtime context and history through negotiated conversation capability. Active, queued, uncertain, or approval-waiting work prevents switching; the runtime also refuses staged agent edits until committed or discarded. Loading history never resumes execution. Per-conversation drafts live in the bounded atomic workspace recovery file.
 
-Files requests one directory page at a time and filters that folder, with a short debounced request. Changes shows staged, working-tree, and untracked distinctions; its filter applies to the loaded list. Sessions shows recorded run state and date, with Earlier Runs and Previous paging; filtering is limited to the loaded page. Messages identify empty, loading, limited, or failed views. These controls expose read-only browsing and do not add model context.
+A conversation change first saves the current draft, dismisses Open File, invalidates pending navigation and inspection replies, and holds the composer noneditable until the destination is confirmed by a fresh runtime snapshot. Adopting the destination restores its draft, clears prior inspection/history controls and Walkthrough selection, and keeps run details and recorded output within that conversation. A background completion does not activate an inactive workspace. Unconfirmed selection exposes a reconnect notice before sending can resume.
 
-When item data changes, selection is preserved by stable item ID only if that ID remains in the new list. Old row selection is cleared before reloading. An actual AppKit regression verifies that opening a selected folder leaves its sole child selectable; this does not establish full keyboard or VoiceOver coverage.
+The unified composer joins plain NSTextView editing and its action row. Message LUMI… appears only while empty and without marked text. Up Next leads; Send / Queue and conditional Stop & Send trail; the keyboard hint sits below. Return submits outside marked-text composition, Shift–Return follows native editing, and quote/dash substitutions are disabled. Source guards sending by connection, conversation, instruction and queue limits, cancellation, and uncertain acceptance. Accepted drafts clear only if unchanged; failures preserve them. Up Next reviews, edits, or removes runtime-owned queued instructions. Stop & Send waits for confirmed cancellation outcomes. Physical keyboard and IME behavior remains unverified.
 
-### Composer
+Focus Composer (⌘L) dismisses the file picker, selects Conversation in compact mode, makes the workspace key, and places the first responder in the composer. This explicit handoff is part of native navigation, including when a child panel currently owns keyboard input.
 
-The composer is a plain `NSTextView` in a bordered, vertically scrollable region. It receives first responder status when a workspace attaches. Quote and dash substitution are disabled. Return submits when there is no marked text and Shift is not held; Shift–Return follows native text entry. The visible hint states “Enter to send · Shift–Enter for a new line.”
+### Open File and keyboard browsing
 
-Send becomes Queue while the window has outstanding work. Sending is disabled for an empty draft, disconnected or uncertain state, pending submission, cancellation, closing, or a full three-instruction queue. An accepted request clears the draft only if it still matches what was sent. Empty or marked-text submissions are ignored. The source preserves a failed or uncertain draft and exposes an explanatory persistent notice. Physical Return, Shift–Return, marked-text input, and selection behavior remain unverified.
+Open File… (⌘P) is available from File, Actions, and the context header when the connected runtime negotiates file-search-v1. A native search field, plain result table, document symbols, native selection, rounded actions, and semantic labels preserve the incumbent visual system. Filename/path lookup is distinct from file-content search, the Code folder filter, and conversation page search. Scope copy identifies Git ignore rules or the plain-folder exclusions; count and partial-scan copy expose bounded results.
 
-Stop & Send appears when work is outstanding and the draft is nonempty. It snapshots the instruction, cancels all outstanding runs, and submits only after their confirmed terminal outcomes and the absence of other work. Interrupted outcome, connection loss, or cancellation failure discards the pending send intent while preserving the draft. These transitions are implemented; the current scoped review does not certify the entire interaction.
+Typing clears old selectable results while the current search is pending. Loading, no match, partial scan, overlong query, and failure states have explicit copy. Refresh rebuilds results; failure changes that action to Retry and offers Code browsing as recovery. Open Preview stays disabled without a valid selection. Arrow keys select results; Return, double-click, or Open Preview deliberately opens the selected read-only file. Marked-text composition retains native input handling. Escape restores prior focus; clicking back into the conversation dismisses the picker without reclaiming focus. A result grants no read access or model context by itself.
 
-### Transcript and activity
+In Code, selecting a folder leaves it selected. Return, double-click, or Right opens it; Left returns to its parent. File selection previews alongside the browser when the layout has room; when the short layout alternates browser and preview, Return or double-click opens the file. Opening a path reveals its parent folder. Background workspace refresh keeps the current preview until Reload and does not replace a recorded-history page.
 
-The transcript is a single-column `NSTableView` with no header or row selection highlight. Each row contains a semibold wrapping title and, when present, a selectable wrapping body. Activity rows use secondary text; user and result rows use primary label text. Row height is computed from available width with a 36-point minimum.
+### Transcript and task context
 
-Activity rows have inline disclosure controls that expand or collapse detail in place. Their titles include operation, phase, and elapsed time when reported. Result labels report recorded state, “Command evidence available,” “Checks not run,” or “Evidence incomplete,” and “Not reviewed.” No visual state equates command completion with independent review. The view retains bounded recent content; fuller recorded output belongs in Sessions inspection.
+The header names the conversation and state. A headerless table uses wrapping author-state titles, selectable plain-text bodies, compact expandable activity, and Jump to Latest. Completion, command evidence, incomplete evidence, Checks not run, and Not reviewed remain distinct. Recorded Runs exposes fuller recorded output.
 
-The table reloads changed rows or inserts appended rows when possible, retaining unchanged views. Jump to Latest appears when updates occur while the reader is away from the bottom; new content follows when the reader was already near the bottom. These implementation choices aim to preserve reading and selection context, but they are not evidence of complete selection, scroll-retention, or accessibility testing. Cosmetic activity updates and elapsed timers reduce or stop when the window is not visible; this is presentation scheduling, not a decorative motion system.
+Walkthrough / Changes / Code remain secondary. Code and Changes combine a compact browser and read-only inspector with paths, parent navigation, filtering, back/forward history, Reload, Close, Reveal, native find, and explicit paging. Browsing adds no model context. Code uses lexical color and an “Outline · declarations on this page” popup with at most 100 lexical matches in the displayed page for supported Swift, JavaScript/TypeScript, Python, and Rust files. It is not a language-server project index.
 
-### Inspector
+Changes identifies Working Tree or Staged baselines, including earlier and external edits. Diff prefixes accompany semantic color; untracked entries open as files. Byte-range labels, revision-aware paging, and Reload expose bounded snapshots. Inspection does not edit, stage, apply, undo, or attribute every change exclusively to LUMI.
 
-Inspection uses a selectable, noneditable, plain `NSTextView` with monospaced type, vertical scrolling, and native find-bar support. Its header has a title, Reload, and Close. Files and diffs expose workspace-relative path breadcrumbs and Reveal in Finder. Breadcrumb navigation opens the corresponding folder in Files.
+### Live Walkthrough
 
-Files, recorded output, and diffs share Previous / Next Page controls and a byte-range “Read only” label. Each page replaces the displayed text and starts at the top. Revision-aware paging and explicit Reload prevent a stale file offset from silently appearing current; diffs page a captured comparison. Failed paging leaves a persistent message and a Reload instruction. Limited diffs are visibly labeled incomplete. Automatic link detection is disabled.
+Follow current instruction prefers running, approval-waiting, or cancelling work over queued work. Selecting a loaded instruction pins it while new work arrives; Recorded Runs supplies older history. Stage text derives from structured activity and known operations, with explicit approval, connection-loss, interrupted, and terminal states. No percentage or fixed linear checklist is implied. After 30 seconds without an update, explanatory copy reports quiet work without declaring failure.
 
-The Working Tree / Staged segmented control selects the comparison. A plain-text baseline names what is compared and states that pre-existing and external edits are included. Untracked entries open as files. Diff text is implemented and paged, without syntax coloring or custom addition/deletion decoration. Nothing in this inspector edits, stages, applies, undoes, or attributes changes exclusively to a run.
+A native activity table retains stable identities, inline disclosures, text filtering, an Issues filter, reported durations, and literal exit codes. Return or Space toggles a selected row in source; newly observed issues expand without moving keyboard focus. Expanded file links use the existing authorized read-only inspection service. Changes opens the current Git comparison; Run details opens durable instruction details and recorded-output access. Review request… opens the existing immutable approval sheet. Activity never grants file access or creates a new execution or approval path.
 
-### Approval and stopping
+The negotiated walkthrough-v1 capability carries structured core events into a bounded retained activity window. Coverage labels expose omitted history; Retry activity load preserves recorded work. Ordered merges resist older snapshots, checkpoints preserve partial progress, and restart marks unfinished work interrupted without replay. Bounded checkpoints can lose later activity on a crash; this is not a complete audit log. Command results, Checks not confirmed, Output incomplete, and Not reviewed remain separate from completion and human review.
 
-When a run is awaiting approval, the code exposes “Approval required,” a scrollable text region containing tool, scope, arguments, and reason, followed by Deny and Allow Once. The buttons disable while resolution is requested. The current captures do not exercise approval layout or its controls at the minimum window size.
+### Approval, recovery, and native lifecycle
 
-Stop requests cancellation of outstanding runs and reports Cancelling in the toolbar. After five seconds, Force Stop becomes available only if that same cancellation request is still current and work or shutdown remains pending. A cancellation-generation token prevents an old deadline from escalating replacement work. This regression is verified with an actual AppKit workspace and private-pipe runtime fixture. Force Stop clears pending Stop & Send intent and displays that existing edits remain and remote effects may be unknown.
+Approval required offers Deny and Review Request…. A 620 × 380-point native sheet leads with Allow this operation?, readable operation name, and exact secondary tool identifier. System-font Workspace / Reason / Arguments labels structure the request; reason is system prose, while exact paths and arguments are selectable monospace. Scrolling retains the full payload. Close leaves the immutable operation waiting; Deny and Allow Once resolve it. No decision has a Return key equivalent. Initial focus is in details, Escape closes, and stale/disconnected/submitting/stopping states disable decisions. Wide dark and compact light captures show all decisions using synthetic requests.
 
-Standard `NSAlert` dialogs handle active-work close and quit decisions. Stop and Close waits for runtime shutdown rather than hiding an unfinished workspace. Existing edits remain. These decisions use native modal styling; full lifecycle acceptance is outside the current two-fix review.
+Persistent notices above the composer distinguish recovery from changing activity status. Reconnect waits for worker exit; uncertain acceptance is reconciled by original request ID without replay. Stop covers outstanding work; Force Stop is gated by the current cancellation deadline. Native alerts govern active-work close/quit and wait for shutdown. Independent workspaces own their window, runtime client, draft, and navigation state. The four-window product boundary is intended; source does not enforce a four-window cap.
 
-### Persistent notices and recovery
+Native menus, editing commands, inspector find/history, toolbar Stop, and a searchable Actions sheet preserve macOS conventions. Explicit accessibility labels cover major inputs, lists, task context, outline, inspection, approval, and actions. Native APIs and source-defined shortcuts do not establish complete keyboard, IME, VoiceOver, or focus-order acceptance.
 
-A selectable notice region sits above the composer, separate from changing activity status. It carries failure, queue, incomplete-evidence, and uncertain-acceptance messages. Reconnect appears when the old worker has exited. An uncertain submission is looked up by its original request ID after reconnection; it is never automatically resubmitted. Dismissal is permitted only when the client is ready and no uncertain submission remains. These controls communicate the runtime's confirmed state without inventing success.
+### Authority and verification
 
-### Searchable action sheet
+Presentation authority is [JourneyStyle](Sources/Heav3nsCode/JourneyStyle.swift), [LauncherWindow](Sources/Heav3nsCode/LauncherWindow.swift), [ConversationSidebar](Sources/Heav3nsCode/ConversationSidebar.swift), [WorkspaceWindow](Sources/Heav3nsCode/WorkspaceWindow.swift), [WalkthroughView](Sources/Heav3nsCode/WalkthroughView.swift), [ApprovalReview](Sources/Heav3nsCode/ApprovalReview.swift), [QuickOpenWindow](Sources/Heav3nsCode/QuickOpenWindow.swift), [KeyboardListView](Sources/Heav3nsCode/KeyboardListView.swift), [NavigationSidebar](Sources/Heav3nsCode/NavigationSidebar.swift), and [CodeOutline](Sources/Heav3nsCode/CodeOutline.swift). Journey/state sources are [App](Sources/Heav3nsCode/App.swift), [ProjectLibrary](Sources/Heav3nsCode/ProjectLibrary.swift), [AccountClient](Sources/Heav3nsCode/AccountClient.swift), [WorkspaceDraftStore](Sources/Heav3nsCode/WorkspaceDraftStore.swift), [WalkthroughState](Sources/Heav3nsCode/WalkthroughState.swift), and [RuntimeClient](Sources/Heav3nsCode/RuntimeClient.swift). [IntegrationProbe](Sources/Heav3nsCode/IntegrationProbe.swift) provides native capture and bounds reporting.
 
-Actions opens a native `NSPanel` sheet containing an `NSSearchField`, a matching-action table, shortcut hints, and an empty-result label. It includes workspace opening, composer focus, Files / Changes / Sessions, navigation toggle, and refresh; Stop and Reload appear when relevant. Matching is case-insensitive by action title. The source implements arrow-key selection, Return activation, Escape dismissal, and double-click activation. The palette is visually captured; physical keyboard and marked-text behavior still need a walkthrough.
+The [workspace](.impeccable/review/journey-v3/hero-repro.png), [Code](.impeccable/review/journey-v3/workspace-ui-code.png), [Changes](.impeccable/review/journey-v3/workspace-ui-changes.png), [new conversation](.impeccable/review/journey-v3/workspace-ui-new-conversation.png), [light draft](.impeccable/review/journey-v3/workspace-ui-draft-light.png), and [expanded light activity](.impeccable/review/journey-v3/workspace-ui-expanded-light.png) show the built workspace. [Wide projects](.impeccable/review/journey-v3/launcher-launcher-projects.png), [compact projects](.impeccable/review/journey-v3/launcher-launcher-narrow-projects.png), [welcome](.impeccable/review/journey-v3/launcher-launcher-welcome.png), [sign-in](.impeccable/review/journey-v3/launcher-launcher-signin.png), and [light approval](.impeccable/review/journey-v3/approval-ui-approval-light-overlay-0.png) complete the inspected journey.
 
-### Native menus and accessibility coverage
+The [review](.impeccable/review/journey-v3/review.json) and [verdict](.impeccable/review/journey-v3/verdict.json) resolve J3-F01–J3-F04: unified composer/placeholder, full-width library/single-line dates, readable approval, and compact disclosures. “Ship” covers those four fixes and attributable regressions only. [Verification](.impeccable/review/journey-v3/verification.json) records 37 native tests, 38 desktop tests, four OAuth-helper tests, TypeScript checks, isolated account status/EOF cleanup, 20 workspace bounds reports, and a locally signed development build; the finish run also reports passing lint. [Provenance](.impeccable/review/journey-v3/evidence.json) identifies capture origins and supplemental light states. History/approval fixtures are synthetic; file/diff reads and conversation switching use the packaged runtime. No OAuth or model task ran in these UI fixtures. The reviewer inspected captures and targeted source without rerunning tests; no design detector ran.
 
-The app builds native application, File, Edit, Workspace, and Window menus. Defined shortcuts include Open Workspace (⌘O), Close Window (⌘W), Actions (⇧⌘P), Toggle Navigation (⌘B), Focus Composer (⌘L), Files / Changes / Sessions (⌘1 / ⌘2 / ⌘3), Stop Run (⌘.), Minimize (⌘M), and standard editing commands. Menu targeting recognizes the workspace behind its attached action sheet.
+The [Walkthrough review](.impeccable/review/walkthrough-v1/review.json) returns “ship” with no material fixes for eight valid captured states and targeted native source: live wide/compact, pinned history, file preview, failure wide/compact, compact approval, and recovered work. Matching JSON provides diagnostics. [Verification](.impeccable/review/walkthrough-v1/verification.json) records 42 native, 44 desktop, and nine CLI engine tests, TypeScript, changed-file lint, and an ad-hoc development build. A scripted engine drives the production bridge, store, transport, and native UI with actual file reads; real CLI scheduler callbacks are tested separately. The [packaged runtime check](.impeccable/review/walkthrough-v1/packaged-runtime.json) verifies walkthrough-v1 negotiation, persisted metadata/paths, and file inspection in the bundled Node/CLI. No provider, OAuth, or approval command ran in these fixtures.
 
-Explicit accessibility labels cover composer, transcript, Stop, navigation and item tables, filter and parent/page/refresh controls, inspected path/content, Reload, Reveal, notices' dismiss control, action search/results, and activity disclosures. AppKit supplies native control semantics. This inventory does not establish complete labeling, focus order, full keyboard access, IME handling, or VoiceOver usability; those remain unverified.
+The Walkthrough reviewer sampled native captures and integration source, without independently reviewing backend/engine sources or rerunning tests; no native design detector ran. Physical keyboard/IME, full VoiceOver/focus order, increased contrast, physical Reduce Motion/timing acceptance, production-provider performance, ambiguous owner-lock crash reconciliation, Developer ID signing, notarization, and public distribution remain unverified. Local signatures and scoped reviews do not certify them.
 
-### Review evidence and limits
+The separate [navigation review](.impeccable/review/navigation-v1/review.json) initially requested the picker-to-composer focus correction. Its final “ship” verdict covers that resolved fix and attributable regressions: all nine refreshed captures are valid, with no attributable regressions observed. They include wide/compact Open File and Code, empty search, new conversation, restored draft, compact conversation, and [composer focus](.impeccable/review/navigation-v1/composer-focused-wide.png). The active native probe confirmed the actual workspace key window and composer first responder, with the picker hidden, before capture could change focus.
 
-The current [Files capture](../.impeccable/review/desktop.png), [Changes capture](../.impeccable/review/changes.png), [light narrow capture](../.impeccable/review/narrow.png), [Dark Aqua capture](../.impeccable/review/dark.png), and [action-sheet capture](../.impeccable/review/palette.png) show the actual native application using real CLI read-only file/diff data. These UI-probe fixtures do not represent a provider task. The harness captures the owned window with native chrome; it does not supply model output.
-
-Raw capture reports are in [desktop-ui-1790728696210](../build/desktop-ui-1790728696210). Their control bounds verify composer, Send, and Stop within the 720 × 480 light window and the 720 × 500 dark window. Screenshots establish appearance for those states, not full keyboard or interaction correctness.
-
-The reviewer returned **ship**, scoped only to the stale cancellation-deadline fix and the sidebar selection replacement fix. The cancellation regression uses an actual AppKit workspace and private-pipe runtime fixture; the sidebar regression uses actual AppKit selection and reload. The native suite passed 11 tests in this pass. No design detector ran because this is a native surface. Physical keyboard/IME/VoiceOver, approval controls at minimum size, deliberate reading-position and selection retention, same-worker TUI/SwiftTerm, and full alpha readiness remain unverified. Source-backed features above must not be read as individually reviewed acceptance claims. Runtime and broader release evidence belongs in [INTEGRATION.md](../docs/desktop/INTEGRATION.md) and [RELEASE-EVIDENCE.md](../docs/desktop/RELEASE-EVIDENCE.md).
+Navigation [verification](.impeccable/review/navigation-v1/verification.json) records 49 native and 49 desktop tests, TypeScript, changed-file lint at error severity, and a locally signed development build. [Provenance](.impeccable/review/navigation-v1/provenance.json) identifies the raw native captures and scripted engine over production DesktopSession and inspection. The [packaged runtime check](.impeccable/review/navigation-v1/packaged-runtime.json) verifies real filename search and conversation-bound run/output inspection in the bundled CLI without a provider request. Prior journey and Walkthrough evidence remains historical. Physical keyboard/IME, VoiceOver, provider OAuth, and release acceptance are not established by this navigation pass.
 
 ## Do's and Don'ts
 
-### Do:
-
-- **Do** preserve AppKit system fonts, semantic color APIs, native controls, and standard window chrome.
-- **Do** keep the composer immediately available and file/output inspection selectable and read-only.
-- **Do** use selected Files / Changes / Sessions navigation, native search, breadcrumbs, and explicit paging for wayfinding.
-- **Do** distinguish recorded completion, command evidence, and independent review in task labels.
-- **Do** preserve drafts and show persistent recovery messages when acceptance or stopping is uncertain.
-- **Do** preserve the cancellation-generation and stable-item selection corrections while distinguishing source-backed behavior from verified interaction.
-
-### Don't:
-
-- **Don't** replace the native surface with a web shell, landing-page composition, or decorative metrics.
-- **Don't** derive fixed colors, synthetic tonal ramps, or a radius scale from AppKit screenshots.
-- **Don't** introduce an empty editor as the starting point or imply that read-only inspection edits files.
-- **Don't** equate the implemented action sheet, selected sidebar, expandable activity, or paged plain-text diff with a complete editor or rich Markdown renderer.
-- **Don't** describe browsing as adding model context or Git comparisons as exclusive run attribution.
-- **Don't** promote scoped regression review, idle captures, or native API use into full alpha, keyboard, IME, or accessibility readiness.
+- **Do** keep conversation dominant and its unified composer available beside secondary context.
+- **Do** preserve native semantic colors, fonts, controls, symbols, and window behavior.
+- **Do** fill the library's main pane, protect single-line dates, and let paths truncate.
+- **Do** use readable approval prose with exact selectable technical payloads and explicit decisions.
+- **Do** align conversation context, drafts, history, and admission with confirmed runtime state.
+- **Do** distinguish read-only evidence, Git baselines, review status, and verification limits.
+- **Do** preserve explicit follow-current versus pinned history and honest stage, coverage, and issue labels.
+- **Do** state each search scope and keep folder selection separate from opening; require file activation when preview replaces the browser.
+- **Do** restore the intended native key window and responder when returning to the composer.
+- **Don't** replace Swift/AppKit with illustrative SwiftUI snippets, a web shell, or raster concepts.
+- **Don't** infer fixed palettes, tonal ramps, or a radius scale from native screenshots.
+- **Don't** promote the page outline to a language-server index or Git changes to exclusive run attribution.
+- **Don't** grant permission on default Return, replay uncertain submissions, or resume execution from history.
+- **Don't** equate connection/catalog status with subscription, billing, or inference entitlement.
+- **Don't** promote scoped reviews, synthetic fixtures, or local signing into release or accessibility certification.

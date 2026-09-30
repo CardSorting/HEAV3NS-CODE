@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>HEAV3NS-CODE · Native design study</title>
+  <style>
+    :root { color-scheme: light; --page:#f6f7f9; --surface:#fff; --text:#1b2028; --muted:#596271; --line:#d3d8e0; --accent:#075ccc; --selection:#dceaff; --stage:#e6e9ee; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--page); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    ::selection { background:var(--selection); color:var(--text); }
+    a { color:var(--accent); text-underline-offset:3px; }
+    a:hover { text-decoration-thickness:2px; }
+    button, a { -webkit-tap-highlight-color:transparent; }
+    button { font:inherit; cursor:pointer; color:inherit; }
+    :focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+    .masthead { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 36px; border-bottom:1px solid var(--line); background:var(--surface); }
+    .brand { font-size:13px; font-weight:650; letter-spacing:.015em; }
+    .masthead span:last-child { color:var(--muted); font-size:12px; }
+    main { max-width:1600px; margin:auto; padding:30px 36px 44px; }
+    h1 { margin:0; font-size:30px; line-height:1.2; font-weight:650; letter-spacing:-.025em; }
+    .intro { margin:8px 0 23px; color:var(--muted); max-width:75ch; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:20px; }
+    .views { display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--stage); border-radius:10px; }
+    .views button { border:0; padding:8px 16px; border-radius:7px; font-size:13px; background:transparent; min-height:36px; }
+    .views button:hover { background:var(--page); }
+    .views button[aria-pressed="true"] { background:var(--surface); box-shadow:0 1px 3px #101b3020; font-weight:600; }
+    .actions { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+    .compare { background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:7px 12px; font-size:13px; min-height:36px; }
+    .compare:hover { border-color:var(--accent); }
+    .compare[aria-pressed="true"] { color:var(--accent); background:var(--selection); border-color:var(--accent); }
+    .actions a { font-size:13px; }
+    .preview-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:24px; align-items:start; }
+    .preview-grid.comparing { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    figure { margin:0; min-width:0; }
+    figure[hidden] { display:none; }
+    figcaption { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px 16px; margin-bottom:10px; font-size:12px; color:var(--muted); }
+    figcaption strong { color:var(--text); font-weight:600; }
+    .image-stage { padding:18px; border-radius:14px; background:var(--stage); }
+    .image-stage img { display:block; width:100%; height:auto; border-radius:10px; box-shadow:0 8px 24px #18233318; }
+    .preview-grid:not(.comparing) .image-stage.compact img { max-width:1000px; margin-inline:auto; }
+    .image-link { display:block; border-radius:10px; }
+    .image-link:focus-visible { outline-offset:6px; }
+    .reference-caption { margin:10px 0 0; color:var(--muted); font-size:12px; max-width:75ch; }
+    .status { min-height:21px; margin:12px 0 0; color:var(--muted); font-size:12px; }
+    .notes { display:grid; grid-template-columns:1.05fr 1fr 1fr; gap:36px; margin-top:28px; padding-top:24px; border-top:1px solid var(--line); }
+    h2 { font-size:16px; line-height:1.3; font-weight:650; margin:0 0 10px; }
+    .notes p { margin:0; max-width:65ch; color:var(--muted); }
+    ul { margin:0; padding-left:18px; color:var(--muted); }
+    li + li { margin-top:6px; }
+    details { margin-top:30px; border-block:1px solid var(--line); padding:16px 0; }
+    summary { cursor:pointer; font-weight:600; width:fit-content; }
+    details p { color:var(--muted); max-width:75ch; margin:12px 0; }
+    .table-wrap { overflow-x:auto; margin-top:16px; scrollbar-color:var(--muted) var(--stage); }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { text-align:left; vertical-align:top; padding:11px 14px 11px 0; border-bottom:1px solid var(--line); }
+    th { font-weight:600; }
+    td { color:var(--muted); }
+    td:first-child { color:var(--text); width:22%; }
+    code { font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    footer { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:22px; font-size:12px; color:var(--muted); }
+    footer p { margin:0; max-width:80ch; }
+    .footer-links { display:flex; gap:18px; flex-wrap:wrap; }
+    noscript p { padding:12px; background:var(--selection); }
+    @media (prefers-color-scheme:dark) {
+      :root { color-scheme:dark; --page:#161a20; --surface:#222830; --text:#f0f2f6; --muted:#b4bdca; --line:#414b59; --accent:#80b7ff; --selection:#253f63; --stage:#2b323d; }
+    }
+    @media (max-width:850px) {
+      main { padding:24px 20px 30px; }
+      .masthead { padding:16px 20px; }
+      .preview-grid.comparing { grid-template-columns:minmax(0,1fr); }
+      .notes { grid-template-columns:1fr; gap:24px; }
+      .image-stage { padding:10px; }
+    }
+    @media (max-width:480px) {
+      main { padding:22px 14px 28px; }
+      .masthead { padding:14px; align-items:flex-start; }
+      .masthead span:last-child { max-width:105px; text-align:right; }
+      h1 { font-size:26px; }
+      .views { width:100%; }
+      .views button { flex:1; padding:8px 6px; font-size:12px; }
+      .actions { width:100%; justify-content:space-between; gap:10px; }
+      .image-stage { padding:6px; border-radius:10px; }
+      .image-stage img { border-radius:6px; }
+    }
+    @media print {
+      .toolbar,.masthead,.status,footer { display:none; }
+      main { padding:0; }
+      .notes { break-inside:avoid; }
+      .image-stage { padding:0; background:none; }
+      .image-stage img { box-shadow:none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- THESIS: Make the native workspace's conversation, evidence, and composer easy to assess in a local image review.
+  OWN-WORLD: Inherit native/PRODUCT.md and native/DESIGN.md: semantic macOS surfaces, system type, source-list navigation, read-only inspection.
+  STORY: Inspect a proposed screen, switch appearance or compact state, compare with an actual app reference, then review the native handoff.
+  FIRST VIEWPORT: A quiet title and three view controls above one large generated app image. Current-app comparison is opt-in. Image controls remain raster mockups.
+  FORM: Extension of the established native workspace; user-requested isolated image prototypes. No new visual-world roll or production implementation. No concept has been approved.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+  <header class="masthead">
+    <span class="brand">HEAV3NS-CODE</span>
+    <span>Local design study · v1</span>
+  </header>
+  <main>
+    <h1>Native workspace</h1>
+    <p class="intro">Light, dark, and compact concepts for directing LUMI. Generated images with illustrative task content.</p>
+    <noscript><p>JavaScript is disabled. The light concept is below; <a href="assets/workspace-dark.png">open the dark concept</a> or <a href="assets/approval-compact.png">open compact approval</a>.</p></noscript>
+    <div class="toolbar">
+      <div class="views" role="group" aria-label="Choose a concept">
+        <button type="button" data-view="light" aria-pressed="true">Light workspace</button>
+        <button type="button" data-view="dark" aria-pressed="false">Dark workspace</button>
+        <button type="button" data-view="approval" aria-pressed="false">Compact approval</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="compare" class="compare" aria-pressed="false" aria-controls="reference-figure">Compare current app</button>
+        <a id="full-size" href="assets/workspace-light.png" target="_blank" rel="noopener">Open full size</a>
+      </div>
+    </div>
+    <div class="preview-grid" id="preview-grid">
+      <figure>
+        <figcaption><strong id="concept-title">Light workspace</strong><span>Generated concept · illustrative content</span></figcaption>
+        <div class="image-stage" id="concept-stage">
+          <a class="image-link" id="concept-link" href="assets/workspace-light.png" target="_blank" rel="noopener" aria-label="Open light workspace concept at full size">
+            <img id="concept-image" src="assets/workspace-light.png" width="1586" height="992" alt="Light native workspace concept: Files, Changes and Sessions sidebar, LUMI conversation, read-only diff inspector and a persistent composer with Send.">
+          </a>
+        </div>
+      </figure>
+      <figure id="reference-figure" hidden>
+        <figcaption><strong>Current app reference</strong><a id="reference-link" href="references/current-workspace-light.png" target="_blank" rel="noopener">Open full size</a></figcaption>
+        <div class="image-stage"><img id="reference-image" src="references/current-workspace-light.png" alt="Existing AppKit app capture in light appearance with file navigation, an empty conversation and a restored composer draft."></div>
+        <p class="reference-caption" id="reference-caption">Actual AppKit capture. This is a different task state, supplied for visual comparison.</p>
+      </figure>
+    </div>
+    <p class="status" id="status" aria-live="polite">1586 × 992 px · intended wide-window composition</p>
+    <div class="notes">
+      <section aria-labelledby="change-heading">
+        <h2 id="change-heading">What to look at</h2>
+        <p id="view-note">A clearer separation between conversation and inspection. Activity is grouped, evidence stays explicit, and the composer anchors the working area.</p>
+      </section>
+      <section aria-labelledby="kept-heading">
+        <h2 id="kept-heading">Carried forward</h2>
+        <ul>
+          <li>Files, Changes, and Sessions navigation.</li>
+          <li>Read-only evidence and visible task state.</li>
+          <li>Native controls, system type, and keyboard conventions.</li>
+        </ul>
+      </section>
+      <section aria-labelledby="scope-heading">
+        <h2 id="scope-heading">Prototype boundary</h2>
+        <p>The current client uses AppKit. These images propose a finished native appearance; they are not SwiftUI renders. Native source is unchanged. Buttons inside the images are part of the mockup.</p>
+      </section>
+    </div>
+    <details>
+      <summary>Native implementation handoff</summary>
+      <p>Keep the runtime behavior and adapt the existing native components after selecting a direction. This study does not decide a framework migration.</p>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Native component mapping">
+        <table>
+          <thead><tr><th>Surface</th><th>Proposed refinement</th><th>Existing source</th></tr></thead>
+          <tbody>
+            <tr><td>Workspace</td><td>Clear pane headings, consistent insets, balanced reading widths.</td><td><code>WorkspaceWindow.swift</code></td></tr>
+            <tr><td>Navigation</td><td>Predictable selected rows; stronger filename / status hierarchy.</td><td><code>NavigationSidebar.swift</code></td></tr>
+            <tr><td>Activity</td><td>Compact disclosure rows; evidence labels remain distinct from task completion.</td><td><code>WorkspaceWindow.swift</code></td></tr>
+            <tr><td>Composer</td><td>More breathing room, native blue Send, persistent keyboard hint.</td><td><code>WorkspaceWindow.swift</code></td></tr>
+            <tr><td>Approval</td><td>Separate the review title from the operation name; improve detail grouping. Keep Allow Once neutral.</td><td><code>ApprovalReview.swift</code></td></tr>
+            <tr><td>Compact window</td><td>Hide navigation; show Agent / Inspect when inspection is open; keep the composer available.</td><td><code>WorkspaceWindow.swift</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Raster geometry and generated lettering are approximate. Sample code, counts, and commands are illustrative. A native implementation must verify resizing, focus, contrast, text selection, and accessibility with live controls. Diff coloring and colored author labels visible in the concepts are proposals, not existing behavior.</p>
+    </details>
+    <footer>
+      <p>Created with Codex image generation · September 29, 2026. All files stay inside this prototype directory.</p>
+      <div class="footer-links">
+        <a id="prompt-link" href="prompts/workspace-light.txt" target="_blank" rel="noopener">Generation prompt</a>
+        <a href="README.md">Review notes</a>
+        <a href="manifest.json">Asset manifest</a>
+      </div>
+    </footer>
+  </main>
+  <script>
+    const concepts = {
+      light: { title:'Light workspace', file:'assets/workspace-light.png', width:1586, height:992, reference:'references/current-workspace-light.png', referenceAlt:'Actual AppKit light workspace with source-list navigation and restored draft.', prompt:'prompts/workspace-light.txt', note:'A clearer separation between conversation and inspection. Activity is grouped, evidence stays explicit, and the composer anchors the working area.', alt:'Light native workspace concept: Files, Changes and Sessions sidebar, LUMI conversation, read-only diff inspector and a persistent composer with Send.', size:'1586 × 992 px · intended wide-window composition', referenceNote:'Actual AppKit capture. This is a different task state, supplied for visual comparison.' },
+      dark: { title:'Dark workspace', file:'assets/workspace-dark.png', width:1586, height:992, reference:'references/current-workspace-dark.png', referenceAlt:'Actual AppKit compact dark workspace showing conversation instructions and a restored draft.', prompt:'prompts/workspace-dark.txt', note:'The same workspace in Dark Aqua. Graphite surfaces separate navigation, conversation, and evidence, with readable secondary text and restrained system-blue emphasis.', alt:'Dark native workspace concept with the same three-pane layout and content as the light concept, graphite surfaces, readable activity and a bottom composer.', size:'1586 × 992 px · same composition in dark appearance', referenceNote:'Actual AppKit capture at compact width. Use this reference for dark materials and controls; its layout and task state differ.' },
+      approval: { title:'Compact approval', file:'assets/approval-compact.png', width:1505, height:1045, reference:'references/current-approval.png', referenceAlt:'Actual compact AppKit approval sheet with operation details and Close, Deny, and Allow Once controls.', prompt:'prompts/approval-compact.txt', note:'Review one operation with its workspace, reason, and full arguments. Close, Deny, and Allow Once stay distinct. Approval has no default Return action; the composer remains visible behind the sheet.', alt:'Compact light native window with a Review Request sheet showing run_command, workspace, reason, command arguments, and neutral Close, Deny and Allow Once buttons.', size:'1505 × 1045 px · intended compact 720 × 500-point composition; geometry is approximate', referenceNote:'Actual AppKit approval capture. The operation and sheet content differ from the illustrative concept.' }
+    };
+    const $ = id => document.getElementById(id);
+    const buttons = [...document.querySelectorAll('[data-view]')];
+    let active = 'light';
+    let comparing = false;
+    function render() {
+      const view = concepts[active];
+      buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === active)));
+      $('concept-title').textContent = view.title;
+      $('concept-image').src = view.file;
+      $('concept-image').alt = view.alt;
+      $('concept-image').width = view.width;
+      $('concept-image').height = view.height;
+      $('concept-link').href = view.file;
+      $('concept-link').setAttribute('aria-label', 'Open ' + view.title.toLowerCase() + ' concept at full size');
+      $('full-size').href = view.file;
+      $('reference-image').src = view.reference;
+      $('reference-image').alt = view.referenceAlt;
+      $('reference-link').href = view.reference;
+      $('reference-caption').textContent = view.referenceNote;
+      $('view-note').textContent = view.note;
+      $('prompt-link').href = view.prompt;
+      $('status').textContent = view.size;
+      $('concept-stage').classList.toggle('compact', active === 'approval');
+      $('preview-grid').classList.toggle('comparing', comparing);
+      $('reference-figure').hidden = !comparing;
+      $('compare').setAttribute('aria-pressed', String(comparing));
+      $('compare').textContent = comparing ? 'Hide current app' : 'Compare current app';
+    }
+    buttons.forEach(button => button.addEventListener('click', () => { active = button.dataset.view; render(); }));
+    $('compare').addEventListener('click', () => { comparing = !comparing; render(); });
+    $('concept-image').addEventListener('error', () => { $('status').textContent = 'Image could not load. Keep the assets folder beside index.html, then reload this page.'; });
+    $('reference-image').addEventListener('error', () => { if (comparing) $('status').textContent = 'The current-app reference could not load. Keep the references folder beside index.html, then reload.'; });
+  </script>
+</body>
+</html>

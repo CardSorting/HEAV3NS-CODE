@@ -1,0 +1,78 @@
+{
+  "name": "HEAV3NS-CODE native design study",
+  "version": 1,
+  "created": "2026-09-29",
+  "scope": "Isolated image prototypes and offline review gallery; native app source unchanged",
+  "generator": "Codex built-in image_gen",
+  "status": "concepts_for_review",
+  "approved": false,
+  "pathBase": "ui-prototypes/native-v1/",
+  "entry": "index.html",
+  "nativeFramework": "AppKit (Swift); not SwiftUI",
+  "generated": [
+    {
+      "file": "assets/workspace-light.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/workspace-light-refinement.txt",
+      "history": [
+        "prompts/workspace-light.txt",
+        "prompts/workspace-light-refinement.txt"
+      ],
+      "inputs": [
+        "references/current-workspace-light.png"
+      ],
+      "approved": false
+    },
+    {
+      "file": "assets/workspace-dark.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/workspace-dark.txt",
+      "inputs": [
+        "assets/workspace-light.png",
+        "references/current-workspace-dark.png"
+      ],
+      "approved": false
+    },
+    {
+      "file": "assets/approval-compact.png",
+      "kind": "generated-concept",
+      "width": 1505,
+      "height": 1045,
+      "promptFile": "prompts/approval-compact.txt",
+      "inputs": [
+        "assets/workspace-light.png",
+        "../../docs/desktop/evidence/2026-09-29-approval-review/review-dark.png"
+      ],
+      "approved": false
+    }
+  ],
+  "references": [
+    {
+      "file": "references/current-workspace-light.png",
+      "origin": "../../docs/desktop/evidence/2026-09-29-draft-recovery/wide-light.png",
+      "role": "Actual wide light native capture; different task state"
+    },
+    {
+      "file": "references/current-workspace-dark.png",
+      "origin": "../../docs/desktop/evidence/2026-09-29-draft-recovery/compact-dark.png",
+      "role": "Actual compact dark native capture; materials reference rather than matched layout"
+    },
+    {
+      "file": "references/current-approval.png",
+      "origin": "../../docs/desktop/evidence/2026-09-29-approval-review/review-light.png",
+      "role": "Actual compact approval sheet; different request"
+    }
+  ],
+  "constraints": [
+    "Synthetic task content",
+    "Generated text and geometry are approximate",
+    "No production UI implementation or framework migration",
+    "No runtime model or capability changes",
+    "No approval is a default Return action",
+    "Images are reference mockups, not interactive app controls"
+  ]
+}

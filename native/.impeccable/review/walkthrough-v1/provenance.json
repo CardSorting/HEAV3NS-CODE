@@ -1,0 +1,7 @@
+{
+  "kind": "Scripted engine driving production DesktopSession and native client",
+  "providerInvoked": false,
+  "approvalCommandExecuted": false,
+  "crash": "Fixture worker exits after a live checkpoint; reopen marks the run interrupted without re-execution.",
+  "artifact": "/Users/bozoegg/Desktop/LUMI-NEW/build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE"
+}

@@ -6,21 +6,22 @@ import { promisify } from "node:util"
 import { z } from "zod"
 import type { EngineProgressEvent, EngineTickResult, IAgentEngine } from "../core/contracts/agent.contracts.js"
 import { StateManager } from "../core/storage/StateManager.js"
-import { sanitizeProgressText } from "../core/utilities/progress-sanitizer.js"
 import { HostProvider } from "../hosts/host-provider.js"
 import { LumiMonolith } from "../index.js"
+import type { MemoryEntry } from "../sessions/extensions/memory/session-memory-store.js"
 import { BroccoliDatabaseKernel } from "../sessions/extensions/substrate/broccolidb-kernel.js"
 import { Logger } from "../shared/services/Logger.js"
 import { createStorageContext } from "../shared/storage/storage-context.js"
 import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
+import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
 import { WorkspaceInspection } from "./inspection.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
-	MAX_INSTRUCTION_LENGTH,
 	type DesktopRequest,
 	encodeFrame,
 	FrameDecoder,
+	MAX_INSTRUCTION_LENGTH,
 	MAX_PENDING_BYTES,
 	requestSchema,
 } from "./protocol.js"
@@ -39,8 +40,11 @@ type Run = Record<string, unknown> & {
 	updatedAt: number
 	revision?: number
 	session: string
+	conversation?: string
 	response?: string
 	activities: EngineProgressEvent[]
+	activitySequence?: number
+	activityCount?: number
 	approval?: Record<string, unknown>
 	verification: "not_run" | "evidence_available"
 	review: "not_reviewed"
@@ -62,6 +66,7 @@ const projectRun = (run: Run) => ({
 	id: run.id,
 	request: run.request,
 	session: run.session,
+	conversation: run.conversation ?? run.session,
 	text: shortText(run.text, 2000),
 	state: run.state,
 	createdAt: run.createdAt,
@@ -70,16 +75,13 @@ const projectRun = (run: Run) => ({
 	queueOrder: run.queueOrder,
 	startedAt: run.startedAt,
 	response: run.response ? shortText(run.response, 6000) : undefined,
-	activities: run.activities.slice(-8).map((a) => ({
-		activityId: a.activityId,
-		phase: a.phase,
-		status: a.status,
-		message: shortText(a.message, 300),
-		detail: a.detail ? shortText(a.detail, 400) : undefined,
-		elapsedMs: a.elapsedMs,
-		timestamp: a.timestamp,
-		sequence: a.sequence,
-	})),
+	activities: run.activities
+		.slice(-8)
+		.map((activity) => projectActivity(activity, "/"))
+		.filter(Boolean),
+	activitySequence: run.activitySequence ?? Math.max(0, ...run.activities.map((activity) => activity.sequence)),
+	activityCount: run.activityCount ?? run.activities.length,
+	activityRetained: Math.min(ACTIVITY_LIMIT, run.activities.length),
 	approval: run.approval,
 	verification: run.verification,
 	review: run.review,
@@ -103,10 +105,19 @@ const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<
 	return baseline ? shortText(baseline.stdout) : "Git status unavailable"
 }
 
+type ConversationContext = { jsonl: string; turnCount: number; memories?: MemoryEntry[] }
+type DesktopLifecycle = {
+	sessionId: string
+	saveContext: (conversation?: string) => void
+	readContext?: () => ConversationContext
+	restoreContext?: (context: ConversationContext) => void
+}
+
 /** This adapter schedules existing ticks. It has no provider, prompt, or tool implementation. */
 export class DesktopSession {
 	readonly runtime = randomUUID()
 	session = ""
+	conversation = ""
 	private seq = 0
 	private active?: Run
 	private controller?: AbortController
@@ -120,24 +131,30 @@ export class DesktopSession {
 	private runs
 	private metadata
 	private approvals
+	private conversations
 	private inspection: WorkspaceInspection
 	private submissions: Promise<unknown> = Promise.resolve()
 	private queueMutations = 0
 	private revision = 0
 	private cancellingAll = false
 	private cancellation?: Promise<void>
+	private activityCheckpoint?: ReturnType<typeof setTimeout>
+	private activityWriting = false
+	private activityDirty = false
+	private activityDelivery?: ReturnType<typeof setTimeout>
+	private pendingActivities = new Map<string, EngineProgressEvent>()
 	readonly workspace: { path: string; id: string }
 	private readonly engine: IAgentEngine
 	private readonly database: BroccoliDatabaseKernel
 	private readonly send: (frame: unknown) => void
-	private readonly lifecycle?: { sessionId: string; saveContext: () => void }
+	private readonly lifecycle?: DesktopLifecycle
 	private readonly readBaseline: typeof readGitBaseline
 	constructor(
 		workspace: { path: string; id: string },
 		engine: IAgentEngine,
 		database: BroccoliDatabaseKernel,
 		send: (frame: unknown) => void,
-		lifecycle?: { sessionId: string; saveContext: () => void },
+		lifecycle?: DesktopLifecycle,
 		readBaseline = readGitBaseline,
 	) {
 		this.workspace = workspace
@@ -150,14 +167,32 @@ export class DesktopSession {
 		this.runs = database.getTable<Run>("desktop.runs.v1")
 		this.metadata = database.getTable("desktop.metadata.v1")
 		this.approvals = database.getTable("desktop.approvals.v1")
+		this.conversations = database.getTable("desktop.conversations.v1")
 	}
 	async start() {
 		await this.database.start()
 		const meta = this.metadata.get("session")
 		this.session = typeof meta?.session === "string" ? meta.session : (this.lifecycle?.sessionId ?? randomUUID())
 		this.seq = typeof meta?.seq === "number" ? meta.seq : 0
+		// The selected identity and its engine context share one WAL record. A
+		// crash between separate metadata writes must never attach another thread's context.
+		const selected = this.metadata.get("context")?.conversation ?? this.metadata.get("activeConversation")?.id
+		this.conversation = typeof selected === "string" && this.conversations.get(selected) ? selected : this.session
+		if (!this.conversations.get(this.conversation)) {
+			const first = this.runs.getAll().find((run) => run.session === this.session)
+			this.conversations.put(this.conversation, {
+				id: this.conversation,
+				title: first?.text.slice(0, 100) ?? "New conversation",
+				createdAt: first?.createdAt ?? Date.now(),
+				updatedAt: Date.now(),
+			})
+		}
 		// Never resume accepted or uncertain work merely because the app reopened.
 		for (const run of this.runs.getAll()) {
+			if (!run.conversation) {
+				run.conversation = run.session
+				this.runs.put(run.id, { ...run })
+			}
 			if (!terminalStates.has(run.state))
 				await this.commit({ ...run, state: "interrupted", approval: undefined }, "run.state")
 		}
@@ -181,6 +216,12 @@ export class DesktopSession {
 		})
 	}
 	private commit(run: Run, type: string): Promise<void> {
+		if (run.id === this.active?.id) {
+			this.flushActivities(run)
+			clearTimeout(this.activityCheckpoint)
+			this.activityCheckpoint = undefined
+			this.activityDirty = false
+		}
 		run.updatedAt = Date.now()
 		// Copies of a live run (for approval records) share the same monotonic
 		// version space, including commits still waiting for durable storage.
@@ -205,15 +246,21 @@ export class DesktopSession {
 		return guarded
 	}
 	private recent(cursor?: { createdAt: number; id: string }, before = Number.MAX_SAFE_INTEGER) {
-		const page = this.runs.query({
-			where: { session: this.session, createdAt: { $lt: before } },
-			or: cursor
-				? [{ createdAt: { $lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { $lt: cursor.id } }]
-				: undefined,
-			sortBy: ["createdAt", "id"],
-			sortOrder: "desc",
-			limit: 7,
-		})
+		const query = (conversation: string | { $exists: boolean }) =>
+			this.runs.query({
+				where: { session: this.session, conversation, createdAt: { $lt: before } },
+				or: cursor
+					? [{ createdAt: { $lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { $lt: cursor.id } }]
+					: undefined,
+				sortBy: ["createdAt", "id"],
+				sortOrder: "desc",
+				limit: 7,
+			})
+		// Older writers and imported records can still omit conversation. Their
+		// original transport session is the only conversation allowed to see them.
+		const page = [...query(this.conversation), ...(this.conversation === this.session ? query({ $exists: false }) : [])]
+			.sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+			.slice(0, 7)
 		const last = page[5]
 		return {
 			runs: page.slice(0, 6).reverse().map(projectRun),
@@ -231,7 +278,7 @@ export class DesktopSession {
 		)
 	}
 	async request(request: DesktopRequest): Promise<unknown> {
-		if (request.method === "task.submit" || request.method === "task.edit") {
+		if (["task.submit", "task.edit", "conversation.create", "conversation.select"].includes(request.method)) {
 			if (this.cancellingAll) throw new Error("CANCELLING: wait for a confirmed stopping boundary")
 			this.queueMutations++
 			const result = this.submissions.then(() => this.handleRequest(request))
@@ -262,12 +309,15 @@ export class DesktopSession {
 					"approval",
 					"history",
 					"files",
+					"file-search-v1",
 					"changes",
 					"paged-inspection",
 					"workspace-stop",
 					"run-details",
 					"queue-edit",
 					"queue-remove",
+					"walkthrough-v1",
+					...(this.lifecycle?.restoreContext && this.lifecycle.readContext ? ["conversations"] : []),
 				],
 				terminal: false,
 			}
@@ -277,24 +327,82 @@ export class DesktopSession {
 		switch (request.method) {
 			case "workspace.attach":
 			case "snapshot":
+				await this.submissions
 				await this.commits
 				return {
 					runtime: this.runtime,
 					workspace: this.workspace.id,
 					session: this.session,
+					conversation: this.conversation,
 					seq: this.seq,
 					runs: this.snapshotRuns(),
 					active: this.active?.id,
 					queued: this.queue.map((r) => r.id),
 				}
+			case "conversation.list": {
+				await this.submissions
+				const { offset } = z
+					.object({ offset: z.number().int().min(0).default(0) })
+					.strict()
+					.parse(request.params)
+				const all = [...this.conversations.getAll()].sort(
+					(a, b) => Number(b.updatedAt) - Number(a.updatedAt) || String(a.id).localeCompare(String(b.id)),
+				)
+				return {
+					active: this.conversation,
+					conversations: all.slice(offset, offset + 100).map(({ id, title, updatedAt }) => ({ id, title, updatedAt })),
+					more: all.length > offset + 100,
+				}
+			}
+			case "conversation.create":
+			case "conversation.select": {
+				if (!this.lifecycle?.restoreContext || !this.lifecycle.readContext)
+					throw new Error("UNSUPPORTED: this runtime cannot switch conversations")
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: stop or finish current work before switching conversations")
+				const params =
+					request.method === "conversation.create"
+						? z.object({}).strict().parse(request.params)
+						: z
+								.object({ id: z.string().min(1).max(128) })
+								.strict()
+								.parse(request.params)
+				const id = "id" in params ? String(params.id) : randomUUID()
+				const target = this.conversations.get(id)
+				if (request.method === "conversation.select" && !target) throw new Error("UNKNOWN_CONVERSATION")
+				if (id === this.conversation) return { conversation: id }
+				await this.commits
+				const prior = this.lifecycle.readContext()
+				const restored = target?.context as ConversationContext | undefined
+				// Validate/restore in the engine before changing the durable selection.
+				this.lifecycle.restoreContext(restored ?? { jsonl: "", turnCount: 0 })
+				this.conversations.put(this.conversation, { ...this.conversations.get(this.conversation), context: prior })
+				this.conversations.put(
+					id,
+					target ?? { id, title: "New conversation", createdAt: Date.now(), updatedAt: Date.now() },
+				)
+				this.metadata.put("activeConversation", { id })
+				this.lifecycle.saveContext(id)
+				try {
+					await this.database.flush()
+				} catch (error) {
+					this.closing = true
+					throw error
+				}
+				this.conversation = id
+				return { conversation: id }
+			}
 			case "task.submit": {
 				const params = z
 					.object({
 						text: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
 						attachments: z.array(z.never()).max(0).default([]),
+						conversation: z.string().min(1).max(128).optional(),
 					})
 					.strict()
 					.parse(request.params)
+				if (params.conversation && params.conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: reload the selected conversation before sending")
 				const fingerprint = createHash("sha256").update(JSON.stringify(params)).digest("hex")
 				const id = createHash("sha256").update(`${this.session}:${request.id}`).digest("hex")
 				const previous = this.runs.get(id)
@@ -313,6 +421,7 @@ export class DesktopSession {
 					fingerprint,
 					text: params.text,
 					session: this.session,
+					conversation: this.conversation,
 					state: "queued",
 					queueOrder: this.seq + 1,
 					createdAt: Date.now(),
@@ -321,6 +430,12 @@ export class DesktopSession {
 					verification: "not_run",
 					review: "not_reviewed",
 				}
+				const conversation = this.conversations.get(this.conversation)
+				this.conversations.put(this.conversation, {
+					...conversation,
+					title: conversation?.title === "New conversation" ? params.text.slice(0, 100) : conversation?.title,
+					updatedAt: run.createdAt,
+				})
 				await this.commit(run, "run.accepted")
 				this.queue.push(run)
 				this.kick()
@@ -413,6 +528,7 @@ export class DesktopSession {
 				return { resolved: true }
 			}
 			case "history.list": {
+				await this.submissions
 				const { before, cursor } = z
 					.object({
 						before: z.number().optional(),
@@ -426,14 +542,38 @@ export class DesktopSession {
 				await this.commits
 				return this.recent(cursor, before)
 			}
+			case "activity.list": {
+				await this.submissions
+				const { run: id } = z
+					.object({ run: z.string().regex(/^[a-f0-9]{64}$/) })
+					.strict()
+					.parse(request.params)
+				await this.commits
+				const run = this.active?.id === id ? this.active : this.runs.get(id)
+				if (!run || run.session !== this.session || (run.conversation ?? run.session) !== this.conversation)
+					throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
+				return {
+					run: id,
+					activities: run.activities
+						.slice(-ACTIVITY_LIMIT)
+						.map((activity) => projectActivity(activity, this.workspace.path))
+						.filter(Boolean),
+					activitySequence: run.activitySequence ?? Math.max(0, ...run.activities.map((activity) => activity.sequence)),
+					activityCount: run.activityCount ?? run.activities.length,
+					limit: ACTIVITY_LIMIT,
+				}
+			}
 			case "history.read": {
+				await this.submissions
 				const { run: id } = z
 					.object({ run: z.string().regex(/^[a-f0-9]{64}$/) })
 					.strict()
 					.parse(request.params)
 				await this.commits
 				const run = this.runs.get(id)
-				if (!run || run.session !== this.session) throw new Error("UNKNOWN_RUN: this run is not in the attached session")
+				if (!run || run.session !== this.session || (run.conversation ?? run.session) !== this.conversation)
+					throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
+				const conversation = this.conversation
 				let outputAvailable = false
 				try {
 					const file = await this.inspection.resolve(path.join(".broccolidb", "desktop-output", `${id}.txt`))
@@ -441,6 +581,7 @@ export class DesktopSession {
 				} catch (error) {
 					if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
 				}
+				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: open the instruction again")
 				return {
 					run: { ...projectRun(run), text: run.text, response: run.response, baseline: run.baseline },
 					outputAvailable,
@@ -450,6 +591,13 @@ export class DesktopSession {
 							? "No output was recorded for this run. Its instruction and last confirmed state are preserved."
 							: "Output will be available after LUMI records the result. Activity is shown in the conversation.",
 				}
+			}
+			case "files.search": {
+				const p = z
+					.object({ query: z.string().max(200).default(""), refresh: z.boolean().default(false) })
+					.strict()
+					.parse(request.params)
+				return this.inspection.fileSearch.search(p.query, p.refresh)
 			}
 			case "files.list": {
 				const p = z
@@ -470,6 +618,8 @@ export class DesktopSession {
 				return this.inspection.read(p.path, p.offset, p.revision)
 			}
 			case "artifact.read": {
+				await this.submissions
+				await this.commits
 				const p = z
 					.object({
 						run: z.string().regex(/^[a-f0-9]{64}$/),
@@ -478,8 +628,17 @@ export class DesktopSession {
 					})
 					.strict()
 					.parse(request.params)
-				if (!this.runs.get(p.run)) throw new Error("UNKNOWN_RUN")
-				return this.inspection.read(path.join(".broccolidb", "desktop-output", `${p.run}.txt`), p.offset, p.revision)
+				const run = this.runs.get(p.run),
+					conversation = this.conversation
+				if (!run || run.session !== this.session || (run.conversation ?? run.session) !== conversation)
+					throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
+				const result = await this.inspection.read(
+					path.join(".broccolidb", "desktop-output", `${p.run}.txt`),
+					p.offset,
+					p.revision,
+				)
+				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: open the output again")
+				return result
 			}
 			case "changes.list":
 				return this.inspection.changes()
@@ -566,24 +725,55 @@ export class DesktopSession {
 		}
 	}
 	private progress(run: Run, event: EngineProgressEvent) {
-		const bounded = {
-			activityId: event.activityId,
-			phase: event.phase,
-			status: event.status,
-			timestamp: event.timestamp,
-			sequence: event.sequence,
-			elapsedMs: event.elapsedMs,
-			message: sanitizeProgressText(event.message, 1000),
-			detail: event.detail ? sanitizeProgressText(event.detail, 2000) : undefined,
-		}
-		const index = run.activities.findIndex((e) => e.activityId === event.activityId)
-		if (index >= 0 && event.sequence <= run.activities[index].sequence) return
-		if (index >= 0) run.activities[index] = bounded
-		else {
-			run.activities.push(bounded)
-			if (run.activities.length > 40) run.activities.shift()
-		}
-		this.event("activity", bounded, run.id)
+		if (this.closing || this.active !== run || terminalStates.has(run.state)) return
+		const bounded = reduceActivity(run, event, this.workspace.path)
+		if (!bounded) return
+		this.pendingActivities.set(bounded.activityId, bounded)
+		if (this.pendingActivities.size > ACTIVITY_LIMIT)
+			this.pendingActivities.delete(this.pendingActivities.keys().next().value!)
+		if (!this.activityDelivery) this.activityDelivery = setTimeout(() => this.flushActivities(run), 50)
+		this.activityDirty = true
+		this.scheduleActivityCheckpoint(run)
+	}
+	private flushActivities(run: Run) {
+		clearTimeout(this.activityDelivery)
+		this.activityDelivery = undefined
+		if (!this.pendingActivities.size) return
+		const activities = [...this.pendingActivities.values()].sort((a, b) => a.sequence - b.sequence)
+		this.pendingActivities.clear()
+		this.event(
+			"activity.batch",
+			{ activities, activitySequence: run.activitySequence, activityCount: run.activityCount },
+			run.id,
+		)
+	}
+	private scheduleActivityCheckpoint(run: Run) {
+		if (
+			this.activityCheckpoint ||
+			this.activityWriting ||
+			!this.activityDirty ||
+			this.active !== run ||
+			this.closing ||
+			terminalStates.has(run.state)
+		)
+			return
+		// Persist live progress at a bounded rate. Approval/stop/terminal commits
+		// capture it immediately; streaming tokens never queue unbounded disk flushes.
+		this.activityCheckpoint = setTimeout(() => {
+			this.activityCheckpoint = undefined
+			this.activityWriting = true
+			void this.commit(run, "run.progress")
+				.catch(() => {
+					this.event("runtime.error", {
+						message: "Activity could not be saved. Execution stopped; reconnect to inspect the recorded state.",
+					})
+				})
+				.finally(() => {
+					this.activityWriting = false
+					this.scheduleActivityCheckpoint(run)
+				})
+		}, 500)
+		this.activityCheckpoint.unref?.()
 	}
 	private async saveResult(run: Run, result: EngineTickResult) {
 		run.response = shortText(result.response)
@@ -714,10 +904,33 @@ export class DesktopSession {
 	}
 	async stop() {
 		this.closing = true
+		clearTimeout(this.activityCheckpoint)
+		clearTimeout(this.activityDelivery)
 		this.inspection.clear()
-		await this.cancelAll()
-		await this.engine.close?.()
-		await this.database.stop()
+		let failure: unknown
+		try {
+			await this.cancelAll()
+		} catch (error) {
+			failure = error
+		}
+		// A rejected durability chain must not skip engine/database cleanup, or
+		// close storage while an aborted tick is still recording its outcome.
+		try {
+			await this.pumping
+		} catch (error) {
+			failure ??= error
+		}
+		try {
+			await this.engine.close?.()
+		} catch (error) {
+			failure ??= error
+		}
+		try {
+			await this.database.stop()
+		} catch (error) {
+			failure ??= error
+		}
+		if (failure) throw failure
 	}
 }
 
@@ -760,13 +973,19 @@ export async function runDesktopWorker(): Promise<void> {
 			process.exit(2)
 		}, 5000)
 		try {
-			await bridge?.stop()
-			engine?.processSupervisorEngine.shutdownAll()
-			if (initialized) await StateManager.get().shutdown()
-			await owner.release()
-		} catch (error) {
-			Logger.error(`Desktop cleanup failed: ${String(error)}`)
-			process.exitCode = 2
+			for (const cleanup of [
+				() => bridge?.stop(),
+				() => engine?.processSupervisorEngine.shutdownAll(),
+				() => (initialized ? StateManager.get().shutdown() : undefined),
+				() => owner.release(),
+			]) {
+				try {
+					await cleanup()
+				} catch (error) {
+					Logger.error(`Desktop cleanup failed: ${String(error)}`)
+					process.exitCode = 2
+				}
+			}
 		} finally {
 			clearTimeout(deadline)
 			process.stdin.destroy()
@@ -788,18 +1007,35 @@ export async function runDesktopWorker(): Promise<void> {
 			engine.sessionStore.importJsonl(context.jsonl)
 			engine.sessionContext.turnCount = typeof context.turnCount === "number" ? context.turnCount : 0
 		}
+		const readContext = (): ConversationContext => ({
+			jsonl: engine!.sessionStore
+				.getActiveMessages()
+				.map((message) => JSON.stringify(message))
+				.join("\n"),
+			turnCount: engine!.sessionContext.turnCount,
+			memories: engine!.sessionMemoryStore.listMemories(),
+		})
+		const restoreContext = (value: ConversationContext) => {
+			if (engine!.sessionVfs.exportStaged().length)
+				throw new Error("STAGED_EDITS: commit or discard the agent's staged edits before switching conversations")
+			engine!.sessionStore.importJsonl(value.jsonl)
+			engine!.sessionContext.turnCount = value.turnCount
+			engine!.sessionMemoryStore.clear()
+			for (const memory of value.memories ?? [])
+				engine!.sessionMemoryStore.saveMemory(memory.key, memory.value, memory.category)
+		}
+		if (context && Array.isArray(context.memories)) {
+			for (const memory of context.memories as MemoryEntry[])
+				engine.sessionMemoryStore.saveMemory(memory.key, memory.value, memory.category)
+		}
 		bridge = new DesktopSession(owner, engine, database, send, {
 			sessionId,
-			saveContext: () => {
+			readContext,
+			restoreContext,
+			saveContext: (conversation) => {
 				// Context selection/compaction remains in LUMI. The native client never
 				// rebuilds it from visible messages. Archived output remains separate.
-				metadata.put("context", {
-					jsonl: engine!.sessionStore
-						.getActiveMessages()
-						.map((message) => JSON.stringify(message))
-						.join("\n"),
-					turnCount: engine!.sessionContext.turnCount,
-				})
+				metadata.put("context", { ...readContext(), conversation: conversation ?? bridge!.conversation })
 			},
 		})
 		engine.toolRegistry.requireInteractiveHost((request) => bridge!.approve(request))

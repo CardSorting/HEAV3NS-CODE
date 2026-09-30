@@ -1,0 +1,37 @@
+[
+  {
+    "file": "review/desktop-working.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-working.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/desktop-symbols.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-symbols.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/desktop-approval.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-approval.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/desktop-changes.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-changes.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/mobile-working.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File mobile-working.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/mobile-signin.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File mobile-signin.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  },
+  {
+    "file": "review/storyboard.png",
+    "kind": "gallery-verification-capture",
+    "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File storyboard.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+  }
+]

@@ -15,6 +15,7 @@ import {
 	isClaudeSubscriptionDirectSdkProvider,
 } from "../../../core/providers/provider-ids.js"
 import { sanitizeProgressText } from "../../../core/utilities/progress-sanitizer.js"
+import { describeToolProgress } from "../../../core/utilities/tool-progress.js"
 import {
 	type ClaudeSubscriptionDirectSdkCompletionResponse,
 	createClaudeSubscriptionDirectSdkCompletion,
@@ -682,6 +683,8 @@ export class AgentEngine extends AbstractAgentEngine {
 								const toolActivityPrefix = `lumi:${encodeURIComponent(this.sessionContext.sessionId)}:turn:${this.sessionContext.turnCount}:round:${totalProviderRounds}:tool:`
 								const toolActivityId = (callId: string | undefined): string =>
 									`${toolActivityPrefix}${encodeURIComponent(callId ?? "unknown")}`
+								const describe = (name: string, args: unknown) =>
+									describeToolProgress(name, args, this.sessionContext.cwd)
 
 								const { results: batchResults } = await this.scheduler.executeBatch(
 									scheduledCalls,
@@ -695,21 +698,21 @@ export class AgentEngine extends AbstractAgentEngine {
 										bypassThreatDetection: input.executionAuthority ? false : true,
 										signal: input.signal,
 										onToolStart: (call: ScheduledToolCall) => {
+											const activity = describe(call.name, call.args)
 											this.reportProgress(input.onProgress, {
 												activityId: toolActivityId(call.id),
-												phase: "tool",
+												phase: activity.phase,
 												status: "in_progress",
-												message: `Executing ${call.name}`,
-												detail:
-													typeof call.args === "string"
-														? call.args.slice(0, 100)
-														: JSON.stringify(call.args).slice(0, 100),
+												message: activity.message,
+												detail: activity.detail,
 												timestamp: Date.now(),
 												elapsedMs: 0,
 												sequence: nextProgressSequence(),
 												metadata: {
 													source: progressSource,
 													itemType: call.name,
+													files: activity.files,
+													operation: activity.operation,
 													scope: "activity",
 													attempt: attempt + 1,
 												},
@@ -717,11 +720,15 @@ export class AgentEngine extends AbstractAgentEngine {
 										},
 										onToolComplete: (record: ToolExecutionRecord) => {
 											accumulatedToolResults.push(record)
+											const activity = describe(
+												record.name,
+												record.args ?? scheduledCalls.find((call) => call.id === record.callId)?.args,
+											)
 											this.reportProgress(input.onProgress, {
 												activityId: toolActivityId(record.callId),
-												phase: "tool",
+												phase: activity.phase,
 												status: record.denied ? "denied" : record.success ? "completed" : "failed",
-												message: `${record.denied ? "Denied" : record.success ? "Completed" : "Failed"} ${record.name}`,
+												message: activity.message,
 												detail: record.denied
 													? "Permission denied for this operation"
 													: record.success
@@ -733,6 +740,8 @@ export class AgentEngine extends AbstractAgentEngine {
 												metadata: {
 													source: progressSource,
 													itemType: record.name,
+													files: activity.files,
+													operation: activity.operation,
 													scope: "activity",
 													attempt: attempt + 1,
 													exitCode: record.exitCode,

@@ -2,7 +2,7 @@ import AppKit
 
 enum WorkspaceDestination: Int, CaseIterable {
     case files, changes, sessions
-    var title: String { ["Files", "Changes", "Sessions"][rawValue] }
+    var title: String { ["Files", "Changes", "Recorded Runs"][rawValue] }
     var symbol: String { ["folder", "arrow.triangle.branch", "clock"][rawValue] }
 }
 
@@ -26,7 +26,7 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     private(set) var destination = WorkspaceDestination.files
     private(set) var entries = [SidebarEntry]()
     private let destinations = NSTableView()
-    private let items = NSTableView()
+    private let items = KeyboardListView()
     private let search = NSSearchField()
     private let location = NSTextField(labelWithString: "Workspace")
     private let message = NSTextField(wrappingLabelWithString: "Choose Files to browse this workspace.")
@@ -35,12 +35,23 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     private let previous = NSButton(image: NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Previous page")!, target: nil, action: nil)
     private var suppressSelection = false
     private var filterWork: DispatchWorkItem?
+    private let destinationScroll = NSScrollView()
+    private let destinationRule = NSBox()
+    private let root = NSStackView()
+    private var compact = false
+    var previewsSelection = true
+
+    func useAsContextBrowser() {
+        compact = true; destinationScroll.isHidden = true; destinationRule.isHidden = true
+        root.spacing = 6; root.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        items.rowHeight = 32
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         let background = NSVisualEffectView(); background.material = .sidebar; background.blendingMode = .withinWindow
         background.autoresizingMask = [.width, .height]; background.frame = bounds; addSubview(background)
-        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 10; root.distribution = .fill
+        root.orientation = .vertical; root.alignment = .leading; root.spacing = 10; root.distribution = .fill
         root.edgeInsets = NSEdgeInsets(top: 12, left: 8, bottom: 12, right: 8)
         for table in [destinations, items] {
             table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name")))
@@ -52,10 +63,18 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
         }
         destinations.setAccessibilityLabel("Workspace navigation")
         items.setAccessibilityLabel("Workspace items")
-        let destinationScroll = NSScrollView(); destinationScroll.documentView = destinations; destinationScroll.drawsBackground = false
+        items.toolTip = "Arrow keys select. Return or double-click opens. Right opens a folder; Left goes to its parent."
+        items.target = self; items.doubleAction = #selector(activateSelected)
+        items.onActivate = { [weak self] in self?.activateSelected() }
+        items.onEnterFolder = { [weak self] in
+            guard let self, self.entries.indices.contains(self.items.selectedRow), self.entries[self.items.selectedRow].value["directory"] as? Bool == true else { return }
+            self.activateSelected()
+        }
+        items.onParent = { [weak self] in guard let self, self.destination == .files, self.back.isEnabled else { return }; self.onBack?() }
+        destinationScroll.documentView = destinations; destinationScroll.drawsBackground = false
         destinationScroll.heightAnchor.constraint(equalToConstant: 94).isActive = true
         root.addArrangedSubview(destinationScroll)
-        let rule = NSBox(); rule.boxType = .separator; root.addArrangedSubview(rule)
+        let rule = destinationRule; rule.boxType = .separator; root.addArrangedSubview(rule)
         let pathBar = NSStackView(views: [back, location]); pathBar.spacing = 5
         location.font = .systemFont(ofSize: 11, weight: .semibold); location.lineBreakMode = .byTruncatingMiddle
         location.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -82,13 +101,14 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     func select(_ value: WorkspaceDestination, notify: Bool = true) {
         resetFilter(); destination = value
         suppressSelection = true; destinations.selectRowIndexes(IndexSet(integer: value.rawValue), byExtendingSelection: false); suppressSelection = false
-        search.placeholderString = value == .files ? "Filter this folder" : "Filter \(value.title.lowercased())"
+        search.placeholderString = value == .files ? "Filter this folder" : value == .sessions ? "Filter runs on this page" : "Filter changed files"
         if notify { onDestination?(value) }
     }
     func show(_ entries: [SidebarEntry], location: String, message: String, canGoBack: Bool = false, more: Bool = false, hasPrevious: Bool = false) {
         let selected = items.selectedRow >= 0 && self.entries.indices.contains(items.selectedRow) ? self.entries[items.selectedRow].id : nil
         self.entries = entries; self.location.stringValue = location; self.location.toolTip = location; items.isEnabled = true
-        self.message.stringValue = message; self.message.isHidden = message.isEmpty
+        self.message.stringValue = message + (!previewsSelection && !entries.isEmpty ? " · Return or double-click to open" : "")
+        self.message.isHidden = self.message.stringValue.isEmpty
         back.isEnabled = canGoBack; back.isHidden = destination != .files
         next.isHidden = !more; next.title = destination == .sessions ? "Earlier Runs" : "Next 100"
         previous.isEnabled = hasPrevious
@@ -105,6 +125,17 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
         let work = DispatchWorkItem { [weak self] in self?.onFilter?(query) }; filterWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard !textView.hasMarkedText() else { return false }
+        if commandSelector == #selector(NSResponder.moveDown(_:)), !entries.isEmpty, items.isEnabled {
+            window?.makeFirstResponder(items); items.selectRowIndexes(IndexSet(integer: max(0, items.selectedRow)), byExtendingSelection: false); return true
+        }
+        return false
+    }
+    @objc private func activateSelected() {
+        guard items.isEnabled, entries.indices.contains(items.selectedRow) else { return }
+        onOpen?(entries[items.selectedRow])
+    }
     @objc private func parent() { onBack?() }
     @objc private func nextPage() { onNext?() }
     @objc private func previousPage() { onPrevious?() }
@@ -113,7 +144,7 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !suppressSelection, let table = notification.object as? NSTableView else { return }
         if table === destinations, let value = WorkspaceDestination(rawValue: table.selectedRow) { select(value) }
-        else if entries.indices.contains(table.selectedRow) { onOpen?(entries[table.selectedRow]) }
+        else if table === items, previewsSelection, items.isEnabled, entries.indices.contains(table.selectedRow), entries[table.selectedRow].value["directory"] as? Bool != true { onOpen?(entries[table.selectedRow]) }
     }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let cell = NSTableCellView()
@@ -122,11 +153,12 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
         icon.contentTintColor = .controlAccentColor
         let title = NSTextField(labelWithString: entry.title); title.font = .systemFont(ofSize: 12); title.lineBreakMode = .byTruncatingMiddle
         let detail = NSTextField(labelWithString: entry.detail); detail.font = .systemFont(ofSize: 10); detail.textColor = .secondaryLabelColor; detail.lineBreakMode = .byTruncatingMiddle
-        let labels = NSStackView(views: entry.detail.isEmpty ? [title] : [title, detail]); labels.orientation = .vertical; labels.alignment = .leading; labels.spacing = 2
+        let showDetail = !entry.detail.isEmpty && (!compact || destination != .files)
+        let labels = NSStackView(views: showDetail ? [title, detail] : [title]); labels.orientation = .vertical; labels.alignment = .leading; labels.spacing = 2
         let content = NSStackView(views: [icon, labels]); content.spacing = 8; content.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(content); cell.textField = title; cell.imageView = icon; cell.toolTip = entry.title + (entry.detail.isEmpty ? "" : "\n" + entry.detail)
         NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 5), content.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -5), content.centerYAnchor.constraint(equalTo: cell.centerYAnchor), icon.widthAnchor.constraint(equalToConstant: 16), title.widthAnchor.constraint(equalTo: labels.widthAnchor)])
-        if !entry.detail.isEmpty { detail.widthAnchor.constraint(equalTo: labels.widthAnchor).isActive = true }
+        if showDetail { detail.widthAnchor.constraint(equalTo: labels.widthAnchor).isActive = true }
         return cell
     }
     deinit { filterWork?.cancel() }

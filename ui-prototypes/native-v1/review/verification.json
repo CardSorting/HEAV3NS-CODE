@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-29",
+  "preview": "file:// (no server required)",
+  "desktop": {
+    "width": 1440,
+    "height": 1100
+  },
+  "mobileGallery": {
+    "width": 390,
+    "height": 844
+  },
+  "checked": [
+    "all three concept buttons",
+    "all three comparison states",
+    "full-size links",
+    "all active local links",
+    "image decode",
+    "handoff disclosure",
+    "horizontal overflow",
+    "page errors"
+  ],
+  "failures": []
+}

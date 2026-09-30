@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>HEAV3NS-CODE · Complete native journey</title>
+  <link rel="stylesheet" href="gallery.css">
+  <script src="journey-data.js" defer></script>
+  <script src="gallery.js" defer></script>
+</head>
+<body>
+  <!-- THESIS: Review the complete native journey, from first launch to returning work, through linked generated screens.
+  OWN-WORLD: User-requested VS Code and Xcode navigation grammar inside the established dark macOS identity: labeled rail, Explorer, file tabs, breadcrumbs, Outline, and LUMI.
+  STORY: Start, connect, choose a project, inspect files/classes, direct work, review evidence, and return later.
+  FIRST VIEWPORT: A visible journey list beside one full app image; explicit preview actions and optional hotspots move through the flow.
+  FORM: Expansion of the user's explicitly pinned IDE direction. Image concepts and simulation only; no native implementation or auth integration.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+  <header class="topbar">
+    <a class="brand" href="#splash">HEAV3NS-CODE</a>
+    <span>Native journey · v2</span>
+    <nav aria-label="Review tools"><a href="storyboard.html">All screens</a><a href="README.md">Design notes</a></nav>
+  </header>
+  <div class="layout">
+    <aside class="journey-nav" aria-label="Journey navigation">
+      <h2>The journey</h2>
+      <nav id="steps" aria-label="Choose a screen"></nav>
+      <div class="shortcuts"><button type="button" data-go="projects">Returning user</button><button type="button" data-go="splash">Restart walkthrough</button></div>
+      <p class="nav-note">Generated screens. Sample project data. All actions are simulated.</p>
+    </aside>
+    <main id="main">
+      <div class="screen-heading"><div><h1 id="screen-title">Launch</h1><p id="screen-goal">Recognize the app while it prepares the local session.</p></div><span id="count" class="count">1 / 12</span></div>
+      <div class="viewer-tools"><span id="phase">Start</span><div><button type="button" id="toggle-hotspots" aria-pressed="false">Show hotspots</button><a id="full-size" href="assets/01-splash.png" target="_blank" rel="noopener">Open full size</a></div></div>
+      <div class="image-stage" id="stage">
+        <img id="screen-image" src="assets/01-splash.png" width="1586" height="992" alt="HEAV3NS-CODE launch concept: dark native window, product wordmark, and a preparing-workspace indicator.">
+        <div id="hotspots" aria-label="Simulated screen actions"></div>
+      </div>
+      <div class="actionbar"><button type="button" id="previous" disabled>Previous screen</button><div id="branches"></div><button type="button" class="primary" id="primary">Continue to welcome</button></div>
+      <p class="feedback" id="feedback" aria-live="polite">Prototype only. Continue below or use Show hotspots to explore the image.</p>
+      <div class="screen-notes"><section><h2>Flow intent</h2><p id="screen-detail">A brief launch state. Returning users skip welcome and sign-in when their connection is valid.</p></section><section><h2>Design boundary</h2><p>These are generated visual concepts with simulated navigation. Auth, project pinning, file tabs, and symbol indexing are proposed capabilities. The current Swift/AppKit app is unchanged.</p></section></div>
+      <details><summary>Recovery paths and implementation notes</summary><div class="recovery-actions"><button type="button" data-dialog="authFailed">Sign-in interrupted</button><button type="button" data-dialog="identityOnly">Plan access declined</button><button type="button" data-dialog="noProjects">No recent projects</button><button type="button" data-dialog="missingFolder">Project folder moved</button></div><p>These supplementary states explain recovery; the twelve full-size generated screens show the main journey. Only the marked hotspots and gallery controls are interactive.</p><p>File contents in these images are illustrative. Explorer represents folders on disk; Outline represents symbols in the active file. Opening a file changes inspection and does not silently attach it to a model request. Read-only inspection and recorded task evidence remain separate from editing and approval.</p><p>Pattern references: <a href="https://code.visualstudio.com/docs/editing/getting-started/userinterface" target="_blank" rel="noopener">VS Code navigation</a>, <a href="https://developer.apple.com/documentation/xcode/managing-files-and-folders-in-your-xcode-project" target="_blank" rel="noopener">Xcode project navigation</a>, and <a href="https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt" target="_blank" rel="noopener">OpenAI browser sign-in</a>. The study adapts these patterns; it makes no claim of a completed integration.</p></details>
+      <footer><span>Codex image generation · Image-based prototype</span><div><a id="prompt-link" href="prompts/01-splash.txt" target="_blank" rel="noopener">This screen’s prompt</a><a href="manifest.json">Asset manifest</a><a href="../native-v1/index.html">Original workspace study</a></div></footer>
+    </main>
+  </div>
+  <dialog id="simulation-dialog" aria-labelledby="dialog-title"><form method="dialog"><button class="dialog-close" aria-label="Close explanation">Close</button></form><h2 id="dialog-title"></h2><p id="dialog-body"></p><pre id="dialog-output" hidden></pre><p class="dialog-note">Prototype state · no authentication, command execution, or file changes occur.</p><div id="dialog-actions"></div></dialog>
+  <noscript><p class="no-script">Enable JavaScript for the walkthrough, or open the generated images in the <a href="assets/">assets directory</a>.</p></noscript>
+</body>
+</html>

@@ -1,0 +1,121 @@
+{
+  "nativeTests": 37,
+  "desktopTests": 38,
+  "oauthHelperTests": 4,
+  "typescript": "passed",
+  "packagedAccountStatusAndEOFCleanup": "passed in isolated storage",
+  "nativeControls": [
+    {
+      "capture": "workspace-initial.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-changes.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-clear-draft-light.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-clear-draft.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-code.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-collapsed-light.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-collapsed.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-compact-code.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-conversation.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-dark.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-draft-light.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-draft.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-expanded-light.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-expanded.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-light.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-narrow.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-new-conversation.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-previous-conversation.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-walkthrough.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    },
+    {
+      "capture": "workspace-ui-wide.json",
+      "allReportedControlsWithinWindow": true,
+      "outside": []
+    }
+  ],
+  "liveOAuthPerformed": false,
+  "providerTaskPerformed": false,
+  "reviewScope": "Native journey UI and runtime boundary; reviewer fix batch J3-F01 through J3-F04. No external release certification.",
+  "captureSource": "build/desktop-journey-1790791995538",
+  "trueLightApprovalCaptured": true,
+  "supplementalCaptureSource": "build/desktop-journey-1790792150798/workspace",
+  "releaseBuild": "passed; local ad-hoc signature verified",
+  "application": {
+    "path": "build/HEAV3NS-CODE.app",
+    "executableSHA256": "be01d4cbd634f8f3f3bd3aecd3d1afb99b892d83f2afd8e17d9e75d8874c251c",
+    "openedForUser": true
+  }
+}

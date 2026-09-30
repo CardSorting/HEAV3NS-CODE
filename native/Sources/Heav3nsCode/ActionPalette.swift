@@ -10,7 +10,7 @@ final class ActionPalette: NSWindowController, NSWindowDelegate, NSTableViewData
     private let actions: [WorkspaceAction]
     private var matches: [WorkspaceAction]
     private let search = NSSearchField()
-    private let table = NSTableView()
+    private let table = KeyboardListView()
     private let empty = NSTextField(labelWithString: "No matching actions.")
     init(actions: [WorkspaceAction]) {
         self.actions = actions; matches = actions
@@ -22,6 +22,7 @@ final class ActionPalette: NSWindowController, NSWindowDelegate, NSTableViewData
         table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("action")))
         table.headerView = nil; table.rowHeight = 34; table.dataSource = self; table.delegate = self; table.style = .plain
         table.target = self; table.doubleAction = #selector(choose); table.setAccessibilityLabel("Matching actions")
+        table.onActivate = { [weak self] in self?.choose() }; table.onCancel = { [weak self] in self?.dismiss() }
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
         empty.isHidden = true; empty.textColor = .secondaryLabelColor
         let root = NSStackView(views: [search, empty, scroll]); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12

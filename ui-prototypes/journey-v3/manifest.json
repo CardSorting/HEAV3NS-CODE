@@ -1,0 +1,278 @@
+{
+  "name": "HEAV3NS-CODE native journey",
+  "version": 3,
+  "created": "2026-09-29",
+  "status": "selected_for_native_implementation",
+  "approved": true,
+  "implementationSelection": { "selected": true, "date": "2026-09-30", "authority": "User requested continuing journey-v3 from prototype into production", "record": "../../docs/desktop/JOURNEY-V3.md", "note": "Original asset approval flags describe generation-time status." },
+  "scope": "Generated reference concepts and simulated offline walkthrough; native implementation is documented separately in docs/desktop/JOURNEY-V3.md",
+  "nativeFramework": "Swift/AppKit; generated code snippets are illustrative, not source captures",
+  "generator": "Codex built-in image_gen",
+  "entry": "index.html",
+  "storyboard": "storyboard.html",
+  "generated": [
+    {
+      "id": "splash",
+      "file": "assets/01-splash.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/01-splash.txt",
+      "inputs": [
+        "../journey-v2/assets/08-workspace.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-8db5af86-f578-48a0-ad71-773db7fcfaaf.png",
+      "sha256": "59a3df29ba44ecabe4c026c061a4c9d0cb88f8fac77e5003c18c790dfd9b9ca6",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/01-splash.png"
+    },
+    {
+      "id": "welcome",
+      "file": "assets/02-welcome.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/02-welcome.txt",
+      "inputs": [
+        "../journey-v2/assets/01-splash.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-27e5e846-9917-4e0a-9393-ecbab4a4df71.png",
+      "sha256": "9b6614d7ed2f2b77c60186f0be07fc19bcd8b29bf09f655d654f4812af5b5d60",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/02-welcome.png"
+    },
+    {
+      "id": "signin",
+      "file": "assets/03-signin.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/03-signin.txt",
+      "inputs": [
+        "../journey-v2/assets/02-welcome.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-91d5d892-8639-48e2-94f1-9442612b6024.png",
+      "sha256": "ef382e5e2773d6616c8549b5f61516e2df4ab9edb14b2117c80e412528424790",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/03-signin.png"
+    },
+    {
+      "id": "browser",
+      "file": "assets/04-browser.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/04-browser.txt",
+      "inputs": [
+        "../journey-v2/assets/03-signin.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-d4a6ec5f-5560-4c64-9b9f-c9e3a3f5d38c.png",
+      "sha256": "cb05d91d800f23b7bdff759a12695456a4fef73b306a43c0391128e42ea0a4b4",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/04-browser.png"
+    },
+    {
+      "id": "connected",
+      "file": "assets/05-connected.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/05-connected.txt",
+      "inputs": [
+        "../journey-v2/assets/03-signin.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-6f006ca7-7454-4340-91c2-bd64cdd10b10.png",
+      "sha256": "ee30a8ed6b9b32ca9fbabcdaf2332df5433e2a37d0b0bdc09464f94aaf315903",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/05-connected.png"
+    },
+    {
+      "id": "projects",
+      "file": "assets/06-projects.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/06-projects.txt",
+      "inputs": [
+        "../journey-v2/assets/08-workspace.png",
+        "../journey-v2/assets/02-welcome.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-d8634608-9c91-405a-abb8-28d975eb7aee.png",
+      "sha256": "8e2d217a9a0cdc776eadfafee2fd24d262c530d25257d6f9f8d72e4d899df8c5",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/06-projects.png"
+    },
+    {
+      "id": "folder",
+      "file": "assets/07-folder.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/07-folder.txt",
+      "inputs": [
+        "../journey-v2/assets/06-projects.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-811c45a9-1192-492c-8dc8-f5da39ad677a.png",
+      "sha256": "8dec549bea9ae3018df99464e1ec7b5ad4a544583f16a5b428ebb53468946988",
+      "approved": false,
+      "reusedFrom": "../journey-v2/assets/07-folder.png"
+    },
+    {
+      "id": "workspace",
+      "file": "assets/08-workspace.png",
+      "kind": "generated-concept",
+      "width": 1585,
+      "height": 992,
+      "promptFile": "prompts/08-workspace.txt",
+      "inputs": [
+        "assets/11-working.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-0df2c879-34e9-404a-a17a-3c9bc1f4df95.png",
+      "sha256": "b533563cd2003cd1942363433fafec125f14ed9feaf2f012dfad0d698d9584a2",
+      "approved": false
+    },
+    {
+      "id": "symbols",
+      "file": "assets/09-symbols.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/09-symbols.txt",
+      "inputs": [
+        "assets/11-working.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-3cbfb5ed-f122-4d62-8ff9-27c6e013444f.png",
+      "sha256": "6c486b05cb18cea088ad296981b3fe089e7b32122bc6798cdc0f651230a8c98c",
+      "approved": false
+    },
+    {
+      "id": "approval",
+      "file": "assets/10-approval.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/10-approval-refinement.txt",
+      "inputs": [
+        "../../../../.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-8e9c3fce-63dd-4e15-ae50-36290e815e26.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-ddfe47db-10ac-4761-b1a6-1b1c88604dfd.png",
+      "sha256": "7099e97616efe00010cdc026c095f363bfeaca3b2a73422df31a82fe21c6e37d",
+      "approved": false,
+      "history": [
+        "prompts/10-approval.txt",
+        "prompts/10-approval-refinement.txt"
+      ]
+    },
+    {
+      "id": "working",
+      "file": "assets/11-working.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/11-working.txt",
+      "inputs": [
+        "../journey-v2/assets/08-workspace.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-7de249ac-0a76-4d97-b34b-cf7cbf4aca1f.png",
+      "sha256": "5825ee9ae74f05150f72e90d89cd72ea2a80c690482c5ec9d3ecc896127f7835",
+      "approved": false
+    },
+    {
+      "id": "changes",
+      "file": "assets/12-changes.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/12-changes.txt",
+      "inputs": [
+        "assets/11-working.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-7dd6afff-8201-429d-8e79-7a8edb7fc879.png",
+      "sha256": "ce2e91865eac741cd303f9db05aef3d07cefe09ef914fac7ee884cff4d5ba218",
+      "approved": false
+    },
+    {
+      "id": "sessions",
+      "file": "assets/13-sessions.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/13-sessions.txt",
+      "inputs": [
+        "assets/11-working.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-425fb33f-3d2a-4983-b7ae-dd2f5809537c.png",
+      "sha256": "d8312a047142aba5aadc8bae2cab371a9f0298509534fd140dd0c9e19c17a1e2",
+      "approved": false
+    }
+  ],
+  "direction": "Human-agent conversation centered and dominant; left projects/conversations; right Walkthrough, Changes, Code",
+  "constraints": [
+    "No authentication or task execution",
+    "Only gallery controls and marked hotspots are interactive",
+    "Generated code, paths, timestamps and geometry are approximate",
+    "Concept review is not implementation approval"
+  ],
+  "references": [
+    {
+      "title": "Native product truth",
+      "path": "../../native/PRODUCT.md"
+    },
+    {
+      "title": "VS Code interface grammar",
+      "url": "https://code.visualstudio.com/docs/editing/getting-started/userinterface"
+    },
+    {
+      "title": "Xcode project navigation",
+      "url": "https://developer.apple.com/documentation/xcode/managing-files-and-folders-in-your-xcode-project"
+    },
+    {
+      "title": "Sign in with ChatGPT",
+      "url": "https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt"
+    }
+  ],
+  "review": [
+    {
+      "file": "review/desktop-working.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-working.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/desktop-symbols.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-symbols.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/desktop-approval.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-approval.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/desktop-changes.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File desktop-changes.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/mobile-working.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File mobile-working.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/mobile-signin.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File mobile-signin.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    },
+    {
+      "file": "review/storyboard.png",
+      "kind": "gallery-verification-capture",
+      "origin": "Origin: local Chromium/Playwright capture of HEAV3NS-CODE journey-v3 offline gallery. Date 2026-09-29. File storyboard.png. Captured from document top after PNG decode with animations disabled. This is a gallery verification capture, not a native application capture. See review/verification.json for viewport and checks."
+    }
+  ],
+  "finishReview": {
+    "disposition": "ship",
+    "scope": "Review prototype only; not user design approval or native readiness",
+    "report": "review/verdict.json",
+    "verification": "review/verification.json",
+    "designRecord": "DESIGN.md"
+  }
+}

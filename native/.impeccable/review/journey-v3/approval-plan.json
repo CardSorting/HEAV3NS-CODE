@@ -1,0 +1,12 @@
+{
+  "output": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/approval",
+  "draftRoot": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-journey-1790791035828/approval/drafts",
+  "navigationPass": true,
+  "steps": [
+    "dark",
+    "approval-wide",
+    "approval-close",
+    "narrow",
+    "approval-light"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "appPID" : 63531,
+  "capturedAt" : "2026-09-30T18:13:27Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : true,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 671,
+        "x" : 253,
+        "y" : 83
+      },
+      "inspection" : {
+        "height" : 189,
+        "visibleWithinWindow" : true,
+        "width" : 326,
+        "x" : 972,
+        "y" : 50
+      },
+      "inspectionBack" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 34,
+        "x" : 972,
+        "y" : 315
+      },
+      "inspectionFind" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 39.5,
+        "x" : 1175.5,
+        "y" : 315
+      },
+      "inspectionForward" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 34,
+        "x" : 1010,
+        "y" : 315
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 869,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1196,
+        "y" : 687
+      }
+    },
+    "destination" : "Changes",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–179 \/ 179 bytes · Read only",
+    "inspectionPreview" : "Index → working tree · includes pre-existing and external changes\n\ndiff --git a\/fixture.txt b\/fixture.txt\nindex 2da11c2..39897db 100644\n--- a\/fixture.txt\n+++ b\/fixture.txt\n@@ -1 +1,2 @@\n Native journey fixture.\n+A working-tree change for re",
+    "inspectionTitle" : "fixture.txt",
+    "navigationVisible" : true,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1312
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1312,
+  "workerPID" : 63539,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-journey-1790791995538\/Journey review fixture"
+}

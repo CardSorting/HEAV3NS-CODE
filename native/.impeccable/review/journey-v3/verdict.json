@@ -1,0 +1,68 @@
+{
+  "verdict": {
+    "scope": "Verdict pass covering only J3-F01 through J3-F04 and material regressions introduced by their fix batch. Previous native adaptation decisions remain unchanged.",
+    "evidence_check": "Pass. All 23 required captures were reopened and show complete nonblank native windows matching the requested state. The compact approval-light capture now shows actual light appearance.",
+    "origins": [
+      "build/desktop-journey-1790791995538",
+      "build/desktop-journey-1790792150798/workspace (expanded-light and collapsed-light only; no implementation change)"
+    ],
+    "required_captures": [
+      "hero-repro.png",
+      "workspace-ui-code.png",
+      "workspace-ui-changes.png",
+      "workspace-ui-new-conversation.png",
+      "workspace-ui-previous-conversation.png",
+      "workspace-ui-narrow.png",
+      "workspace-ui-light.png",
+      "workspace-ui-wide.png",
+      "launcher-launcher-splash.png",
+      "launcher-launcher-welcome.png",
+      "launcher-launcher-signin.png",
+      "launcher-launcher-projects.png",
+      "launcher-launcher-narrow-projects.png",
+      "launcher-launcher-light.png",
+      "approval-ui-approval-wide-overlay-0.png",
+      "approval-ui-approval-light-overlay-0.png",
+      "workspace-ui-draft.png",
+      "workspace-ui-draft-light.png",
+      "workspace-ui-expanded.png",
+      "workspace-ui-collapsed.png",
+      "workspace-ui-expanded-light.png",
+      "workspace-ui-collapsed-light.png",
+      "workspace-ui-compact-code.png"
+    ],
+    "findings": [
+      {
+        "id": "J3-F01",
+        "status": "resolved",
+        "assessment": "Empty input now has a visible Message LUMI… prompt; native input and actions form one rounded semantic group. Populated drafts remove the placeholder and retain visible Send/Up Next controls in wide dark and compact light. The composer also remains present beside compact code context.",
+        "evidence": ["hero-repro.png", "workspace-ui-new-conversation.png", "workspace-ui-light.png", "workspace-ui-draft.png", "workspace-ui-draft-light.png", "workspace-ui-compact-code.png"]
+      },
+      {
+        "id": "J3-F02",
+        "status": "resolved",
+        "assessment": "The library now fills the available main pane at wide and minimum widths. The wide path is visible, compact paths truncate within their row, and the trailing date remains on one line without clipping the toolbar or footer actions.",
+        "evidence": ["launcher-launcher-projects.png", "launcher-launcher-narrow-projects.png", "launcher-launcher-light.png"]
+      },
+      {
+        "id": "J3-F03",
+        "status": "resolved",
+        "assessment": "Approval now leads with Allow this operation?, then Run Command and the secondary exact run_command identifier. System-font labels and reason distinguish the selectable monospace path/arguments. Both wide dark and compact light show the request, one-operation scope statement and all decision buttons. Sampled source retains the complete request body and scrolling.",
+        "evidence": ["approval-ui-approval-wide-overlay-0.png", "approval-ui-approval-light-overlay-0.png"]
+      },
+      {
+        "id": "J3-F04",
+        "status": "resolved",
+        "assessment": "Collapsed and expanded activity controls remain compact chevrons immediately beside their labels in both appearances. The stretched dark pill is gone; expanded activity rows remain readable.",
+        "evidence": ["workspace-ui-expanded.png", "workspace-ui-collapsed.png", "workspace-ui-expanded-light.png", "workspace-ui-collapsed-light.png"]
+      }
+    ]
+  },
+  "remaining": {
+    "status": "clear",
+    "regressions": [],
+    "assessment": "No material regression attributable to this fix batch was found in the supplied captures. Ship covers the scored fixes only, not the whole surface.",
+    "verification_limits": "Static native evidence and targeted source review; no UI interaction or tests were rerun by this reviewer. The parent reports 37 native and 38 desktop tests, TypeScript, lint, final build, isolated account status/EOF and all 20 workspace control-bounds reports passing. No live OAuth/provider task, physical keyboard/IME, VoiceOver or public distribution certification is established. No detector ran."
+  },
+  "disposition": "ship"
+}

@@ -1,0 +1,51 @@
+{
+  "disposition": "ship",
+  "scope": "Independent review of eight named native captures and targeted AppKit source. Incumbent-world extension; no new quality-bar card, comp or concept seed. No web detector ran. Physical keyboard, VoiceOver, IME and release acceptance remain outside the review.",
+  "persistence": "Pass. PRODUCT.md records the approved hierarchy. Existing DESIGN.md matches the native world; new component documentation remains assigned to the documenter.",
+  "fidelity": [
+    {
+      "element": "TYPE",
+      "finding": "Match: system typography, readable hierarchy, monospace for code."
+    },
+    {
+      "element": "MATERIAL",
+      "finding": "Match: native controls, tables, panels, chrome and symbols."
+    },
+    {
+      "element": "GROUND",
+      "finding": "Match: semantic dark and light surfaces."
+    },
+    {
+      "element": "FIRST VIEWPORT",
+      "finding": "Match: conversation and composer remain dominant; context stays secondary at both captured sizes."
+    },
+    {
+      "element": "THESIS / STORY",
+      "finding": "Match: explicit conversation identity, restored draft and cleared inspection state."
+    },
+    {
+      "element": "FORM",
+      "finding": "Match: scoped filename/path search, deliberate activation, empty state, Return/Escape/arrow handling."
+    },
+    {
+      "element": "Return to composer",
+      "finding": "Contradicted at initial review: Cmd-L leaves the modeless picker as the key window."
+    }
+  ],
+  "ceiling": "No additional visual devices warranted within the established AppKit world. All required captures are valid.",
+  "material_fixes": [
+    {
+      "id": "composer-focus",
+      "requirement": "In WorkspaceWindow.focusComposer(), dismiss QuickOpen, make the workspace window key, then focus the composer. App.swift correctly routes Cmd-L through the picker's parent, but changing only that parent's first responder leaves keyboard input in the picker.",
+      "status": "resolved"
+    }
+  ],
+  "keep": "Preserve the conversation-first hierarchy, semantic AppKit treatment, explicit search scope, deliberate file activation and per-conversation draft isolation.",
+  "initialDisposition": "fix",
+  "verdict": {
+    "scope": "The scored composer-focus fix and attributable regressions only.",
+    "evidence": "composer-focused-wide.png shows the picker dismissed and draft retained. Diagnostics recorded before capture confirm workspaceKey=true and composerFocused=true; targeted source implements the required focus handoff.",
+    "captures": "All nine captures are valid. No attributable regressions observed.",
+    "remaining": "Clear for the scored fix. Physical keyboard, IME and VoiceOver acceptance remain unverified."
+  }
+}

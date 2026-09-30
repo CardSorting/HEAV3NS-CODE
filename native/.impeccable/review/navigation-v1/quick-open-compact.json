@@ -1,0 +1,86 @@
+{
+  "appPID" : 93132,
+  "capturedAt" : "2026-09-30T19:57:45Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : false
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "composerFocused" : true,
+    "composerUTF16Count" : 57,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 654,
+        "x" : 33,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 33,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 632,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 604,
+        "y" : 456
+      }
+    },
+    "conversation" : "walkthrough-fixture",
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "Choose a file, change, or recorded instruction to inspect.",
+    "inspectionTitle" : "Inspect",
+    "navigationVisible" : false,
+    "quickOpen" : {
+      "count" : 3,
+      "paths" : [
+        "Sources\/WorkspaceCoordinator.swift",
+        "Sources\/WorkspaceCoordinatorWithAnIntentionallyLongNameForNativeTruncation.swift",
+        "WorkspaceExample.swift"
+      ],
+      "query" : "swift",
+      "scope" : "Project files · Git ignore rules apply. File contents aren’t searched.",
+      "status" : "3 files",
+      "visible" : true
+    },
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage" : "Response ready",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 500,
+    "windowFrameWidth" : 720,
+    "workspaceKey" : false
+  },
+  "windowHeight" : 448,
+  "windowWidth" : 720,
+  "workerPID" : 93134,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790798248709\/navigation\/Workspace"
+}

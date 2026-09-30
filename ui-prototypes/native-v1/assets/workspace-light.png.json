@@ -1,0 +1,18 @@
+{
+  "generator": "Codex built-in image_gen",
+  "created": "2026-09-29",
+  "file": "assets/workspace-light.png",
+  "kind": "generated-concept",
+  "width": 1586,
+  "height": 992,
+  "prompt": "Use case: precise-object-edit\nEdit the supplied native macOS HEAV3NS-CODE light workspace concept. Preserve the complete image, content, pane widths, typography, light appearance, task state and all controls except these two precise corrections.\n1. The toolbar incorrectly contains two identical sidebar-toggle icons. KEEP the left icon immediately after the traffic lights. REMOVE only the second sidebar-toggle icon near the right side immediately before the green Connected indicator. Leave natural empty toolbar space there. All remaining toolbar content and positions are unchanged.\n2. The inspector should display only one short monochrome plain-text diff. KEEP its heading, breadcrumb, segmented control, baseline, inset code region, Read only footer and page buttons exactly where they are. Replace all the example code inside the inset code region with these five lines, black/gray monospaced text with no syntax coloring: \"@@ Workspace layout @@\", \"- spacing = 6\", \"+ spacing = 10\", \"  alignment = .leading\", \"  composer.isEditable = true\". The rest of the inset code region stays empty white. Do not add any other code, made-up settings, counters, line numbers or sections. Keep the code region's current dimensions so the inspector footer does not move.\nMake no other changes. Keep the full app window, composer, and Send button visible. The result remains an illustrative product concept, not a screenshot of shipped code.",
+  "promptFile": "prompts/workspace-light-refinement.txt",
+  "history": [
+    "prompts/workspace-light.txt",
+    "prompts/workspace-light-refinement.txt"
+  ],
+  "inputs": [
+    "references/current-workspace-light.png"
+  ],
+  "approved": false
+}

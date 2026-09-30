@@ -1,0 +1,55 @@
+{
+  "capturedAt": "2026-09-30T19:13:57.646292+00:00",
+  "captureRoot": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790795519402",
+  "artifact": "/Users/bozoegg/Desktop/LUMI-NEW/build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE",
+  "artifactSHA256": "806940395080dbfe231a68afa3ef97aa4a373f31f801acb7112e6fab84758aaa",
+  "requiredScreenshots": [
+    "live-wide.png",
+    "live-compact.png",
+    "history-wide.png",
+    "file-wide.png",
+    "failure-wide.png",
+    "failure-compact.png",
+    "approval-compact.png",
+    "recovered-wide.png"
+  ],
+  "tests": {
+    "native": 42,
+    "desktop": 44,
+    "cliEngine": 9,
+    "typescript": "passed",
+    "changedFileLint": "passed",
+    "build": "passed, ad-hoc development signature verified"
+  },
+  "checks": {
+    "live": {
+      "constraintsReported": false
+    },
+    "failure": {
+      "constraintsReported": false
+    },
+    "approval": {
+      "constraintsReported": false
+    },
+    "crash": {
+      "constraintsReported": false
+    }
+  },
+  "nativeFixtureScenarios": "live/queued, pinned history, file read, reduced motion, failure, approval denial, crash/reconnect all passed",
+  "scope": "Scripted engine drives production DesktopSession, database, protocol and native UI; real CLI scheduler callbacks tested separately; no OAuth/provider or approval command invoked. Owner-lock crash reconciliation is not exercised by the fixture.",
+  "packagedRuntime": {
+    "status": "passed",
+    "checks": [
+      "walkthrough-v1 capability negotiation",
+      "persisted activity metadata and file path projection",
+      "read-only file inspection"
+    ],
+    "providerInvoked": false,
+    "source": "build/walkthrough-runtime-1790795871043/verification.json"
+  },
+  "review": {
+    "disposition": "ship",
+    "materialFixes": 0,
+    "scope": "Eight captured native frames and targeted native source; actual wide 1440x731, compact 720x500/504; not full accessibility, backend or release certification."
+  }
+}

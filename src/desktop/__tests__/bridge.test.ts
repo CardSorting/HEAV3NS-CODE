@@ -55,6 +55,78 @@ describe("desktop machine transport", () => {
 })
 
 describe("desktop acceptance durability", () => {
+	it("stops on a live checkpoint failure and still closes the engine and storage", async () => {
+		const folder = await mkdtemp(path.join(tmpdir(), "heav3ns-checkpoint-failure-"))
+		const database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
+		const flush = database.flush.bind(database),
+			stop = database.stop.bind(database)
+		let aborted = false,
+			closed = false,
+			storageClosed = false
+		const events: any[] = []
+		const bridge = new DesktopSession(
+			{ path: folder, id: "workspace" },
+			{
+				tick: async (input) => {
+					input.onProgress?.({
+						activityId: "live",
+						phase: "tool",
+						status: "in_progress",
+						message: "Read workspace",
+						sequence: 1,
+						timestamp: Date.now(),
+					})
+					database.flush = async () => {
+						throw new Error("ENOSPC: checkpoint fixture")
+					}
+					await new Promise<void>((resolve) =>
+						input.signal?.addEventListener(
+							"abort",
+							() => {
+								aborted = true
+								resolve()
+							},
+							{ once: true },
+						),
+					)
+					return { ...completed(), outcome: "cancelled" }
+				},
+				close: async () => {
+					closed = true
+				},
+			},
+			database,
+			(event) => events.push(event),
+			undefined,
+			async () => "fixture",
+		)
+		database.stop = async () => {
+			storageClosed = true
+			await stop()
+		}
+		try {
+			await bridge.start()
+			await bridge.request({
+				v: 1,
+				kind: "request",
+				id: "failure",
+				workspace: "workspace",
+				session: bridge.session,
+				method: "task.submit",
+				params: { text: "Checkpoint failure" },
+			})
+			await waitFor(() => events.some((event) => event.type === "runtime.error"))
+			assert.equal(aborted, true)
+			database.flush = flush
+			await assert.rejects(bridge.stop(), /ENOSPC/)
+			assert.equal(closed, true)
+			assert.equal(storageClosed, true)
+		} finally {
+			database.flush = flush
+			await stop()
+			await rm(folder, { recursive: true, force: true })
+		}
+	})
 	it("never acknowledges or executes a submission whose flush failed", async () => {
 		const folder = await mkdtemp(path.join(tmpdir(), "heav3ns-flush-failure-"))
 		const database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
@@ -615,5 +687,59 @@ describe("desktop runtime boundary", () => {
 		const result = await task
 		assert.notEqual(result.exitCode, 0)
 		assert.ok(Date.now() - started < 3000, "cancellation must not wait for sleep to finish")
+	})
+	it("checkpoints ongoing work, coalesces a progress flood and retains structured activity after completion", async () => {
+		let release!: () => void
+		let report!: NonNullable<EngineTickInput["onProgress"]>
+		execute = async (input) => {
+			report = input.onProgress!
+			for (let n = 1; n <= 5000; n++)
+				report({
+					activityId: "edit",
+					phase: "writing",
+					status: "in_progress",
+					message: "Update workspace",
+					timestamp: Date.now(),
+					sequence: n,
+					metadata: { scope: "activity", files: ["src/app.ts", "../outside"], itemType: "write_file" },
+				})
+			await new Promise<void>((resolve) => {
+				release = resolve
+			})
+			report({
+				activityId: "edit",
+				phase: "writing",
+				status: "completed",
+				message: "Update workspace",
+				timestamp: Date.now(),
+				sequence: 5001,
+				metadata: { files: ["src/app.ts"] },
+			})
+			return completed()
+		}
+		const accepted: any = await request("task.submit", { text: "Track live work" })
+		await waitFor(() => events.some((e) => e.type === "run.progress"))
+		const saved = database.getTable<any>("desktop.runs.v1").get(accepted.run.id)!
+		assert.equal(saved.state, "running")
+		assert.equal(saved.activities[0].sequence, 5000)
+		assert.deepEqual(saved.activities[0].metadata.files, ["src/app.ts"])
+		assert.equal(events.filter((e) => e.type === "activity.batch").length, 1)
+		const live: any = await request("activity.list", { run: accepted.run.id })
+		assert.equal(live.activitySequence, 5000)
+		release()
+		await waitFor(() => events.some((e) => e.payload?.state === "completed"))
+		const before = events.length
+		report({
+			activityId: "late",
+			phase: "tool",
+			status: "in_progress",
+			message: "Late callback",
+			timestamp: Date.now(),
+			sequence: 6000,
+		})
+		assert.equal(events.length, before)
+		const final: any = await request("activity.list", { run: accepted.run.id })
+		assert.equal(final.activities[0].status, "completed")
+		assert.equal(final.activitySequence, 5001)
 	})
 })

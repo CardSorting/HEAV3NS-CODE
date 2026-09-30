@@ -46,7 +46,7 @@ struct RunDetails {
         sections.append("Instruction\n" + (run["text"] as? String ?? "Instruction unavailable."))
         if let response = run["response"] as? String, !response.isEmpty { sections.append("Result\n" + response) }
         if let error = run["error"] as? String, !error.isEmpty { sections.append("Error\n" + error) }
-        let verification = run["outputLimited"] as? Bool == true ? "Recorded evidence is incomplete." : run["verification"] as? String == "evidence_available" ? "Command evidence is available. Review recorded output for the checks performed." : "Checks were not recorded."
+        let verification = run["outputLimited"] as? Bool == true ? "Recorded evidence is incomplete." : run["verification"] as? String == "evidence_available" ? "Tool results were recorded. Review the output to see which checks, if any, were performed." : "Checks were not recorded."
         sections.append(verification)
         outputAvailable = data["outputAvailable"] as? Bool == true
         sections.append(data["outputMessage"] as? String ?? (outputAvailable ? "Recorded output is available." : "No output was recorded for this run."))

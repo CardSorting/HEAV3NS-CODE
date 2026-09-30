@@ -1,506 +1,174 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T00:42:15Z",
+  "generatedAt": "2026-09-30T20:05:07+00:00",
+  "sourceHash": "a9e77026b5bef820287f56141bd218e9a7dc1e76bafabc0ae7384bf4f7879169",
   "title": "Design System: HEAV3NS-CODE Native",
   "extensions": {
     "native": {
-      "framework": "AppKit",
+      "framework": "Swift/AppKit",
       "platform": "macOS",
-      "status": "integration preview after native UX hardening",
-      "scope": "native/ only; no authority over the root CLI design system",
-      "authority": [
-        "Sources/Heav3nsCode/App.swift",
-        "Sources/Heav3nsCode/WorkspaceWindow.swift",
-        "Sources/Heav3nsCode/NavigationSidebar.swift",
-        "Sources/Heav3nsCode/ActionPalette.swift",
-        "Sources/Heav3nsCode/RuntimeClient.swift",
-        "Sources/Heav3nsCode/IntegrationProbe.swift",
-        "PRODUCT.md"
-      ],
-      "representation": "Native APIs and AppKit point units are preserved here because the portable CSS-oriented frontmatter cannot express them faithfully. No HTML/CSS substitutes, fixed CSS palette, or synthetic tonal ramps are provided.",
-      "colorBindings": [
-        {
-          "api": "NSColor.controlAccentColor",
-          "purpose": "Sidebar SF Symbols; native selection and control states inherit the system accent."
-        },
-        {
-          "api": "NSColor.labelColor",
-          "purpose": "Conversation titles and response text."
-        },
-        {
-          "api": "NSColor.secondaryLabelColor",
-          "purpose": "Connection state, tool activity, sidebar details/messages, page metadata, action shortcuts, composer hint, and launcher detail."
-        },
-        {
-          "api": "NSColor.textBackgroundColor",
-          "purpose": "Transcript table background."
-        },
-        {
-          "api": "NSColor.clear",
-          "purpose": "Source-list table backgrounds over the system sidebar material."
-        },
-        {
-          "api": "AppKit defaults",
-          "purpose": "Window and toolbar chrome, text views, control bezels, search fields, segmented controls, separators, disabled states, selection, and focus; no fixed brand accent."
-        }
-      ],
-      "materialBindings": [
-        {
-          "api": "NSVisualEffectView",
-          "material": "sidebar",
-          "blendingMode": "withinWindow",
-          "purpose": "Native navigation background."
-        }
-      ],
-      "fontBindings": [
-        {
-          "role": "launcher-heading",
-          "api": "NSFont.systemFont",
-          "size": 26,
-          "weight": "semibold",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "conversation-composer-detail",
-          "api": "NSFont.systemFont",
-          "size": 14,
-          "weight": "regular",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "section-heading",
-          "api": "NSFont.systemFont",
-          "size": 13,
-          "weight": "semibold",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "transcript-title-and-recent-label",
-          "api": "NSFont.systemFont",
-          "size": 12,
-          "weight": "semibold",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "navigation-and-activity",
-          "api": "NSFont.systemFont",
-          "size": 12,
-          "weight": "regular",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "sidebar-location",
-          "api": "NSFont.systemFont",
-          "size": 11,
-          "weight": "semibold",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "status-notice-hint-shortcut",
-          "api": "NSFont.systemFont",
-          "size": 11,
-          "weight": "regular",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "sidebar-and-page-metadata",
-          "api": "NSFont.systemFont",
-          "size": 10,
-          "weight": "regular",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "inspection",
-          "api": "NSFont.monospacedSystemFont",
-          "size": 12,
-          "weight": "regular",
-          "unit": "AppKit point"
-        },
-        {
-          "role": "approval-detail",
-          "api": "NSFont.monospacedSystemFont",
-          "size": 11,
-          "weight": "regular",
-          "unit": "AppKit point"
-        }
-      ],
-      "layout": {
-        "unit": "AppKit point",
-        "workspaceInitialContentSize": {
-          "width": 1280,
-          "height": 800
-        },
-        "launcherInitialContentSize": {
-          "width": 780,
-          "height": 520
-        },
-        "minimumWindowFrameSize": {
-          "width": 720,
-          "height": 480
-        },
-        "narrowWindowFrameThreshold": 1000,
-        "toolbar": "NSToolbar with unified window style; AppKit determines geometry.",
-        "navigationWidth": 200,
-        "destinationRowHeight": 30,
-        "itemRowHeight": 42,
-        "destinationScrollHeight": 94,
-        "transcriptMinimumWidth": 260,
-        "inspectorMinimumWidth": 260,
-        "workMinimumHeight": 60,
-        "composerHeight": 64,
-        "approvalDetailHeight": 58,
-        "stackGap": 8,
-        "centerStackGap": 6,
-        "workPaneGap": 12,
-        "navigationStackGap": 10,
-        "inspectorStackGap": 10,
-        "navigationInsets": {
-          "top": 12,
-          "left": 8,
-          "bottom": 12,
-          "right": 8
-        },
-        "centerInsets": {
-          "top": 12,
-          "left": 12,
-          "bottom": 12,
-          "right": 16
-        },
-        "composerTextInset": {
-          "width": 10,
-          "height": 10
-        },
-        "inspectionTextInset": {
-          "width": 12,
-          "height": 12
-        },
-        "transcriptCellInsets": {
-          "left": 16,
-          "right": 16,
-          "top": 8
-        },
-        "transcriptTitleBodyGap": 5,
-        "transcriptIntercellGap": 12,
-        "transcriptMinimumRowHeight": 36,
-        "followLatestThreshold": 35,
-        "actionSheet": {
-          "contentSize": {
-            "width": 500,
-            "height": 340
-          },
-          "inset": 16,
-          "stackGap": 12,
-          "rowHeight": 34
-        },
-        "resizeBehavior": "Capture pre-resize bottom proximity and clip origin; after layout, follow latest or restore origin. Earlier integration review covered follow-latest. Physical earlier-position retention and selection continuity remain unverified.",
-        "narrowBehavior": "Use separate wide-sidebar preference and compact-sidebar visibility. Narrow windows start with navigation hidden and switch Agent/Inspect when inspection is open. Navigation commands reveal the sidebar; widening restores the wide preference. Composer remains available. These preferences are per-window in memory.",
-        "capturedWindowFrames": {
-          "lightNarrow": {
-            "width": 720,
-            "height": 480
-          },
-          "dark": {
-            "width": 720,
-            "height": 500
-          },
-          "qualification": "Both reports place composer, Send, and Stop within the owned window. The dark capture does not verify 480-point minimum height. Idle inspection captures do not verify approval controls."
-        }
+      "status": "Built journey-v3, user-approved September 30, 2026, extended by live Walkthrough and native file/conversation navigation",
+      "scope": "native/ only; no authority over root CLI design docs or reference gallery",
+      "authority": ["PRODUCT.md", "../docs/desktop/JOURNEY-V3.md", "../docs/desktop/WALKTHROUGH.md", "Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/ProjectLibrary.swift", "Sources/Heav3nsCode/ConversationSidebar.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/JourneyStyle.swift", "Sources/Heav3nsCode/ApprovalReview.swift", "Sources/Heav3nsCode/CodeOutline.swift", "Sources/Heav3nsCode/AccountClient.swift", "Sources/Heav3nsCode/WorkspaceDraftStore.swift", "Sources/Heav3nsCode/NavigationSidebar.swift", "Sources/Heav3nsCode/IntegrationProbe.swift", "Sources/Heav3nsCode/WalkthroughView.swift", "Sources/Heav3nsCode/WalkthroughState.swift", "Sources/Heav3nsCode/RuntimeClient.swift", "Sources/Heav3nsCode/QuickOpenWindow.swift", "Sources/Heav3nsCode/KeyboardListView.swift"],
+      "representation": "Native APIs and AppKit points extend identity-only portable frontmatter. No fixed CSS colors, HTML/CSS previews, synthetic tonal ramps, or raster concept assets.",
+      "colorBindings": {
+        "primary": "NSColor.controlAccentColor: entry/open/send actions, folder symbols, and native state",
+        "text": "NSColor.labelColor: primary prose, headings, approval, and base code",
+        "secondary": "NSColor.secondaryLabelColor: supporting prose, metadata, activity, and comments",
+        "placeholder": "NSColor.placeholderTextColor: empty composer only",
+        "surface": "NSColor.textBackgroundColor: transcript and composer",
+        "border": "NSColor.separatorColor: single composer border",
+        "material": "Clear source lists over NSVisualEffectView.sidebar with withinWindow blending",
+        "syntax": "systemPurple keywords; systemRed strings/removals; systemGreen additions; systemBlue diff hunks",
+        "defaults": "AppKit owns window grounds, controls, selection, focus, disabled and inactive state",
+        "walkthrough": "systemOrange issue/approval symbols; systemRed failed instruction; controlAccentColor other stages; text and symbols preserve meaning"
       },
-      "shapeBindings": [
-        "NSButton.bezelStyle = .rounded for composer, inspector, paging, and approval actions",
-        "NSButton.bezelStyle = .texturedRounded for Stop and sidebar controls",
-        "NSButton.bezelStyle = .inline for recent workspaces and activity disclosures",
-        "NSTableView.style = .sourceList for destinations and workspace items",
-        "NSSearchField for sidebar filters and action search",
-        "NSScrollView.borderType = .bezelBorder for composer",
-        "NSBox.boxType = .separator",
-        "NSSegmentedControl(trackingMode: .selectOne) for Agent/Inspect and Working Tree/Staged",
-        "NSImage(systemSymbolName:) for native interface icons"
-      ],
-      "depth": "System sidebar material, native unified window chrome, sheet presentation, source-list selection, and control bezels. No application shadow, gradient, or corner-radius scale.",
-      "motion": "No authored decorative animation or transition tokens. Folder filtering is debounced by 0.18 seconds; cosmetic activity updates and elapsed timers are reduced or suspended for occluded windows.",
-      "interactionEvidence": {
-        "sidebarSelection": "Stable item IDs preserve selection only when still present. Clear stale selection before reload; actual AppKit regression covers reaching a selected folder's sole child.",
-        "cancellationDeadline": "A generation token limits the five-second Force Stop deadline to its current cancellation. Actual AppKit/private-pipe regression proves an old deadline cannot escalate a replacement run.",
-        "stopAndSend": "Implemented: snapshot draft, cancel all outstanding runs, wait for confirmed terminal outcomes and no work, then submit. Interrupted state, lost connection, or cancellation failure drops pending send intent and preserves draft. Entire physical interaction unverified.",
-        "transcript": "Implemented expandable tool rows and selective row updates. Full selection, deliberate scroll retention, and physical keyboard/IME/VoiceOver remain unverified.",
-        "recovery": "Persistent notices are separate from activity status. Explicit reconnect waits for old worker exit; uncertain submission is looked up using the original request ID without automatic resubmission."
+      "fontBindings": {
+        "system": "NSFont.systemFont; AppKit points; native control defaults retained",
+        "display": "Welcome 32 semibold; other entry headings 30 semibold",
+        "headings": "Conversation 21 semibold; approval 20 semibold; context 16 semibold; project 15 semibold",
+        "body": "Entry 15/16 regular; conversation/composer 14 regular; workspace 14 semibold",
+        "rows": "Conversation 13 regular/medium; transcript 12 semibold; activity 12 regular; Open File filename medium over smaller secondary path",
+        "metadata": "12/11/10 regular according to context",
+        "evidence": "NSFont.monospacedSystemFont 12 regular; exact tool identifier 11 regular",
+        "walkthrough": "16 semibold stage; 12 medium activity message; 12 regular selectable detail; 11 regular status/duration/exit/coverage captions",
+        "limitations": "No bundled fonts or global tracking/line-height tokens; transcript is plain text"
+      },
+      "layoutPoints": {
+        "workspaceInitialContent": [1440, 880],
+        "launcherInitialContent": [1100, 740],
+        "minimumWindowFrame": [720, 480],
+        "entry": {"width": 490, "gap": 20},
+        "library": {"sidebarWidth": 200, "sidebarInset": 16, "mainInsets": [36, 32, 28, 32], "gap": 18, "rowHeight": 78, "mainFillsRemainder": true, "dateSingleLine": true},
+        "conversation": {"sidebarWidth": 220, "sidebarInset": 14, "rowHeight": 54, "mainInsets": [20, 22, 16, 22], "gap": 10, "transcriptRowGap": 20},
+        "context": {"wideWidth": "clamp(0.27 × window frame width, 330, 400)", "compactWidth": 300, "insets": [20, 14, 16, 14], "browserHeight": 236, "rowHeight": 32},
+        "composer": {"editorHeight": 64, "groupInset": 10, "gap": 8, "cornerRadius": 10, "borderWidth": 1, "editorTextInset": [0, 3]},
+        "disclosure": [20, 20],
+        "approvalInitialContent": [620, 380],
+        "responsive": {"compactBelowFrameWidth": 1000, "shortBelowFrameHeight": 640, "compact": "Conversation hides context; Task context reveals a 300-point panel alongside center. Transcript/composer persist; revealing navigation hides context.", "short": "Alternate Code/Changes browser and preview; release browser height. File selection requires activation so arrow navigation keeps the browser visible. Walkthrough hides secondary stage explanation and evidence summary, retaining stage, activity and actions."},
+        "captureFrames": {"wideWorkspace": [1440, 731], "compactDarkWorkspaceAndCode": [720, 480], "lightDraft": [720, 500], "lightApprovalParent": [720, 504], "wideLauncher": [1100, 731], "compactLauncher": [720, 480], "walkthroughWide": [1440, 731], "walkthroughCompact": [720, 500], "walkthroughApproval": [720, 504], "navigationWide": [1312, 731], "navigationCompact": [720, 500]},
+        "captureQualification": "Prior journey frames remain historical evidence. Walkthrough requested 720x480 was constrained by native minimum window size; actual compact frames are 720x500/504. Exact 480-point acceptance is not established. Navigation follow-up frames are 1312x731 and 720x500; evidence dimensions are not layout breakpoints.",
+        "reading": "Reflow rows, preserve earlier origin or follow within 35 points of bottom; physical selection/reading retention unverified",
+        "walkthrough": {"stackGap": 9, "horizontalGap": 8, "collapsedRowHeight": 58, "expandedRows": "Grow with selectable detail and file links; scrolling table yields to native controls"}
+      },
+      "shapesAndDepth": "Native buttons, source lists, search fields, segments, SF Symbols, sidebar material, sheets and popovers. One 10-point NSBox composer radius; 20-point square transcript disclosure and native Walkthrough table disclosures. No custom shadow/gradient/texture or general radius scale.",
+      "motion": {
+        "indicator": "Native indeterminate Walkthrough spinner only for connected, visible running/cancelling work; hidden/minimized/offline/approval/terminal states stop it",
+        "stageIcon": "CATransition fade, 0.18 seconds, for visible stage changes; no percentage or fixed linear checklist",
+        "reduceMotion": "AppKit preference stops the indicator and removes the transition; stage text and symbol remain",
+        "evidence": "Fixture diagnostics cover live and stopped states including Reduce Motion; static captures do not certify timing or physical accessibility acceptance",
+        "other": "Native preparation/sign-in spinners remain; filter/draft/elapsed scheduling is not decorative motion"
+      },
+      "stateBoundaries": {
+        "conversations": "Negotiated durable isolated runtime context/history. Switching blocked for active/queued/uncertain/approval work; runtime refuses staged agent edits. Save current draft, invalidate pending navigation/inspection/activity, and hold composer noneditable until a fresh destination snapshot is confirmed. Adoption clears prior inspection/history controls and Walkthrough selection. Run details/output stay in the selected conversation. History never resumes execution.",
+        "drafts": "Per-conversation drafts in bounded atomic workspace recovery; destination adoption restores its own text. Failed save prevents switching. Uncertain submission looked up by original ID, never replayed.",
+        "account": "Private account process reuses existing OpenAI Codex OAuth/protected storage. Swift receives status/restricted browser URL/catalog availability, never credentials. Workspaces close before account change; disconnect removes local connection.",
+        "providerMigration": "New dynamic-client/token-sharing contract remains separate; see JOURNEY-V3.md. No entitlement, billing or inference claim from connection/catalog status.",
+        "inspection": "Read-only; browsing adds no context and filename results grant no read access. Conversation changes discard stale replies and clear inspector history. Lexical outline at most 100 declarations in displayed page; Git comparisons include earlier/external edits. Background refresh retains the preview until Reload and preserves recorded-history pages.",
+        "windows": "Independent workspaces; four-window product target is not an enforced source cap",
+        "walkthrough": "Negotiated walkthrough-v1; follow active/approval/cancelling work over queued work, or explicitly pin loaded history. Structured events, bounded retained activity/checkpoints and ordered merges preserve partial recorded work; restart marks unfinished work interrupted without replay. Coverage and load-retry UI expose limits; not a complete audit log."
+      },
+      "navigation": {
+        "filePicker": "Modeless NSPanel child of the workspace, inheriting its appearance; conversation and Stop remain available. Scope/search precede a flexible result table; status, keyboard hint, Refresh and Open Preview follow. Local picker measurements are not global tokens.",
+        "scope": "Open File searches filenames and paths, not file contents. Git scope names ignore rules; plain-folder scope names hidden/generated exclusions. Conversation search says Find on this page and filters loaded titles. Code filtering remains local to the folder.",
+        "states": "Clear old selectable results while searching; explicit loading, no-match, partial-scan, overlong-query and failure copy. Refresh rebuilds results; failure offers Retry and Code browsing. Open Preview disabled without valid selection. Coverage/result limits remain visible.",
+        "resultRows": "Native document symbol, medium system-font filename above smaller secondary path, middle truncation, full-path tooltip and native selection.",
+        "activation": "Picker arrows select; Return, double-click or Open Preview opens read-only content. Code folder selection never opens: Return/double-click/Right enters; Left returns to parent. Code file selection previews when browser and preview coexist; short layouts require Return/double-click. Opening a path reveals its parent.",
+        "focus": "Escape restores previous responder; clicking the conversation dismisses without reclaiming focus. Focus Composer (Cmd-L) dismisses the picker, selects compact Conversation, makes the workspace key and makes composer first responder. Background conversation completion does not activate an inactive workspace.",
+        "availability": "File menu, Actions and context header expose Open File (Cmd-P) only with a ready runtime and file-search-v1; closing, conversation transition and attached sheets prevent opening.",
+        "input": "NSSearchField marked-text composition retains native handling. Debouncing and request generations schedule work and reject stale results; no decorative motion."
       },
       "review": {
-        "capturesRelativeToNativeRoot": [
-          "../.impeccable/review/desktop.png",
-          "../.impeccable/review/changes.png",
-          "../.impeccable/review/narrow.png",
-          "../.impeccable/review/dark.png",
-          "../.impeccable/review/palette.png"
-        ],
-        "rawEvidenceRelativeToNativeRoot": "../build/desktop-ui-1790728696210",
-        "captureContent": "Actual native application with real CLI read-only file/diff data. These UI-probe fixtures do not represent a provider task.",
-        "harness": "Actual native controls and LUMI bridge; owned-window capture with native chrome; no supplied model output.",
+        "directory": ".impeccable/review/journey-v3",
+        "records": ["review.json", "verdict.json", "verification.json", "evidence.json"],
+        "capturesInspected": ["hero-repro.png", "workspace-ui-code.png", "workspace-ui-changes.png", "workspace-ui-new-conversation.png", "workspace-ui-draft-light.png", "workspace-ui-expanded-light.png", "launcher-launcher-projects.png", "launcher-launcher-narrow-projects.png", "launcher-launcher-welcome.png", "launcher-launcher-signin.png", "approval-ui-approval-light-overlay-0.png"],
         "disposition": "ship",
-        "dispositionScope": "Only the stale cancellation-deadline fix and sidebar selection replacement fix; not full interaction or alpha readiness.",
-        "nativeTestsPassed": 11,
-        "regressions": [
-          {
-            "test": "testOldStopDeadlineCannotEscalateAReplacementRun",
-            "mechanism": "Actual AppKit workspace and private-pipe runtime fixture."
-          },
-          {
-            "test": "testReplacingASelectedFolderDoesNotLeaveItsChildUnreachable",
-            "mechanism": "Actual AppKit source-list selection and reload."
-          }
+        "dispositionScope": "J3-F01 through J3-F04 and regressions attributable to their fix batch only; not full surface or release certification",
+        "resolved": ["Unified composer/empty-only placeholder", "Full-width library/single-line date", "Readable approval and exact payload", "Compact activity disclosure"],
+        "automatedEvidence": {"nativeTests": 37, "desktopTests": 38, "oauthHelperTests": 4, "typescript": "passed", "lint": "finish-run reported passed", "accountStatusAndEOF": "passed in isolated storage", "workspaceBoundsReports": 20, "build": "local ad-hoc signature verified"},
+        "provenance": "verification.json and evidence.json carry build identity and capture origins; supplemental light disclosure states are separately recorded",
+        "fixtureScope": "Synthetic conversation history/approval; packaged runtime file/diff reads and conversation switching. No OAuth or model task in UI fixtures.",
+        "reviewerScope": "Static native captures and targeted source; reviewer did not rerun tests or interaction. No design detector ran.",
+        "unverified": ["Live OAuth/provider behavior", "Physical keyboard and IME", "VoiceOver and complete focus order", "Increased contrast", "Reduce Motion", "Performance", "Developer ID signing", "Notarization and public distribution"]
+      },
+      "walkthroughReview": {
+        "directory": ".impeccable/review/walkthrough-v1",
+        "records": ["review.json", "verification.json", "provenance.json", "packaged-runtime.json"],
+        "capturesInspected": ["live-wide.png", "live-compact.png", "history-wide.png", "file-wide.png", "failure-wide.png", "failure-compact.png", "approval-compact.png", "recovered-wide.png"],
+        "diagnostics": "Matching JSON for all eight captured states; actual wide 1440x731, compact 720x500, approval 720x504; exact 720x480 not certified",
+        "disposition": "ship",
+        "materialFixes": [],
+        "dispositionScope": "Eight captured native states and targeted WalkthroughView/WalkthroughState/WorkspaceWindow/RuntimeClient integration source; not backend, full accessibility or release certification",
+        "automatedEvidence": {"nativeTests": 42, "desktopTests": 44, "cliEngineTests": 9, "typescript": "passed", "changedFileLint": "passed", "build": "local ad-hoc signature verified"},
+        "fixtureScope": "Scripted engine over production DesktopSession, database, protocol and native client; actual file reads. Real CLI scheduler callbacks tested separately. No provider, OAuth or approval command executed.",
+        "packagedRuntime": "Actual bundled Node/CLI negotiated walkthrough-v1, preserved persisted activity metadata/paths and passed read-only file inspection; no provider request",
+        "reviewerScope": "Native captures, JSON provenance and targeted native source; backend/engine not independently reviewed and tests not rerun. No native design detector ran.",
+        "unverified": ["Physical keyboard and IME", "Full VoiceOver and focus order", "Increased contrast", "Physical Reduce Motion and transition timing acceptance", "Production-provider performance", "Ambiguous owner-lock crash reconciliation", "Developer ID signing", "Notarization and public distribution"]
+      },
+      "navigationReview": {
+        "directory": ".impeccable/review/navigation-v1",
+        "records": [
+          "review.json",
+          "verification.json",
+          "provenance.json",
+          "packaged-runtime.json"
         ],
-        "detectorRun": false,
-        "detectorReason": "Native AppKit surface.",
+        "capturesInspected": [
+          "quick-open-wide.png",
+          "quick-open-compact.png",
+          "empty-search-wide.png",
+          "code-wide.png",
+          "code-compact.png",
+          "new-conversation-wide.png",
+          "draft-restored-wide.png",
+          "conversation-compact.png",
+          "composer-focused-wide.png"
+        ],
+        "diagnostics": "Matching JSON for all nine captured states; actual wide 1312x731 and compact 720x500. Active native focus probe recorded workspaceKey=true and composerFocused=true with picker hidden before capture could alter focus.",
+        "initialDisposition": "fix",
+        "disposition": "ship",
+        "resolved": [
+          "composer-focus: Cmd-L dismisses picker, restores workspace key window and composer first responder"
+        ],
+        "dispositionScope": "Final narrow verdict covers the scored composer-focus fix and attributable regressions only. All nine refreshed captures valid; no attributable regressions observed. Earlier journey/Walkthrough reviews remain historical.",
+        "automatedEvidence": {
+          "nativeTests": 49,
+          "desktopTests": 49,
+          "typescript": "passed",
+          "changedFileLint": "passed at error severity",
+          "build": "locally signed development build passed",
+          "navigation": "scoped search, compact preview, draft restoration, stale-history clearing and composer focus handoff passed"
+        },
+        "fixtureScope": "Actual native app with explicitly scripted engine over production DesktopSession and inspection; raw native window captures including attached modeless picker. No generated UI imagery or provider invocation.",
+        "packagedRuntime": "Bundled Node/CLI negotiated file-search-v1 and passed real filename search; foreign run details/output rejected and original history restored. No provider request.",
+        "reviewerScope": "Native captures and targeted AppKit source; initial review of eight captures followed by nine refreshed captures for the scored correction. No web design detector ran.",
         "unverified": [
-          "physical keyboard walkthrough",
-          "IME and marked-text interaction",
+          "Physical keyboard and IME",
           "VoiceOver and complete focus order",
-          "approval controls at minimum window size",
-          "dark appearance at 720 × 480 points",
-          "deliberate earlier reading-position and selection retention",
-          "same-worker TUI/SwiftTerm",
-          "full alpha readiness"
-        ],
-        "broaderEvidence": [
-          "../docs/desktop/INTEGRATION.md",
-          "../docs/desktop/RELEASE-EVIDENCE.md"
+          "Provider OAuth",
+          "Release acceptance"
         ]
       }
     }
   },
   "components": [
-    {
-      "name": "Native Action Controls",
-      "kind": "button",
-      "description": "Standard native actions use rounded, textured-rounded, or inline bezels according to their toolbar, content, or disclosure role. AppKit supplies hover, focus, pressed, and disabled rendering.",
-      "native": {
-        "api": "NSButton",
-        "source": [
-          "Sources/Heav3nsCode/App.swift",
-          "Sources/Heav3nsCode/WorkspaceWindow.swift",
-          "Sources/Heav3nsCode/NavigationSidebar.swift"
-        ],
-        "bezelStyles": [
-          "rounded",
-          "texturedRounded",
-          "inline"
-        ]
-      }
-    },
-    {
-      "name": "Workspace Source List",
-      "kind": "nav",
-      "description": "Selected Files / Changes / Sessions above paged workspace items, folder location, parent, filter, refresh, and paging controls. Files filter the folder; Changes and Sessions filter loaded entries. Browsing adds no model context.",
-      "native": {
-        "api": [
-          "NSTableView",
-          "NSVisualEffectView",
-          "NSSearchField",
-          "NSScrollView",
-          "NSButton"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/NavigationSidebar.swift",
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "tableStyle": "sourceList",
-        "selection": "Single selection; preserve matching item IDs and clear stale selection.",
-        "symbols": [
-          "folder",
-          "arrow.triangle.branch",
-          "clock"
-        ],
-        "verification": "Destination selection captured; sole-child reachability regression verified. Physical keyboard and VoiceOver unverified."
-      }
-    },
-    {
-      "name": "Instruction Composer",
-      "kind": "input",
-      "description": "Plain text composer with Send/Queue, a three-instruction queue limit, preserved uncertain drafts, and conditional Stop & Send. Return submits and Shift–Return inserts a line; marked text prevents submission in the source.",
-      "native": {
-        "api": [
-          "ComposerView: NSTextView",
-          "NSScrollView",
-          "NSButton"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "accessibilityLabel": "Instruction to LUMI",
-        "verification": "Source-backed. Light 720 × 480 and dark 720 × 500 bounds captured. Physical keyboard, IME, and complete Stop & Send flow unverified."
-      }
-    },
-    {
-      "name": "Conversation and Expandable Activity",
-      "kind": "custom",
-      "description": "Headerless transcript table with semibold wrapping titles, selectable plain-text bodies, and inline tool-detail disclosures. Command evidence, incomplete evidence, checks not run, and not reviewed remain separate labels.",
-      "native": {
-        "api": [
-          "NSTableView",
-          "NSTextField",
-          "NSButton",
-          "TranscriptScrollView: NSScrollView"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "accessibilityLabel": "Agent conversation and tool activity",
-        "selectionHighlightStyle": "none",
-        "verification": "Expandable rows and selective updates are implemented; selection continuity and physical reading-position retention unverified."
-      }
-    },
-    {
-      "name": "Read-only Inspector",
-      "kind": "custom",
-      "description": "Selectable monospaced file, recorded-output, and paged plain-text diff content with Reload, Close, workspace-relative breadcrumbs, Reveal, Previous/Next, byte-range metadata, and native find support. Working Tree/Staged selects a named comparison.",
-      "native": {
-        "api": [
-          "NSTextView",
-          "NSScrollView",
-          "NSPathControl",
-          "NSSegmentedControl",
-          "NSButton"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "isEditable": false,
-        "isSelectable": true,
-        "isRichText": false,
-        "verification": "Actual file/diff rendering captured through the real read-only bridge. Complete physical paging, find, breadcrumb, and Reveal walkthrough unverified."
-      }
-    },
-    {
-      "name": "Compact Surface Switch",
-      "kind": "nav",
-      "description": "Agent / Inspect appears in narrow windows with inspection open. Composer remains below the selected surface; wide-sidebar preference is restored after widening.",
-      "native": {
-        "api": "NSSegmentedControl",
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "trackingMode": "selectOne",
-        "verification": "Compact Inspect state captured; all responsive interaction paths are not certified."
-      }
-    },
-    {
-      "name": "Approval and Stopping",
-      "kind": "custom",
-      "description": "Approval required, scrollable tool/scope/arguments/reason, Deny, and Allow Once. Stop escalates to Force Stop only for the current still-pending cancellation after five seconds; existing edits are retained.",
-      "native": {
-        "api": [
-          "NSStackView",
-          "NSTextView",
-          "NSScrollView",
-          "NSButton",
-          "NSAlert"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift",
-          "Sources/Heav3nsCode/App.swift"
-        ],
-        "verification": "Old cancellation-deadline regression verified using actual AppKit/private pipes. Approval layout at minimum size and full lifecycle acceptance unverified."
-      }
-    },
-    {
-      "name": "Persistent Notice and Recovery",
-      "kind": "custom",
-      "description": "Selectable recovery message above the composer, Reconnect after worker exit, and constrained dismissal. Uncertain acceptance is reconciled by lookup rather than automatic resubmission.",
-      "native": {
-        "api": [
-          "NSTextField",
-          "NSStackView",
-          "NSButton"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/WorkspaceWindow.swift",
-          "Sources/Heav3nsCode/RuntimeClient.swift"
-        ],
-        "verification": "Source-backed recovery state; not a complete physical interaction claim."
-      }
-    },
-    {
-      "name": "Searchable Workspace Actions",
-      "kind": "custom",
-      "description": "Native sheet with action search, matching rows, shortcut hints, and empty state. Includes workspace/navigation/focus/refresh actions plus context-relevant Stop and Reload.",
-      "native": {
-        "api": [
-          "NSPanel",
-          "NSSearchField",
-          "NSTableView",
-          "NSScrollView"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/ActionPalette.swift",
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "presentation": "beginSheet",
-        "verification": "Appearance captured. Arrow keys, Return, Escape, double-click, and marked-text guard exist in source; physical keyboard/IME walkthrough unverified."
-      }
-    },
-    {
-      "name": "Native Windows, Launcher, and Menus",
-      "kind": "custom",
-      "description": "Independent workspace windows, canonical-workspace refocusing, native Open Folder, recent workspaces, menu shortcuts, and active-work close/quit alerts. Workspace subtitle adds the branch after Changes loads; toolbar shows run state, elapsed time, and queue count.",
-      "native": {
-        "api": [
-          "NSWindow",
-          "NSToolbar",
-          "NSMenu",
-          "NSOpenPanel",
-          "NSAlert"
-        ],
-        "source": [
-          "Sources/Heav3nsCode/App.swift",
-          "Sources/Heav3nsCode/WorkspaceWindow.swift"
-        ],
-        "verification": "Source-backed; broader provider, process-footprint, lifecycle, and release acceptance are recorded separately."
-      }
-    }
+    {"name": "Native Action Controls", "kind": "button", "description": "Native accent entry/open/send actions and neutral supporting actions; system state rendering.", "native": {"api": "NSButton / JourneyButton", "source": ["Sources/Heav3nsCode/JourneyStyle.swift", "Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
+    {"name": "Entry and Account Journey", "kind": "custom", "description": "Preparation, welcome, browser sign-in, saved connection, cancel/retry and existing-setup routes; private runtime account boundary.", "native": {"api": "NSWindow / NSProgressIndicator / NSWorkspace", "source": ["Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/AccountClient.swift"]}},
+    {"name": "Project Library", "kind": "nav", "description": "Full-width searchable project table, pinned/recency order, single-line date and yielding path; remove never deletes files.", "native": {"api": "NSTableView.fullWidth / NSSearchField / NSOpenPanel", "source": ["Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/ProjectLibrary.swift", "Sources/Heav3nsCode/App.swift"]}},
+    {"name": "Conversation Navigation", "kind": "nav", "description": "Source list of durable isolated conversations; Find on this page filters loaded titles. Guarded selection confirms a fresh destination snapshot, restores its draft and clears stale inspection; background replies do not take focus.", "native": {"api": "NSVisualEffectView / NSTableView.sourceList / NSSearchField", "source": ["Sources/Heav3nsCode/ConversationSidebar.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/WorkspaceDraftStore.swift"]}},
+    {"name": "Unified Composer and Up Next", "kind": "input", "description": "Single semantic NSBox joins native text and actions; empty-only Message LUMI…; queue controls and per-conversation drafts. Noneditable during conversation transition; Cmd-L restores workspace key and composer focus. Return/IME behavior source-backed, not physically certified.", "native": {"api": "NSBox / ComposerView:NSTextView / NSScrollView / NSPopover", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
+    {"name": "Conversation and Activity", "kind": "custom", "description": "Selectable plain-text conversation, compact expandable activity, distinct completion/evidence/review labels and Jump to Latest.", "native": {"api": "NSTableView / NSTextField / NSButton", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
+    {"name": "Task Context and Inspection", "kind": "custom", "description": "Secondary Walkthrough/Changes/Code with scoped modeless filename/path search, native result states and deliberate keyboard activation. Folder selection never opens; short file browsing waits for activation. Read-only previews retain paths/history/find/paging and bounded outline; current or pinned Walkthrough preserves stable filtered activity and honest evidence.", "native": {"api": "NSSegmentedControl / NSPopUpButton / NSPanel / KeyboardListView:NSTableView / NSSearchField / NSProgressIndicator / NSTextView / NSPathControl", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/NavigationSidebar.swift", "Sources/Heav3nsCode/CodeOutline.swift", "Sources/Heav3nsCode/WalkthroughView.swift", "Sources/Heav3nsCode/WalkthroughState.swift", "Sources/Heav3nsCode/RuntimeClient.swift", "Sources/Heav3nsCode/QuickOpenWindow.swift", "Sources/Heav3nsCode/KeyboardListView.swift"]}},
+    {"name": "Approval Review", "kind": "custom", "description": "Immutable operation, readable question/prose, exact selectable path/arguments, full payload scroll, non-default Close/Deny/Allow Once.", "native": {"api": "AppKit sheet / NSTextView / NSButton", "source": ["Sources/Heav3nsCode/ApprovalReview.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
+    {"name": "Notices and Recovery", "kind": "custom", "description": "Persistent notices, explicit reconnect, uncertain-acceptance lookup, guarded Stop/Force Stop, and native close decisions.", "native": {"api": "NSTextField / NSButton / NSAlert", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
+    {"name": "Native Windows and Menus", "kind": "custom", "description": "Independent workspace windows, canonical refocusing, standard editing/window commands, toolbar Stop and searchable Actions. Open File Cmd-P and Focus Composer Cmd-L resolve the workspace through its native child panel.", "native": {"api": "NSWindow / NSToolbar / NSMenu / NSOpenPanel", "source": ["Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}}
   ],
   "narrative": {
     "northStar": "A native workspace for LUMI",
-    "overview": "The native client is a compact macOS operating surface. Familiar window chrome, system typography, semantic colors, and standard AppKit controls establish its character. The composer is the primary working input; conversation, tool activity, and read-only evidence carry the useful content.\n\nThis document records the integration preview after its native UX hardening pass. Its visual authority is [App.swift](Sources/Heav3nsCode/App.swift), [WorkspaceWindow.swift](Sources/Heav3nsCode/WorkspaceWindow.swift), [NavigationSidebar.swift](Sources/Heav3nsCode/NavigationSidebar.swift), and [ActionPalette.swift](Sources/Heav3nsCode/ActionPalette.swift), with state boundaries from [RuntimeClient.swift](Sources/Heav3nsCode/RuntimeClient.swift), capture behavior from [IntegrationProbe.swift](Sources/Heav3nsCode/IntegrationProbe.swift), and the confirmed direction in [PRODUCT.md](PRODUCT.md). Each workspace has an independent window and runtime client. This record applies only to `native/`; the root CLI design system remains separate.\n\nImplementation, captured appearance, and verified interaction are distinct evidence levels. The current review's ship disposition covers two corrected regressions only; it does not declare a distributable alpha or complete accessibility readiness. The component and review notes below state those boundaries.\n\nThe portable frontmatter intentionally contains identity only. AppKit semantic color objects, font factories, standard control geometry, and layout points are recorded as native bindings in [.impeccable/design.json](.impeccable/design.json). No fixed CSS palette, web component preview, or synthetic tonal ramp is a source of truth for this app.",
-    "keyCharacteristics": [
-      "System typography and appearance, with restrained emphasis.",
-      "Selected Files / Changes / Sessions navigation in a native source list.",
-      "An immediately available composer and selectable, read-only inspection.",
-      "Plain-text task state, tool activity, and verification labels.",
-      "Standard native controls, searchable actions, and independent workspace windows."
-    ],
-    "rules": [
-      {
-        "name": "The Semantic Appearance Rule",
-        "body": "Preserve semantic colors and the system sidebar material. Captures do not establish fixed white, gray, or accent tokens. Normal application use follows the system appearance; the development probe explicitly switches its owned window to Dark Aqua for capture.",
-        "section": "colors"
-      },
-      {
-        "name": "The Evidence Type Rule",
-        "body": "Use readable system text for conversation and monospaced system text for inspection. Transcript responses are wrapping plain text; backticks and code fences remain literal characters in the current implementation.",
-        "section": "typography"
-      },
-      {
-        "name": "The Native Depth Rule",
-        "body": "Use AppKit materials and control states for hierarchy. Do not reproduce their captured appearance as custom gradients, shadows, or fixed fills.",
-        "section": "elevation"
-      }
-    ],
-    "dos": [
-      "Do preserve AppKit system fonts, semantic color APIs, native controls, and standard window chrome.",
-      "Do keep the composer immediately available and file/output inspection selectable and read-only.",
-      "Do use selected Files / Changes / Sessions navigation, native search, breadcrumbs, and explicit paging for wayfinding.",
-      "Do distinguish recorded completion, command evidence, and independent review in task labels.",
-      "Do preserve drafts and show persistent recovery messages when acceptance or stopping is uncertain.",
-      "Do preserve the cancellation-generation and stable-item selection corrections while distinguishing source-backed behavior from verified interaction."
-    ],
-    "donts": [
-      "Don't replace the native surface with a web shell, landing-page composition, or decorative metrics.",
-      "Don't derive fixed colors, synthetic tonal ramps, or a radius scale from AppKit screenshots.",
-      "Don't introduce an empty editor as the starting point or imply that read-only inspection edits files.",
-      "Don't equate the implemented action sheet, selected sidebar, expandable activity, or paged plain-text diff with a complete editor or rich Markdown renderer.",
-      "Don't describe browsing as adding model context or Git comparisons as exclusive run attribution.",
-      "Don't promote scoped regression review, idle captures, or native API use into full alpha, keyboard, IME, or accessibility readiness."
-    ]
+    "overview": "Human–agent conversation leads this macOS workspace. A quiet native shell gives the conversation room to breathe, keeps its composer available, and places project navigation and read-only evidence within reach. System typography, semantic appearance, SF Symbols, and familiar AppKit controls provide the visual character.\n\nThis records the built translation of [journey-v3](../ui-prototypes/journey-v3/), approved for implementation on September 30, 2026: projects and conversations on the left, a dominant central conversation with a unified composer, and secondary Walkthrough / Changes / Code on the right. The live Walkthrough extends that system with inspectable activity and explicit follow-current or pinned-history selection. Native filename/path search and deliberate file activation connect intent to read-only evidence; conversation changes preserve separate drafts and clear stale inspection. The same native system carries preparation, welcome, browser sign-in, and the project library. Generated concepts remain references; no raster concept ships inside the app UI.\n\nSwift/AppKit remains the implementation. [PRODUCT.md](PRODUCT.md), [JOURNEY-V3.md](../docs/desktop/JOURNEY-V3.md), and the [Walkthrough contract](../docs/desktop/WALKTHROUGH.md) define product and runtime boundaries. This record applies only to native/. Identity-only portable frontmatter is extended by [.impeccable/design.json](.impeccable/design.json), which preserves native semantic bindings and point measurements without inventing CSS colors, web previews, or tonal ramps.",
+    "keyCharacteristics": ["A dominant human–agent conversation and persistent, unified native composer.", "Projects and durable conversations on the left; secondary task context on the right.", "Semantic light and dark appearance, system fonts, SF Symbols, and native chrome.", "Readable activity and approval language with selectable technical evidence.", "Explicit search scope, deliberate navigation, and a reliable return to the composer.", "Runtime-owned execution, context, permissions, credentials, and task history."],
+    "rules": [{"name": "The Semantic Appearance Rule", "body": "Preserve semantic colors and native materials in both appearances. Do not convert screenshots or system accents into fixed brand colors or synthetic tonal ramps.", "section": "colors"}, {"name": "The Evidence Type Rule", "body": "Use system prose for intent, explanation, and decisions. Reserve monospaced text for code, exact paths, arguments, and identifiers.", "section": "typography"}, {"name": "The Native Depth Rule", "body": "Let AppKit render material, focus, control state, and modality. Native screenshot shadows and bezels do not establish application shadow or blur tokens.", "section": "elevation"}],
+    "dos": ["Do keep conversation dominant and its unified composer available beside secondary context.", "Do preserve native semantic colors, fonts, controls, symbols, and window behavior.", "Do fill the library's main pane, protect single-line dates, and let paths truncate.", "Do use readable approval prose with exact selectable technical payloads and explicit decisions.", "Do align conversation context, drafts, history, and admission with confirmed runtime state.", "Do distinguish read-only evidence, Git baselines, review status, and verification limits.", "Do preserve explicit follow-current versus pinned history and honest stage, coverage, and issue labels.", "Do state each search scope and keep folder selection separate from opening; require file activation when preview replaces the browser.", "Do restore the intended native key window and responder when returning to the composer."],
+    "donts": ["Don't replace Swift/AppKit with illustrative SwiftUI snippets, a web shell, or raster concepts.", "Don't infer fixed palettes, tonal ramps, or a radius scale from native screenshots.", "Don't promote the page outline to a language-server index or Git changes to exclusive run attribution.", "Don't grant permission on default Return, replay uncertain submissions, or resume execution from history.", "Don't equate connection/catalog status with subscription, billing, or inference entitlement.", "Don't promote scoped reviews, synthetic fixtures, or local signing into release or accessibility certification."]
   }
 }

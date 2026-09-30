@@ -1,0 +1,21 @@
+{
+  "nativeNavigation": "passed",
+  "scopedSearch": "passed",
+  "compactPreview": "passed",
+  "draftRestoration": "passed",
+  "staleHistoryCleared": "passed",
+  "providerInvoked": false,
+  "automatedTests": {
+    "native": 49,
+    "desktop": 49,
+    "failed": 0
+  },
+  "checks": {
+    "typescript": "passed",
+    "changedFileLint": "passed (error severity)",
+    "signedDevelopmentBuild": "passed",
+    "diffWhitespace": "passed"
+  },
+  "packagedRuntime": "packaged-runtime.json",
+  "composerFocusHandoff": "passed (before capture activates the window)"
+}

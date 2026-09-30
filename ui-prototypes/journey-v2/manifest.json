@@ -1,0 +1,211 @@
+{
+  "name": "HEAV3NS-CODE native journey",
+  "version": 2,
+  "created": "2026-09-29",
+  "status": "superseded_intermediate",
+  "approved": false,
+  "scope": "Isolated generated concepts and simulated offline walkthrough; native application unchanged",
+  "nativeFramework": "Swift/AppKit; generated code snippets are illustrative, not source captures",
+  "generator": "Codex built-in image_gen",
+  "entry": "index.html",
+  "storyboard": "storyboard.html",
+  "generated": [
+    {
+      "id": "splash",
+      "file": "assets/01-splash.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/01-splash.txt",
+      "inputs": [
+        "assets/08-workspace.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-8db5af86-f578-48a0-ad71-773db7fcfaaf.png",
+      "sha256": "59a3df29ba44ecabe4c026c061a4c9d0cb88f8fac77e5003c18c790dfd9b9ca6",
+      "approved": false
+    },
+    {
+      "id": "welcome",
+      "file": "assets/02-welcome.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/02-welcome.txt",
+      "inputs": [
+        "assets/01-splash.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-27e5e846-9917-4e0a-9393-ecbab4a4df71.png",
+      "sha256": "9b6614d7ed2f2b77c60186f0be07fc19bcd8b29bf09f655d654f4812af5b5d60",
+      "approved": false
+    },
+    {
+      "id": "signin",
+      "file": "assets/03-signin.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/03-signin.txt",
+      "inputs": [
+        "assets/02-welcome.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-91d5d892-8639-48e2-94f1-9442612b6024.png",
+      "sha256": "ef382e5e2773d6616c8549b5f61516e2df4ab9edb14b2117c80e412528424790",
+      "approved": false
+    },
+    {
+      "id": "browser",
+      "file": "assets/04-browser.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/04-browser.txt",
+      "inputs": [
+        "assets/03-signin.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-d4a6ec5f-5560-4c64-9b9f-c9e3a3f5d38c.png",
+      "sha256": "cb05d91d800f23b7bdff759a12695456a4fef73b306a43c0391128e42ea0a4b4",
+      "approved": false
+    },
+    {
+      "id": "connected",
+      "file": "assets/05-connected.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/05-connected.txt",
+      "inputs": [
+        "assets/03-signin.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-6f006ca7-7454-4340-91c2-bd64cdd10b10.png",
+      "sha256": "ee30a8ed6b9b32ca9fbabcdaf2332df5433e2a37d0b0bdc09464f94aaf315903",
+      "approved": false
+    },
+    {
+      "id": "projects",
+      "file": "assets/06-projects.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/06-projects.txt",
+      "inputs": [
+        "assets/08-workspace.png",
+        "assets/02-welcome.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-d8634608-9c91-405a-abb8-28d975eb7aee.png",
+      "sha256": "8e2d217a9a0cdc776eadfafee2fd24d262c530d25257d6f9f8d72e4d899df8c5",
+      "approved": false
+    },
+    {
+      "id": "folder",
+      "file": "assets/07-folder.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/07-folder.txt",
+      "inputs": [
+        "assets/06-projects.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-811c45a9-1192-492c-8dc8-f5da39ad677a.png",
+      "sha256": "8dec549bea9ae3018df99464e1ec7b5ad4a544583f16a5b428ebb53468946988",
+      "approved": false
+    },
+    {
+      "id": "workspace",
+      "file": "assets/08-workspace.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/08-workspace.txt",
+      "inputs": [
+        "../native-v1/assets/workspace-dark.png",
+        "references/vscode-layout.png",
+        "references/vscode-outline.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-b3478328-13e8-4904-a9e8-ae93406a0f47.png",
+      "sha256": "ae08c954d04ed19f3ae3f8c98e69921a37c2e517627861f7518c48df4943bb73",
+      "approved": false
+    },
+    {
+      "id": "symbols",
+      "file": "assets/09-symbols.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/09-symbols.txt",
+      "inputs": [
+        "assets/08-workspace.png",
+        "references/vscode-outline.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-385c54c1-b362-48e6-a62e-7e582d313737.png",
+      "sha256": "32bdd00e27bf0f8eaa6e8c4747bfc167bec2dfb39d377b6d2a1c64c1b09d2961",
+      "approved": false
+    },
+    {
+      "id": "approval",
+      "file": "assets/10-approval.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/10-approval.txt",
+      "inputs": [
+        "assets/09-symbols.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-df661a0c-f547-4585-8f51-1718b27a7cfa.png",
+      "sha256": "4395dc74aeceff5aeb951cbb961a625d0a9ea112f9fc443ae9f1f5f8263634ad",
+      "approved": false
+    },
+    {
+      "id": "changes",
+      "file": "assets/11-changes.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/11-changes.txt",
+      "inputs": [
+        "assets/09-symbols.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-c7218c8d-85df-4c6f-8f43-afea43ebb2d7.png",
+      "sha256": "c06962f75a827a1f846b742cb620032d37e3611aca9cef06f98e7353f927a7e8",
+      "approved": false
+    },
+    {
+      "id": "sessions",
+      "file": "assets/12-sessions.png",
+      "kind": "generated-concept",
+      "width": 1586,
+      "height": 992,
+      "promptFile": "prompts/12-sessions.txt",
+      "inputs": [
+        "assets/09-symbols.png"
+      ],
+      "origin": "/Users/bozoegg/.codex/generated_images/01a0f065-d1d5-7a60-a73b-c9d5a6486e49/exec-c8f59c59-f80c-44d0-9705-cc09431ed640.png",
+      "sha256": "6ab1ed56e2ed216d7b2ef8e79091f5800cc138068423aa49519d1609e0004cd3",
+      "approved": false
+    }
+  ],
+  "direction": "Superseded editor-centered direction",
+  "constraints": [
+    "No authentication or task execution",
+    "Only gallery controls and marked hotspots are interactive",
+    "Generated code, paths, timestamps and geometry are approximate",
+    "Concept review is not implementation approval"
+  ],
+  "references": [
+    {
+      "title": "Native product truth",
+      "path": "../../native/PRODUCT.md"
+    },
+    {
+      "title": "VS Code interface grammar",
+      "url": "https://code.visualstudio.com/docs/editing/getting-started/userinterface"
+    },
+    {
+      "title": "Xcode project navigation",
+      "url": "https://developer.apple.com/documentation/xcode/managing-files-and-folders-in-your-xcode-project"
+    },
+    {
+      "title": "Sign in with ChatGPT",
+      "url": "https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt"
+    }
+  ]
+}

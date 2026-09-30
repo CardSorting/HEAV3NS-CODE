@@ -1,0 +1,66 @@
+{
+  "appPID" : 78680,
+  "capturedAt" : "2026-09-30T19:12:16Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 353,
+        "x" : 33,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 92.5,
+        "x" : 33,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 322,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 604,
+        "y" : 456
+      }
+    },
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–133 \/ 133 bytes · Read only",
+    "inspectionPreview" : "import AppKit\n\nfinal class WorkspaceExample: NSView {\n    func focusConversation() {\n        window?.makeFirstResponder(nil)\n    }\n}\n",
+    "inspectionTitle" : "WorkspaceExample.swift",
+    "navigationVisible" : false,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 1,
+      "pinnedRun" : "",
+      "reduceMotion" : true,
+      "selectedRun" : "865bbcf306b064dc7806f28df5055739543ce1dcdd6cf6ac7a31af44bf246ac8",
+      "stage" : "Updating workspace",
+      "visibleActivities" : 2
+    },
+    "windowFrameHeight" : 500,
+    "windowFrameWidth" : 720
+  },
+  "windowHeight" : 448,
+  "windowWidth" : 720,
+  "workerPID" : 78683,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790795519402\/live\/Workspace"
+}

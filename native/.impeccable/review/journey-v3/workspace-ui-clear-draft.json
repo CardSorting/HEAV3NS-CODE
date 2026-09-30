@@ -1,0 +1,57 @@
+{
+  "appPID" : 63531,
+  "capturedAt" : "2026-09-30T18:13:26Z",
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 671,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 869,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1196,
+        "y" : 687
+      }
+    },
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "",
+    "inspectionTitle" : "Inspect",
+    "navigationVisible" : false,
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1312
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1312,
+  "workerPID" : 63539,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-journey-1790791995538\/Journey review fixture"
+}

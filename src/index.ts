@@ -5293,6 +5293,10 @@ ${modelCommands}
 	let runtime: LumiMonolith | undefined
 	let workspaceOwner: Awaited<ReturnType<typeof import("./desktop/workspace-owner.js").acquireWorkspace>> | undefined
 	;(async () => {
+		if (primaryCmd === "--desktop-account") {
+			await (await import("./desktop/account.js")).runDesktopAccount()
+			return
+		}
 		if (primaryCmd === "--desktop-worker") {
 			await (await import("./desktop/worker.js")).runDesktopWorker()
 			return

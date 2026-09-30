@@ -1,0 +1,6 @@
+{
+  "scope": "Gallery HTML, CSS, and JavaScript only",
+  "mode": "degraded-regex",
+  "findings": [],
+  "limitation": "HTML parser modules htmlparser2, css-select, css-tree and domutils unavailable. Custom properties, selector matching and computed contrast were not evaluated. This is not a contrast certification."
+}

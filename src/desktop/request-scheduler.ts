@@ -1,6 +1,17 @@
-import { MAX_PENDING_BYTES, type DesktopRequest } from "./protocol.js"
+import { type DesktopRequest, MAX_PENDING_BYTES } from "./protocol.js"
 
-const inspectionMethods = new Set(["files.list", "files.read", "changes.list", "changes.read", "artifact.read", "history.read"])
+const inspectionMethods = new Set([
+	"files.list",
+	"files.search",
+	"files.read",
+	"changes.list",
+	"changes.read",
+	"artifact.read",
+	"history.read",
+	"history.list",
+	"activity.list",
+	"conversation.list",
+])
 const controlMethods = new Set(["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown"])
 interface Waiting {
 	run: () => void
