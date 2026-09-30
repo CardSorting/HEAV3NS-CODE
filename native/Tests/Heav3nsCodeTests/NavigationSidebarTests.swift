@@ -3,6 +3,19 @@ import XCTest
 @testable import Heav3nsCode
 
 final class NavigationSidebarTests: XCTestCase {
+    func testChangingFolderScopeClearsTheQueryAndCancelsItsPendingFilter() {
+        _ = NSApplication.shared
+        let sidebar = NavigationSidebar(frame: .zero)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        let search = descendants(sidebar).compactMap { $0 as? NSSearchField }.first!
+        let filtered = expectation(description: "the previous folder query is not delivered"); filtered.isInverted = true
+        sidebar.onFilter = { _ in filtered.fulfill() }
+        search.stringValue = "parent-folder"
+        sidebar.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: search))
+        sidebar.resetFilter()
+        XCTAssertEqual(search.stringValue, "")
+        wait(for: [filtered], timeout: 0.3)
+    }
     func testReplacingASelectedFolderDoesNotLeaveItsChildUnreachable() {
         _ = NSApplication.shared
         let sidebar = NavigationSidebar(frame: NSRect(x: 0, y: 0, width: 200, height: 500))

@@ -3201,6 +3201,7 @@ export type { FencingLockRecord } from "./sessions/extensions/substrate/broccoli
 export { BroccoliFencingMutexEngine } from "./sessions/extensions/substrate/broccolidb-fencing-mutex.js"
 export { BroccoliInvertedIndexEngine } from "./sessions/extensions/substrate/broccolidb-inverted-index-engine.js"
 export { BroccoliDatabaseKernel } from "./sessions/extensions/substrate/broccolidb-kernel.js"
+export { BroccoliRuntimeQueue, type RuntimeQueueOptions } from "./agents/extensions/execution/broccoli-runtime-queue.js"
 export { BroccoliLockAuthority } from "./sessions/extensions/substrate/broccolidb-lock-authority.js"
 export { BroccoliLsmStore } from "./sessions/extensions/substrate/broccolidb-lsm-store.js"
 export { BroccoliMaterializedViewEngine } from "./sessions/extensions/substrate/broccolidb-materialized-view-engine.js"
@@ -3777,6 +3778,9 @@ export * as Tui from "./tui/tui-facade.js"
  * and provides frame-perfect state rewind and replay.
  */
 export class LumiMonolith implements IAgentEngine {
+	private readonly ownsDatabase: boolean
+	private readonly forks = new Set<LumiMonolith>()
+	private closing?: Promise<void>
 	/** Complete, future-compatible factory composition. Named fields below remain compatibility aliases. */
 	readonly components: Readonly<ReturnType<typeof MonolithFactory.createEngine>>
 	readonly config: AgentConfig
@@ -4338,6 +4342,7 @@ export class LumiMonolith implements IAgentEngine {
 	readonly agentEngine: AgentEngine
 
 	constructor(options: MonolithFactoryOptions = {}) {
+		this.ownsDatabase = !options.databaseKernel
 		const components = MonolithFactory.createEngine(options)
 		this.components = components
 		this.config = components.config
@@ -4901,29 +4906,44 @@ export class LumiMonolith implements IAgentEngine {
 
 	/** Primary Game Engine Frame Step (Tick Loop) */
 	async tick(input: EngineTickInput): Promise<EngineTickResult> {
-		return this.telemetryTracer.startSpan(`tick-frame-${this.sessionContext.turnCount + 1}`, async (span) => {
-			this.telemetryTracer.addEvent(span, "frame_start", { promptLength: input.prompt.length })
-			this.loopPhaseController.setPhase("thinking")
-			const startTime = Date.now()
-			try {
-				const res = await this.agentEngine.tick(input)
-				this.timingBuffer.record("frame_tick", Date.now() - startTime)
-				span.attributes["turn.outcome"] = res.outcome
-				if (res.outcome !== "completed") span.status = "error"
-				this.telemetryTracer.addEvent(span, "frame_terminal", {
-					outcome: res.outcome,
-					responseLength: res.response.length,
-				})
-				return res
-			} finally {
-				this.loopPhaseController.setPhase("idle")
-			}
-		})
+		return this.agentEngine.tick(input, (execute) =>
+			this.telemetryTracer.startSpan(`tick-frame-${this.sessionContext.turnCount + 1}`, async (span) => {
+				this.telemetryTracer.addEvent(span, "frame_start", { promptLength: input.prompt.length })
+				this.loopPhaseController.setPhase("thinking")
+				const startTime = Date.now()
+				try {
+					const res = await execute()
+					this.timingBuffer.record("frame_tick", Date.now() - startTime)
+					span.attributes["turn.outcome"] = res.outcome
+					if (res.outcome !== "completed") span.status = "error"
+					this.telemetryTracer.addEvent(span, "frame_terminal", {
+						outcome: res.outcome,
+						responseLength: res.response.length,
+					})
+					return res
+				} finally {
+					this.loopPhaseController.setPhase("idle")
+				}
+			}),
+		)
 	}
 
 	/** Backward-compatible turn runner */
 	async runTurn(prompt: string): Promise<EngineTickResult> {
 		return this.tick({ prompt })
+	}
+
+	/** Runtime pressure without copying prompts, tool results, or queued callbacks. */
+	get requestQueue() {
+		return this.agentEngine.requestQueue!
+	}
+
+	close(): Promise<void> {
+		this.closing ??= (async () => {
+			await Promise.all([this.agentEngine.close(), ...[...this.forks].map((fork) => fork.close())])
+			if (this.ownsDatabase) await this.databaseKernel.stop()
+		})()
+		return this.closing
 	}
 
 	/** Dynamically changes the active LLM model with alias normalization */
@@ -5035,13 +5055,16 @@ export class LumiMonolith implements IAgentEngine {
 
 	/** Forks game engine state into a new isolated engine instance */
 	forkSession(newSessionId?: string): LumiMonolith {
+		if (this.closing) throw new Error("Cannot fork a closing runtime")
 		const snapshot = this.createSnapshot()
 		const forkedMonolith = new LumiMonolith({
 			cwd: this.sessionContext.cwd,
 			sessionId: newSessionId ?? `${this.sessionContext.sessionId}-fork-${Date.now()}`,
 			config: this.config,
+			databaseKernel: this.databaseKernel,
 		})
 		forkedMonolith.rewindToSnapshot(snapshot)
+		this.forks.add(forkedMonolith)
 		return forkedMonolith
 	}
 }
@@ -5267,6 +5290,7 @@ ${modelCommands}
 	}
 
 	let stateManagerInitialized = false
+	let runtime: LumiMonolith | undefined
 	let workspaceOwner: Awaited<ReturnType<typeof import("./desktop/workspace-owner.js").acquireWorkspace>> | undefined
 	;(async () => {
 		if (primaryCmd === "--desktop-worker") {
@@ -5294,6 +5318,7 @@ ${modelCommands}
 		}
 		workspaceOwner = await (await import("./desktop/workspace-owner.js")).acquireWorkspace(process.cwd())
 		const lumi = new LumiMonolith(configuredProviderValue ? { provider: configuredProvider } : {})
+		runtime = lumi
 		if (configuredModelValue) {
 			lumi.setModel(configuredModelValue)
 		}
@@ -5479,6 +5504,12 @@ ${modelCommands}
 			process.exitCode = 1
 		})
 		.finally(async () => {
+			try {
+				await runtime?.close()
+			} catch (error) {
+				console.error("Could not close HEAV3NS request queue during shutdown:", error)
+				process.exitCode = 1
+			}
 			if (stateManagerInitialized) {
 				try {
 					await StateManager.get().shutdown()

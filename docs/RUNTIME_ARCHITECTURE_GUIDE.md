@@ -83,6 +83,60 @@ The Zenith-tier hybrid database kernel ($\mathcal{K}_{\text{broccoli}}$ / [ADR-1
 
 ---
 
+### 2.5 Runtime request buffering
+
+`MonolithFactory` injects `BroccoliRuntimeQueue` into the shared `AgentEngine`,
+so CLI, desktop, and direct factory callers use the local
+[`BROCCOLIQUEUE`](../BROCCOLIQUEUE/README.md) source for turn admission. The build
+bundles that source; no separate broker, database process, dashboard, or package
+installation is needed.
+
+Each conversation has one FIFO worker on the runtime's existing BroccoliDB
+kernel. Concurrent submissions share WAL flushes. The default buffer permits
+32 pending requests (including the active turn and admissions being persisted),
+8 MiB of pending UTF-8 prompt text, and 1 MiB per prompt. Excess requests reject
+with `RUNTIME_QUEUE_FULL` or `RUNTIME_REQUEST_TOO_LARGE`. Configure these limits
+with `MonolithFactoryOptions.requestQueueOptions`; inspect pressure with
+`lumi.requestQueue.getSnapshot()` or
+`components.agentEngine.requestQueue.getSnapshot()`. Desktop's separate
+three-instruction admission limit still applies before the engine.
+
+Queued cancellation rejects the caller immediately, while its reservation is
+held until an in-progress admission/cancellation write finishes. Running turns
+retain the execution slot until their handler stops. Progress callbacks,
+execution authority, and abort signals remain attached to their original
+request. Queue rows store scheduling metadata and a small outcome summary;
+prompts, callbacks, and full tool results are not duplicated into queue rows.
+Turn telemetry and the Thinking phase begin only when the worker starts that
+turn. A waiting or cancelled request cannot reset another turn's phase.
+Terminal queue records older than one hour are pruned while their conversation
+queue is open or when it starts again.
+
+Agent turns have one attempt. On startup, stale queued/active jobs are cancelled
+before starting a worker; a job without a live caller cannot execute. This
+prevents automatic replay of file changes, commands, and approval decisions
+after a crash. Persistence failures stop admission and abort live work rather
+than accepting more uncertain requests. Start a new runtime after resolving the
+storage error.
+
+Queries explicitly selecting only waiting, delayed or active states read the
+indexed live records, even when more than 12,000 newer terminal records exist.
+The bounded recent-history window remains an inspection limit, not a recovery
+limit. Desktop controls use a separate bounded request scheduler so slow file
+inspection cannot block stop, approval or recovery requests; see the
+[desktop protocol and queue controls](desktop/INTEGRATION.md#protocol-v1).
+
+Hosts must await `lumi.close()` before releasing workspace ownership. Factory
+callers must await `components.agentEngine.close()` before
+`components.databaseKernel.stop()`. CLI and desktop shutdown do this
+automatically. Forked monolith sessions share their parent's kernel, and the
+parent closes its forks before stopping that kernel. Idle workers do not keep
+a single-shot Node process alive; pending and active work do.
+
+Regression coverage lives in
+[`broccoliRuntimeQueue.test.ts`](../src/agents/extensions/execution/__tests__/broccoliRuntimeQueue.test.ts)
+and the Agent Flight Test exercises the default factory wiring.
+
 ## 3. Executive Terminal User Interface (TUI)
 
 ### 3.1 Differential Rendering Engine (`src/tui/tui-alt-screen.ts`)

@@ -30,7 +30,7 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     private let search = NSSearchField()
     private let location = NSTextField(labelWithString: "Workspace")
     private let message = NSTextField(wrappingLabelWithString: "Choose Files to browse this workspace.")
-    private let back = NSButton(image: NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Parent folder")!, target: nil, action: nil)
+    private let back = NSButton(image: NSImage(systemSymbolName: "chevron.up", accessibilityDescription: "Parent folder")!, target: nil, action: nil)
     private let next = NSButton(title: "Next 100", target: nil, action: nil)
     private let previous = NSButton(image: NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Previous page")!, target: nil, action: nil)
     private var suppressSelection = false
@@ -60,7 +60,7 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
         location.font = .systemFont(ofSize: 11, weight: .semibold); location.lineBreakMode = .byTruncatingMiddle
         location.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         back.bezelStyle = .texturedRounded; back.target = self; back.action = #selector(parent)
-        back.setAccessibilityLabel("Parent folder")
+        back.setAccessibilityLabel("Parent folder"); back.toolTip = "Open parent folder"
         root.addArrangedSubview(pathBar)
         search.placeholderString = "Filter this folder"; search.delegate = self; search.setAccessibilityLabel("Filter workspace items")
         root.addArrangedSubview(search)
@@ -80,9 +80,9 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func select(_ value: WorkspaceDestination, notify: Bool = true) {
-        filterWork?.cancel(); destination = value
+        resetFilter(); destination = value
         suppressSelection = true; destinations.selectRowIndexes(IndexSet(integer: value.rawValue), byExtendingSelection: false); suppressSelection = false
-        search.stringValue = ""; search.placeholderString = value == .files ? "Filter this folder" : "Filter \(value.title.lowercased())"
+        search.placeholderString = value == .files ? "Filter this folder" : "Filter \(value.title.lowercased())"
         if notify { onDestination?(value) }
     }
     func show(_ entries: [SidebarEntry], location: String, message: String, canGoBack: Bool = false, more: Bool = false, hasPrevious: Bool = false) {
@@ -98,6 +98,7 @@ final class NavigationSidebar: NSView, NSTableViewDataSource, NSTableViewDelegat
     }
     func loading(_ text: String) { message.stringValue = text; message.isHidden = false; next.isHidden = true; items.isEnabled = false; previous.isEnabled = false }
     func focusFilter() { window?.makeFirstResponder(search) }
+    func resetFilter() { filterWork?.cancel(); filterWork = nil; search.stringValue = "" }
     func controlTextDidChange(_ obj: Notification) {
         filterWork?.cancel()
         let query = search.stringValue

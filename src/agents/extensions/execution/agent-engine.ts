@@ -48,6 +48,7 @@ import { hasOpenAiCodexOAuthCredentials } from "../../../services/auth/OpenAiCod
 import type { DietCodeStorageMessage } from "../../../shared/messages/content.js"
 import type { DietCodeTool } from "../../../shared/tools.js"
 import { FlappyBirdProjectSynthesizer } from "./flappy-bird-project-synthesizer.js"
+import type { BroccoliRuntimeQueue } from "./broccoli-runtime-queue.js"
 
 interface PreparedProviderContext {
 	messages: SessionMessage[]
@@ -143,6 +144,7 @@ function toCodexOAuthTranscript(
 }
 
 export interface AgentContextServices {
+	requestQueue?: BroccoliRuntimeQueue
 	modelCatalog?: ModelCatalog
 	budgetCalculator?: ContextBudgetCalculator
 	tokenTruncator?: TokenTruncator
@@ -182,6 +184,7 @@ export class AgentEngine extends AbstractAgentEngine {
 	private readonly getOpenAiAuthMethod?: () => "oauth" | "api-key" | undefined
 	private readonly flappyBirdProjectSynthesizer = new FlappyBirdProjectSynthesizer()
 	private turnQueue: Promise<void> = Promise.resolve()
+	readonly requestQueue?: BroccoliRuntimeQueue
 
 	constructor(
 		config: AgentConfig,
@@ -224,10 +227,16 @@ export class AgentEngine extends AbstractAgentEngine {
 		this.openAiApiKey = contextServices.openAiApiKey
 		this.getOpenAiApiKey = contextServices.getOpenAiApiKey
 		this.getOpenAiAuthMethod = contextServices.getOpenAiAuthMethod
+		this.requestQueue = contextServices.requestQueue
 	}
 
 	/** Serialize mutations and stateful provider calls for deterministic turn order. */
-	override async tick(input: EngineTickInput): Promise<EngineTickResult> {
+	override async tick(
+		input: EngineTickInput,
+		aroundExecution: (execute: () => Promise<EngineTickResult>) => Promise<EngineTickResult> = (execute) => execute(),
+	): Promise<EngineTickResult> {
+		const execute = (queuedInput: EngineTickInput) => aroundExecution(() => super.tick(queuedInput))
+		if (this.requestQueue) return this.requestQueue.run(input, execute)
 		const predecessor = this.turnQueue
 		let releaseTurn: () => void = () => undefined
 		this.turnQueue = new Promise<void>((resolve) => {
@@ -239,7 +248,7 @@ export class AgentEngine extends AbstractAgentEngine {
 			if (input.signal?.aborted) {
 				throw new Error("Turn cancelled before execution")
 			}
-			return await super.tick(input)
+			return await execute(input)
 		} finally {
 			releaseTurn()
 		}
@@ -255,6 +264,10 @@ export class AgentEngine extends AbstractAgentEngine {
 		if (this.toolRegistry && "loopBreaker" in this.toolRegistry) {
 			;(this.toolRegistry as unknown as { loopBreaker: { reset: () => void } }).loopBreaker.reset()
 		}
+	}
+
+	async close(): Promise<void> {
+		await this.requestQueue?.close()
 	}
 
 	protected override async executeTick(input: EngineTickInput): Promise<EngineTickResult> {
@@ -709,7 +722,11 @@ export class AgentEngine extends AbstractAgentEngine {
 												phase: "tool",
 												status: record.denied ? "denied" : record.success ? "completed" : "failed",
 												message: `${record.denied ? "Denied" : record.success ? "Completed" : "Failed"} ${record.name}`,
-												detail: record.denied ? "Permission denied for this operation" : record.success ? "Success" : `Failed: ${record.error ?? "See recorded output"}`,
+												detail: record.denied
+													? "Permission denied for this operation"
+													: record.success
+														? "Success"
+														: `Failed: ${record.error ?? "See recorded output"}`,
 												timestamp: Date.now(),
 												elapsedMs: record.durationMs,
 												sequence: nextProgressSequence(),

@@ -28,7 +28,7 @@ cp "build/downloads/node-v${node_version}-darwin-arm64/bin/node" "$app/Contents/
 cp -R dist/. "$app/Contents/Resources/runtime/dist/"
 mkdir -p "$app/Contents/Resources/runtime/node_modules"
 cp -R node_modules/typescript "$app/Contents/Resources/runtime/node_modules/"
-cp LICENSE NOTICE THIRD-PARTY-NOTICES.md LICENSE-MAP.md TRADEMARKS.md "$app/Contents/Resources/"
+cp LICENSE NOTICE THIRD-PARTY-NOTICES.md LICENSE-MAP.md TRADEMARKS.md PATENT-NON-AGGRESSION-PLEDGE.md "$app/Contents/Resources/"
 cp "build/downloads/node-v${node_version}-darwin-arm64/LICENSE" "$app/Contents/Resources/NODE-LICENSE"
 cp native/Info.plist "$app/Contents/Info.plist"
 codesign --force --sign "$identity" --options runtime --entitlements native/Node.entitlements "$app/Contents/Resources/runtime/node"

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { mkdir, open, realpath } from "node:fs/promises"
+import { mkdir, open, realpath, stat } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
 import { z } from "zod"
@@ -15,7 +15,16 @@ import { createStorageContext } from "../shared/storage/storage-context.js"
 import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { WorkspaceInspection } from "./inspection.js"
-import { type DesktopRequest, encodeFrame, FrameDecoder, MAX_PENDING_BYTES, requestSchema } from "./protocol.js"
+import {
+	DESKTOP_QUEUE_LIMIT,
+	MAX_INSTRUCTION_LENGTH,
+	type DesktopRequest,
+	encodeFrame,
+	FrameDecoder,
+	MAX_PENDING_BYTES,
+	requestSchema,
+} from "./protocol.js"
+import { DesktopRequestScheduler } from "./request-scheduler.js"
 import { acquireWorkspace } from "./workspace-owner.js"
 
 const exec = promisify(execFile)
@@ -28,6 +37,7 @@ type Run = Record<string, unknown> & {
 	state: string
 	createdAt: number
 	updatedAt: number
+	revision?: number
 	session: string
 	response?: string
 	activities: EngineProgressEvent[]
@@ -56,26 +66,42 @@ const projectRun = (run: Run) => ({
 	state: run.state,
 	createdAt: run.createdAt,
 	updatedAt: run.updatedAt,
+	revision: run.revision ?? 0,
+	queueOrder: run.queueOrder,
 	startedAt: run.startedAt,
 	response: run.response ? shortText(run.response, 6000) : undefined,
-	activities: run.activities
-		.slice(-8)
-		.map((a) => ({
-			activityId: a.activityId,
-			phase: a.phase,
-			status: a.status,
-			message: shortText(a.message, 300),
-			detail: a.detail ? shortText(a.detail, 400) : undefined,
-			elapsedMs: a.elapsedMs,
-			timestamp: a.timestamp,
-			sequence: a.sequence,
-		})),
+	activities: run.activities.slice(-8).map((a) => ({
+		activityId: a.activityId,
+		phase: a.phase,
+		status: a.status,
+		message: shortText(a.message, 300),
+		detail: a.detail ? shortText(a.detail, 400) : undefined,
+		elapsedMs: a.elapsedMs,
+		timestamp: a.timestamp,
+		sequence: a.sequence,
+	})),
 	approval: run.approval,
 	verification: run.verification,
 	review: run.review,
 	outputLimited: run.outputLimited,
 	toolCount: run.toolCount,
+	commandCount: run.commandCount,
 })
+
+const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<string> => {
+	const baseline = await exec(
+		"git",
+		["--no-pager", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "--untracked-files=normal"],
+		{
+			cwd: workspace,
+			maxBuffer: 128 * 1024,
+			timeout: 5000,
+			signal,
+			env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+		},
+	).catch(() => null)
+	return baseline ? shortText(baseline.stdout) : "Git status unavailable"
+}
 
 /** This adapter schedules existing ticks. It has no provider, prompt, or tool implementation. */
 export class DesktopSession {
@@ -94,23 +120,30 @@ export class DesktopSession {
 	private approvals
 	private inspection: WorkspaceInspection
 	private submissions: Promise<unknown> = Promise.resolve()
+	private queueMutations = 0
+	private revision = 0
+	private cancellingAll = false
+	private cancellation?: Promise<void>
 	readonly workspace: { path: string; id: string }
 	private readonly engine: IAgentEngine
 	private readonly database: BroccoliDatabaseKernel
 	private readonly send: (frame: unknown) => void
 	private readonly lifecycle?: { sessionId: string; saveContext: () => void }
+	private readonly readBaseline: typeof readGitBaseline
 	constructor(
 		workspace: { path: string; id: string },
 		engine: IAgentEngine,
 		database: BroccoliDatabaseKernel,
 		send: (frame: unknown) => void,
 		lifecycle?: { sessionId: string; saveContext: () => void },
+		readBaseline = readGitBaseline,
 	) {
 		this.workspace = workspace
 		this.engine = engine
 		this.database = database
 		this.send = send
 		this.lifecycle = lifecycle
+		this.readBaseline = readBaseline
 		this.inspection = new WorkspaceInspection(workspace.path)
 		this.runs = database.getTable<Run>("desktop.runs.v1")
 		this.metadata = database.getTable("desktop.metadata.v1")
@@ -147,6 +180,9 @@ export class DesktopSession {
 	}
 	private commit(run: Run, type: string): Promise<void> {
 		run.updatedAt = Date.now()
+		// Copies of a live run (for approval records) share the same monotonic
+		// version space, including commits still waiting for durable storage.
+		run.revision = this.revision = Math.max(this.revision, this.seq, run.revision ?? 0) + 1
 		const projection = structuredClone(run)
 		const operation = this.commits.then(async () => {
 			this.runs.put(run.id, projection)
@@ -182,10 +218,27 @@ export class DesktopSession {
 			nextCursor: page.length > 6 ? { createdAt: last.createdAt, id: last.id } : undefined,
 		}
 	}
+	private snapshotRuns() {
+		// A long-running task must not disappear when newer queued tasks are
+		// repeatedly accepted and removed. Reserve space for every live run.
+		const live = [this.active, ...this.queue].filter((run): run is Run => Boolean(run))
+		const ids = new Set(live.map((run) => run.id))
+		const history = this.recent().runs.filter((run) => !ids.has(run.id))
+		return [...live.map(projectRun), ...history.slice(-(6 - live.length))].sort(
+			(a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+		)
+	}
 	async request(request: DesktopRequest): Promise<unknown> {
-		if (request.method === "task.submit") {
+		if (request.method === "task.submit" || request.method === "task.edit") {
+			if (this.cancellingAll) throw new Error("CANCELLING: wait for a confirmed stopping boundary")
+			this.queueMutations++
 			const result = this.submissions.then(() => this.handleRequest(request))
-			this.submissions = result.catch(() => {})
+			this.submissions = result
+				.catch(() => {})
+				.finally(() => {
+					this.queueMutations--
+					this.kick()
+				})
 			return result
 		}
 		return this.handleRequest(request)
@@ -198,6 +251,7 @@ export class DesktopSession {
 				workspace: this.workspace.id,
 				session: this.session,
 				path: this.workspace.path,
+				limits: { queuedInstructions: DESKTOP_QUEUE_LIMIT, instructionLength: MAX_INSTRUCTION_LENGTH },
 				capabilities: [
 					"native",
 					"snapshot",
@@ -208,6 +262,10 @@ export class DesktopSession {
 					"files",
 					"changes",
 					"paged-inspection",
+					"workspace-stop",
+					"run-details",
+					"queue-edit",
+					"queue-remove",
 				],
 				terminal: false,
 			}
@@ -223,13 +281,16 @@ export class DesktopSession {
 					workspace: this.workspace.id,
 					session: this.session,
 					seq: this.seq,
-					runs: this.recent().runs,
+					runs: this.snapshotRuns(),
 					active: this.active?.id,
 					queued: this.queue.map((r) => r.id),
 				}
 			case "task.submit": {
 				const params = z
-					.object({ text: z.string().trim().min(1).max(16_000), attachments: z.array(z.never()).max(0).default([]) })
+					.object({
+						text: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
+						attachments: z.array(z.never()).max(0).default([]),
+					})
 					.strict()
 					.parse(request.params)
 				const fingerprint = createHash("sha256").update(JSON.stringify(params)).digest("hex")
@@ -240,8 +301,9 @@ export class DesktopSession {
 						throw new Error("REQUEST_ID_REUSED: the accepted instruction differs")
 					return { accepted: true, run: projectRun(previous), duplicate: true }
 				}
-				if (this.active?.state === "cancelling") throw new Error("CANCELLING: wait for a confirmed stopping boundary")
-				if (this.queue.length >= 3)
+				if (this.cancellingAll || this.active?.state === "cancelling")
+					throw new Error("CANCELLING: wait for a confirmed stopping boundary")
+				if (this.queue.length >= DESKTOP_QUEUE_LIMIT)
 					throw new Error("QUEUE_FULL: three instructions are already queued; your draft has not been submitted")
 				const run: Run = {
 					id,
@@ -250,6 +312,7 @@ export class DesktopSession {
 					text: params.text,
 					session: this.session,
 					state: "queued",
+					queueOrder: this.seq + 1,
 					createdAt: Date.now(),
 					updatedAt: Date.now(),
 					activities: [],
@@ -260,6 +323,24 @@ export class DesktopSession {
 				this.queue.push(run)
 				this.kick()
 				return { accepted: true, run: projectRun(run) }
+			}
+			case "task.edit": {
+				const params = z
+					.object({
+						run: z.string(),
+						text: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
+						revision: z.number().int().nonnegative(),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.cancellingAll) throw new Error("CANCELLING: wait until stopping is confirmed")
+				const run = this.queue.find((entry) => entry.id === params.run)
+				if (!run) throw new Error("NO_LONGER_QUEUED: this instruction has started or stopped; your edit was not applied")
+				if ((run.revision ?? 0) !== params.revision)
+					throw new Error("STALE_RUN: this instruction changed; reload it before saving")
+				run.text = params.text
+				await this.commit(run, "run.state")
+				return { updated: true, run: projectRun(run) }
 			}
 			case "task.lookup": {
 				const params = z
@@ -272,10 +353,21 @@ export class DesktopSession {
 				return { found: Boolean(run), run: run ? projectRun(run) : undefined }
 			}
 			case "task.cancel": {
-				const { run } = z.object({ run: z.string() }).strict().parse(request.params)
+				const { run, ifQueued } = z
+					.object({ run: z.string(), ifQueued: z.boolean().optional() })
+					.strict()
+					.parse(request.params)
+				if (ifQueued && !this.queue.some((entry) => entry.id === run))
+					throw new Error(
+						"NO_LONGER_QUEUED: this instruction already started or stopped. Refresh its state before using Stop.",
+					)
 				await this.cancel(run)
 				return { requested: true }
 			}
+			case "task.cancelAll":
+				z.object({}).strict().parse(request.params)
+				await this.cancelAll()
+				return { requested: true }
 			case "approval.resolve": {
 				const p = z
 					.object({ operation: z.string(), run: z.string(), decision: z.enum(["allow", "deny"]) })
@@ -331,6 +423,31 @@ export class DesktopSession {
 					.parse(request.params)
 				await this.commits
 				return this.recent(cursor, before)
+			}
+			case "history.read": {
+				const { run: id } = z
+					.object({ run: z.string().regex(/^[a-f0-9]{64}$/) })
+					.strict()
+					.parse(request.params)
+				await this.commits
+				const run = this.runs.get(id)
+				if (!run || run.session !== this.session) throw new Error("UNKNOWN_RUN: this run is not in the attached session")
+				let outputAvailable = false
+				try {
+					const file = await this.inspection.resolve(path.join(".broccolidb", "desktop-output", `${id}.txt`))
+					outputAvailable = (await stat(file)).isFile()
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+				}
+				return {
+					run: { ...projectRun(run), text: run.text, response: run.response, baseline: run.baseline },
+					outputAvailable,
+					outputMessage: outputAvailable
+						? "Recorded output is available."
+						: terminalStates.has(run.state)
+							? "No output was recorded for this run. Its instruction and last confirmed state are preserved."
+							: "Output will be available after LUMI records the result. Activity is shown in the conversation.",
+				}
 			}
 			case "files.list": {
 				const p = z
@@ -388,7 +505,7 @@ export class DesktopSession {
 		}
 	}
 	private kick() {
-		if (this.pumping || this.closing) return
+		if (this.pumping || this.closing || this.cancellingAll || this.queueMutations) return
 		this.pumping = this.pump()
 			.catch((error) => {
 				this.closing = true
@@ -397,37 +514,41 @@ export class DesktopSession {
 			})
 			.finally(() => {
 				this.pumping = undefined
-				if (this.queue.length && !this.closing) this.kick()
+				if (this.queue.length && !this.closing && !this.cancellingAll) this.kick()
 			})
 	}
 	private async pump() {
-		while (this.queue.length && !this.closing) {
+		while (this.queue.length && !this.closing && !this.cancellingAll && !this.queueMutations) {
 			const run = this.queue.shift()!
 			this.active = run
-			this.controller = new AbortController()
+			const controller = new AbortController()
+			this.controller = controller
 			run.state = "running"
 			run.startedAt = Date.now()
 			await this.commit(run, "run.state")
+			let executionStarted = false
 			try {
-				const baseline = await exec("git", ["status", "--porcelain=v1", "--untracked-files=normal"], {
-					cwd: this.workspace.path,
-					maxBuffer: 128 * 1024,
-					timeout: 5000,
-				}).catch(() => null)
-				run.baseline = baseline ? shortText(baseline.stdout) : "Git status unavailable"
+				controller.signal.throwIfAborted()
+				run.baseline = await this.readBaseline(this.workspace.path, controller.signal)
+				// Stop may arrive during Git preflight. Never hand an already-aborted
+				// instruction to the engine or wait for an abort event that has passed.
+				controller.signal.throwIfAborted()
+				executionStarted = true
 				const result = await this.engine.tick({
 					prompt: run.text,
 					executionAuthority: "interactive",
-					signal: this.controller.signal,
+					signal: controller.signal,
 					onProgress: (e) => this.progress(run, e),
 				})
 				await this.saveResult(run, result)
 				run.state = result.outcome
 				this.lifecycle?.saveContext()
 			} catch (error) {
-				// An exception after abort is not proof of successful cleanup.
-				run.state = this.controller.signal.aborted ? "interrupted" : "failed"
-				run.response = shortText(error instanceof Error ? error.message : String(error))
+				// Before engine admission cancellation is confirmed. An exception
+				// after admission is not proof of successful tool cleanup.
+				run.state = controller.signal.aborted ? (executionStarted ? "interrupted" : "cancelled") : "failed"
+				if (executionStarted || !controller.signal.aborted)
+					run.response = shortText(error instanceof Error ? error.message : String(error))
 			}
 			run.approval = undefined
 			await this.commit(run, "run.state")
@@ -459,6 +580,7 @@ export class DesktopSession {
 		run.response = shortText(result.response)
 		run.verification = result.toolResults.length ? "evidence_available" : "not_run"
 		run.toolCount = result.toolResults.length
+		run.commandCount = result.toolResults.filter((tool) => tool.name === "run_command").length
 		const folder = path.join(this.workspace.path, ".broccolidb", "desktop-output")
 		await mkdir(folder, { recursive: true, mode: 0o700 })
 		if ((await realpath(folder)) !== folder)
@@ -526,14 +648,31 @@ export class DesktopSession {
 			await this.commit(this.active, "run.state")
 		} else if (!this.runs.get(id)) throw new Error("UNKNOWN_RUN")
 	}
+	private cancelAll(): Promise<void> {
+		if (this.cancellation) return this.cancellation
+		// Close admission and the pump synchronously. An acceptance already
+		// crossing its flush boundary is included before cancellation completes.
+		this.cancellingAll = true
+		const activeCancellation = this.active ? this.cancel(this.active.id) : Promise.resolve()
+		this.cancellation = Promise.all([
+			activeCancellation,
+			this.submissions.then(() => Promise.all(this.queue.map((run) => this.cancel(run.id)))),
+		])
+			.then(async () => {
+				await this.pumping
+				await this.commits
+			})
+			.finally(() => {
+				this.cancellingAll = false
+				this.cancellation = undefined
+			})
+		return this.cancellation
+	}
 	async stop() {
 		this.closing = true
 		this.inspection.clear()
-		await this.submissions
-		for (const run of [...this.queue]) await this.cancel(run.id)
-		if (this.active) await this.cancel(this.active.id)
-		await this.pumping
-		await this.commits
+		await this.cancelAll()
+		await this.engine.close?.()
 		await this.database.stop()
 	}
 }
@@ -558,6 +697,7 @@ export async function runDesktopWorker(): Promise<void> {
 	let engine: LumiMonolith | undefined
 	let initialized = false
 	let ending = false
+	const requests = new DesktopRequestScheduler()
 	let complete!: () => void
 	const lifetime = new Promise<void>((resolve) => {
 		complete = resolve
@@ -570,6 +710,7 @@ export async function runDesktopWorker(): Promise<void> {
 	const shutdown = async () => {
 		if (ending) return
 		ending = true
+		requests.close()
 		const deadline = setTimeout(() => {
 			engine?.processSupervisorEngine.shutdownAll()
 			process.exit(2)
@@ -620,49 +761,34 @@ export async function runDesktopWorker(): Promise<void> {
 		engine.toolRegistry.requireInteractiveHost((request) => bridge!.approve(request))
 		await bridge.start()
 		const decoder = new FrameDecoder()
-		let requests = Promise.resolve()
-		let queuedBytes = 0
 		process.stdin.on("data", (data: Buffer) => {
 			try {
 				for (const raw of decoder.push(data)) {
-					const size = Buffer.byteLength(JSON.stringify(raw))
-					queuedBytes += size
-					if (queuedBytes > MAX_PENDING_BYTES) throw new Error("REQUEST_BACKPRESSURE")
-					// Cancellation must not queue behind an unrelated slow file/Git read.
-					const urgent =
-						typeof raw === "object" &&
-						raw !== null &&
-						["task.cancel", "shutdown"].includes(String((raw as Record<string, unknown>).method))
-					const operation = (urgent ? Promise.resolve() : requests)
-						.then(async () => {
-							let id: string | undefined
-							try {
-								const request = requestSchema.parse(raw)
-								id = request.id
-								if (request.method === "shutdown") {
-									if (request.workspace !== bridge!.workspace.id || request.session !== bridge!.session)
-										throw new Error(
-											"IDENTITY_MISMATCH: shutdown must address the attached workspace and session",
-										)
-									await shutdown()
-									send({ v: 1, kind: "response", id, result: { stopped: true } })
-								} else send({ v: 1, kind: "response", id, result: await bridge!.request(request) })
-							} catch (error) {
+					const request = requestSchema.parse(raw)
+					void requests
+						.dispatch(request, async () => {
+							if (request.method === "shutdown") {
+								if (request.workspace !== bridge!.workspace.id || request.session !== bridge!.session)
+									throw new Error("IDENTITY_MISMATCH: shutdown must address the attached workspace and session")
+								await shutdown()
+								return { stopped: true }
+							}
+							return bridge!.request(request)
+						})
+						.then(
+							(result) => send({ v: 1, kind: "response", id: request.id, result }),
+							(error) =>
 								send({
 									v: 1,
 									kind: "response",
-									id,
+									id: request.id,
 									error: { message: error instanceof Error ? error.message : String(error) },
-								})
-							} finally {
-								queuedBytes -= size
-							}
-						})
+								}),
+						)
 						.catch((error) => {
 							Logger.error(String(error))
 							void shutdown()
 						})
-					if (!urgent) requests = operation
 				}
 			} catch (error) {
 				try {

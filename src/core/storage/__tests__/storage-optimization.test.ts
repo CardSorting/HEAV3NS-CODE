@@ -461,8 +461,18 @@ describe("Storage & Memory Optimizations", () => {
 
 			const mutableFsPromises = fsPromises as unknown as {
 				writeFile: (...args: Parameters<typeof fsPromises.writeFile>) => ReturnType<typeof fsPromises.writeFile>
+				rename: typeof fsPromises.rename
 			}
 			const originalWriteFile = mutableFsPromises.writeFile
+			const originalRename = mutableFsPromises.rename
+			let finishRecovery!: () => void
+			const recovered = new Promise<void>((resolve) => {
+				finishRecovery = resolve
+			})
+			mutableFsPromises.rename = async (...args) => {
+				await originalRename(...args)
+				if (String(args[1]) === path.join(tempDir, "data", "globalState.json")) finishRecovery()
+			}
 			let shouldFail = true
 			mutableFsPromises.writeFile = async (...args: Parameters<typeof fsPromises.writeFile>) => {
 				const targetPath = String(args[0])
@@ -482,13 +492,16 @@ describe("Storage & Memory Optimizations", () => {
 				expect(flushError).to.be.instanceOf(Error)
 
 				shouldFail = false
-				// The first retry backoff is the normal 500ms persistence window.
-				await new Promise((resolve) => setTimeout(resolve, 650))
+				// Observe the automatic retry's actual atomic rename. A wall-clock
+				// delay can expire before disk I/O completes on a busy test machine.
+				await recovered
+				await manager.flushPendingState()
 
 				const globalStatePath = path.join(tempDir, "data", "globalState.json")
 				expect(JSON.parse(fs.readFileSync(globalStatePath, "utf8")).joyZoningSteeringEnabled).to.equal(false)
 			} finally {
 				mutableFsPromises.writeFile = originalWriteFile
+				mutableFsPromises.rename = originalRename
 			}
 		})
 

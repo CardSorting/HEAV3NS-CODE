@@ -8,6 +8,7 @@ final class IntegrationProbe {
     let cancelAfter: Double?
     let perWorkspace: Bool
     let navigationPass: Bool
+    let steps: [String]
     private var submitted = false
     private var finished = false
     init?() {
@@ -20,6 +21,7 @@ final class IntegrationProbe {
         cancelAfter = config["cancelAfter"] as? Double
         perWorkspace = config["perWorkspace"] as? Bool ?? false
         navigationPass = config["navigationPass"] as? Bool ?? false
+        steps = config["steps"] as? [String] ?? ["files", "changes", "narrow", "dark", "palette"]
     }
     func connected(_ workspace: WorkspaceWindow) {
         guard !submitted else { return }; submitted = true
@@ -32,7 +34,7 @@ final class IntegrationProbe {
         }
     }
     func outcome(_ workspace: WorkspaceWindow, state: String) {
-        guard !finished else { return }; finished = true
+        guard !finished, !navigationPass else { return }; finished = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
             self.capture(workspace, suffix: "result", state: state)
@@ -43,7 +45,6 @@ final class IntegrationProbe {
         }
     }
     private func navigationStep(_ workspace: WorkspaceWindow, index: Int) {
-        let steps = ["files", "changes", "narrow", "dark", "palette"]
         guard steps.indices.contains(index) else { return }
         workspace.navigateProbe(steps[index])
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak workspace] in
@@ -63,7 +64,14 @@ final class IntegrationProbe {
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         capture.arguments = ["-x", "-o", "-l", String(workspace.window!.windowNumber), destination.appendingPathComponent("\(suffix).png").path]
         try? capture.run(); capture.waitUntilExit()
-        var report: [String: Any] = ["appPID": ProcessInfo.processInfo.processIdentifier, "workspace": workspace.folder.path, "windowWidth": view.bounds.width, "windowHeight": view.bounds.height, "capturedAt": ISO8601DateFormatter().string(from: Date()), "harness": "native composer and actual LUMI worker"]
+        // Popovers and editing sheets are separate native windows. Include them
+        // in an opt-in visual pass so the new controls can actually be reviewed.
+        for (index, window) in NSApp.windows.filter({ $0.isVisible && $0 !== workspace.window }).enumerated() {
+            let overlay = Process(); overlay.executableURL = capture.executableURL
+            overlay.arguments = ["-x", "-o", "-l", String(window.windowNumber), destination.appendingPathComponent("\(suffix)-overlay-\(index).png").path]
+            try? overlay.run(); overlay.waitUntilExit()
+        }
+        var report: [String: Any] = ["appPID": ProcessInfo.processInfo.processIdentifier, "workspace": workspace.folder.path, "windowWidth": view.bounds.width, "windowHeight": view.bounds.height, "capturedAt": ISO8601DateFormatter().string(from: Date()), "harness": "native composer and configured stdio worker"]
         if let pid = workspace.client.pid { report["workerPID"] = pid }
         if let state { report["state"] = state }
         report["layout"] = workspace.probeLayout

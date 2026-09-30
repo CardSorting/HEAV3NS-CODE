@@ -3,6 +3,8 @@ import { z } from "zod"
 export const PROTOCOL_VERSION = 1
 export const MAX_FRAME_BYTES = 256 * 1024
 export const MAX_PENDING_BYTES = 4 * 1024 * 1024
+export const DESKTOP_QUEUE_LIMIT = 3
+export const MAX_INSTRUCTION_LENGTH = 16_000
 
 export const requestSchema = z
 	.object({
@@ -16,10 +18,13 @@ export const requestSchema = z
 			"workspace.attach",
 			"snapshot",
 			"task.submit",
+			"task.edit",
 			"task.cancel",
+			"task.cancelAll",
 			"task.lookup",
 			"approval.resolve",
 			"history.list",
+			"history.read",
 			"artifact.read",
 			"files.list",
 			"files.read",

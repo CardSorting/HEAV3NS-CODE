@@ -34,6 +34,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let status = NSTextField(wrappingLabelWithString: "Preparing workspace…")
     private let stopButton = NSButton(title: "Stop", target: nil, action: nil)
     private let sendButton = NSButton(title: "Send", target: nil, action: nil)
+    private let queueButton = NSButton(title: "Up Next", target: nil, action: nil)
+    private let queueContent = QueuedInstructions()
+    private let queuePopover = NSPopover()
+    private var queueEditor: QueuedInstructionEditor?
+    private var editingQueued: QueuedInstruction?
+    private var removingQueued = Set<String>()
     private let jumpButton = NSButton(title: "Jump to Latest", target: nil, action: nil)
     private let composer = ComposerView()
     private let transcript = NSTableView()
@@ -63,6 +69,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var nextChunk: (() -> Void)?
     private var previousChunk: (() -> Void)?
     private var reloadInspection: (() -> Void)?
+    private var inspectionHistory = InspectionHistory()
+    private let inspectionBack = NSButton()
+    private let inspectionForward = NSButton()
+    private let inspectionFind = NSButton()
+    private let recordedOutput = NSButton(title: "View Recorded Output", target: nil, action: nil)
     private let previousButton = NSButton(title: "Previous", target: nil, action: nil)
     private let pageLabel = NSTextField(labelWithString: "Read only")
     private let breadcrumb = NSPathControl()
@@ -91,6 +102,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var palette: ActionPalette?
     private var needsRebuild = false
     private var cancelRequested = false
+    private var stopAcknowledged = true
     private var cancellationToken: UUID?
     private var recovering = false
     private let terminalStates: Set<String> = ["completed", "failed", "cancelled", "timed_out", "interrupted"]
@@ -100,6 +112,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let probe = IntegrationProbe()
     var hasWork: Bool { runs.contains { !terminalStates.contains($0["state"] as? String ?? "") } || pendingRequest != nil }
     var isClosing: Bool { closing }
+    var canInspectBack: Bool { inspectionHistory.canGoBack && window?.attachedSheet == nil }
+    var canInspectForward: Bool { inspectionHistory.canGoForward && window?.attachedSheet == nil }
+    var canFindInInspection: Bool { showingInspector && !inspector.isHidden && window?.attachedSheet == nil }
 
     init(folder: URL, runtimeClient: RuntimeClient? = nil) {
         self.folder = folder
@@ -161,8 +176,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor
         status.maximumNumberOfLines = 1; status.lineBreakMode = .byTruncatingTail
         stopButton.target = self; stopButton.action = #selector(stop); stopButton.bezelStyle = .texturedRounded
-        stopButton.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: "Stop Run")
-        stopButton.imagePosition = .imageLeading; stopButton.isEnabled = false; stopButton.setAccessibilityLabel("Stop Run")
+        stopButton.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: "Stop All Work")
+        stopButton.imagePosition = .imageLeading; stopButton.isEnabled = false; stopButton.setAccessibilityLabel("Stop All Work")
+        stopButton.toolTip = "Stop current and queued instructions (⌘.)"
         let toolbar = NSToolbar(identifier: "workspace"); toolbar.delegate = self; toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window?.toolbar = toolbar; window?.toolbarStyle = .unified
@@ -195,14 +211,27 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
 
         inspector.orientation = .vertical; inspector.alignment = .leading; inspector.spacing = 10
         inspectorTitle.font = .systemFont(ofSize: 13, weight: .semibold)
-        let closeInspect = button("Close", #selector(closeInspection))
+        let closeInspect = button("", #selector(closeInspection), symbol: "xmark")
+        closeInspect.imagePosition = .imageOnly; closeInspect.toolTip = "Close inspector"; closeInspect.setAccessibilityLabel("Close inspector")
         inspectorTitle.lineBreakMode = .byTruncatingMiddle
         inspectorTitle.setContentHuggingPriority(.init(100), for: .horizontal)
         inspectorTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let refreshInspect = button("", #selector(refreshInspection), symbol: "arrow.clockwise")
         refreshInspect.imagePosition = .imageOnly
-        refreshInspect.setAccessibilityLabel("Reload inspected content")
-        let inspectorBar = stack([inspectorTitle, refreshInspect, closeInspect])
+        refreshInspect.setAccessibilityLabel("Reload inspected content"); refreshInspect.toolTip = "Reload inspected content"
+        for (control, symbol, label, action) in [
+            (inspectionBack, "chevron.left", "Back (⌘[)", #selector(inspectBack)),
+            (inspectionForward, "chevron.right", "Forward (⌘])", #selector(inspectForward)),
+            (inspectionFind, "magnifyingglass", "Find in Current Page (⌘F)", #selector(findInInspection))
+        ] {
+            control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
+            control.imagePosition = .imageOnly; control.bezelStyle = .rounded
+            control.target = self; control.action = action; control.title = ""
+            control.toolTip = label; control.setAccessibilityLabel(label)
+            control.setContentHuggingPriority(.required, for: .horizontal)
+        }
+        inspectionBack.isEnabled = false; inspectionForward.isEnabled = false
+        let inspectorBar = stack([inspectionBack, inspectionForward, inspectorTitle, inspectionFind, refreshInspect, closeInspect], spacing: 4)
         inspector.addArrangedSubview(inspectorBar)
         inspectorBar.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
         breadcrumb.pathStyle = .standard; breadcrumb.isEditable = false; breadcrumb.target = self; breadcrumb.action = #selector(openBreadcrumb)
@@ -212,6 +241,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         inspector.addArrangedSubview(breadcrumb); breadcrumb.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
         diffScope.target = self; diffScope.action = #selector(changeDiffScope); diffScope.isHidden = true; diffScope.selectedSegment = 0
         inspector.addArrangedSubview(diffScope)
+        recordedOutput.target = self; recordedOutput.action = #selector(openRecordedOutput); recordedOutput.bezelStyle = .rounded; recordedOutput.isHidden = true
+        inspector.addArrangedSubview(recordedOutput)
         inspection.isEditable = false; inspection.isSelectable = true; inspection.isRichText = false
         inspection.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         inspection.textContainerInset = NSSize(width: 12, height: 12)
@@ -271,6 +302,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         composer.isVerticallyResizable = true; composer.autoresizingMask = [.width]
         composerScroll.heightAnchor.constraint(equalToConstant: 64).isActive = true
         sendButton.target = self; sendButton.action = #selector(submit); sendButton.bezelStyle = .rounded; sendButton.isEnabled = false
+        queueButton.target = self; queueButton.action = #selector(showQueue); queueButton.bezelStyle = .rounded
+        queueButton.toolTip = "Review, edit, or remove queued instructions (⌘4)"
+        queueButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        queuePopover.behavior = .transient; queuePopover.contentViewController = queueContent
+        queueContent.onEdit = { [weak self] in self?.editQueued($0) }
+        queueContent.onRemove = { [weak self] in self?.removeQueued($0) }
         hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         stopSendButton.target = self; stopSendButton.action = #selector(stopAndSend); stopSendButton.bezelStyle = .rounded; stopSendButton.isHidden = true
@@ -281,7 +318,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         noticeBar.orientation = .horizontal; noticeBar.alignment = .centerY; noticeBar.spacing = 6; noticeBar.isHidden = true
         [notice, reconnectButton, dismiss].forEach(noticeBar.addArrangedSubview)
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
-        let composerBar = stack([hint, NSView(), stopSendButton, sendButton]); composerBar.distribution = .fill
+        let composerBar = stack([hint, NSView(), queueButton, stopSendButton, sendButton]); composerBar.distribution = .fill
         let center = stack([surfaces, work, approval, noticeBar, composerScroll, composerBar], vertical: true, spacing: 6)
         center.setContentHuggingPriority(.init(1), for: .horizontal)
         work.setContentHuggingPriority(.init(1), for: .vertical)
@@ -314,7 +351,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "state":
             item.label = "Runtime State"; item.view = status
             status.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
-        case "stop": item.label = "Stop Run"; item.view = stopButton; item.visibilityPriority = .user
+        case "stop": item.label = "Stop All Work"; item.view = stopButton; item.visibilityPriority = .user
         case "actions":
             item.label = "Actions"; item.toolTip = "Workspace Actions (⌘⇧P)"
             item.image = NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "Workspace Actions")
@@ -331,11 +368,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             WorkspaceAction(title: "Show Files", shortcut: "⌘1") { [weak self] in self?.showFiles() },
             WorkspaceAction(title: "Show Changes", shortcut: "⌘2") { [weak self] in self?.showChanges() },
             WorkspaceAction(title: "Show Sessions", shortcut: "⌘3") { [weak self] in self?.showSessions() },
+            WorkspaceAction(title: "Show Up Next", shortcut: "⌘4") { [weak self] in self?.showQueue() },
             WorkspaceAction(title: "Toggle Navigation", shortcut: "⌘B") { [weak self] in self?.toggleNavigation() },
             WorkspaceAction(title: "Refresh Current Destination", shortcut: "") { [weak self] in self?.refreshNavigation() }
         ]
-        if hasWork { actions.insert(WorkspaceAction(title: "Stop Run", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
+        if hasWork { actions.insert(WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
         if showingInspector { actions.append(WorkspaceAction(title: "Reload Inspected Content", shortcut: "") { [weak self] in self?.refreshInspection() }) }
+        if canInspectBack { actions.append(WorkspaceAction(title: "Back in Inspector", shortcut: "⌘[") { [weak self] in self?.inspectBack() }) }
+        if canInspectForward { actions.append(WorkspaceAction(title: "Forward in Inspector", shortcut: "⌘]") { [weak self] in self?.inspectForward() }) }
+        if canFindInInspection { actions.append(WorkspaceAction(title: "Find in Current Page", shortcut: "⌘F") { [weak self] in self?.findInInspection() }) }
         palette = ActionPalette(actions: actions); palette?.present(for: window)
     }
     @objc func focusComposer() { surfaces.selectedSegment = 0; adapt(); window?.makeFirstResponder(composer) }
@@ -346,17 +387,17 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     private func submitInstruction(_ text: String) {
         guard !text.isEmpty, pendingRequest == nil else { return }
-        guard text.utf16.count <= 16_000 else { showNotice("This instruction is too long. Keep it under 16,000 characters; your draft is preserved."); return }
+        guard text.utf16.count <= client.instructionLimit else { showNotice("Keep this instruction under \(client.instructionLimit.formatted()) characters; your draft is preserved."); return }
         guard client.isReady, uncertainSubmission == nil, !closing else { showNotice("Reconnect to check the last confirmed state before sending. Your draft is preserved."); return }
         guard !cancelRequested else { showNotice("LUMI is still cancelling. Wait for its confirmed stopping boundary."); return }
-        guard runs.filter({ $0["state"] as? String == "queued" }).count < 3 else { showNotice("Three instructions are already queued. Your draft is preserved until a slot opens."); return }
+        guard runs.filter({ $0["state"] as? String == "queued" }).count < client.queueLimit else { showNotice("The queue is full. Your draft is preserved until a slot opens. Review waiting instructions in Up Next."); return }
         let id = UUID().uuidString; pendingRequest = id; updateStatus()
         client.request("task.submit", params: ["text": text, "attachments": []], id: id) { [weak self] result in
             guard let self else { return }; self.pendingRequest = nil
             switch result {
             case .success(let data):
                 if let run = data["run"] as? [String: Any] { self.mergeRun(run) }
-                if self.cancelRequested, let run = data["run"] as? [String: Any], let runID = run["id"] as? String {
+                if self.cancelRequested, !self.client.capabilities.contains("workspace-stop"), let run = data["run"] as? [String: Any], let runID = run["id"] as? String {
                     self.client.request("task.cancel", params: ["run": runID]) { [weak self] result in
                         if case .failure(let error) = result { self?.showNotice(error.localizedDescription) }
                     }
@@ -392,7 +433,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc private func reconnect() {
         guard client.process?.isRunning != true, !closing else { return }
-        client = RuntimeClient(); stopped = false; sequence = 0; cancelRequested = false; cancellationToken = nil; forceAvailable = false; recovering = true
+        client = RuntimeClient(); stopped = false; sequence = 0; cancelRequested = false; stopAcknowledged = true; cancellationToken = nil; forceAvailable = false; recovering = true
         configureClient(); reconnectButton.isHidden = true; client.start(folder: folder)
     }
     func submitProbe(_ instruction: String) { composer.string = instruction; submit() }
@@ -402,34 +443,56 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         switch step {
         case "files": showFiles(); readFile("fixture.txt")
         case "changes": showChanges(); diffScope.selectedSegment = 0; readDiff("fixture.txt")
+        case "sessions":
+            showSessions()
+            if let id = runs.first(where: { $0["state"] as? String == "cancelled" })?["id"] as? String { inspect(.run(id)) }
+        case "run-output":
+            if let id = runs.first(where: { $0["state"] as? String == "completed" })?["id"] as? String { inspect(.run(id)) }
+        case "output": openRecordedOutput()
+        case "back": inspectBack()
+        case "forward": inspectForward()
+        case "find": findInInspection()
+        case "missing-file": readFile("missing.txt")
         case "narrow":
             if let window { window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 720, height: 480)), display: true) }
             compactSidebarRevealed = false; adapt()
         case "dark": window?.appearance = NSAppearance(named: .darkAqua)
+        case "light": window?.appearance = NSAppearance(named: .aqua)
         case "palette": showActions()
+        case "queue": showQueue()
+        case "queue-edit":
+            if let run = runs.first(where: { $0["state"] as? String == "queued" }), let id = run["id"] as? String {
+                editQueued(QueuedInstruction(id: id, text: run["text"] as? String ?? "", revision: run["revision"] as? Int ?? 0))
+            }
         default: break
         }
     }
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("stop", stopButton), ("allow", allowButton), ("deny", denyButton)] {
+        for (name, view) in [("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("allow", allowButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionPage": pageLabel.stringValue, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable]
+        return ["windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
-        if let index = runs.firstIndex(where: { $0["id"] as? String == id }) { runs[index] = run } else { runs.append(run) }
-        runs = Array(runs.suffix(12))
+        if let index = runs.firstIndex(where: { $0["id"] as? String == id }) {
+            if let incoming = run["revision"] as? Int, let current = runs[index]["revision"] as? Int, incoming < current { return }
+            runs[index] = run
+        } else { runs.append(run) }
+        let retained = Set(runs.filter { terminalStates.contains($0["state"] as? String ?? "") }.suffix(12).compactMap { $0["id"] as? String })
+        runs.removeAll { terminalStates.contains($0["state"] as? String ?? "") && !retained.contains($0["id"] as? String ?? "") }
     }
     private func receive(_ event: [String: Any]) {
         guard let payload = event["payload"] as? [String: Any] else { return }
         if event["kind"] as? String == "snapshot" {
+            guard (payload["seq"] as? Int ?? 0) >= sequence else { return }
             sequence = payload["seq"] as? Int ?? 0; runs = payload["runs"] as? [[String: Any]] ?? []; rebuildRows()
+            finishStopAndSend()
             if probe?.instruction == nil, let state = runs.last?["state"] as? String, terminalStates.contains(state) { probe?.outcome(self, state: state) }
             return
         }
@@ -496,11 +559,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         updateStatus()
     }
     private func updateStatus() {
-        if !hasWork && !closing { forceAvailable = false; cancelRequested = false; cancellationToken = nil; stopButton.title = "Stop" }
+        if !hasWork && !closing && stopAcknowledged { forceAvailable = false; cancelRequested = false; cancellationToken = nil; stopButton.title = "Stop" }
         let queued = runs.filter { $0["state"] as? String == "queued" }.count
         let draft = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
-        sendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && queued < 3
-        stopButton.isEnabled = hasWork || (closing && !stopped)
+        sendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit
+        stopButton.isEnabled = forceAvailable || (!cancelRequested && hasWork) || (closing && !stopped)
         let run = runs.first(where: { $0["id"] as? String == active })
         let state = run?["state"] as? String
         let elapsed = (run?["startedAt"] as? Double).map { " · \(Int(max(0, Date().timeIntervalSince1970 - $0 / 1000)))s" } ?? ""
@@ -509,8 +572,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         status.toolTip = status.stringValue
         sendButton.title = hasWork ? "Queue" : "Send"
         stopSendButton.isHidden = !hasWork || draft.isEmpty
-        stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil
-        hint.stringValue = queued >= 3 ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : "Enter to send · Shift–Enter for a new line"
+        stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
+        hint.stringValue = draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : "Enter to send · Shift–Enter for a new line"
+        queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
+        queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
+        updateQueue()
         updateElapsedTimer()
     }
     private func updateElapsedTimer() {
@@ -522,11 +588,25 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     @objc private func dismissNotice() { if client.isReady && uncertainSubmission == nil { noticeBar.isHidden = true } }
     @objc func stop() {
         if forceAvailable { stopThenSend = nil; client.forceStop(); showNotice("Force Stop interrupted LUMI. Existing edits remain; remote effects may be unknown."); return }
-        let token = UUID(); cancellationToken = token; cancelRequested = true; updateStatus()
-        for run in runs where !terminalStates.contains(run["state"] as? String ?? "") {
-            if let id = run["id"] as? String { client.request("task.cancel", params: ["run": id]) { [weak self] result in
-                if case .failure(let error) = result { self?.showNotice(error.localizedDescription); self?.stopThenSend = nil }
-            } }
+        guard !cancelRequested else { return }
+        let token = UUID(); cancellationToken = token; cancelRequested = true
+        stopAcknowledged = !client.capabilities.contains("workspace-stop"); updateStatus()
+        if client.capabilities.contains("workspace-stop") {
+            client.request("task.cancelAll", params: [:]) { [weak self] result in
+                guard let self, self.cancellationToken == token else { return }
+                switch result {
+                case .success:
+                    self.stopAcknowledged = true
+                    self.client.requestSnapshot { [weak self] in self?.updateStatus(); self?.finishStopAndSend() }
+                case .failure(let error): self.showNotice(error.localizedDescription); self.stopThenSend = nil
+                }
+            }
+        } else {
+            for run in runs where !terminalStates.contains(run["state"] as? String ?? "") {
+                if let id = run["id"] as? String { client.request("task.cancel", params: ["run": id]) { [weak self] result in
+                    if case .failure(let error) = result { self?.showNotice(error.localizedDescription); self?.stopThenSend = nil }
+                } }
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             guard let self, self.cancellationToken == token, self.cancelRequested, self.hasWork || (self.closing && !self.stopped) else { return }
@@ -535,19 +615,84 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc private func stopAndSend() {
         let text = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text.utf16.count <= 16_000, !composer.hasMarkedText(), pendingRequest == nil, client.isReady, stopThenSend == nil else { return }
+        guard !text.isEmpty, text.utf16.count <= client.instructionLimit, !composer.hasMarkedText(), pendingRequest == nil, client.isReady, stopThenSend == nil else { return }
         let ids = Set(runs.filter { !terminalStates.contains($0["state"] as? String ?? "") }.compactMap { $0["id"] as? String })
         guard !ids.isEmpty else { submit(); return }
         stopThenSend = (text, ids); stop()
     }
     private func finishStopAndSend() {
-        guard let pending = stopThenSend else { return }
+        guard let pending = stopThenSend, stopAcknowledged else { return }
         let targets = runs.filter { pending.runs.contains($0["id"] as? String ?? "") }
         if targets.contains(where: { $0["state"] as? String == "interrupted" }) {
             stopThenSend = nil; showNotice("The stopping boundary is unknown. Review the interrupted run before sending your preserved draft."); return
         }
         guard targets.count == pending.runs.count, targets.allSatisfy({ terminalStates.contains($0["state"] as? String ?? "") }), !hasWork else { return }
         stopThenSend = nil; cancelRequested = false; cancellationToken = nil; submitInstruction(pending.text)
+    }
+    private func updateQueue() {
+        if let editing = editingQueued, queueEditor?.window?.sheetParent != nil {
+            let run = runs.first { $0["id"] as? String == editing.id }
+            let reason: String?
+            if !client.isReady { reason = "LUMI is disconnected. Your edit is preserved; use Copy Edit to keep it while reconnecting." }
+            else if cancelRequested || closing { reason = "Work is stopping. Your edit is preserved; use Copy Edit to keep it for a follow-up." }
+            else if run?["state"] as? String != "queued" { reason = "This instruction is no longer waiting. Your edit is preserved; use Copy Edit to keep it for a follow-up." }
+            else if run?["revision"] as? Int != editing.revision { reason = "This instruction changed while you were editing. Use Copy Edit, then close and reopen it to review the latest version." }
+            else { reason = nil }
+            queueEditor?.setUnavailable(reason)
+        }
+        let entries = runs.filter { $0["state"] as? String == "queued" }.sorted {
+            ($0["queueOrder"] as? Double ?? $0["createdAt"] as? Double ?? 0) < ($1["queueOrder"] as? Double ?? $1["createdAt"] as? Double ?? 0)
+        }.compactMap { run -> QueuedInstruction? in
+            guard let id = run["id"] as? String, let text = run["text"] as? String else { return nil }
+            return QueuedInstruction(id: id, text: text, revision: run["revision"] as? Int ?? 0)
+        }
+        queueContent.update(entries, enabled: client.isReady && !cancelRequested && !closing, editing: client.capabilities.contains("queue-edit"), removing: client.capabilities.contains("queue-remove"), busy: removingQueued)
+        if queuePopover.isShown { queuePopover.contentSize = queueContent.preferredContentSize }
+    }
+    @objc func showQueue() {
+        guard window?.attachedSheet == nil else { return }
+        updateQueue()
+        if queuePopover.isShown { queuePopover.close() }
+        else { queuePopover.show(relativeTo: queueButton.bounds, of: queueButton, preferredEdge: .maxY) }
+    }
+    private func removeQueued(_ entry: QueuedInstruction) {
+        guard client.isReady, !cancelRequested, !closing, !removingQueued.contains(entry.id) else { return }
+        removingQueued.insert(entry.id); updateQueue()
+        client.request("task.cancel", params: ["run": entry.id, "ifQueued": true]) { [weak self] result in
+            guard let self else { return }
+            self.removingQueued.remove(entry.id)
+            if case .failure(let error) = result { self.showNotice(error.localizedDescription) }
+            self.updateQueue(); self.client.requestSnapshot()
+        }
+    }
+    private func editQueued(_ entry: QueuedInstruction) {
+        guard client.isReady, !cancelRequested, !closing, window?.attachedSheet == nil else { return }
+        queuePopover.close()
+        client.request("history.read", params: ["run": entry.id]) { [weak self] result in
+            guard let self, let window = self.window, window.attachedSheet == nil else { return }
+            switch result {
+            case .failure(let error): self.showNotice(error.localizedDescription)
+            case .success(let data):
+                guard let run = data["run"] as? [String: Any], run["state"] as? String == "queued", let text = run["text"] as? String, let revision = run["revision"] as? Int else {
+                    self.showNotice("This instruction has already left the queue. Follow its progress in the transcript."); self.client.requestSnapshot(); return
+                }
+                self.mergeRun(run)
+                self.editingQueued = QueuedInstruction(id: entry.id, text: text, revision: revision)
+                self.queueEditor = QueuedInstructionEditor(text: text, limit: self.client.instructionLimit) { [weak self] text, complete in
+                    guard let self, self.client.isReady, !self.cancelRequested, !self.closing else { complete(.failure(BridgeError.message("Connect to LUMI and wait for cancellation to finish before saving."))); return }
+                    self.client.request("task.edit", params: ["run": entry.id, "text": text, "revision": revision]) { [weak self] result in
+                        switch result {
+                        case .failure(let error): complete(.failure(error)); self?.client.requestSnapshot()
+                        case .success(let data):
+                            if let run = data["run"] as? [String: Any] { self?.mergeRun(run); self?.rebuildRows() }
+                            complete(.success(()))
+                        }
+                    }
+                }
+                self.queueEditor?.present(for: window)
+                self.updateQueue()
+            }
+        }
     }
     @objc private func allow() { resolveApproval("allow") }
     @objc private func deny() { resolveApproval("deny") }
@@ -580,7 +725,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func loadDirectory(_ path: String, offset: Int = 0) {
+        if path != directory { navigationQuery = ""; navigation.resetFilter() }
         directory = path; navigationOffset = offset; navigationGeneration += 1
+        nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
         let generation = navigationGeneration
         navigation.loading("Loading folder…")
         client.request("files.list", params: ["path": path, "offset": offset, "query": navigationQuery]) { [weak self] result in
@@ -605,6 +752,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     private func loadChanges() {
         navigationGeneration += 1; let generation = navigationGeneration; navigation.loading("Reading Git changes…")
+        nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
         client.request("changes.list") { [weak self] result in
             guard let self, self.navigationGeneration == generation, self.navigation.destination == .changes else { return }
             switch result {
@@ -622,6 +770,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     private func loadSessions(cursor: [String: Any]? = nil, trail: [[String: Any]] = []) {
         navigationGeneration += 1; let generation = navigationGeneration; navigation.loading("Loading recorded runs…")
+        nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
         client.request("history.list", params: cursor.map { ["cursor": $0] } ?? [:]) { [weak self] result in
             guard let self, self.navigationGeneration == generation, self.navigation.destination == .sessions else { return }
             switch result {
@@ -649,15 +798,56 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case .changes:
             if entry.value["untracked"] as? Bool == true { readFile(entry.id) }
             else { diffScope.selectedSegment = entry.value["unstaged"] as? Bool == true ? 0 : 1; readDiff(entry.id) }
-        case .sessions: readOutput(entry.id)
+        case .sessions: inspect(.run(entry.id))
         }
     }
-    private func readFile(_ path: String) { beginInspection("files.read", params: ["path": path], title: path, file: path) }
-    private func readOutput(_ run: String) { beginInspection("artifact.read", params: ["run": run], title: "Recorded Output", file: nil) }
-    private func readDiff(_ path: String) { beginInspection("changes.read", params: ["path": path, "staged": diffScope.selectedSegment == 1], title: path, file: path, diff: true) }
-    private func beginInspection(_ method: String, params: [String: Any], title: String, file: String?, diff: Bool = false) {
+    private func readFile(_ path: String) { inspect(.file(path)) }
+    private func readDiff(_ path: String) { inspect(.diff(path, staged: diffScope.selectedSegment == 1)) }
+    func inspect(_ destination: InspectionDestination, addToHistory: Bool = true) {
+        if addToHistory { inspectionHistory.visit(destination) }
+        inspectionBack.isEnabled = inspectionHistory.canGoBack; inspectionForward.isEnabled = inspectionHistory.canGoForward
+        reloadInspection = { [weak self] in self?.inspect(destination, addToHistory: false) }
+        switch destination {
+        case .file(let path):
+            prepareInspection(title: path, file: path)
+            showPage("files.read", params: ["path": path], offset: 0, trail: [], revision: nil)
+        case .diff(let path, let staged):
+            diffScope.selectedSegment = staged ? 1 : 0
+            prepareInspection(title: path, file: path, diff: true)
+            showPage("changes.read", params: ["path": path, "staged": staged], offset: 0, trail: [], revision: nil)
+        case .output(let run):
+            prepareInspection(title: "Recorded Output", file: nil)
+            showPage("artifact.read", params: ["run": run], offset: 0, trail: [], revision: nil)
+        case .run(let run):
+            prepareInspection(title: "Run Details", file: nil)
+            guard client.capabilities.contains("run-details") else {
+                showPage("artifact.read", params: ["run": run], offset: 0, trail: [], revision: nil); return
+            }
+            inspection.font = .systemFont(ofSize: 14)
+            let generation = inspectionGeneration
+            client.request("history.read", params: ["run": run]) { [weak self] result in
+                guard let self, self.inspectionGeneration == generation else { return }
+                switch result {
+                case .success(let data):
+                    let details = RunDetails(data)
+                    self.inspection.string = details.text; self.inspection.scrollToBeginningOfDocument(nil)
+                    self.recordedOutput.isHidden = !details.outputAvailable
+                    self.pageLabel.stringValue = "Last recorded state · Reload to update"
+                    self.pageLabel.toolTip = self.pageLabel.stringValue
+                case .failure(let error): self.inspectionFailed(error, initial: true)
+                }
+            }
+        }
+    }
+    private func prepareInspection(title: String, file: String?, diff: Bool = false) {
+        inspectionGeneration += 1
+        let hideFind = NSMenuItem(); hideFind.tag = NSTextFinder.Action.hideFindInterface.rawValue
+        inspection.performTextFinderAction(hideFind)
         inspectedFile = file; inspectedDiff = diff ? file : nil
-        inspectorTitle.stringValue = title; inspection.string = "Loading…"; pageLabel.stringValue = "Read only"
+        inspectorTitle.stringValue = title; inspectorTitle.toolTip = title
+        inspection.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        inspection.string = "Loading…"; pageLabel.stringValue = "Loading…"; pageLabel.toolTip = nil
+        recordedOutput.isHidden = true
         showingInspector = true; surfaces.selectedSegment = 1
         breadcrumb.isHidden = file == nil
         if let file {
@@ -668,9 +858,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             }
         }
         diffScope.isHidden = !diff; revealButton.isHidden = file == nil
-        moreButton.isHidden = true; previousButton.isEnabled = false; nextChunk = nil; previousChunk = nil
-        reloadInspection = { [weak self] in self?.beginInspection(method, params: params, title: title, file: file, diff: diff) }
-        adapt(); showPage(method, params: params, offset: 0, trail: [], revision: nil)
+        moreButton.isHidden = true; previousButton.isHidden = true; previousButton.isEnabled = false; nextChunk = nil; previousChunk = nil
+        adapt()
     }
     private func showPage(_ method: String, params: [String: Any], offset: Int, trail: [Int], revision: String?) {
         inspectionGeneration += 1; let generation = inspectionGeneration
@@ -692,11 +881,34 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.moreButton.isHidden = data["more"] as? Bool != true; self.moreButton.isEnabled = true
                 self.nextChunk = data["more"] as? Bool == true ? { [weak self] in self?.showPage(method, params: params, offset: end, trail: Array((trail + [offset]).suffix(128)), revision: token) } : nil
                 self.previousButton.isEnabled = !trail.isEmpty
+                self.previousButton.isHidden = trail.isEmpty && data["more"] as? Bool != true
                 self.previousChunk = trail.last.map { previous in { [weak self] in self?.showPage(method, params: params, offset: previous, trail: Array(trail.dropLast()), revision: token) } }
                 if data["truncated"] as? Bool == true { self.showNotice("This diff exceeds the 1 MiB preview limit. The preview is incomplete; inspect the full diff with Git before reviewing it.") }
-            case .failure(let error): self.showNotice(error.localizedDescription); self.pageLabel.stringValue = "Could not load page · use Reload"
+            case .failure(let error): self.inspectionFailed(error, initial: revision == nil)
             }
         }
+    }
+    private func inspectionFailed(_ error: Error, initial: Bool) {
+        if initial {
+            inspection.font = .systemFont(ofSize: 14)
+            inspection.string = "Could not load this content.\n\n\(error.localizedDescription)\n\nUse Reload to try again, or go Back to your previous view."
+            inspection.scrollToBeginningOfDocument(nil)
+        }
+        else { showNotice("Could not load the requested page. The last loaded page is still visible. \(error.localizedDescription)") }
+        pageLabel.stringValue = initial ? "Could not load · use Reload" : "Page unchanged · use Reload"
+        pageLabel.toolTip = pageLabel.stringValue
+        moreButton.isHidden = true; previousButton.isEnabled = false; nextChunk = nil; previousChunk = nil
+    }
+    @objc func inspectBack() { if canInspectBack, let destination = inspectionHistory.back() { inspect(destination, addToHistory: false) } }
+    @objc func inspectForward() { if canInspectForward, let destination = inspectionHistory.forward() { inspect(destination, addToHistory: false) } }
+    @objc func findInInspection() {
+        guard canFindInInspection else { return }
+        window?.makeFirstResponder(inspection)
+        let find = NSMenuItem(); find.tag = NSTextFinder.Action.showFindInterface.rawValue
+        inspection.performTextFinderAction(find)
+    }
+    @objc private func openRecordedOutput() {
+        if case .run(let run) = inspectionHistory.current, !recordedOutput.isHidden { inspect(.output(run)) }
     }
     @objc private func refreshInspection() { reloadInspection?() }
     @objc private func loadNextPage() { nextChunk?() }

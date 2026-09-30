@@ -89,4 +89,6 @@ export interface EngineTickResult {
 
 export interface IAgentEngine {
   tick(input: EngineTickInput): Promise<EngineTickResult>;
+  /** Stop admission and settle active work before the host closes shared storage. */
+  close?(): Promise<void>;
 }

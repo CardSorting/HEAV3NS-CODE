@@ -54,6 +54,85 @@ The independent finish reviewer returned **ship**, scoped to the two listed canc
 
 The GUI probe sets the actual composer and invokes its submission path, then captures the real AppKit window. It does not establish physical keyboard behavior, IME behavior, accessibility, or all approval/inspection layouts. Initial invalid layer-cache captures were discarded; accepted captures use macOS window capture.
 
+## Queue and runtime hardening follow-up
+
+This pass integrates the embedded BroccoliQueue into normal runtime turns and
+adds native queue management. Up Next (Command–4) shows waiting instructions in
+order, with a separate editing sheet and explicit Remove action. Failed saves
+preserve the edit; stale Remove cannot cancel a run that has already started.
+Workspace Stop includes acceptances in progress and Stop & Send waits for its
+acknowledgment. Slow inspection reads have bounded concurrency and cannot take
+the capacity reserved for cancellation, approvals and recovery snapshots.
+
+Recovery queries now find live jobs even beyond the recent 12,000-job history
+window. Turn telemetry begins after dequeue. Protobuf lint is scoped to `proto/`,
+read-only, and propagates failures; named exceptions preserve existing public
+RPC/type conventions. The missing package-boundary checker and `legal:check`
+entry point are restored, and the required legal notices are included in npm
+and desktop artifacts.
+
+| Verification | Result |
+|---|---|
+| Full CLI unit suite | **2,565 passing** via `npm run test:unit`. |
+| BroccoliQueue suite | **24 passing**, including live-job recovery after 12,000 newer terminal records. |
+| Native suite | **16 passing**, including reserved control/snapshot capacity, late read replies, atomic Stop, coalesced snapshots and preserved editor drafts after failure. |
+| Flight scenarios | **5/5 passing** deterministic local harness scenarios. |
+| Build and checks | Production CLI and locally signed Swift release bundle built; TypeScript, lint, licensing and npm dry-run package checks passed. An invalid protobuf fixture correctly returned exit 100. |
+| Packaged worker smoke | The rebuilt bundled Node/CLI accepted three `/help` instructions, cancelled all three, completed a new `/help`, rejected an edit to a terminal run, and exited 0. No provider request was made. |
+| Native visual review | Actual AppKit captures with a deterministic stdio peer: wide and compact queue, light/dark appearance and editing sheet. Composer, Queue, Up Next and Stop remain inside the window. Light compact is 720 × 480; dark is 720 × 500. |
+
+The [validation record](evidence/2026-09-29-queue-hardening/validation.json)
+contains artifact hashes, control bounds and the packaged-worker result. See
+the [wide queue](evidence/2026-09-29-queue-hardening/queue-wide.png),
+[dark queue](evidence/2026-09-29-queue-hardening/queue-dark.png), and
+[editing sheet](evidence/2026-09-29-queue-hardening/queue-edit.png).
+Visual captures use the debug GUI; packaging and worker smoke use the rebuilt
+release artifact. This pass does not replace the earlier live-provider or
+resource measurements and does not establish keyboard, IME or VoiceOver
+acceptance. The existing source-provenance release gate still fails on 96
+historical source markers and eight localized files requiring review.
+
+## Inspection and cancellation follow-up
+
+Sessions now opens run details, including complete instructions and a clear
+no-output state. Recorded output has its own destination, with Back/Forward
+navigation across files, comparisons and runs. History retains 64 destinations
+and reloads their first page rather than retaining content or stale revisions.
+Command–F opens the native Find bar for the loaded page. Folder changes clear
+the prior filter and pending debounce; failed reads expose recovery instead of
+remaining on Loading.
+
+Open queue editors respond to live state: a started, changed, disconnected or
+cancelling instruction disables Save while keeping the draft and Copy Edit
+available. Diff cache ownership follows request order, and strict UTF-8
+validation prevents silent replacement characters at the preview limit.
+
+The full-suite run exposed a real preflight cancellation gap. Stop can now abort
+the Git read, and the worker rechecks cancellation immediately before admitting
+work to the engine. A deterministic blocked-preflight regression verifies zero
+engine calls and confirmed cancellation, followed by a successful new request.
+The persistence recovery test also now waits for the retry's atomic rename
+instead of assuming disk I/O finishes within a fixed delay.
+
+| Verification | Result |
+|---|---|
+| Full unit suite | **2,569 passing**, including the new diff/cache and preflight cancellation regressions. |
+| Native suite | **24 passing**, including history branching/bounds, cancelled run details, delayed inspection replies, folder-filter cancellation and live queue-editor invalidation. |
+| Build and checks | TypeScript, lint, licensing, npm dry-run package boundary and locally signed release build passed. |
+| Packaged worker | Five file pages preserved exact Unicode; five diff pages retained their revision after the file changed. Missing-file errors recovered, three instructions cancelled, a subsequent local `/help` completed, run details/output read successfully, terminal editing was rejected and the worker exited 0. No provider calls. |
+| Native visual review | Two AppKit batches using a deterministic peer. All reported visible controls remain within window bounds. Final light is 720 × 480; the appearance switch expanded dark to 720 × 500. |
+
+See the [validation record](evidence/2026-09-29-inspection-hardening/validation.json),
+[run details](evidence/2026-09-29-inspection-hardening/sessions-wide.png),
+[native Find in light mode](evidence/2026-09-29-inspection-hardening/find-light.png),
+[native Find in dark mode](evidence/2026-09-29-inspection-hardening/find-dark.png),
+[stale edit recovery](evidence/2026-09-29-inspection-hardening/queue-edit-stale.png),
+and [missing-file recovery](evidence/2026-09-29-inspection-hardening/missing-file.png).
+The record distinguishes the debug GUI captures from the rebuilt release-worker
+smoke and includes hashes for both. Physical keyboard, IME, VoiceOver, final
+minimum-height dark behavior and new performance measurements remain unverified.
+The earlier source-provenance release gate remains unresolved.
+
 ## Resource measurements
 
 The first table preserves the original integration baseline. The follow-up table records the reviewed QoL build; the earlier CPU miss is retained rather than overwritten.
@@ -103,6 +182,6 @@ An earlier attempt launched two independent GUI probes concurrently and observed
 | Native usability | Physical keyboard/focus/VoiceOver and complete approval, selection, minimum-height dark and deliberately scrolled transcript matrix. CUA was unavailable; macOS denied assistive-access automation. These are unverified, not inferred from source. |
 | Distribution — blocked on external credentials | No valid Developer ID signing identity was available. Developer ID signing, notarization, Gatekeeper and clean-machine installation remain unverified. Local ad-hoc signing does not satisfy distribution acceptance. |
 | Existing repository release gate | The repository's source-release manifest still requires human provenance review of historical material. This preview preserves that gate; packaging the existing CLI does not clear it. |
-| Existing validation tooling | `provenance:check` fails on 96 historical source markers and eight localized files awaiting review. `license:check` cannot run because `scripts/check-package-boundary.mjs` is absent. The documented `legal:check` package script is also absent, so its available constituent checks were invoked individually; `ip:check` passed. |
+| Existing validation tooling | The missing package-boundary checker and `legal:check` command are repaired. Licensing, IP and npm artifact checks pass. `legal:check` reaches the existing provenance gate and fails on 96 historical source markers and eight localized files awaiting review. |
 
 The next integration milestone is the existing TUI attached through SwiftTerm to this same worker, followed by the remaining reliability and four-active-workspace fixtures. No additional provider backend, editor engine, browser shell, marketplace or database rewrite was introduced.

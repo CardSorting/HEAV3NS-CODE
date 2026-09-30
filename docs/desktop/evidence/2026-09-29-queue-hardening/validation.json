@@ -1,0 +1,306 @@
+{
+  "recordedAt": "2026-09-30T01:26:52.197175+00:00",
+  "scope": "Queue integration and native control hardening; local validation, not release clearance",
+  "sourceDirectory": "build/queue-audit",
+  "checks": [
+    {
+      "command": "npm run test:unit",
+      "passed": true,
+      "tests": 2565
+    },
+    {
+      "command": "npm test (BROCCOLIQUEUE)",
+      "passed": true,
+      "tests": 24
+    },
+    {
+      "command": "npm run desktop:test:native",
+      "passed": true,
+      "tests": 16
+    },
+    {
+      "command": "npm run benchmark:flight",
+      "passed": true,
+      "scenarios": 5
+    },
+    {
+      "command": "npm run check",
+      "passed": true,
+      "scope": "CLI and worker TypeScript configurations"
+    },
+    {
+      "command": "npm run lint",
+      "passed": true
+    },
+    {
+      "command": "npm run license:check",
+      "passed": true
+    },
+    {
+      "command": "npm run package:check",
+      "passed": true
+    },
+    {
+      "command": "npm run desktop:build",
+      "passed": true,
+      "signature": "local ad-hoc Hardened Runtime"
+    },
+    {
+      "command": "invalid proto fixture through scripts/proto-lint.sh",
+      "passed": true,
+      "expectedFailureExitCode": 100
+    },
+    {
+      "command": "npm run legal:check",
+      "passed": false,
+      "reason": "Existing source provenance gate: 96 historical source markers and 8 localized files require review. license:check and ip:check pass."
+    }
+  ],
+  "packagedWorker": {
+    "passed": true,
+    "providerCalls": 0,
+    "worker": "rebuilt packaged Node and CLI",
+    "capabilities": [
+      "native",
+      "snapshot",
+      "queue:3",
+      "cancel",
+      "approval",
+      "history",
+      "files",
+      "changes",
+      "paged-inspection",
+      "workspace-stop",
+      "run-details",
+      "queue-edit",
+      "queue-remove"
+    ],
+    "limits": {
+      "queuedInstructions": 3,
+      "instructionLength": 16000
+    },
+    "accepted": 3,
+    "stopStates": [
+      "cancelled",
+      "cancelled",
+      "cancelled"
+    ],
+    "resumedOutcome": "completed",
+    "terminalEditRejected": true,
+    "cleanExit": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "visualReview": {
+    "renderer": "Actual AppKit debug build with deterministic stdio peer; no provider calls",
+    "captures": [
+      {
+        "capture": "initial",
+        "window": {
+          "width": 1280,
+          "height": 731
+        },
+        "appearance": "NSAppearanceNameAqua",
+        "controls": {
+          "composer": {
+            "height": 64,
+            "visibleWithinWindow": true,
+            "width": 1052,
+            "x": 212,
+            "y": 42
+          },
+          "queue": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 94.5,
+            "x": 1097.5,
+            "y": 12
+          },
+          "send": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 1200,
+            "y": 12
+          },
+          "stop": {
+            "height": 36,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 1164,
+            "y": 687
+          }
+        }
+      },
+      {
+        "capture": "ui-dark",
+        "window": {
+          "width": 720,
+          "height": 500
+        },
+        "appearance": "NSAppearanceNameDarkAqua",
+        "controls": {
+          "composer": {
+            "height": 64,
+            "visibleWithinWindow": true,
+            "width": 692,
+            "x": 12,
+            "y": 42
+          },
+          "queue": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 94.5,
+            "x": 537.5,
+            "y": 12
+          },
+          "send": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 640,
+            "y": 12
+          },
+          "stop": {
+            "height": 36,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 604,
+            "y": 456
+          }
+        }
+      },
+      {
+        "capture": "ui-narrow",
+        "window": {
+          "width": 720,
+          "height": 480
+        },
+        "appearance": "NSAppearanceNameAqua",
+        "controls": {
+          "composer": {
+            "height": 64,
+            "visibleWithinWindow": true,
+            "width": 692,
+            "x": 12,
+            "y": 42
+          },
+          "queue": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 94.5,
+            "x": 537.5,
+            "y": 12
+          },
+          "send": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 640,
+            "y": 12
+          },
+          "stop": {
+            "height": 36,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 604,
+            "y": 436
+          }
+        }
+      },
+      {
+        "capture": "ui-queue-edit",
+        "window": {
+          "width": 720,
+          "height": 500
+        },
+        "appearance": "NSAppearanceNameDarkAqua",
+        "controls": {
+          "composer": {
+            "height": 64,
+            "visibleWithinWindow": true,
+            "width": 692,
+            "x": 12,
+            "y": 42
+          },
+          "queue": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 94.5,
+            "x": 537.5,
+            "y": 12
+          },
+          "send": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 640,
+            "y": 12
+          },
+          "stop": {
+            "height": 36,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 604,
+            "y": 456
+          }
+        }
+      },
+      {
+        "capture": "ui-queue",
+        "window": {
+          "width": 1280,
+          "height": 731
+        },
+        "appearance": "NSAppearanceNameAqua",
+        "controls": {
+          "composer": {
+            "height": 64,
+            "visibleWithinWindow": true,
+            "width": 1052,
+            "x": 212,
+            "y": 42
+          },
+          "queue": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 94.5,
+            "x": 1097.5,
+            "y": 12
+          },
+          "send": {
+            "height": 24,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 1200,
+            "y": 12
+          },
+          "stop": {
+            "height": 36,
+            "visibleWithinWindow": true,
+            "width": 64,
+            "x": 1164,
+            "y": 687
+          }
+        }
+      }
+    ],
+    "images": [
+      "queue-wide.png",
+      "queue-dark.png",
+      "queue-edit.png"
+    ],
+    "limitations": [
+      "Physical keyboard, IME and VoiceOver walkthrough not performed.",
+      "No new latency percentile, 30-minute soak, or idle CPU measurements.",
+      "Notarization and clean-machine installation not verified."
+    ]
+  },
+  "sha256": {
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "99c5850dc952a2622d154af42c38095908b34b8d3775278febb4c3928c897722",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "393a70a4c527c657e9c59b9bdde3d9d7119cb1b6f6167c8c2ab203a4e10a551c",
+    "build/native-tests/arm64-apple-macosx/debug/HEAV3NS-CODE": "9829b34d4ed2d224634a0d5c0cf16ab610d81a9a26865f8cb561ccc1bd8aba82"
+  }
+}

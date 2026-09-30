@@ -30,6 +30,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let editItem = NSMenuItem(); editItem.title = "Edit"; let edit = NSMenu(title: "Edit")
         edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
         for (name, action, key) in [("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"), ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")] { edit.addItem(withTitle: name, action: action, keyEquivalent: key) }
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Find in Current Page…", action: #selector(findInInspection), keyEquivalent: "f").target = self
         editItem.submenu = edit; main.addItem(editItem)
         let viewItem = NSMenuItem(); viewItem.title = "Workspace"; let view = NSMenu(title: "Workspace")
         let palette = view.addItem(withTitle: "Actions…", action: #selector(actions), keyEquivalent: "p"); palette.keyEquivalentModifierMask = [.command, .shift]; palette.target = self
@@ -39,8 +41,12 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Files", action: #selector(showFiles), keyEquivalent: "1").target = self
         view.addItem(withTitle: "Changes", action: #selector(showChanges), keyEquivalent: "2").target = self
         view.addItem(withTitle: "Sessions", action: #selector(showSessions), keyEquivalent: "3").target = self
+        view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
         view.addItem(.separator())
-        view.addItem(withTitle: "Stop Run", action: #selector(stop), keyEquivalent: ".").target = self
+        view.addItem(withTitle: "Back in Inspector", action: #selector(inspectBack), keyEquivalent: "[").target = self
+        view.addItem(withTitle: "Forward in Inspector", action: #selector(inspectForward), keyEquivalent: "]").target = self
+        view.addItem(.separator())
+        view.addItem(withTitle: "Stop All Work", action: #selector(stop), keyEquivalent: ".").target = self
         viewItem.submenu = view; main.addItem(viewItem)
         let windowItem = NSMenuItem(); windowItem.title = "Window"; let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
@@ -102,13 +108,20 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showFiles() { current?.showFiles() }
     @objc private func showChanges() { current?.showChanges() }
     @objc private func showSessions() { current?.showSessions() }
+    @objc private func showQueue() { current?.showQueue() }
+    @objc private func inspectBack() { current?.inspectBack() }
+    @objc private func inspectForward() { current?.inspectForward() }
+    @objc private func findInInspection() { current?.findInInspection() }
     @objc private func stop() { current?.stop() }
     @objc private func actions() {
         if let current { current.showActions() } else { openFolder() }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
+        if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
+        if menuItem.action == #selector(findInInspection) { return current?.canFindInInspection == true }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
-        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions)].contains(menuItem.action) { return current != nil }
+        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue)].contains(menuItem.action) { return current != nil }
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

@@ -8,14 +8,33 @@ import { promisify } from "node:util"
 const exec = promisify(execFile)
 const PAGE = 32 * 1024
 const DIFF_LIMIT = 1024 * 1024
-const revisionOf = (value: string) => createHash("sha256").update(value).digest("hex")
+const revisionOf = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
+// Read-only inspection must not launch repository-configured fsmonitor helpers,
+// pagers, diff drivers or text conversion commands.
+const gitOptions = ["--no-pager", "-c", "core.fsmonitor=false"]
+const readGitDiff = async (args: string[], cwd: string): Promise<Buffer> =>
+	(await exec("git", args, { cwd, maxBuffer: DIFF_LIMIT, timeout: 5000, encoding: "buffer" })).stdout
+
+// A bounded subprocess can stop in the middle of a UTF-8 scalar. Only trim that
+// incomplete suffix; invalid bytes elsewhere must still fail strict decoding.
+function completeUtf8Prefix(bytes: Buffer): Buffer {
+	let start = bytes.length - 1
+	while (start >= 0 && (bytes[start] & 0xc0) === 0x80) start--
+	if (start < 0) return bytes
+	const byte = bytes[start]
+	const width = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : byte >= 0xc0 ? 2 : 1
+	return start + width > bytes.length ? bytes.subarray(0, start) : bytes
+}
 
 /** Read-only inspection has one bounded diff cache per owned workspace. */
 export class WorkspaceInspection {
 	private root: string
 	private diff?: { key: string; revision: string; bytes: Buffer; truncated: boolean; baseline: string }
-	constructor(root: string) {
+	private diffGeneration = 0
+	private readonly runDiff: typeof readGitDiff
+	constructor(root: string, runDiff = readGitDiff) {
 		this.root = root
+		this.runDiff = runDiff
 	}
 	async resolve(relative: string) {
 		const resolved = await realpath(path.resolve(this.root, relative))
@@ -50,7 +69,7 @@ export class WorkspaceInspection {
 	}
 	async read(relative: string, offset: number, expectedRevision?: string) {
 		const file = await this.resolve(relative)
-		const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+		const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
 		try {
 			const info = await handle.stat()
 			if (!info.isFile()) throw new Error("NOT_A_FILE: select a regular file")
@@ -99,10 +118,18 @@ export class WorkspaceInspection {
 		}
 	}
 	async changes() {
+		const prefix = (
+			await exec("git", [...gitOptions, "rev-parse", "--show-prefix"], {
+				cwd: this.root,
+				maxBuffer: 8192,
+				timeout: 3000,
+				env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+			})
+		).stdout.replace(/\n$/, "")
 		const result = await exec(
 			"git",
-			["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", ".", ":(exclude).broccolidb"],
-			{ cwd: this.root, maxBuffer: DIFF_LIMIT, timeout: 5000 },
+			[...gitOptions, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ".", ":(exclude).broccolidb"],
+			{ cwd: this.root, maxBuffer: DIFF_LIMIT, timeout: 5000, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } },
 		)
 		const parts = result.stdout.split("\0")
 		const entries = []
@@ -110,8 +137,10 @@ export class WorkspaceInspection {
 			const value = parts[index]
 			if (value.length < 4) continue
 			const status = value.slice(0, 2),
-				file = value.slice(3)
+				repositoryPath = value.slice(3)
 			if (/[RC]/.test(status)) index++ // -z reports destination first, then source.
+			if (!repositoryPath.startsWith(prefix)) continue
+			const file = repositoryPath.slice(prefix.length)
 			entries.push({
 				path: file,
 				name: path.basename(file),
@@ -140,52 +169,65 @@ export class WorkspaceInspection {
 		const relative = file ? path.relative(this.root, path.resolve(this.root, file)) : "."
 		if (relative === ".." || relative.startsWith(`..${path.sep}`)) throw new Error("OUTSIDE_WORKSPACE")
 		const key = JSON.stringify([relative, staged])
+		let diff = this.diff
 		if (revision) {
-			if (!this.diff || this.diff.key !== key || this.diff.revision !== revision)
+			if (!diff || diff.key !== key || diff.revision !== revision)
 				throw new Error("DIFF_EXPIRED: reload this diff before continuing")
 		} else {
-			let stdout = "",
+			const generation = ++this.diffGeneration
+			let stdout: Buffer = Buffer.alloc(0),
 				truncated = false
 			try {
-				stdout = (
-					await exec(
-						"git",
-						[
-							"--no-pager",
-							"diff",
-							"--no-ext-diff",
-							"--no-textconv",
-							...(staged ? ["--cached"] : []),
-							"--",
-							relative,
-							":(exclude).broccolidb",
-						],
-						{ cwd: this.root, maxBuffer: DIFF_LIMIT, timeout: 5000 },
-					)
-				).stdout
+				stdout = await this.runDiff(
+					[
+						...gitOptions,
+						"diff",
+						"--no-ext-diff",
+						"--no-textconv",
+						"--no-color",
+						...(staged ? ["--cached"] : []),
+						"--",
+						file ? `:(literal)${relative}` : ".",
+						":(exclude).broccolidb",
+					],
+					this.root,
+				)
 			} catch (error) {
-				const failure = error as Error & { code?: string; stdout?: string }
+				const failure = error as Error & { code?: string; stdout?: Buffer }
 				if (failure.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") throw error
-				stdout = failure.stdout ?? ""
+				stdout = failure.stdout ?? Buffer.alloc(0)
 				truncated = true
 			}
-			const bytes = Buffer.from(stdout).subarray(0, DIFF_LIMIT)
-			this.diff = {
+			truncated ||= stdout.length > DIFF_LIMIT
+			const bounded = stdout.subarray(0, DIFF_LIMIT)
+			try {
+				// Streaming validation tolerates an incomplete final scalar while
+				// still rejecting malformed suffixes before anything is trimmed.
+				new TextDecoder("utf-8", { fatal: true }).decode(bounded, { stream: truncated })
+			} catch {
+				throw new Error(
+					"UNSUPPORTED_ENCODING: this diff contains text that is not UTF-8; open the file in an editor that supports its encoding",
+				)
+			}
+			const bytes = truncated ? completeUtf8Prefix(bounded) : bounded
+			diff = {
 				key,
 				bytes,
-				revision: revisionOf(stdout),
+				revision: revisionOf(bytes),
 				truncated,
 				baseline: staged
 					? "HEAD → index · includes pre-existing changes"
 					: "Index → working tree · includes pre-existing and external changes",
 			}
+			// An earlier, slower read must not evict the comparison selected later.
+			// clear() also advances the generation so shutdown cannot refill the cache.
+			if (generation === this.diffGeneration) this.diff = diff
 		}
-		const diff = this.diff!
 		if (offset > diff.bytes.length) throw new Error("INVALID_OFFSET: reload this diff")
 		let end = Math.min(offset + PAGE, diff.bytes.length)
 		while (end < diff.bytes.length && (diff.bytes[end] & 0xc0) === 0x80) end--
 		return {
-			text: diff.bytes.subarray(offset, end).toString("utf8"),
+			text: new TextDecoder("utf-8", { fatal: true }).decode(diff.bytes.subarray(offset, end)),
 			offset,
 			nextOffset: end,
 			more: end < diff.bytes.length,
@@ -196,6 +238,7 @@ export class WorkspaceInspection {
 		}
 	}
 	clear() {
+		this.diffGeneration++
 		this.diff = undefined
 	}
 }

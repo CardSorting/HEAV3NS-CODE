@@ -9,6 +9,11 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const failures = []
 
 function read(relativePath) {
+	if (!fs.existsSync(path.join(repoRoot, relativePath))) {
+		const message = `missing required artifact: ${relativePath}`
+		if (!failures.includes(message)) failures.push(message)
+		return ""
+	}
 	return fs.readFileSync(path.join(repoRoot, relativePath), "utf8")
 }
 
@@ -32,7 +37,8 @@ for (const relativePath of [
 	".wiki/ip/SOURCE-PROVENANCE.md",
 	".wiki/ip/SOURCE-RELEASE-MANIFEST.json",
 	"src/core/joyride/LICENSE",
-]) requireFile(relativePath)
+])
+	requireFile(relativePath)
 
 const packageJson = JSON.parse(read("package.json"))
 const lockfile = JSON.parse(read("package-lock.json"))
@@ -40,8 +46,10 @@ const lockRoot = lockfile.packages?.[""]
 const broccolidbSpec = packageJson.dependencies?.["@noorm/broccolidb"]
 const reviewedBroccolidbCommit = "77a1814f7c8549d8cce4da6df3e633468d178450"
 
-if (packageJson.license !== "Apache-2.0") failures.push(`package.json license must be Apache-2.0, found ${packageJson.license ?? "missing"}`)
-if (lockRoot?.license !== "Apache-2.0") failures.push(`package-lock root license must be Apache-2.0, found ${lockRoot?.license ?? "missing"}`)
+if (packageJson.license !== "Apache-2.0")
+	failures.push(`package.json license must be Apache-2.0, found ${packageJson.license ?? "missing"}`)
+if (lockRoot?.license !== "Apache-2.0")
+	failures.push(`package-lock root license must be Apache-2.0, found ${lockRoot?.license ?? "missing"}`)
 const expectedBroccolidbSpec = "https://github.com/CardSorting/ABroccoliDB/archive/" + reviewedBroccolidbCommit + ".tar.gz"
 if (broccolidbSpec !== expectedBroccolidbSpec) {
 	failures.push("@noorm/broccolidb must use the reviewed HTTPS commit archive, not a local sibling path or floating range")
@@ -82,7 +90,14 @@ if (!joyrideLicense.includes("MIT License") || !joyrideLicense.includes("Copyrig
 	failures.push("src/core/joyride/LICENSE must retain its nested MIT notice")
 }
 
-for (const requiredPackageFile of ["LICENSE", "NOTICE", "PATENT-NON-AGGRESSION-PLEDGE.md", "TRADEMARKS.md", "THIRD-PARTY-NOTICES.md", "LICENSE-MAP.md"]) {
+for (const requiredPackageFile of [
+	"LICENSE",
+	"NOTICE",
+	"PATENT-NON-AGGRESSION-PLEDGE.md",
+	"TRADEMARKS.md",
+	"THIRD-PARTY-NOTICES.md",
+	"LICENSE-MAP.md",
+]) {
 	if (!packageFiles.has(requiredPackageFile)) failures.push(`package.json files boundary omits ${requiredPackageFile}`)
 }
 
@@ -91,5 +106,7 @@ if (failures.length > 0) {
 	for (const failure of failures) console.error(`- ${failure}`)
 	process.exitCode = 1
 } else {
-	console.log("license:check OK — Apache-2.0 metadata, provenance pins, legal artifacts, SPDX audit files, and package boundary verified")
+	console.log(
+		"license:check OK — Apache-2.0 metadata, provenance pins, legal artifacts, SPDX audit files, and package boundary verified",
+	)
 }

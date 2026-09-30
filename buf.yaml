@@ -1,0 +1,16 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  # Preserve the established RPC/type names used by generated clients. This
+  # pass scopes and enforces lint; renaming the wire API is a separate migration.
+  except:
+    - PACKAGE_VERSION_SUFFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_PASCAL_CASE
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+    - ENUM_VALUE_PREFIX
+    - ENUM_ZERO_VALUE_SUFFIX

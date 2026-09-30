@@ -627,11 +627,13 @@ import { WebIntelligenceToolSuite } from "../tooling/extensions/web/web-intellig
 import { WebsitePolicyToolSuite } from "../tooling/extensions/website_policy/website-policy-tool-suite.js"
 import { WorktreeToolSuite } from "../tooling/extensions/worktree/worktree-tool-suite.js"
 import { AcpDashboardModal } from "../tui/components/acp-dashboard-modal.js"
+import { BroccoliRuntimeQueue, runtimeQueueDatabase, type RuntimeQueueOptions } from "../agents/extensions/execution/broccoli-runtime-queue.js"
 
 export interface MonolithFactoryOptions {
 	cwd?: string
 	/** An already-owned workspace kernel, used by the desktop session adapter. */
 	databaseKernel?: BroccoliDatabaseKernel
+	requestQueueOptions?: RuntimeQueueOptions
 	sessionId?: string
 	config?: AgentConfig
 	provider?: AgentProviderId
@@ -2272,6 +2274,7 @@ export class MonolithFactory {
 		})
 		monolithSwarmDelegator.setChildRunner((manifest, signal) => cliSubagentRunner.run(manifest, signal), CLI_SUBAGENT_TOOLS)
 
+		const requestQueue = new BroccoliRuntimeQueue(runtimeQueueDatabase(databaseKernel, cwd), sessionId, options.requestQueueOptions)
 		const agentEngine = new AgentEngine(
 			config,
 			sessionContext,
@@ -2286,6 +2289,7 @@ export class MonolithFactory {
 			proxyGateway,
 			undefined,
 			{
+				requestQueue,
 				modelCatalog,
 				budgetCalculator,
 				tokenTruncator,

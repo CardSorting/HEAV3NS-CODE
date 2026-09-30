@@ -289,7 +289,7 @@ export class AgentHarnessFlightTest {
 					}),
 				});
 				components.proxyGateway.configureProxy({ baseUrl: FIXTURE_ENDPOINT, timeoutMs: 5_000 });
-				return { engine: components.agentEngine, workspace };
+				return { engine: components.agentEngine, database: components.databaseKernel, workspace };
 			};
 
 			const runScenario = async (
@@ -303,8 +303,9 @@ export class AgentHarnessFlightTest {
 				const scenarioStartedAt = performance.now();
 				let result: EngineTickResult | undefined;
 				let assertions: ScenarioAssertion[] = [];
+				let runtime: ReturnType<typeof createScenarioRuntime> | undefined;
 				try {
-					const runtime = createScenarioRuntime(id);
+					runtime = createScenarioRuntime(id);
 					const execution = await execute(runtime.engine, runtime.workspace);
 					result = execution.result;
 					assertions = execution.assertions;
@@ -318,6 +319,9 @@ export class AgentHarnessFlightTest {
 						),
 						provider.assertScriptConsumed(),
 					];
+				} finally {
+					await runtime?.engine.close();
+					await runtime?.database.stop();
 				}
 			scenarios.push({
 					id,

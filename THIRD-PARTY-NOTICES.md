@@ -18,11 +18,14 @@ must comply with any applicable attribution, notice, source-offer, or other
 condition. A dependency's license is not evidence that the project itself is
 licensed under that dependency's terms.
 
-The repository also contains a separately licensed nested component:
+The repository also contains separately licensed nested components:
 
 - src/core/joyride/** carries the MIT license in
   src/core/joyride/LICENSE. Preserve that notice when the subtree is
   redistributed; the root Apache-2.0 metadata does not relicense it.
+- BROCCOLIQUEUE/** carries the MIT license in BROCCOLIQUEUE/LICENSE. Its queue
+  implementation is bundled into the runtime from source. Builds preserve the
+  full notice as dist/BROCCOLIQUEUE-LICENSE, including in the native app bundle.
 
 The complete repository boundary is summarized in
 LICENSE-MAP.md. Project acknowledgments for referenced research or

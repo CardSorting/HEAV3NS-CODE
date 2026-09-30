@@ -10,6 +10,7 @@ file-level license and notice that applies to the exact material being used.
 |---|---|---|
 | Current first-party project files without a more specific notice | Apache License 2.0 (LICENSE) | May be distributed under Apache-2.0 only where the contributor has the right to grant it. |
 | src/core/joyride/** | MIT (src/core/joyride/LICENSE) | Preserve the nested MIT license and its attribution. Do not describe this subtree as exclusively Apache-2.0. |
+| BROCCOLIQUEUE/** | MIT (BROCCOLIQUEUE/LICENSE) | Runtime builds bundle this local source and copy its full notice to dist/BROCCOLIQUEUE-LICENSE. |
 | Commits and tags before Apache adoption commit c1405ab | Historical license at that exact revision; known pre-adoption state included MIT | Read the exact revision's license before redistribution. |
 | node_modules/**, provider SDKs, fonts, icons, and generated assets | Individual dependency or asset terms | Preserve upstream notices and comply with each applicable license. |
 | locales/** and translated documentation | File history and any embedded attribution/notice | Treat attribution as unresolved until the source, license, and permission are verified. |

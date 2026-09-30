@@ -1,4 +1,7 @@
 import assert from "node:assert/strict"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import sinon from "sinon"
 import type { EngineProgressEvent } from "../../../../core/contracts/agent.contracts.js"
 import type { ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
@@ -7,6 +10,7 @@ import { SessionCompactor } from "../../../../sessions/extensions/compaction/ses
 import { SessionMemoryStore } from "../../../../sessions/extensions/memory/session-memory-store.js"
 import { PersistentSessionStore } from "../../../../sessions/extensions/persistence/session-store.js"
 import { SessionVfs } from "../../../../sessions/extensions/vfs/session-vfs.js"
+import { BroccoliDatabaseKernel } from "../../../../sessions/extensions/substrate/broccolidb-kernel.js"
 import type { ValidatingToolRegistry } from "../../../../tooling/extensions/registry/tool-registry.js"
 import { AgentActivityTimeline } from "../../../../tui/components/agent-activity-timeline.js"
 import { AgentConfig } from "../../../base/agent-config.js"
@@ -15,8 +19,16 @@ import { AgentSlashRouter } from "../../resolution/agent-slash-router.js"
 import { LlmProxyGateway } from "../../resolution/llm-proxy-gateway.js"
 import { ModelResolver } from "../../resolution/model-resolver.js"
 import { AgentEngine } from "../agent-engine.js"
+import { BroccoliRuntimeQueue, runtimeQueueDatabase } from "../broccoli-runtime-queue.js"
 
-function createEngine(options: { execute?: () => Promise<unknown>; timeoutMs?: number; maxToolRounds?: number } = {}) {
+function createEngine(
+	options: {
+		execute?: () => Promise<unknown>
+		timeoutMs?: number
+		maxToolRounds?: number
+		requestQueue?: BroccoliRuntimeQueue
+	} = {},
+) {
 	const config = AgentConfig.createDefault()
 	const executeTool = sinon.spy(options.execute ?? (async () => "Observed file contents"))
 	const tool: ToolDefinition = {
@@ -46,7 +58,7 @@ function createEngine(options: { execute?: () => Promise<unknown>; timeoutMs?: n
 		new AgentSlashRouter(),
 		gateway,
 		undefined,
-		{ getOpenAiAuthMethod: () => "api-key", maxToolRounds: options.maxToolRounds },
+		{ getOpenAiAuthMethod: () => "api-key", maxToolRounds: options.maxToolRounds, requestQueue: options.requestQueue },
 	)
 	return { engine, executeTool }
 }
@@ -81,6 +93,54 @@ function terminalEvents(events: EngineProgressEvent[]) {
 
 describe("CLI AgentEngine autonomous execution", () => {
 	afterEach(() => sinon.restore())
+	it("starts turn telemetry only after dequeue and never starts it for a cancelled waiter", async () => {
+		const folder = await mkdtemp(path.join(tmpdir(), "lumi-queue-telemetry-"))
+		const database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
+		const queue = new BroccoliRuntimeQueue(runtimeQueueDatabase(database, folder), "telemetry")
+		const { engine } = createEngine({ requestQueue: queue })
+		const trace: string[] = []
+		let release!: () => void, entered!: () => void
+		const blocked = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const started = new Promise<void>((resolve) => {
+			entered = resolve
+		})
+		try {
+			const first = engine.tick({ prompt: "/help" }, async (execute) => {
+				trace.push("start first")
+				entered()
+				await blocked
+				const result = await execute()
+				trace.push("finish first")
+				return result
+			})
+			await started
+			const second = engine.tick({ prompt: "/help" }, async (execute) => {
+				trace.push("start second")
+				const result = await execute()
+				trace.push("finish second")
+				return result
+			})
+			const cancelled = new AbortController()
+			const third = engine.tick({ prompt: "/help", signal: cancelled.signal }, async (execute) => {
+				trace.push("cancelled turn started")
+				return execute()
+			})
+			const rejected = assert.rejects(third, { name: "AbortError" })
+			cancelled.abort()
+			await rejected
+			assert.deepEqual(trace, ["start first"])
+			release()
+			await Promise.all([first, second])
+			assert.deepEqual(trace, ["start first", "finish first", "start second", "finish second"])
+		} finally {
+			release()
+			await engine.close()
+			await database.stop()
+			await rm(folder, { recursive: true, force: true })
+		}
+	})
 
 	it("keeps parallel tool progress distinct through out-of-order completion and the final turn event", async () => {
 		const now = sinon.stub(Date, "now").returns(1_000)

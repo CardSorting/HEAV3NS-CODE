@@ -41,6 +41,92 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testQueueEditorRespondsWhenItsInstructionStarts() throws {
+        _ = NSApplication.shared
+        let behavior = """
+        if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime', capabilities: ['run-details', 'queue-edit'] }); continue; }
+        globalThis.run ??= { id: 'queued', text: 'Original waiting instruction', state: 'queued', session: 'session', createdAt: 1, revision: 1 };
+        if (request.method === 'snapshot') reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [globalThis.run] });
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'history.read') {
+          reply(request, { run: globalThis.run, outputAvailable: false });
+          setTimeout(() => {
+            globalThis.run.state = 'running'; globalThis.run.revision++;
+            send({ kind: 'event', workspace: 'ws', session: 'session', runtime: 'runtime', run: 'queued', type: 'run.state', seq: 1, payload: globalThis.run });
+          }, 100);
+        }
+        """
+        let client = try peer(behavior, timeout: 1)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        defer {
+            if let parent = workspace.window, let sheet = parent.attachedSheet { parent.endSheet(sheet); sheet.orderOut(nil) }
+            client.onEvent = nil; client.onConnection = nil; workspace.window?.close()
+        }
+        let checked = expectation(description: "live queue state invalidates an open edit")
+        let connection = client.onConnection
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, !requested else { return }; requested = true
+            client.requestSnapshot {
+                workspace.navigateProbe("queue-edit")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+                    let views = workspace.window?.attachedSheet?.contentView.map(descendants) ?? []
+                    let text = views.compactMap { $0 as? NSTextView }.first
+                    text?.string = "Preserved follow-up"; text?.didChangeText()
+                    XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Save Changes" }?.isEnabled, false)
+                    XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Copy Edit" }?.isEnabled, true)
+                    XCTAssertTrue(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("no longer waiting") })
+                    XCTAssertEqual(text?.string, "Preserved follow-up")
+                    checked.fulfill()
+                }
+            }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 4)
+    }
+    func testInspectionHistoryRejectsLateReadsAndRecoversFromMissingContent() throws {
+        _ = NSApplication.shared
+        let behavior = """
+        if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime', capabilities: ['run-details'] }); continue; }
+        \(snapshot)
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'files.read') {
+          if (request.params.path === 'missing') send({ kind: 'response', id: request.id, error: { message: 'FILE_MISSING: choose another file or reload' } });
+          else setTimeout(() => reply(request, { text: 'older file content', revision: 'file', nextOffset: 18, size: 18, more: false }), 100);
+        }
+        if (request.method === 'history.read') reply(request, { run: { id: request.params.run, text: 'Preserved cancelled instruction', state: 'cancelled', session: 'session', createdAt: 1, verification: 'not_run' }, outputAvailable: false, outputMessage: 'No output was recorded for this run.' });
+        """
+        let client = try peer(behavior, timeout: 1)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
+        let checked = expectation(description: "late replies cannot replace run details or missing-content recovery")
+        let connection = client.onConnection
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, !requested else { return }; requested = true
+            workspace.inspect(.file("slow")); workspace.inspect(.run("cancelled"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                XCTAssertTrue((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("Preserved cancelled instruction"))
+                XCTAssertEqual(workspace.probeLayout["recordedOutputAvailable"] as? Bool, false)
+                XCTAssertTrue(workspace.canInspectBack)
+                workspace.inspect(.file("missing"))
+                client.request("snapshot") { _ in
+                    XCTAssertTrue((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("FILE_MISSING"))
+                    XCTAssertEqual(workspace.probeLayout["inspectionPage"] as? String, "Could not load · use Reload")
+                    workspace.inspectBack()
+                    client.request("snapshot") { _ in
+                        XCTAssertEqual(workspace.probeLayout["inspectionTitle"] as? String, "Run Details")
+                        XCTAssertTrue(workspace.canInspectForward)
+                        XCTAssertTrue((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("Preserved cancelled instruction"))
+                        checked.fulfill()
+                    }
+                }
+            }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 4)
+    }
     func testHandshakeDeadlineReleasesCallbacksAndClosesThePrivatePipe() throws {
         let client = try peer("/* Deliberately never acknowledge hello. */")
         let ended = expectation(description: "EOF cleans up the peer")
@@ -90,6 +176,55 @@ final class RuntimeClientTests: XCTestCase {
         client.start(folder: directory); wait(for: [rejected], timeout: 3)
         XCTAssertFalse(client.isReady)
     }
+    func testLateReadResponseDoesNotDisconnectActiveWork() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'files.read') setTimeout(() => reply(request, { intentionally: 'late and invalid' }), 450);
+        if (request.method === 'task.cancelAll') reply(request, { requested: true });
+        """)
+        let checked = expectation(description: "late inspection response is ignored and stop remains available")
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            client.request("files.read", params: ["path": "slow"]) { result in
+                guard case .failure(let error) = result else { return XCTFail("Slow read must expire") }
+                XCTAssertEqual((error as? RuntimeFailure)?.acceptanceUnknown, false)
+                XCTAssertTrue(client.isReady)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    client.request("task.cancelAll") { result in
+                        if case .failure(let error) = result { XCTFail(error.localizedDescription) }
+                        XCTAssertTrue(client.isReady); checked.fulfill()
+                    }
+                }
+            }
+        }
+        client.start(folder: directory); wait(for: [checked], timeout: 3)
+    }
+    func testInspectionSaturationReservesControlCapacity() throws {
+        let client = try peer(hello + snapshot + "if (request.method === 'task.cancelAll') reply(request, { requested: true });", timeout: 1)
+        let stopped = expectation(description: "control reaches the worker before blocked reads finish")
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            for _ in 0..<56 { client.request("files.read", params: ["path": "blocked"]) }
+            client.request("files.list") { result in
+                guard case .failure = result else { return XCTFail("Ordinary admission should be bounded") }
+            }
+            client.request("task.cancelAll") { result in
+                if case .failure(let error) = result { XCTFail(error.localizedDescription) }
+                XCTAssertTrue(client.isReady); XCTAssertEqual(client.pendingRequestCount, 56)
+                client.requestSnapshot { XCTAssertTrue(client.isReady); stopped.fulfill() }
+            }
+        }
+        client.start(folder: directory); wait(for: [stopped], timeout: 3)
+    }
+    func testCoalescedSnapshotsCompleteEveryWaitingCaller() throws {
+        let client = try peer(hello + "if (request.method === 'snapshot') setTimeout(() => reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }), 50);", timeout: 1)
+        let completed = expectation(description: "both snapshot callers finish"); completed.expectedFulfillmentCount = 2
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            client.requestSnapshot { completed.fulfill() }
+            client.requestSnapshot { completed.fulfill() }
+        }
+        client.start(folder: directory); wait(for: [completed], timeout: 3)
+    }
     func testSnapshotFromAnotherWorkspaceDisablesExecution() throws {
         let client = try peer(hello + "reply(request, { workspace: 'other', session: 'session', runtime: 'runtime', runs: [] });")
         let ended = expectation(description: "mismatch stops connection")
@@ -109,11 +244,12 @@ final class RuntimeClientTests: XCTestCase {
         let client = try peer(behavior, timeout: 0.5)
         let received = expectation(description: "reads drain while writes back up")
         let expired = expectation(description: "deadline remains responsive")
-        var reported = false, seen = false
+        var reported = false, seen = false, lastConnection = "Not started"
         client.onEvent = { event in if event["type"] as? String == "fixture", !seen { seen = true; received.fulfill() } }
-        client.onConnection = { _ in
+        client.onConnection = { value in
+            lastConnection = value
             if client.isReady {
-                for index in 0..<63 {
+                for index in 0..<56 {
                     client.request("fixture", params: ["data": String(repeating: "x", count: 60_000)], id: "request-\(index)") { result in
                         if case .failure = result, !reported { reported = true; expired.fulfill() }
                     }
@@ -121,6 +257,7 @@ final class RuntimeClientTests: XCTestCase {
             }
         }
         client.start(folder: directory); wait(for: [received, expired], timeout: 3)
+        XCTAssertTrue(seen, lastConnection)
         XCTAssertEqual(client.pendingRequestCount, 0)
     }
     func testOldStopDeadlineCannotEscalateAReplacementRun() throws {
@@ -160,5 +297,36 @@ final class RuntimeClientTests: XCTestCase {
             }
         }
         workspace.attach(); wait(for: [checked], timeout: 9)
+    }
+    func testWorkspaceStopIncludesUnseenQueuedWorkAndWaitsForAcknowledgment() throws {
+        _ = NSApplication.shared
+        let behavior = """
+        if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime', capabilities: ['workspace-stop'] }); continue; }
+        globalThis.runs ??= ['running', 'queued'].map((state, i) => ({ id: 'run-'+i, text: 'fixture '+i, state, session: 'session', createdAt: 1, activities: [], revision: 1 }));
+        if (request.method === 'snapshot') {
+          reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: globalThis.stopped ? 1 : 0, runs: globalThis.stopped ? globalThis.runs : [globalThis.runs[0]] });
+        } else if (request.method === 'task.cancelAll') {
+          for (const run of globalThis.runs) { run.state = 'cancelled'; run.revision++; }
+          globalThis.stopped = true;
+          setTimeout(() => reply(request, { requested: true }), 100);
+        } else if (request.method === 'files.list') { reply(request, { entries: [] }); }
+        """
+        let client = try peer(behavior, timeout: 1)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client)
+        defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
+        let checked = expectation(description: "atomic stop includes work missing from the client's last snapshot")
+        let connection = client.onConnection, event = client.onEvent
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            if client.isReady && !requested { requested = true; workspace.stop(); XCTAssertTrue(workspace.hasWork) }
+        }
+        client.onEvent = { value in
+            event?(value)
+            guard requested, value["kind"] as? String == "snapshot", let payload = value["payload"] as? [String: Any], payload["seq"] as? Int == 1 else { return }
+            XCTAssertEqual((payload["runs"] as? [[String: Any]])?.count, 2)
+            XCTAssertFalse(workspace.hasWork); XCTAssertTrue(client.isReady); checked.fulfill()
+        }
+        workspace.attach(); wait(for: [checked], timeout: 3)
     }
 }

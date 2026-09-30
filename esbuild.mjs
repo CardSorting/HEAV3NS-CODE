@@ -84,6 +84,8 @@ const copyWasmFiles = {
 	name: "copy-wasm-files",
 	setup(build) {
 		build.onEnd(() => {
+			fs.mkdirSync(path.join(__dirname, destDir), { recursive: true })
+			fs.copyFileSync(path.join(__dirname, "BROCCOLIQUEUE", "LICENSE"), path.join(__dirname, destDir, "BROCCOLIQUEUE-LICENSE"))
 			// tree sitter
 			const sourceDir = path.join(__dirname, "node_modules", "web-tree-sitter")
 			const targetDir = path.join(__dirname, destDir)

@@ -46,6 +46,9 @@ final class RuntimeClient {
     private(set) var session = ""
     private(set) var runtime = ""
     private(set) var isReady = false
+    private(set) var capabilities = Set<String>()
+    private(set) var queueLimit = 3
+    private(set) var instructionLimit = 16_000
     private(set) var process: Process?
     private let input = Pipe(), output = Pipe(), diagnostic = Pipe()
     private let io = DispatchQueue(label: "io.heav3ns.desktop.transport")
@@ -62,6 +65,9 @@ final class RuntimeClient {
     private var closed = false
     private var failure: String?
     private var snapshotPending = false
+    private var snapshotCompletions = [() -> Void]()
+    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown"]
+    private static let inspections: Set<String> = ["files.list", "files.read", "changes.list", "changes.read", "artifact.read", "history.read"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -142,6 +148,14 @@ final class RuntimeClient {
                         self.fail("This app and LUMI use incompatible protocols. Install a matching version pair."); return
                     }
                     self.workspace = ws; self.session = session; self.runtime = runtime
+                    self.capabilities = Set(hello["capabilities"] as? [String] ?? [])
+                    if let limits = hello["limits"] as? [String: Any] {
+                        guard let queued = limits["queuedInstructions"] as? Int, (1...32).contains(queued),
+                              let length = limits["instructionLength"] as? Int, (1...65_536).contains(length) else {
+                            self.fail("LUMI reported incompatible input limits. Install a matching app and runtime."); return
+                        }
+                        self.queueLimit = queued; self.instructionLimit = length
+                    }
                     self.requestSnapshot { [weak self] in
                         guard let self, !self.closed else { return }
                         self.isReady = true; self.onConnection?("Connected")
@@ -152,15 +166,20 @@ final class RuntimeClient {
         } catch { fail("Could not start LUMI: \(error.localizedDescription)") }
     }
     func request(_ method: String, params: [String: Any] = [:], id: String = UUID().uuidString, completion: @escaping (Result<[String: Any], Error>) -> Void = { _ in }) {
-        guard process?.isRunning == true, !closed, callbacks.count < 64, callbacks[id] == nil, let writer else {
+        let control = Self.controls.contains(method)
+        guard process?.isRunning == true, !closed, callbacks.count < (control ? 64 : 56), callbacks[id] == nil, let writer else {
             completion(.failure(RuntimeFailure(message: "LUMI is unavailable or has too many pending requests. Your draft is preserved.", acceptanceUnknown: false))); return
         }
         do {
             var data = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "request", "id": id, "workspace": workspace, "session": session, "method": method, "params": params])
-            guard data.count <= FrameParser.limit, pendingWrites + data.count < 4 * 1024 * 1024 else { throw BridgeError.message("The input queue is full. Your draft is preserved; try again after LUMI catches up.") }
+            guard data.count <= FrameParser.limit, pendingWrites + data.count < 4 * 1024 * 1024 - (control ? 0 : 64 * 1024) else { throw BridgeError.message("The input queue is full. Your draft is preserved; try again after LUMI catches up.") }
             data.append(10)
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.callbacks[id] != nil else { return }
+                if Self.inspections.contains(method), let pending = self.callbacks.removeValue(forKey: id) {
+                    pending.completion(.failure(RuntimeFailure(message: "This view took too long to load. Try Reload; LUMI's work is still running.", acceptanceUnknown: false)))
+                    return
+                }
                 self.fail("LUMI did not confirm \(method == "task.submit" ? "the instruction" : "the request") in time. It is stopping; reconnect to reconcile recorded state.")
             }
             callbacks[id] = Pending(method: method, completion: completion, deadline: timeout)
@@ -175,13 +194,16 @@ final class RuntimeClient {
         } catch { completion(.failure(error)) }
     }
     func requestSnapshot(completion: (() -> Void)? = nil) {
+        if let completion { snapshotCompletions.append(completion) }
         guard !snapshotPending else { return }; snapshotPending = true
         request("snapshot") { [weak self] result in
             guard let self else { return }; self.snapshotPending = false
             switch result {
             case .success(let snapshot):
                 guard snapshot["workspace"] as? String == self.workspace, snapshot["session"] as? String == self.session, snapshot["runtime"] as? String == self.runtime else { self.fail("The snapshot belongs to another workspace. LUMI has been disconnected."); return }
-                self.onEvent?(["kind": "snapshot", "payload": snapshot]); completion?()
+                let completions = self.snapshotCompletions; self.snapshotCompletions.removeAll()
+                self.onEvent?(["kind": "snapshot", "payload": snapshot])
+                completions.forEach { $0() }
             case .failure(let error): self.fail(error.localizedDescription)
             }
         }
@@ -234,7 +256,9 @@ final class RuntimeClient {
             guard let found = result["found"] as? Bool else { return false }
             return !found || (result["run"] as? [String: Any]).map(validRun) == true
         case "snapshot", "history.list": return (result["runs"] as? [[String: Any]]).map { $0.allSatisfy(validRun) } == true
-        case "task.cancel": return result["requested"] as? Bool == true
+        case "task.cancel", "task.cancelAll": return result["requested"] as? Bool == true
+        case "task.edit": return result["updated"] as? Bool == true && (result["run"] as? [String: Any]).map(validRun) == true
+        case "history.read": return (result["run"] as? [String: Any]).map(validRun) == true && result["outputAvailable"] is Bool
         case "approval.resolve": return result["resolved"] as? Bool == true
         case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
         case "files.list", "changes.list": return result["entries"] is [[String: Any]]
@@ -244,6 +268,7 @@ final class RuntimeClient {
     private func fail(_ message: String) {
         let wasOpen = !closed
         isReady = false
+        snapshotCompletions.removeAll(); snapshotPending = false
         if failure == nil { failure = message }
         closeInput()
         if wasOpen { onConnection?(failure ?? message) }

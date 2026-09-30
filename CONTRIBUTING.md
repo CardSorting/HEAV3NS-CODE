@@ -60,6 +60,7 @@ Read the [Agent Activity Streaming Strategy](.wiki/agent/streaming-activity-stra
 ### 1. Install Dependencies
 
 ```bash
+git submodule update --init --recursive
 npm install --ignore-scripts
 ```
 

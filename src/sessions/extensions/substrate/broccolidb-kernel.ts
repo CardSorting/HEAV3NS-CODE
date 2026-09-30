@@ -86,6 +86,7 @@ export class BroccoliDatabaseKernel implements IBroccoliDatabaseKernel {
   private readonly cas: BroccoliCASStorageService;
   private readonly mutex = new ReentrantAsyncMutex("broccolidb-kernel-mutex");
   private isStarted = false;
+  private starting?: Promise<void>;
   private frameIndex = 0;
 
   constructor(options: DatabaseKernelOptions = {}) {
@@ -126,6 +127,11 @@ export class BroccoliDatabaseKernel implements IBroccoliDatabaseKernel {
    */
   async start(): Promise<void> {
     if (this.isStarted) return;
+    if (!this.starting) this.starting = this.startInternal().finally(() => { this.starting = undefined; });
+    await this.starting;
+  }
+
+  private async startInternal(): Promise<void> {
 
     await fs.mkdir(this.dbDir, { recursive: true });
     await fs.mkdir(this.checkpointsDir, { recursive: true });
@@ -146,6 +152,7 @@ export class BroccoliDatabaseKernel implements IBroccoliDatabaseKernel {
    * Gracefully flushes WAL and stops kernel subsystems.
    */
   async stop(): Promise<void> {
+    await this.starting;
     await this.wal.flush();
     await this.wal.stop();
     await this.cas.stop();

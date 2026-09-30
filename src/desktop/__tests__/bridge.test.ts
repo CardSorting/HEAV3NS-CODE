@@ -103,6 +103,7 @@ describe("desktop runtime boundary", () => {
 	let events: any[]
 	let calls: EngineTickInput[]
 	let execute: (input: EngineTickInput) => Promise<EngineTickResult>
+	let readBaseline: (signal: AbortSignal) => Promise<string>
 	const request = (method: DesktopRequest["method"], params = {}, id = `${Date.now()}-${Math.random()}`) =>
 		bridge.request({
 			v: 1,
@@ -118,6 +119,7 @@ describe("desktop runtime boundary", () => {
 		events = []
 		calls = []
 		execute = async () => completed()
+		readBaseline = async () => "Fixture baseline"
 		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
 		bridge = new DesktopSession(
 			{ path: folder, id: "workspace" },
@@ -129,6 +131,8 @@ describe("desktop runtime boundary", () => {
 			},
 			database,
 			(e) => events.push(structuredClone(e)),
+			undefined,
+			(_workspace, signal) => readBaseline(signal),
 		)
 		await bridge.start()
 	})
@@ -175,6 +179,143 @@ describe("desktop runtime boundary", () => {
 		await request("task.cancel", { run: first.run.id })
 		await waitFor(() => events.some((e) => e.payload?.id === first.run.id && e.payload?.state === "cancelled"))
 		await bridge.stop()
+	})
+	it("confirms Stop during preflight without admitting an already-aborted instruction", async () => {
+		let started!: () => void, release!: () => void
+		const preflightStarted = new Promise<void>((resolve) => {
+			started = resolve
+		})
+		const preflightGate = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		let signal!: AbortSignal
+		readBaseline = async (current) => {
+			signal = current
+			started()
+			await preflightGate
+			return "Delayed baseline"
+		}
+		const first = await request("task.submit", { text: "Stop before execution" })
+		await preflightStarted
+		try {
+			const stopping = request("task.cancelAll")
+			await waitFor(() => signal.aborted)
+			release()
+			await stopping
+			assert.equal(calls.length, 0)
+			assert.equal((await request("history.read", { run: first.run.id })).run.state, "cancelled")
+			readBaseline = async () => "Recovered baseline"
+			const next = await request("task.submit", { text: "After cancellation" })
+			await waitFor(() => events.some((e) => e.payload?.id === next.run.id && e.payload?.state === "completed"))
+			assert.equal(calls.length, 1)
+		} finally {
+			release()
+		}
+	})
+	it("edits a queued instruction with a revision guard and preserves its acceptance identity", async () => {
+		execute = (input) =>
+			new Promise((resolve) =>
+				input.signal!.addEventListener("abort", () => resolve({ ...completed(), outcome: "cancelled" }), { once: true }),
+			)
+		const active = await request("task.submit", { text: "Active" })
+		await waitFor(() => calls.length === 1)
+		const queued = await request("task.submit", { text: "Original" }, "editable")
+		const edited = await request("task.edit", {
+			run: queued.run.id,
+			text: "Updated instruction",
+			revision: queued.run.revision,
+		})
+		assert.equal(edited.run.id, queued.run.id)
+		assert.equal(edited.run.queueOrder, queued.run.queueOrder)
+		assert.ok(edited.run.revision > queued.run.revision)
+		assert.equal((await request("history.read", { run: queued.run.id })).run.text, "Updated instruction")
+		assert.equal((await request("task.submit", { text: "Original" }, "editable")).run.text, "Updated instruction")
+		await assert.rejects(
+			request("task.edit", { run: queued.run.id, text: "Stale edit", revision: queued.run.revision }),
+			/STALE_RUN/,
+		)
+		await assert.rejects(
+			request("task.edit", { run: active.run.id, text: "Active edit", revision: active.run.revision }),
+			/NO_LONGER_QUEUED/,
+		)
+		await assert.rejects(request("task.cancel", { run: active.run.id, ifQueued: true }), /NO_LONGER_QUEUED/)
+		assert.equal(calls[0].signal!.aborted, false)
+		await request("task.cancel", { run: queued.run.id, ifQueued: true })
+		assert.equal((await request("history.read", { run: queued.run.id })).run.state, "cancelled")
+	})
+	it("waits for an edited instruction to flush before beginning it", async () => {
+		let finishFirst!: () => void
+		execute = async () => {
+			if (calls.length === 1)
+				await new Promise<void>((resolve) => {
+					finishFirst = resolve
+				})
+			return completed()
+		}
+		await request("task.submit", { text: "First" })
+		await waitFor(() => calls.length === 1)
+		const queued = await request("task.submit", { text: "Original" })
+		const flush = database.flush.bind(database)
+		let release!: () => void,
+			entered = false
+		const blocked = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		database.flush = async () => {
+			entered = true
+			await blocked
+			await flush()
+		}
+		try {
+			const edit = request("task.edit", { run: queued.run.id, text: "Persisted edit", revision: queued.run.revision })
+			await waitFor(() => entered)
+			finishFirst()
+			await new Promise((resolve) => setTimeout(resolve, 30))
+			assert.equal(calls.length, 1)
+			release()
+			await edit
+			await waitFor(() => calls.length === 2)
+			assert.equal(calls[1].prompt, "Persisted edit")
+		} finally {
+			release()
+			finishFirst()
+			database.flush = flush
+		}
+	})
+	it("atomically stops a submission already crossing its durable acceptance boundary", async () => {
+		execute = (input) =>
+			new Promise((resolve) =>
+				input.signal!.addEventListener("abort", () => resolve({ ...completed(), outcome: "cancelled" }), { once: true }),
+			)
+		await request("task.submit", { text: "Active" })
+		await waitFor(() => calls.length === 1)
+		const flush = database.flush.bind(database)
+		let release!: () => void,
+			entered = false
+		const blocked = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		database.flush = async () => {
+			entered = true
+			await blocked
+			await flush()
+		}
+		try {
+			const acceptance = request("task.submit", { text: "In flight" })
+			await waitFor(() => entered)
+			const stopping = request("task.cancelAll")
+			assert.equal(calls[0].signal!.aborted, true)
+			await assert.rejects(request("task.submit", { text: "Too early" }), /CANCELLING/)
+			release()
+			const accepted = await acceptance
+			await stopping
+			assert.equal((await request("history.read", { run: accepted.run.id })).run.state, "cancelled")
+			assert.equal(calls.length, 1)
+			assert.deepEqual((await request("snapshot")).queued, [])
+		} finally {
+			release()
+			database.flush = flush
+		}
 	})
 	it("binds approval decisions to the pending operation and rejects stale decisions", async () => {
 		execute = async () => {

@@ -1,0 +1,1085 @@
+{
+  "recordedAt": "2026-09-30T01:53:24.792444+00:00",
+  "scope": "Inspection navigation, live queue-edit recovery, and cancellation during Git preflight; local validation, not release clearance",
+  "baseCommit": "6268d8f346a7895418b18596606c62cdfe45745b",
+  "uncommittedSource": true,
+  "checks": [
+    {
+      "command": "npm run test:unit",
+      "passed": true,
+      "tests": 2569
+    },
+    {
+      "command": "npm run desktop:test:native",
+      "passed": true,
+      "tests": 24
+    },
+    {
+      "command": "npm run check",
+      "passed": true
+    },
+    {
+      "command": "npm run lint",
+      "passed": true
+    },
+    {
+      "command": "npm run desktop:build",
+      "passed": true
+    },
+    {
+      "command": "npm run package:check",
+      "passed": true
+    },
+    {
+      "command": "npm run license:check",
+      "passed": true
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    }
+  ],
+  "resolvedDuringValidation": [
+    "A full-suite cancellation failure exposed engine admission after Stop during asynchronous Git preflight. The preflight now receives AbortSignal and cancellation is rechecked immediately before engine admission; a deterministic gated regression covers this boundary.",
+    "The persistence recovery fixture used a fixed 650ms delay. It now observes the automatic retry atomic rename and drains the persistence pass before asserting stored state.",
+    "The first visual batch showed an irrelevant Previous button on run details and single-page content; the confirmation batch verifies its removal. Error messages now use native body typography."
+  ],
+  "packagedWorker": {
+    "passed": true,
+    "providerCalls": 0,
+    "worker": "rebuilt packaged Node and CLI",
+    "workspace": "/Users/bozoegg/Desktop/LUMI-NEW/build/inspection-audit/runtime-workspace-tYbpF4",
+    "unicodeFilePages": 5,
+    "stableDiffPages": 5,
+    "unicodeExact": true,
+    "diffRevisionStableAfterEdit": true,
+    "missingFileRecovered": true,
+    "accepted": 3,
+    "stopStates": [
+      "cancelled",
+      "cancelled",
+      "cancelled"
+    ],
+    "runDetails": true,
+    "recordedOutput": true,
+    "terminalEditRejected": true,
+    "resumedOutcome": "completed",
+    "cleanExit": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "visualReview": {
+    "renderer": "Actual AppKit debug build with deterministic stdio peer; no provider calls",
+    "batches": 2,
+    "captures": [
+      {
+        "capture": "initial",
+        "capturedAt": "2026-09-30T01:48:24Z",
+        "layout": {
+          "appearance": "NSAppearanceNameDarkAqua",
+          "canInspectBack": false,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Files",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Read only",
+          "inspectionPreview": "",
+          "inspectionTitle": "Inspect",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-back",
+        "capturedAt": "2026-09-30T01:48:30Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": true,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 464,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "recordedOutput": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 161,
+              "x": 744,
+              "y": 609
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Completed \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nReview the recorded result, then return to this instruction with Back.\n\nResult\nVisual fixture: recorded output is available for inspection.\n\nCommand evidence is available. Review recorded out",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": true,
+          "recordedOutputAvailable": true,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-changes",
+        "capturedAt": "2026-09-30T01:48:26Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 421,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 146
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Changes",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "0\u2013212 / 212 bytes \u00b7 Read only",
+          "inspectionPreview": "Index \u2192 working tree \u00b7 includes pre-existing and external changes\n\ndiff --git a/fixture.txt b/fixture.txt\n--- a/fixture.txt\n+++ b/fixture.txt\n@@ -1 +1,3 @@\n-Original text\n+Native inspection navigation\n+Back, Forward, and Find in Current Pag",
+          "inspectionTitle": "fixture.txt",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-dark",
+        "capturedAt": "2026-09-30T01:48:33Z",
+        "layout": {
+          "appearance": "NSAppearanceNameDarkAqua",
+          "canInspectBack": true,
+          "canInspectForward": true,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 42
+            },
+            "inspection": {
+              "height": 203,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 12,
+              "y": 382
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 581.5,
+              "y": 382
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 50,
+              "y": 382
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 539.5,
+              "y": 12
+            },
+            "recordedOutput": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 161,
+              "x": 12,
+              "y": 348
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 640,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 604,
+              "y": 456
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": true,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Completed \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nReview the recorded result, then return to this instruction with Back.\n\nResult\nVisual fixture: recorded output is available for inspection.\n\nCommand evidence is available. Review recorded out",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": false,
+          "recordedOutputAvailable": true,
+          "windowFrameHeight": 500,
+          "windowFrameWidth": 720
+        }
+      },
+      {
+        "capture": "ui-files",
+        "capturedAt": "2026-09-30T01:48:25Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": false,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 455,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 146
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Files",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "0\u2013177 / 177 bytes \u00b7 Read only",
+          "inspectionPreview": "Native workspace inspection\n\nFind within the current page with \u2318F.\nUse Back and Forward to revisit files, comparisons, and recorded runs.\n\nUnicode: caf\u00e9 \u00b7 \u65e5\u672c\u8a9e \u00b7 \ud83c\udf19\n",
+          "inspectionTitle": "fixture.txt",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-find",
+        "capturedAt": "2026-09-30T01:48:32Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": true,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 42
+            },
+            "inspection": {
+              "height": 183,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 12,
+              "y": 362
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 581.5,
+              "y": 362
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 50,
+              "y": 362
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 539.5,
+              "y": 12
+            },
+            "recordedOutput": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 161,
+              "x": 12,
+              "y": 328
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 640,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 604,
+              "y": 436
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": true,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Completed \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nReview the recorded result, then return to this instruction with Back.\n\nResult\nVisual fixture: recorded output is available for inspection.\n\nCommand evidence is available. Review recorded out",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": false,
+          "recordedOutputAvailable": true,
+          "windowFrameHeight": 480,
+          "windowFrameWidth": 720
+        }
+      },
+      {
+        "capture": "ui-light",
+        "capturedAt": "2026-09-30T01:48:24Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": false,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Files",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Read only",
+          "inspectionPreview": "",
+          "inspectionTitle": "Inspect",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-missing-file",
+        "capturedAt": "2026-09-30T01:48:34Z",
+        "layout": {
+          "appearance": "NSAppearanceNameDarkAqua",
+          "canInspectBack": true,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 42
+            },
+            "inspection": {
+              "height": 194,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 146
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 12,
+              "y": 382
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 581.5,
+              "y": 382
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 50,
+              "y": 382
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 539.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 640,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 604,
+              "y": 456
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Could not load \u00b7 use Reload",
+          "inspectionPreview": "Could not load this content.\n\nFILE_MISSING: This file is no longer available in the workspace.\n\nUse Reload to try again, or go Back to your previous view.",
+          "inspectionTitle": "missing.txt",
+          "navigationVisible": false,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 500,
+          "windowFrameWidth": 720
+        }
+      },
+      {
+        "capture": "ui-narrow",
+        "capturedAt": "2026-09-30T01:48:31Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": true,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 42
+            },
+            "inspection": {
+              "height": 183,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 12,
+              "y": 362
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 581.5,
+              "y": 362
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 50,
+              "y": 362
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 539.5,
+              "y": 12
+            },
+            "recordedOutput": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 161,
+              "x": 12,
+              "y": 328
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 640,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 604,
+              "y": 436
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Completed \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nReview the recorded result, then return to this instruction with Back.\n\nResult\nVisual fixture: recorded output is available for inspection.\n\nCommand evidence is available. Review recorded out",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": false,
+          "recordedOutputAvailable": true,
+          "windowFrameHeight": 480,
+          "windowFrameWidth": 720
+        }
+      },
+      {
+        "capture": "ui-output",
+        "capturedAt": "2026-09-30T01:48:29Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 498,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "0\u2013221 / 221 bytes \u00b7 Read only",
+          "inspectionPreview": "Deterministic visual fixture output\n\nThe recorded instruction and output have separate inspection destinations.\nBack returns to Run Details.\n\nNo provider calls or real command execution were used for this visual fixture.\n",
+          "inspectionTitle": "Recorded Output",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-queue-edit",
+        "capturedAt": "2026-09-30T01:48:35Z",
+        "layout": {
+          "appearance": "NSAppearanceNameDarkAqua",
+          "canInspectBack": false,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 42
+            },
+            "inspection": {
+              "height": 194,
+              "visibleWithinWindow": true,
+              "width": 692,
+              "x": 12,
+              "y": 146
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 12,
+              "y": 382
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 581.5,
+              "y": 382
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 50,
+              "y": 382
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 73.5,
+              "x": 558.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 640,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 604,
+              "y": 456
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Could not load \u00b7 use Reload",
+          "inspectionPreview": "Could not load this content.\n\nFILE_MISSING: This file is no longer available in the workspace.\n\nUse Reload to try again, or go Back to your previous view.",
+          "inspectionTitle": "missing.txt",
+          "navigationVisible": false,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 500,
+          "windowFrameWidth": 720
+        }
+      },
+      {
+        "capture": "ui-run-output",
+        "capturedAt": "2026-09-30T01:48:28Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 464,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "recordedOutput": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 161,
+              "x": 744,
+              "y": 609
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Completed \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nReview the recorded result, then return to this instruction with Back.\n\nResult\nVisual fixture: recorded output is available for inspection.\n\nCommand evidence is available. Review recorded out",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": true,
+          "recordedOutputAvailable": true,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      },
+      {
+        "capture": "ui-sessions",
+        "capturedAt": "2026-09-30T01:48:27Z",
+        "layout": {
+          "appearance": "NSAppearanceNameAqua",
+          "canInspectBack": true,
+          "canInspectForward": false,
+          "controls": {
+            "composer": {
+              "height": 64,
+              "visibleWithinWindow": true,
+              "width": 1052,
+              "x": 212,
+              "y": 42
+            },
+            "inspection": {
+              "height": 498,
+              "visibleWithinWindow": true,
+              "width": 520,
+              "x": 744,
+              "y": 135
+            },
+            "inspectionBack": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 744,
+              "y": 643
+            },
+            "inspectionFind": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 39.5,
+              "x": 1141.5,
+              "y": 643
+            },
+            "inspectionForward": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 34,
+              "x": 782,
+              "y": 643
+            },
+            "queue": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 92.5,
+              "x": 1099.5,
+              "y": 12
+            },
+            "send": {
+              "height": 24,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1200,
+              "y": 12
+            },
+            "stop": {
+              "height": 36,
+              "visibleWithinWindow": true,
+              "width": 64,
+              "x": 1164,
+              "y": 687
+            }
+          },
+          "destination": "Sessions",
+          "findBarVisible": false,
+          "forceStopAvailable": false,
+          "inspectionPage": "Last recorded state \u00b7 Reload to update",
+          "inspectionPreview": "Cancelled \u00b7 Sep 29, 2026 at 7:47\u202fPM\n\nInstruction\nInspect a cancelled instruction and explain why it has no recorded output.\n\nChecks were not recorded.\n\nNo output was recorded for this run. Its instruction and last confirmed state are preser",
+          "inspectionTitle": "Run Details",
+          "navigationVisible": true,
+          "recordedOutputAvailable": false,
+          "windowFrameHeight": 731,
+          "windowFrameWidth": 1280
+        }
+      }
+    ],
+    "images": [
+      "sessions-wide.png",
+      "find-light.png",
+      "find-dark.png",
+      "queue-edit-stale.png",
+      "missing-file.png"
+    ],
+    "limitations": [
+      "Final light minimum-size capture is 720 x 480. Switching appearance expanded the final dark capture to 720 x 500; final minimum-height dark behavior is not established.",
+      "Native actions and pipe transitions were exercised; physical keyboard, IME and VoiceOver walkthroughs were not performed.",
+      "No new live-provider, latency percentile, soak, CPU, notarization or clean-machine installation measurements."
+    ]
+  },
+  "releaseGate": "The prior source-provenance check remains unresolved (96 historical source markers and eight localized files). It was not reclassified or rerun in this inspection pass.",
+  "sha256": {
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "c0c406ae407f453d52f0c81cad0fb74376e9cff1c463e716567cf97a60db0c2a",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "0e39cb2bcbeb0e3028046194fac7875b7de361f7063d0e79b63566627ba02381",
+    "build/native-tests/arm64-apple-macosx/debug/HEAV3NS-CODE": "085c273cde73d121777ba2301eef90021250bf80ab55f2704c55652851b5892d",
+    "native/Sources/Heav3nsCode/InspectionNavigation.swift": "333c5780edd2c6f7083cf32a681658eb5d9e831d604b86d98a1abe5635203cef",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "dfd15d980a90b5760356173dd556a80b2c7391eeaaebbc886fe6ef44ddca0710",
+    "native/Sources/Heav3nsCode/QueuedInstructions.swift": "a16d4e23f00c3ba953130861e9acaa5b6ffead7ef6a094a9ee46edb95b03d500",
+    "src/desktop/inspection.ts": "6c02c290c949af2f3caa4cc418cea131fbc194161f5d0e6268e6621ad48ebf12",
+    "src/desktop/worker.ts": "1c4e4ae3bb0cb19d2705386f7e755f19099c0afe8c8a0bf95c3308f85eee30a2",
+    "build/inspection-audit/peer.cjs": "332d63761d963c3d6198dc456d53f263af79c8eabb13ad6aadf4b9a0eb37cd9c",
+    "build/inspection-audit/probe.json": "9ffae2cbb82c5620e9d70611f43a43ed21ae843ca3e65e326a65e24d179c95b6",
+    "build/inspection-audit/smoke.mjs": "9e74f13c05b265f59e4bbfb2217d061dc757fc638f52ea79ff2f40b27431a161"
+  }
+}

@@ -83,6 +83,51 @@
         "offset": 32768,
         "revision": "captured-file-revision"
       }
+    },
+    {
+      "v": 1,
+      "kind": "request",
+      "id": "edit-1",
+      "workspace": "workspace-sha256",
+      "session": "session-uuid",
+      "method": "task.edit",
+      "params": {
+        "run": "run-sha256",
+        "text": "Read fixture.txt, then summarize the result",
+        "revision": 1
+      }
+    },
+    {
+      "v": 1,
+      "kind": "request",
+      "id": "remove-1",
+      "workspace": "workspace-sha256",
+      "session": "session-uuid",
+      "method": "task.cancel",
+      "params": {
+        "run": "run-sha256",
+        "ifQueued": true
+      }
+    },
+    {
+      "v": 1,
+      "kind": "request",
+      "id": "stop-workspace-1",
+      "workspace": "workspace-sha256",
+      "session": "session-uuid",
+      "method": "task.cancelAll",
+      "params": {}
+    },
+    {
+      "v": 1,
+      "kind": "request",
+      "id": "details-1",
+      "workspace": "workspace-sha256",
+      "session": "session-uuid",
+      "method": "history.read",
+      "params": {
+        "run": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
     }
   ],
   "events": [
@@ -103,7 +148,9 @@
         "session": "session-uuid",
         "text": "Read fixture.txt",
         "createdAt": 1790725000000,
-        "updatedAt": 1790725000001
+        "updatedAt": 1790725000001,
+        "revision": 2,
+        "queueOrder": 1
       }
     },
     {

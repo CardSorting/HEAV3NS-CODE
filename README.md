@@ -65,7 +65,7 @@ Read the [test protocol](agent-flight-test/METHODOLOGY.md) or the [adoption and 
 
 ```bash
 # 1. Download & Build
-git clone https://github.com/CardSorting/LUMI-JOY.git && cd LUMI-JOY
+git clone --recurse-submodules https://github.com/CardSorting/LUMI-JOY.git && cd LUMI-JOY
 npm install && npm run build
 
 # 2. Add your AI API key (friendly step-by-step wizard)
