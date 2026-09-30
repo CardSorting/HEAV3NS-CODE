@@ -1,14 +1,14 @@
 import { strict as assert } from "node:assert"
-import { mkdtemp, rm, symlink } from "node:fs/promises"
+import { mkdtemp, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { FrameDecoder, MAX_FRAME_BYTES, requestSchema, type DesktopRequest } from "../protocol.js"
-import { acquireWorkspace } from "../workspace-owner.js"
-import { DesktopSession } from "../worker.js"
+import type { EngineProgressEvent, EngineTickInput, EngineTickResult } from "../../core/contracts/agent.contracts.js"
 import { BroccoliDatabaseKernel } from "../../sessions/extensions/substrate/broccolidb-kernel.js"
 import { ToolConfirmationGatekeeper } from "../../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
-import type { EngineProgressEvent, EngineTickInput, EngineTickResult } from "../../core/contracts/agent.contracts.js"
 import { AnchoredHands } from "../../tooling/extensions/hashline/hands.js"
+import { type DesktopRequest, encodeFrame, FrameDecoder, MAX_FRAME_BYTES, requestSchema } from "../protocol.js"
+import { DesktopSession } from "../worker.js"
+import { acquireWorkspace } from "../workspace-owner.js"
 
 const completed = (response = "Fixture result"): EngineTickResult => ({
 	frameIndex: 1,
@@ -99,6 +99,7 @@ describe("desktop acceptance durability", () => {
 describe("desktop runtime boundary", () => {
 	let folder: string
 	let bridge: DesktopSession
+	let database: BroccoliDatabaseKernel
 	let events: any[]
 	let calls: EngineTickInput[]
 	let execute: (input: EngineTickInput) => Promise<EngineTickResult>
@@ -113,10 +114,11 @@ describe("desktop runtime boundary", () => {
 			params,
 		}) as Promise<any>
 	beforeEach(async () => {
-		folder = await mkdtemp(path.join(tmpdir(), "heav3ns-desktop-"))
+		folder = await realpath(await mkdtemp(path.join(tmpdir(), "heav3ns-desktop-")))
 		events = []
 		calls = []
 		execute = async () => completed()
+		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
 		bridge = new DesktopSession(
 			{ path: folder, id: "workspace" },
 			{
@@ -125,7 +127,7 @@ describe("desktop runtime boundary", () => {
 					return execute(input)
 				},
 			},
-			new BroccoliDatabaseKernel({ workspaceRoot: folder }),
+			database,
 			(e) => events.push(structuredClone(e)),
 		)
 		await bridge.start()
@@ -142,6 +144,7 @@ describe("desktop runtime boundary", () => {
 		assert.equal(calls.length, 1)
 		assert.equal(first.accepted, true)
 		await bridge.stop()
+		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
 		bridge = new DesktopSession(
 			{ path: folder, id: "workspace" },
 			{
@@ -149,7 +152,7 @@ describe("desktop runtime boundary", () => {
 					throw new Error("Must not replay")
 				},
 			},
-			new BroccoliDatabaseKernel({ workspaceRoot: folder }),
+			database,
 			(e) => events.push(structuredClone(e)),
 		)
 		await bridge.start()
@@ -200,6 +203,111 @@ describe("desktop runtime boundary", () => {
 		await request("approval.resolve", { run: run.run.id, operation, decision: "deny" })
 		await waitFor(() => events.some((e) => e.payload?.response === "deny"))
 		await assert.rejects(request("approval.resolve", { run: run.run.id, operation, decision: "allow" }), /STALE_APPROVAL/)
+	})
+	it("serializes simultaneous delivery and reconciles acceptance without another execution", async () => {
+		const accepts = await Promise.all(
+			Array.from({ length: 20 }, () => request("task.submit", { text: "One instruction" }, "same-request")),
+		)
+		await waitFor(() => events.some((e) => e.payload?.state === "completed"))
+		assert.equal(new Set(accepts.map((value) => value.run.id)).size, 1)
+		assert.equal(accepts.filter((value) => !value.duplicate).length, 1)
+		assert.equal(calls.length, 1)
+		const lookup = await request("task.lookup", { request: "same-request" })
+		assert.equal(lookup.found, true)
+		assert.equal(lookup.run.state, "completed")
+		assert.equal((await request("task.lookup", { request: "missing" })).found, false)
+		assert.equal(calls.length, 1)
+	})
+	it("consumes an approval once even when decisions and cancellation race", async () => {
+		let decided: string | undefined
+		execute = async (input) => {
+			decided = (
+				await bridge.approve({
+					toolName: "run_command",
+					args: { command: "echo fixture" },
+					promptMessage: "Review command",
+					safetyAssessment: {
+						toolName: "run_command",
+						riskTier: "MUTATING",
+						riskScore: 50,
+						requiresConfirmation: true,
+						warnings: [],
+						allowedInDryRun: true,
+					},
+				})
+			).decision
+			return { ...completed(decided), outcome: input.signal?.aborted ? "cancelled" : "completed" }
+		}
+		const accepted = await request("task.submit", { text: "Approval race" })
+		await waitFor(() => events.some((e) => e.type === "approval.requested"))
+		const operation = events.find((e) => e.type === "approval.requested").payload.approval.operation
+		const resolution = request("approval.resolve", { run: accepted.run.id, operation, decision: "allow" })
+		await assert.rejects(
+			request("approval.resolve", { run: accepted.run.id, operation, decision: "allow" }),
+			/STALE_APPROVAL/,
+		)
+		await request("task.cancel", { run: accepted.run.id })
+		await resolution
+		await waitFor(() => events.some((e) => e.payload?.state === "cancelled"))
+		assert.equal(decided, "deny")
+	})
+	it("uses a stable history cursor when several records have the same timestamp", async () => {
+		const table = database.getTable<any>("desktop.runs.v1")
+		for (let i = 1; i <= 13; i++) {
+			const id = i.toString(16).padStart(64, "0")
+			table.put(id, {
+				id,
+				request: id,
+				session: bridge.session,
+				text: "Historical run",
+				createdAt: 100,
+				updatedAt: 100,
+				state: "completed",
+				activities: [],
+				verification: "not_run",
+				review: "not_reviewed",
+			})
+		}
+		const seen: string[] = []
+		let cursor
+		do {
+			const page = await request("history.list", cursor ? { cursor } : {})
+			seen.push(...page.runs.map((run: any) => run.id))
+			cursor = page.nextCursor
+		} while (cursor)
+		assert.equal(seen.length, 13)
+		assert.equal(new Set(seen).size, 13)
+	})
+	it("keeps escaped Unicode history and activity inside the wire frame budget", async () => {
+		const table = database.getTable<any>("desktop.runs.v1")
+		for (let i = 1; i <= 6; i++) {
+			const id = i.toString(16).padStart(64, "0")
+			table.put(id, {
+				id,
+				request: id,
+				session: bridge.session,
+				text: "🌙\u0001".repeat(5000),
+				response: "\u0000🌙".repeat(50000),
+				createdAt: i,
+				updatedAt: i,
+				state: "completed",
+				activities: Array.from({ length: 40 }, (_, j) => ({
+					activityId: String(j),
+					phase: "tool",
+					status: "completed",
+					sequence: j,
+					timestamp: i,
+					message: "🌙\u0001".repeat(500),
+					detail: "\u0000🌙".repeat(1000),
+				})),
+				verification: "not_run",
+				review: "not_reviewed",
+			})
+		}
+		const snapshot = await request("snapshot")
+		assert.doesNotThrow(() => encodeFrame({ v: 1, kind: "response", id: "snapshot", result: snapshot }))
+		assert.equal(snapshot.runs.length, 6)
+		assert.ok(!/\p{Surrogate}/u.test(snapshot.runs[0].text))
 	})
 	it("rejects mismatched identities and symlink inspection outside the workspace", async () => {
 		await assert.rejects(

@@ -1,0 +1,55 @@
+{
+  "sourceBase": "39be0488f3ef8ff97204a371cd2269ec177f8921",
+  "workingTreeModified": true,
+  "checks": [
+    {
+      "command": "npm run desktop:test",
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "command": "npm run desktop:test:native",
+      "passed": 11,
+      "failed": 0,
+      "note": "Includes real AppKit selection and replacement-run cancellation deadline regressions against a deterministic private-pipe peer.",
+      "log": "build/desktop-audit-native-test.log"
+    },
+    {
+      "command": "npm run check",
+      "exitCode": 0
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "unitPassed": 2545,
+      "flightScenariosPassed": 5,
+      "log": "build/desktop-audit-full-test.log",
+      "note": "Existing proto-lint wrapper emits import/definition diagnostics but returns success; not a clean proto-lint result."
+    },
+    {
+      "command": "npx biome check src/desktop --write --no-errors-on-unmatched --diagnostic-level=error",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run desktop:build",
+      "exitCode": 0,
+      "note": "Ad-hoc Hardened Runtime; not Developer ID/notarization."
+    },
+    {
+      "command": "npm run desktop:build while probe-owned GUI PID 38341 was running",
+      "exitCode": 1,
+      "expected": true,
+      "message": "Close the running desktop app and finish native transport tests before rebuilding this signed bundle."
+    },
+    {
+      "command": "npm run ip:check",
+      "exitCode": 0,
+      "surfacesChecked": 449
+    }
+  ],
+  "qualification": "A native transport test timed out during an overlapping build/test attempt. Serial reruns passed; the bundle rebuild guard now refuses a running app/runtime. UI source does not establish physical keyboard, IME or VoiceOver verification.",
+  "review": {
+    "disposition": "ship",
+    "scope": "Two material implementation fixes only: stale Force Stop deadline and stale sidebar row selection. Documentation updated separately after verdict."
+  }
+}

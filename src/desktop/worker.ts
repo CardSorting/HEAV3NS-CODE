@@ -1,21 +1,22 @@
-import { createHash, randomUUID } from "node:crypto"
 import { execFile } from "node:child_process"
-import { mkdir, open, realpath, readdir, stat } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import { mkdir, open, realpath } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
 import { z } from "zod"
-import { LumiMonolith } from "../index.js"
-import { HostProvider } from "../hosts/host-provider.js"
-import { StateManager } from "../core/storage/StateManager.js"
-import { createStorageContext } from "../shared/storage/storage-context.js"
 import type { EngineProgressEvent, EngineTickResult, IAgentEngine } from "../core/contracts/agent.contracts.js"
-import { BroccoliDatabaseKernel } from "../sessions/extensions/substrate/broccolidb-kernel.js"
-import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
-import { acquireWorkspace } from "./workspace-owner.js"
-import { encodeFrame, FrameDecoder, MAX_PENDING_BYTES, requestSchema, type DesktopRequest } from "./protocol.js"
-import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
-import { Logger } from "../shared/services/Logger.js"
+import { StateManager } from "../core/storage/StateManager.js"
 import { sanitizeProgressText } from "../core/utilities/progress-sanitizer.js"
+import { HostProvider } from "../hosts/host-provider.js"
+import { LumiMonolith } from "../index.js"
+import { BroccoliDatabaseKernel } from "../sessions/extensions/substrate/broccolidb-kernel.js"
+import { Logger } from "../shared/services/Logger.js"
+import { createStorageContext } from "../shared/storage/storage-context.js"
+import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
+import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
+import { WorkspaceInspection } from "./inspection.js"
+import { type DesktopRequest, encodeFrame, FrameDecoder, MAX_PENDING_BYTES, requestSchema } from "./protocol.js"
+import { acquireWorkspace } from "./workspace-owner.js"
 
 const exec = promisify(execFile)
 const terminalStates = new Set(["completed", "failed", "cancelled", "interrupted"])
@@ -34,8 +35,47 @@ type Run = Record<string, unknown> & {
 	verification: "not_run" | "evidence_available"
 	review: "not_reviewed"
 }
-const shortText = (text: string, limit = 24_000) =>
-	text.length > limit ? `${text.slice(0, limit)}\n[Display truncated; open recorded output.]` : text
+const shortText = (text: string, limit = 24_000) => {
+	if (Buffer.byteLength(JSON.stringify(text)) <= limit) return text
+	const marker = "\n[Display truncated; open recorded output.]"
+	let low = 0,
+		high = Math.min(text.length, limit)
+	while (low < high) {
+		const middle = Math.ceil((low + high) / 2)
+		if (Buffer.byteLength(JSON.stringify(text.slice(0, middle) + marker)) <= limit) low = middle
+		else high = middle - 1
+	}
+	if (low && /[\uD800-\uDBFF]/.test(text[low - 1])) low--
+	return text.slice(0, low) + marker
+}
+const projectRun = (run: Run) => ({
+	id: run.id,
+	request: run.request,
+	session: run.session,
+	text: shortText(run.text, 2000),
+	state: run.state,
+	createdAt: run.createdAt,
+	updatedAt: run.updatedAt,
+	startedAt: run.startedAt,
+	response: run.response ? shortText(run.response, 6000) : undefined,
+	activities: run.activities
+		.slice(-8)
+		.map((a) => ({
+			activityId: a.activityId,
+			phase: a.phase,
+			status: a.status,
+			message: shortText(a.message, 300),
+			detail: a.detail ? shortText(a.detail, 400) : undefined,
+			elapsedMs: a.elapsedMs,
+			timestamp: a.timestamp,
+			sequence: a.sequence,
+		})),
+	approval: run.approval,
+	verification: run.verification,
+	review: run.review,
+	outputLimited: run.outputLimited,
+	toolCount: run.toolCount,
+})
 
 /** This adapter schedules existing ticks. It has no provider, prompt, or tool implementation. */
 export class DesktopSession {
@@ -52,6 +92,8 @@ export class DesktopSession {
 	private runs
 	private metadata
 	private approvals
+	private inspection: WorkspaceInspection
+	private submissions: Promise<unknown> = Promise.resolve()
 	readonly workspace: { path: string; id: string }
 	private readonly engine: IAgentEngine
 	private readonly database: BroccoliDatabaseKernel
@@ -69,6 +111,7 @@ export class DesktopSession {
 		this.database = database
 		this.send = send
 		this.lifecycle = lifecycle
+		this.inspection = new WorkspaceInspection(workspace.path)
 		this.runs = database.getTable<Run>("desktop.runs.v1")
 		this.metadata = database.getTable("desktop.metadata.v1")
 		this.approvals = database.getTable("desktop.approvals.v1")
@@ -103,13 +146,14 @@ export class DesktopSession {
 		})
 	}
 	private commit(run: Run, type: string): Promise<void> {
+		run.updatedAt = Date.now()
+		const projection = structuredClone(run)
 		const operation = this.commits.then(async () => {
-			run.updatedAt = Date.now()
-			this.runs.put(run.id, { ...run, activities: [...run.activities] })
+			this.runs.put(run.id, projection)
 			const seq = ++this.seq
 			this.metadata.put("session", { session: this.session, seq })
 			await this.database.flush()
-			this.event(type, run, run.id, seq)
+			this.event(type, projectRun(projection), run.id, seq)
 		})
 		const guarded = operation.catch((error) => {
 			this.closing = true
@@ -122,21 +166,31 @@ export class DesktopSession {
 		this.commits = guarded
 		return guarded
 	}
-	private recent(before = Number.MAX_SAFE_INTEGER) {
-		return [...this.runs.query({ where: { createdAt: { $lt: before } }, sortBy: "createdAt", sortOrder: "desc", limit: 6 })]
-			.reverse()
-			.map((run) => ({
-				...run,
-				text: shortText(run.text, 4000),
-				response: run.response ? shortText(run.response, 6000) : undefined,
-				activities: run.activities.slice(-8).map((a) => ({
-					...a,
-					message: shortText(a.message, 500),
-					detail: a.detail ? shortText(a.detail, 500) : undefined,
-				})),
-			}))
+	private recent(cursor?: { createdAt: number; id: string }, before = Number.MAX_SAFE_INTEGER) {
+		const page = this.runs.query({
+			where: { session: this.session, createdAt: { $lt: before } },
+			or: cursor
+				? [{ createdAt: { $lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { $lt: cursor.id } }]
+				: undefined,
+			sortBy: ["createdAt", "id"],
+			sortOrder: "desc",
+			limit: 7,
+		})
+		const last = page[5]
+		return {
+			runs: page.slice(0, 6).reverse().map(projectRun),
+			nextCursor: page.length > 6 ? { createdAt: last.createdAt, id: last.id } : undefined,
+		}
 	}
 	async request(request: DesktopRequest): Promise<unknown> {
+		if (request.method === "task.submit") {
+			const result = this.submissions.then(() => this.handleRequest(request))
+			this.submissions = result.catch(() => {})
+			return result
+		}
+		return this.handleRequest(request)
+	}
+	private async handleRequest(request: DesktopRequest): Promise<unknown> {
 		if (request.method === "hello")
 			return {
 				protocol: 1,
@@ -144,7 +198,17 @@ export class DesktopSession {
 				workspace: this.workspace.id,
 				session: this.session,
 				path: this.workspace.path,
-				capabilities: ["native", "snapshot", "queue:3", "cancel", "approval", "history", "files", "changes"],
+				capabilities: [
+					"native",
+					"snapshot",
+					"queue:3",
+					"cancel",
+					"approval",
+					"history",
+					"files",
+					"changes",
+					"paged-inspection",
+				],
 				terminal: false,
 			}
 		if (request.workspace !== this.workspace.id || request.session !== this.session)
@@ -159,7 +223,7 @@ export class DesktopSession {
 					workspace: this.workspace.id,
 					session: this.session,
 					seq: this.seq,
-					runs: this.recent(),
+					runs: this.recent().runs,
 					active: this.active?.id,
 					queued: this.queue.map((r) => r.id),
 				}
@@ -174,7 +238,7 @@ export class DesktopSession {
 				if (previous) {
 					if (previous.fingerprint !== fingerprint)
 						throw new Error("REQUEST_ID_REUSED: the accepted instruction differs")
-					return { accepted: true, run: previous, duplicate: true }
+					return { accepted: true, run: projectRun(previous), duplicate: true }
 				}
 				if (this.active?.state === "cancelling") throw new Error("CANCELLING: wait for a confirmed stopping boundary")
 				if (this.queue.length >= 3)
@@ -195,7 +259,17 @@ export class DesktopSession {
 				await this.commit(run, "run.accepted")
 				this.queue.push(run)
 				this.kick()
-				return { accepted: true, run }
+				return { accepted: true, run: projectRun(run) }
+			}
+			case "task.lookup": {
+				const params = z
+					.object({ request: z.string().min(1).max(128) })
+					.strict()
+					.parse(request.params)
+				await this.submissions
+				await this.commits
+				const run = this.runs.get(createHash("sha256").update(`${this.session}:${params.request}`).digest("hex"))
+				return { found: Boolean(run), run: run ? projectRun(run) : undefined }
 			}
 			case "task.cancel": {
 				const { run } = z.object({ run: z.string() }).strict().parse(request.params)
@@ -216,86 +290,91 @@ export class DesktopSession {
 				)
 					throw new Error("STALE_APPROVAL: this operation is no longer awaiting a decision")
 				const run = this.active
+				// Claim the operation before the durable write yields. A second click
+				// can never approve a later action or replace the first decision.
+				this.approvalResolvers.delete(p.operation)
 				this.approvals.put(p.operation, {
 					...this.approvals.get(p.operation),
 					decision: p.decision,
 					resolvedAt: Date.now(),
 				})
-				await this.commit({ ...run, approval: { ...run.approval, decision: p.decision } }, "approval.resolved")
-				this.approvalResolvers.delete(p.operation)
-				run.approval = undefined
-				run.state = "running"
-				await this.commit(run, "run.state")
-				resolver({
-					decision: p.decision,
-					feedback: p.decision === "deny" ? "Denied by the user for this operation." : undefined,
-				})
+				try {
+					await this.commit({ ...run, approval: { ...run.approval, decision: p.decision } }, "approval.resolved")
+					run.approval = undefined
+					if (!this.controller?.signal.aborted) run.state = "running"
+					await this.commit(run, "run.state")
+					const cancelled = this.controller?.signal.aborted || this.closing
+					resolver({
+						decision: cancelled ? "deny" : p.decision,
+						feedback: cancelled
+							? "Operation cancelled before execution."
+							: p.decision === "deny"
+								? "Denied by the user for this operation."
+								: undefined,
+					})
+				} catch (error) {
+					resolver({ decision: "deny", feedback: "Approval could not be recorded; execution stopped." })
+					throw error
+				}
 				return { resolved: true }
 			}
 			case "history.list": {
-				const { before } = z.object({ before: z.number().optional() }).strict().parse(request.params)
-				return { runs: this.recent(before) }
+				const { before, cursor } = z
+					.object({
+						before: z.number().optional(),
+						cursor: z
+							.object({ createdAt: z.number(), id: z.string().regex(/^[a-f0-9]{64}$/) })
+							.strict()
+							.optional(),
+					})
+					.strict()
+					.parse(request.params)
+				await this.commits
+				return this.recent(cursor, before)
 			}
 			case "files.list": {
 				const p = z
-					.object({ path: z.string().default("."), offset: z.number().int().min(0).default(0) })
+					.object({
+						path: z.string().default("."),
+						offset: z.number().int().min(0).default(0),
+						query: z.string().max(200).default(""),
+					})
 					.strict()
 					.parse(request.params)
-				const folder = await this.resolveFile(p.path)
-				const entries = (await readdir(folder, { withFileTypes: true }))
-					.filter((e) => e.name !== ".broccolidb" && e.name !== ".git")
-					.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
-				return {
-					entries: entries.slice(p.offset, p.offset + 100).map((e) => ({
-						name: e.name,
-						path: path.relative(this.workspace.path, path.join(folder, e.name)),
-						directory: e.isDirectory(),
-						symlink: e.isSymbolicLink(),
-					})),
-					more: entries.length > p.offset + 100,
-				}
+				return this.inspection.list(p.path, p.offset, p.query)
 			}
 			case "files.read": {
 				const p = z
-					.object({ path: z.string(), offset: z.number().int().min(0).default(0) })
+					.object({ path: z.string(), offset: z.number().int().min(0).default(0), revision: z.string().optional() })
 					.strict()
 					.parse(request.params)
-				return this.readChunk(await this.resolveFile(p.path), p.offset)
+				return this.inspection.read(p.path, p.offset, p.revision)
 			}
 			case "artifact.read": {
 				const p = z
-					.object({ run: z.string().regex(/^[a-f0-9]{64}$/), offset: z.number().int().min(0).default(0) })
+					.object({
+						run: z.string().regex(/^[a-f0-9]{64}$/),
+						offset: z.number().int().min(0).default(0),
+						revision: z.string().optional(),
+					})
 					.strict()
 					.parse(request.params)
 				if (!this.runs.get(p.run)) throw new Error("UNKNOWN_RUN")
-				return this.readChunk(path.join(this.workspace.path, ".broccolidb", "desktop-output", `${p.run}.txt`), p.offset)
+				return this.inspection.read(path.join(".broccolidb", "desktop-output", `${p.run}.txt`), p.offset, p.revision)
 			}
+			case "changes.list":
+				return this.inspection.changes()
 			case "changes.read": {
 				const p = z
-					.object({ staged: z.boolean().default(false) })
+					.object({
+						staged: z.boolean().default(false),
+						path: z.string().optional(),
+						offset: z.number().int().min(0).default(0),
+						revision: z.string().optional(),
+					})
 					.strict()
 					.parse(request.params)
-				const result = await exec(
-					"git",
-					[
-						"--no-pager",
-						"diff",
-						"--no-ext-diff",
-						"--no-textconv",
-						...(p.staged ? ["--cached"] : []),
-						"--",
-						".",
-						":(exclude).broccolidb",
-					],
-					{ cwd: this.workspace.path, maxBuffer: 1024 * 1024, timeout: 5000 },
-				)
-				return {
-					text: shortText(result.stdout, 48_000),
-					baseline: p.staged
-						? "HEAD → index (includes pre-existing changes)"
-						: "Index → working tree (includes pre-existing and external changes)",
-					truncated: result.stdout.length > 48_000,
-				}
+				return this.inspection.readDiff(p.path, p.staged, p.offset, p.revision)
 			}
 			case "input.select": {
 				z.object({ surface: z.literal("native") })
@@ -306,32 +385,6 @@ export class DesktopSession {
 			case "shutdown":
 				await this.stop()
 				return { stopped: true }
-		}
-	}
-	private async resolveFile(relative: string) {
-		const resolved = await realpath(path.resolve(this.workspace.path, relative))
-		if (resolved !== this.workspace.path && !resolved.startsWith(`${this.workspace.path}${path.sep}`))
-			throw new Error("OUTSIDE_WORKSPACE: open this file deliberately in an external application")
-		return resolved
-	}
-	private async readChunk(file: string, offset: number) {
-		const info = await stat(file)
-		if (!info.isFile()) throw new Error("NOT_A_FILE")
-		const handle = await open(file, "r")
-		try {
-			const buffer = Buffer.alloc(32 * 1024)
-			const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset)
-			const bytes = buffer.subarray(0, bytesRead)
-			return {
-				text: bytes.includes(0) ? "Binary file — open externally to inspect." : bytes.toString("utf8"),
-				binary: bytes.includes(0),
-				size: info.size,
-				offset,
-				nextOffset: offset + bytesRead,
-				more: offset + bytesRead < info.size,
-			}
-		} finally {
-			await handle.close()
 		}
 	}
 	private kick() {
@@ -353,6 +406,7 @@ export class DesktopSession {
 			this.active = run
 			this.controller = new AbortController()
 			run.state = "running"
+			run.startedAt = Date.now()
 			await this.commit(run, "run.state")
 			try {
 				const baseline = await exec("git", ["status", "--porcelain=v1", "--untracked-files=normal"], {
@@ -383,7 +437,12 @@ export class DesktopSession {
 	}
 	private progress(run: Run, event: EngineProgressEvent) {
 		const bounded = {
-			...event,
+			activityId: event.activityId,
+			phase: event.phase,
+			status: event.status,
+			timestamp: event.timestamp,
+			sequence: event.sequence,
+			elapsedMs: event.elapsedMs,
 			message: sanitizeProgressText(event.message, 1000),
 			detail: event.detail ? sanitizeProgressText(event.detail, 2000) : undefined,
 		}
@@ -402,10 +461,15 @@ export class DesktopSession {
 		run.toolCount = result.toolResults.length
 		const folder = path.join(this.workspace.path, ".broccolidb", "desktop-output")
 		await mkdir(folder, { recursive: true, mode: 0o700 })
+		if ((await realpath(folder)) !== folder)
+			throw new Error("STORE_ISOLATION: recorded output directory must not be redirected by a symlink")
 		const handle = await open(path.join(folder, `${run.id}.txt`), "wx", 0o600)
 		let bytes = 0
 		try {
-			for (const record of [result.response, ...result.toolResults.map((r) => JSON.stringify(r, null, 2))]) {
+			// Serialize one tool result at a time instead of retaining a second
+			// complete copy of all command evidence in the adapter.
+			for (let index = -1; index < result.toolResults.length; index++) {
+				const record = index < 0 ? result.response : JSON.stringify(result.toolResults[index], null, 2)
 				const data = Buffer.from(`${record}\n\n`)
 				if (bytes + data.length > 64 * 1024 * 1024) {
 					run.outputLimited = true
@@ -428,13 +492,16 @@ export class DesktopSession {
 		// Never ask for approval while hiding part of the operation.
 		if (Buffer.byteLength(argsText) > 48_000)
 			return { decision: "deny", feedback: "Operation exceeds the review limit. Split it into smaller operations." }
-		run.approval = {
+		const approval = {
 			operation,
 			tool: request.toolName,
 			args: argsText,
 			scope: this.workspace.path,
 			reason: request.promptMessage,
 		}
+		if (Buffer.byteLength(JSON.stringify(approval)) > 64_000)
+			return { decision: "deny", feedback: "Operation exceeds the review limit. Split it into smaller operations." }
+		run.approval = approval
 		this.approvals.put(operation, { ...run.approval, run: run.id, decision: "pending", createdAt: Date.now() })
 		run.state = "awaiting_approval"
 		const decision = new Promise<ConfirmationResponse>((resolve) => this.approvalResolvers.set(operation, resolve))
@@ -448,18 +515,21 @@ export class DesktopSession {
 			queued.state = "cancelled"
 			await this.commit(queued, "run.state")
 		} else if (this.active?.id === id && !terminalStates.has(this.active.state)) {
+			if (this.active.state === "cancelling") return
 			for (const operation of this.approvalResolvers.keys())
 				this.approvals.put(operation, { ...this.approvals.get(operation), decision: "cancelled", resolvedAt: Date.now() })
 			this.active.state = "cancelling"
-			await this.commit(this.active, "run.state")
 			this.controller?.abort(new Error("Cancelled by user"))
 			for (const resolve of this.approvalResolvers.values())
 				resolve({ decision: "deny", feedback: "Operation cancelled before approval." })
 			this.approvalResolvers.clear()
+			await this.commit(this.active, "run.state")
 		} else if (!this.runs.get(id)) throw new Error("UNKNOWN_RUN")
 	}
 	async stop() {
 		this.closing = true
+		this.inspection.clear()
+		await this.submissions
 		for (const run of [...this.queue]) await this.cancel(run.id)
 		if (this.active) await this.cancel(this.active.id)
 		await this.pumping
@@ -558,7 +628,12 @@ export async function runDesktopWorker(): Promise<void> {
 					const size = Buffer.byteLength(JSON.stringify(raw))
 					queuedBytes += size
 					if (queuedBytes > MAX_PENDING_BYTES) throw new Error("REQUEST_BACKPRESSURE")
-					requests = requests
+					// Cancellation must not queue behind an unrelated slow file/Git read.
+					const urgent =
+						typeof raw === "object" &&
+						raw !== null &&
+						["task.cancel", "shutdown"].includes(String((raw as Record<string, unknown>).method))
+					const operation = (urgent ? Promise.resolve() : requests)
 						.then(async () => {
 							let id: string | undefined
 							try {
@@ -587,6 +662,7 @@ export async function runDesktopWorker(): Promise<void> {
 							Logger.error(String(error))
 							void shutdown()
 						})
+					if (!urgent) requests = operation
 				}
 			} catch (error) {
 				try {

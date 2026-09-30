@@ -6,7 +6,7 @@ import { buildEvidence } from "./desktop-build-evidence.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const restoreIndex = process.argv.indexOf("--restore")
-const mode = restoreIndex >= 0 ? "restore" : process.argv.includes("--cancel") ? "cancel" : process.argv.includes("--idle") ? "idle" : "live"
+const mode = restoreIndex >= 0 ? "restore" : process.argv.includes("--ui") ? "ui" : process.argv.includes("--cancel") ? "cancel" : process.argv.includes("--idle") ? "idle" : "live"
 const directory = path.join(root, "build", `desktop-${mode}-${Date.now()}`)
 if (restoreIndex >= 0 && !process.argv[restoreIndex + 1]) throw new Error("--restore requires an existing workspace path")
 const workspace = restoreIndex >= 0 ? path.resolve(process.argv[restoreIndex + 1]) : path.join(directory, "workspace")
@@ -14,6 +14,14 @@ await mkdir(directory, { recursive: true })
 await mkdir(workspace, { recursive: true })
 if (mode !== "restore") await writeFile(path.join(workspace, "fixture.txt"), "native workspace proof\n")
 const plan = { output: directory }
+if (mode === "ui") {
+	plan.navigationPass = true
+	const git = args => execFileSync("git", args, { cwd: workspace })
+	git(["init", "-q"]); git(["add", "fixture.txt"])
+	git(["-c", "user.name=Desktop Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "Native inspection fixture"])
+	await writeFile(path.join(workspace, "fixture.txt"), "native workspace proof\nA visible working-tree change.\nUnicode stays intact: 🌙 café 日本語\n")
+	await writeFile(path.join(workspace, "new-file.txt"), "Untracked fixture, deliberately read-only in the app.\n")
+}
 if (mode === "live") plan.instruction = "This is a native desktop integration test in a disposable fixture folder. Read fixture.txt, create result.txt containing its text in uppercase, and run a command that verifies result.txt exactly matches the uppercase source. Use only files in this folder. Report the verification command and its actual result."
 if (mode === "cancel") {
 	plan.instruction = "This is a cancellation test. Use run_command to execute sleep 30, then respond. Do not modify any files."
@@ -30,7 +38,7 @@ let report
 try {
 	const deadline = Date.now() + 180_000
 	while (Date.now() < deadline) {
-		try { report = JSON.parse(await readFile(path.join(directory, mode === "idle" ? "initial.json" : "narrow.json"), "utf8")); break } catch { /* Await the native view and real runtime. */ }
+		try { report = JSON.parse(await readFile(path.join(directory, mode === "ui" ? "ui-palette.json" : mode === "idle" ? "initial.json" : "narrow.json"), "utf8")); break } catch { /* Await the native view and real runtime. */ }
 		if (child.exitCode !== null) throw new Error(`App exited ${child.exitCode}: ${diagnostic}`)
 		await new Promise(resolve => setTimeout(resolve, 250))
 	}
@@ -40,6 +48,14 @@ try {
 	const evidence = { ...report, mode, memory, node: "22.22.0", build: "release, ad-hoc Hardened Runtime", debugger: false, sampleCount: 1, versionPair: await buildEvidence(root, "scripts/verify-desktop.mjs") }
 	if (mode === "live") {
 		try { evidence.fileVerified = await readFile(path.join(workspace, "result.txt"), "utf8") === "NATIVE WORKSPACE PROOF\n" } catch { evidence.fileVerified = false }
+	}
+	if (mode === "ui") {
+		const captures = await Promise.all(["files", "changes", "narrow", "dark", "palette"].map(async step => JSON.parse(await readFile(path.join(directory, `ui-${step}.json`), "utf8"))))
+		evidence.layoutChecksPassed = captures.every(capture => Object.values(capture.layout.controls).every(control => control.visibleWithinWindow))
+		evidence.fileInspectionVerified = captures[0].layout.inspectionPreview.includes("Unicode stays intact: 🌙 café 日本語")
+		evidence.diffInspectionVerified = captures[1].layout.inspectionPreview.includes("Index → working tree")
+		evidence.minimumWindowVerified = captures[2].layout.windowFrameWidth === 720 && captures[2].layout.windowFrameHeight === 480
+		if (![evidence.layoutChecksPassed, evidence.fileInspectionVerified, evidence.diffInspectionVerified, evidence.minimumWindowVerified].every(Boolean)) process.exitCode = 1
 	}
 	await writeFile(path.join(directory, "evidence.json"), JSON.stringify(evidence, null, 2))
 	console.log(JSON.stringify(evidence, null, 2))

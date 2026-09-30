@@ -1,0 +1,81 @@
+{
+  "appPID": 39980,
+  "capturedAt": "2026-09-30T00:41:19Z",
+  "harness": "native composer and actual LUMI worker",
+  "layout": {
+    "appearance": "NSAppearanceNameAqua",
+    "controls": {
+      "composer": {
+        "height": 64,
+        "visibleWithinWindow": true,
+        "width": 692,
+        "x": 12,
+        "y": 42
+      },
+      "send": {
+        "height": 24,
+        "visibleWithinWindow": true,
+        "width": 55,
+        "x": 649,
+        "y": 12
+      },
+      "stop": {
+        "height": 36,
+        "visibleWithinWindow": true,
+        "width": 64,
+        "x": 604,
+        "y": 436
+      }
+    },
+    "destination": "Files",
+    "forceStopAvailable": false,
+    "inspectionPage": "Read only",
+    "inspectionPreview": "",
+    "navigationVisible": false,
+    "windowFrameHeight": 480,
+    "windowFrameWidth": 720
+  },
+  "state": "cancelled",
+  "windowHeight": 428,
+  "windowWidth": 720,
+  "workerPID": 39983,
+  "workspace": "build/desktop-cancel-1790728875197/workspace",
+  "mode": "cancel",
+  "memory": {
+    "sampledAt": 1790728879,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 39980,
+        "footprintBytes": 42353624,
+        "residentBytes": 120520704,
+        "userTicks": 11542260,
+        "systemTicks": 1597476
+      },
+      {
+        "pid": 39983,
+        "footprintBytes": 218281976,
+        "residentBytes": 256245760,
+        "userTicks": 24568681,
+        "systemTicks": 1528069
+      }
+    ],
+    "aggregateFootprintBytes": 260635600
+  },
+  "node": "22.22.0",
+  "build": "release, ad-hoc Hardened Runtime",
+  "debugger": false,
+  "sampleCount": 1,
+  "versionPair": {
+    "sourceBase": "39be0488f3ef8ff97204a371cd2269ec177f8921",
+    "workingTreeModified": true,
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "77d2ed6d2018be4974b0de4ed5f8e1462ba3d673db0218d889c76c952dfd253c",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "20cb79f78aa96104f551d94d79029d22b79592390905d7853e70a51104e90689",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "scripts/verify-desktop.mjs": "868b27e0d8689ad27dfabcc95b6aa6fe8b0ae80342403a0700f2a74ad09bc090"
+    }
+  },
+  "sourceDirectory": "build/desktop-cancel-1790728875197"
+}

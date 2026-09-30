@@ -1,0 +1,42 @@
+{
+  "appPID" : 38341,
+  "capturedAt" : "2026-09-30T00:38:20Z",
+  "harness" : "native composer and actual LUMI worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 1052,
+        "x" : 212,
+        "y" : 42
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 1209,
+        "y" : 12
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1164,
+        "y" : 687
+      }
+    },
+    "destination" : "Files",
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–97 / 97 bytes · Read only",
+    "inspectionPreview" : "native workspace proof\nA visible working-tree change.\nUnicode stays intact: 🌙 café 日本語\n",
+    "navigationVisible" : true,
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1280
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1280,
+  "workerPID" : 38342,
+  "workspace" : "build/desktop-ui-1790728696210/workspace"
+}

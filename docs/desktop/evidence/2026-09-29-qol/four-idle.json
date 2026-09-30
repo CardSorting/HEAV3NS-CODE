@@ -1,0 +1,129 @@
+{
+  "build": "release; no debugger; ad-hoc Hardened Runtime",
+  "hardware": [
+    "MacBookPro18,1",
+    "17179869184",
+    "Apple M1 Pro"
+  ],
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+  "windows": 4,
+  "workers": 4,
+  "warmupSeconds": 5,
+  "samplingSeconds": 60,
+  "start": {
+    "sampledAt": 1790728724,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 38619,
+        "footprintBytes": 63357864,
+        "residentBytes": 141279232,
+        "userTicks": 21141075,
+        "systemTicks": 1776309
+      },
+      {
+        "pid": 38620,
+        "footprintBytes": 195113824,
+        "residentBytes": 229949440,
+        "userTicks": 18504527,
+        "systemTicks": 1084509
+      },
+      {
+        "pid": 38621,
+        "footprintBytes": 195425384,
+        "residentBytes": 230080512,
+        "userTicks": 18387191,
+        "systemTicks": 1217655
+      },
+      {
+        "pid": 38622,
+        "footprintBytes": 196064288,
+        "residentBytes": 230785024,
+        "userTicks": 18445327,
+        "systemTicks": 1150143
+      },
+      {
+        "pid": 38623,
+        "footprintBytes": 193672056,
+        "residentBytes": 228491264,
+        "userTicks": 18311577,
+        "systemTicks": 1080540
+      }
+    ],
+    "aggregateFootprintBytes": 843633416
+  },
+  "end": {
+    "sampledAt": 1790728784,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 38619,
+        "footprintBytes": 63390632,
+        "residentBytes": 141066240,
+        "userTicks": 21342873,
+        "systemTicks": 1867218
+      },
+      {
+        "pid": 38620,
+        "footprintBytes": 173549672,
+        "residentBytes": 211779584,
+        "userTicks": 21387189,
+        "systemTicks": 1582627
+      },
+      {
+        "pid": 38621,
+        "footprintBytes": 174352656,
+        "residentBytes": 212434944,
+        "userTicks": 22260839,
+        "systemTicks": 1817221
+      },
+      {
+        "pid": 38622,
+        "footprintBytes": 175089840,
+        "residentBytes": 213270528,
+        "userTicks": 22318786,
+        "systemTicks": 1723865
+      },
+      {
+        "pid": 38623,
+        "footprintBytes": 172959680,
+        "residentBytes": 211402752,
+        "userTicks": 21622916,
+        "systemTicks": 1442023
+      }
+    ],
+    "aggregateFootprintBytes": 759342480
+  },
+  "cpuPercentOfOneCore": 1.1296322222222221,
+  "note": "Summed process footprints are not unique physical RAM. No fixture tools running. This is not a 30-minute soak.",
+  "memoryPressure": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 57%",
+  "swap": "vm.swapusage: total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)",
+  "standaloneCLI": {
+    "sampledAt": 1790728716,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 38601,
+        "footprintBytes": 195032096,
+        "residentBytes": 228474880,
+        "userTicks": 17801504,
+        "systemTicks": 943610
+      }
+    ],
+    "aggregateFootprintBytes": 195032096
+  },
+  "versionPair": {
+    "sourceBase": "39be0488f3ef8ff97204a371cd2269ec177f8921",
+    "workingTreeModified": true,
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "77d2ed6d2018be4974b0de4ed5f8e1462ba3d673db0218d889c76c952dfd253c",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "20cb79f78aa96104f551d94d79029d22b79592390905d7853e70a51104e90689",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "scripts/benchmark-desktop.mjs": "1f9eb334594f005ac5ff321c5862a5eb8218e1245e08340ebd5481b5c53cdbe9"
+    }
+  },
+  "sourceDirectory": "build/desktop-four-1790728713153"
+}

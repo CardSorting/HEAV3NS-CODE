@@ -1,0 +1,60 @@
+Created `result.txt` with the uppercase source text.
+
+Verification command:
+```sh
+LC_ALL=C tr '[:lower:]' '[:upper:]' < fixture.txt | cmp -s - result.txt; status=$?; printf 'verification_exit=%s\n' "$status"; if [ "$status" -eq 0 ]; then printf 'result.txt exactly matches uppercase fixture.txt\n'; fi; exit "$status"
+```
+
+Actual result:
+```text
+verification_exit=0
+result.txt exactly matches uppercase fixture.txt
+```
+
+{
+  "name": "view_file",
+  "callId": "call_mN4PXvVc6sIGi28TaPho0V9x",
+  "args": {
+    "path": "fixture.txt"
+  },
+  "output": {
+    "path": "build/desktop-live-1790728827863/workspace/fixture.txt",
+    "content": "native workspace proof\n",
+    "totalLines": 2,
+    "truncated": false
+  },
+  "durationMs": 6,
+  "success": true
+}
+
+{
+  "name": "write_file",
+  "callId": "call_06e1cba270a642199273d0cb19640df4",
+  "args": {
+    "path": "result.txt",
+    "content": "NATIVE WORKSPACE PROOF\n"
+  },
+  "output": {
+    "success": true,
+    "path": "build/desktop-live-1790728827863/workspace/result.txt"
+  },
+  "durationMs": 3,
+  "success": true
+}
+
+{
+  "name": "run_command",
+  "callId": "call_yj8C8MNsCEmGvt5JgWqsx9nG",
+  "args": {
+    "command": "LC_ALL=C tr '[:lower:]' '[:upper:]' < fixture.txt | cmp -s - result.txt; status=$?; printf 'verification_exit=%s\\n' \"$status\"; if [ \"$status\" -eq 0 ]; then printf 'result.txt exactly matches uppercase fixture.txt\\n'; fi; exit \"$status\""
+  },
+  "output": {
+    "stdout": "verification_exit=0\nresult.txt exactly matches uppercase fixture.txt\n",
+    "stderr": "",
+    "exitCode": 0,
+    "durationMs": 20.84954199999993
+  },
+  "durationMs": 23,
+  "success": true,
+  "exitCode": 0
+}

@@ -7,6 +7,13 @@ node_sha=5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640
 archive="build/downloads/node-v${node_version}-darwin-arm64.tar.gz"
 app="build/HEAV3NS-CODE.app"
 identity="${HEAV3NS_SIGN_IDENTITY:--}"
+assert_bundle_idle() {
+  if /usr/sbin/lsof -t "$task_root/$app/Contents/MacOS/HEAV3NS-CODE" "$task_root/$app/Contents/Resources/runtime/node" >/dev/null 2>&1; then
+    echo 'Close the running desktop app and finish native transport tests before rebuilding this signed bundle.' >&2
+    exit 1
+  fi
+}
+assert_bundle_idle
 test "$(uname -m)" = arm64 || { echo 'This preview supports arm64 only.' >&2; exit 1; }
 mkdir -p build/downloads "$app/Contents/MacOS" "$app/Contents/Resources/runtime/dist"
 if ! test -f "$archive"; then curl --fail --location --silent --show-error "https://nodejs.org/dist/v${node_version}/node-v${node_version}-darwin-arm64.tar.gz" -o "$archive"; fi
@@ -15,6 +22,7 @@ test "$actual_sha" = "$node_sha" || { echo 'Bundled Node checksum mismatch.' >&2
 tar -xzf "$archive" -C build/downloads
 npm run build
 swift build --package-path native --configuration release --scratch-path build/native
+assert_bundle_idle
 cp build/native/release/HEAV3NS-CODE "$app/Contents/MacOS/HEAV3NS-CODE"
 cp "build/downloads/node-v${node_version}-darwin-arm64/bin/node" "$app/Contents/Resources/runtime/node"
 cp -R dist/. "$app/Contents/Resources/runtime/dist/"

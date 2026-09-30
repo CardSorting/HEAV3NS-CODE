@@ -16,7 +16,7 @@ The builder downloads the official Node **22.22.0 darwin-arm64** archive, verifi
 
 The default signature is ad hoc with Hardened Runtime. Only the Node helper receives `com.apple.security.cs.allow-jit`. `HEAV3NS_SIGN_IDENTITY` selects a Developer ID identity for a future distribution build. A local ad-hoc launch is not a Developer ID, Gatekeeper, clean-machine, or notarization test. The pinned Node version must receive a security/update review before release.
 
-Do not rebuild the bundle while it is running: replacing a signed executable can terminate that executable. Close the preview first. `HEAV3NS_NODE` and `HEAV3NS_CLI` are optional development overrides; neither is required by a packaged app.
+Do not rebuild the bundle while it or the native transport tests are running: replacing a signed executable can terminate that executable. Close the preview and finish tests first. The builder checks for running bundle executables before compilation and before replacement and refuses an active bundle. `HEAV3NS_NODE` and `HEAV3NS_CLI` are optional development overrides; neither is required by a packaged app.
 
 ## Actual integration boundary
 
@@ -43,7 +43,7 @@ Canonicalize the workspace with `realpath`, hash that identity with SHA-256, and
 
 An ambiguous or stale lock is deliberately not stolen. The startup message identifies its PID, creation time and owner-directory path. Verify that the owner **and its managed children** are gone before manual removal. Automatic safe crash reconciliation remains unfinished. Old, unmodified CLI builds and programmatic library callers do not implement this new ownership interface.
 
-Desktop run acceptance is a BroccoliDB row keyed by the session and request ID. It includes a fingerprint of the typed submission. The WAL flush now waits for file sync and fails closed after an ambiguous append failure. Only after that boundary does the adapter acknowledge acceptance or admit the task. Reusing an ID with different contents is rejected. This is task deduplication, not exactly-once external side effects.
+Desktop run acceptance is a BroccoliDB row keyed by the session and request ID. It includes a fingerprint of the typed submission. Admission is serialized even when callers deliver duplicate requests concurrently. The WAL flush waits for file sync and fails closed after an ambiguous append failure. Only after that boundary does the adapter acknowledge acceptance or admit the task. Reusing an ID with different contents is rejected. This is task deduplication, not exactly-once external side effects.
 
 Run, session and approval records remain in BroccoliDB. Recorded output lives in private `.broccolidb/desktop-output/<run>.txt` files, retrieved in 32 KiB chunks. Active context is restored through LUMI's existing session-store API. Prior unfinished runs become Interrupted when a successfully owned worker starts; they are never replayed automatically. Approval IDs and decisions are recorded separately from the latest run projection.
 
@@ -60,18 +60,35 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `hello` | Protocol, runtime/workspace/session IDs and actual capabilities |
 | `workspace.attach`, `snapshot` | Latest bounded run projection, durable cursor, active/queued identities |
 | `task.submit` | `{text, attachments: []}`; durable acceptance or explicit queue rejection |
+| `task.lookup` | `{request}`; reconcile the original request ID without scheduling execution |
 | `task.cancel` | `{run}`; cancellation request, followed by an authoritative outcome event |
 | `approval.resolve` | `{run, operation, decision: "allow" \| "deny"}`; stale IDs rejected |
-| `history.list` | `{before?}`; six earlier run summaries |
-| `artifact.read` | `{run, offset?}`; recorded output page |
-| `files.list`, `files.read` | Canonical workspace-relative paths and optional offset |
-| `changes.read` | `{staged?}`; bounded read-only diff with named baseline |
+| `history.list` | `{cursor?: {createdAt, id}, before?}`; six summaries and a stable `nextCursor`, including timestamp ties |
+| `artifact.read` | `{run, offset?, revision?}`; recorded output page |
+| `files.list` | `{path?, offset?, query?}`; 100 folder entries per page, case-insensitive filter, explicit 20,000-entry scan limit |
+| `files.read` | `{path, offset?, revision?}`; complete UTF-8 scalars, revision check, or binary metadata |
+| `changes.list` | Up to 500 changed paths, Git status, staged/untracked distinctions, branch and explicit limit flag |
+| `changes.read` | `{path?, staged?, offset?, revision?}`; paged read-only diff with named baseline |
 | `input.select` | Only `{surface:"native"}` is advertised/supported in this preview |
 | `shutdown` | Stop admission, cancel, flush, release ownership and exit |
 
 Durable updates carry increasing `seq`; Swift ignores duplicate cursors and requests a snapshot on a gap. Activity deltas have stable action IDs and are cosmetic, without a durable cursor. This implementation provides snapshot resynchronization, not a paged durable event-replay log. Unknown optional events are ignored; an incompatible major protocol fails visibly and disables input.
 
-Limits enforced here: 256 KiB frame, 4 MiB queued transport data, three queued tasks, 16,000-character submissions, 200 loaded native transcript rows / 8 MiB, 40 recent runtime activities per run, bounded snapshot summaries, 32 KiB file/output pages, 64 MiB recorded output per run with an explicit incomplete-evidence marker, and 30 Hz cosmetic presentation batching. Canonical Broccoli history and the CLI's full transcript still need long-session growth work. No claim is made that every alpha resource bound is complete.
+Native request callbacks have a 15-second deadline and a 64-request bound. A missing acknowledgment closes the private input pipe so the runtime begins cleanup. A timed-out submission is **acceptance unknown**, not rejected: the draft is preserved, and explicit Reconnect waits for the old worker to exit, takes a snapshot, then calls `task.lookup`. It never resubmits automatically. Force Stop can still leave an ambiguous ownership record that needs manual reconciliation.
+
+Pipe writes use DispatchIO independently of the draining reader; a blocked writer cannot block read processing. Diagnostics keep only a 16 KiB tail at receipt. Critical cancellation bypasses queued inspection reads. Approval resolution claims the pending operation before its durable write yields, and cancellation during that write denies execution. Protocol responses are validated before an acceptance can clear the composer.
+
+Limits enforced here: 256 KiB frame, 4 MiB queued transport data, three queued tasks, 16,000-character submissions, 200 loaded native transcript rows / 8 MiB, 40 recent runtime activities per run (eight in each bounded snapshot projection), 32 KiB file/output/diff pages, one 1 MiB diff snapshot per workspace, 128 previous-page offsets/cursors, 64 MiB recorded output per run with an explicit incomplete-evidence marker, and up to 30 Hz visible cosmetic presentation batching. JSON-encoded byte budgets account for escaped and multibyte text. Hidden windows keep draining; unnecessary activity repainting and elapsed timers stop while occluded. Canonical Broccoli history and the CLI's full transcript still need long-session growth work. No claim is made that every alpha resource bound is complete.
+
+A file revision is checked before and after each read. Changed files require Reload; no stale offset is silently appended. Diff paging stays on one captured comparison until Reload, even if files change afterward. Switching comparisons expires the old cache. An oversized diff is explicitly incomplete. These are inspection protections, not mutation preconditions or a rollback feature.
+
+## Native navigation and recovery
+
+The source-list sidebar keeps Files, Changes and Sessions visibly selected. Files loads one directory page at a time and filters only that folder. Changes separates working-tree and staged comparisons and identifies untracked paths. Sessions pages recorded runs with a timestamp/ID cursor. Browsing never adds model context.
+
+The searchable native action sheet is available through Command–Shift–P. Command–1/2/3 selects Files/Changes/Sessions; Command–L focuses the composer; Command–B toggles navigation. Native toolbar controls and menus expose Stop. Relative path breadcrumbs, read-only inspection, Previous/Next paging, Reload and Reveal preserve familiar macOS conventions. Sidebar preference returns after widening; compact windows switch between Agent and Inspect while keeping the composer available.
+
+Follow-ups queue with a visible three-instruction bound. Stop & Send preserves the draft, cancels all outstanding runs, and sends only after confirmed terminal outcomes. An Interrupted outcome or lost connection cancels that pending intent instead of overlapping uncertain work. Persistent error messages are separate from changing activity status. Tool rows expand in place, and unchanged transcript rows are preserved where possible. Full selection/IME/VoiceOver behavior still needs an application walkthrough.
 
 ## Reproduce verification
 
@@ -83,14 +100,17 @@ clang -O2 scripts/desktop-footprint.c -o build/desktop-footprint
 node scripts/verify-desktop.mjs          # real provider task; existing CLI credentials
 node scripts/verify-desktop.mjs --cancel # real provider wait cancellation
 node scripts/verify-desktop.mjs --idle
+node scripts/verify-desktop.mjs --ui     # real read-only bridge, native wide/narrow/dark captures
 node scripts/verify-desktop.mjs --restore build/desktop-live-<timestamp>/workspace
 node scripts/benchmark-desktop.mjs       # one GUI, four workers, 60-second idle sample
 ```
 
 The opt-in `--integration-probe <plan.json>` harness writes into a disposable fixture and submits through the actual native composer. It captures the owned application window with macOS screenshot tooling. It does not supply model output or bypass permissions. The script then terminates only the GUI process it spawned and observes worker EOF cleanup. Plans, screenshots, resulting files, process IDs and evidence JSON remain under `build/desktop-*`.
 
-Run the GUI probes sequentially. The restore probe opens an existing completed session without submitting another instruction. Evidence includes SHA-256 hashes of the packaged GUI, CLI, Node helper and harness, alongside the source baseline. This identifies the tested version pair even before its source changes are committed.
+Run the GUI probes sequentially, after the build and native tests finish. The UI probe also verifies actual file/diff text and control bounds; it creates no provider task. Probe folders do not enter Recent Workspaces or save window geometry. The restore probe opens an existing completed session without submitting another instruction. Evidence includes SHA-256 hashes of the packaged GUI, CLI, Node helper and harness, alongside the source baseline. This identifies the tested version pair even before its source changes are committed.
 
 Physical-footprint samples use `proc_pid_rusage` and report each PID separately. CPU time uses Mach ticks with the host timebase. Aggregate process accounting is not exact unique physical RAM. Live-task end samples exclude transient tools that have already exited; they are not a peak complete-workload measurement. The four-window script records hardware, OS, memory pressure and swap. See the release evidence report for measured values and outstanding acceptance work.
 
 Primary references consulted: [Apple NSApplication](https://developer.apple.com/documentation/appkit/nsapplication), [window close policy](https://developer.apple.com/documentation/appkit/nswindowdelegate/windowshouldclose(_:)), [Hardened Runtime](https://developer.apple.com/documentation/security/hardened-runtime), [official Node checksums](https://nodejs.org/dist/v22.22.0/SHASUMS256.txt), and [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm). SwiftTerm is not yet integrated or pinned: same-worker PTY/TUI isolation is the next integration boundary, and this preview does not advertise an Agent Terminal.
+
+Navigation research for this pass: [Apple sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars), [Apple toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars), [AppKit source-list tables](https://developer.apple.com/documentation/appkit/nstableview/style-swift.enum/sourcelist), and [VS Code's navigation and Command Palette](https://code.visualstudio.com/docs/editing/getting-started/userinterface). The implementation adopts selection, wayfinding and command discoverability patterns; the agent and read-only evidence remain the center of this native product.

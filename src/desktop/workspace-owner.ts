@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import { mkdir, open, readFile, realpath, unlink, rmdir, lstat } from "node:fs/promises"
+import { lstat, mkdir, open, readFile, realpath, rmdir, unlink } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 

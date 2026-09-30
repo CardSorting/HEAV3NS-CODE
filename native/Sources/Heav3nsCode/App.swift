@@ -1,6 +1,6 @@
 import AppKit
 
-final class ApplicationDelegate: NSObject, NSApplicationDelegate {
+final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var launcher: NSWindow?
     private var workspaces = [String: WorkspaceWindow]()
     private var quitting = false
@@ -34,6 +34,12 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         let viewItem = NSMenuItem(); viewItem.title = "Workspace"; let view = NSMenu(title: "Workspace")
         let palette = view.addItem(withTitle: "Actions…", action: #selector(actions), keyEquivalent: "p"); palette.keyEquivalentModifierMask = [.command, .shift]; palette.target = self
         view.addItem(withTitle: "Toggle Navigation", action: #selector(toggleNavigation), keyEquivalent: "b").target = self
+        view.addItem(withTitle: "Focus Composer", action: #selector(focusComposer), keyEquivalent: "l").target = self
+        view.addItem(.separator())
+        view.addItem(withTitle: "Files", action: #selector(showFiles), keyEquivalent: "1").target = self
+        view.addItem(withTitle: "Changes", action: #selector(showChanges), keyEquivalent: "2").target = self
+        view.addItem(withTitle: "Sessions", action: #selector(showSessions), keyEquivalent: "3").target = self
+        view.addItem(.separator())
         view.addItem(withTitle: "Stop Run", action: #selector(stop), keyEquivalent: ".").target = self
         viewItem.submenu = view; main.addItem(viewItem)
         let windowItem = NSMenuItem(); windowItem.title = "Window"; let window = NSMenu(title: "Window")
@@ -41,7 +47,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         windowItem.submenu = window; main.addItem(windowItem); NSApp.windowsMenu = window
         NSApp.mainMenu = main
     }
-    private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow } }
+    private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent } }
     @objc private func about() {
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HEAV3NS-CODE", .applicationVersion: "0.1 · Integration Preview", .credits: NSAttributedString(string: "A native workspace for LUMI.\nExecution and credentials remain in the CLI.")])
     }
@@ -62,9 +68,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         }
         launcher?.orderOut(nil)
         workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil); workspace.attach()
-        var recent = UserDefaults.standard.stringArray(forKey: "recentWorkspaces") ?? []
-        recent.removeAll { $0 == canonical.path }; recent.insert(canonical.path, at: 0)
-        UserDefaults.standard.set(Array(recent.prefix(12)), forKey: "recentWorkspaces")
+        if !ProcessInfo.processInfo.arguments.contains("--integration-probe") {
+            var recent = UserDefaults.standard.stringArray(forKey: "recentWorkspaces") ?? []
+            recent.removeAll { $0 == canonical.path }; recent.insert(canonical.path, at: 0)
+            UserDefaults.standard.set(Array(recent.prefix(12)), forKey: "recentWorkspaces")
+        }
     }
     private func showLauncher() {
         let window = launcher ?? NSWindow(contentRect: NSRect(x: 0, y: 0, width: 780, height: 520), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -90,10 +98,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func openRecent(_ sender: NSButton) { if let path = sender.identifier?.rawValue { open(URL(fileURLWithPath: path)) } }
     @objc private func toggleNavigation() { current?.toggleNavigation() }
+    @objc private func focusComposer() { current?.focusComposer() }
+    @objc private func showFiles() { current?.showFiles() }
+    @objc private func showChanges() { current?.showChanges() }
+    @objc private func showSessions() { current?.showSessions() }
     @objc private func stop() { current?.stop() }
     @objc private func actions() {
-        let alert = NSAlert(); alert.messageText = "Workspace Actions"; alert.addButton(withTitle: "Open Folder…"); alert.addButton(withTitle: "Inspect Changes"); alert.addButton(withTitle: "Cancel")
-        switch alert.runModal() { case .alertFirstButtonReturn: openFolder(); case .alertSecondButtonReturn: current?.showChanges(); default: break }
+        if let current { current.showActions() } else { openFolder() }
+    }
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(stop) { return current?.hasWork == true }
+        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions)].contains(menuItem.action) { return current != nil }
+        return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if workspaces.isEmpty { return .terminateNow }

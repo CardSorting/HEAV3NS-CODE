@@ -32,6 +32,12 @@ struct FrameParser {
     }
 }
 
+struct RuntimeFailure: LocalizedError {
+    let message: String
+    let acceptanceUnknown: Bool
+    var errorDescription: String? { message }
+}
+
 final class RuntimeClient {
     var onEvent: (([String: Any]) -> Void)?
     var onConnection: ((String) -> Void)?
@@ -43,65 +49,89 @@ final class RuntimeClient {
     private(set) var process: Process?
     private let input = Pipe(), output = Pipe(), diagnostic = Pipe()
     private let io = DispatchQueue(label: "io.heav3ns.desktop.transport")
+    private var writer: DispatchIO?
     private var parser = FrameParser()
-    private var callbacks = [String: (Result<[String: Any], Error>) -> Void]()
+    private struct Pending {
+        let method: String
+        let completion: (Result<[String: Any], Error>) -> Void
+        let deadline: DispatchWorkItem
+    }
+    private var callbacks = [String: Pending]()
     private var diagnosticTail = Data()
+    private let diagnosticLock = NSLock()
     private var closed = false
+    private var failure: String?
+    private var snapshotPending = false
+    private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
+    private let nodeOverride: URL?
+    private let cliOverride: URL?
+    private let requestTimeout: TimeInterval
     var pid: Int32? { process?.isRunning == true ? process?.processIdentifier : nil }
+    var pendingRequestCount: Int { callbacks.count }
 
+    init(node: URL? = nil, cli: URL? = nil, requestTimeout: TimeInterval = 15) {
+        nodeOverride = node; cliOverride = cli; self.requestTimeout = requestTimeout
+    }
     func start(folder: URL) {
         guard process == nil else { return }
-        let resource = Bundle.main.resourceURL!
+        let resource = Bundle.main.resourceURL ?? Bundle.main.bundleURL
         let environment = ProcessInfo.processInfo.environment
-        let node = environment["HEAV3NS_NODE"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/node")
-        let cli = environment["HEAV3NS_CLI"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/dist/index.js")
+        let node = nodeOverride ?? environment["HEAV3NS_NODE"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/node")
+        let cli = cliOverride ?? environment["HEAV3NS_CLI"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/dist/index.js")
         guard FileManager.default.isExecutableFile(atPath: node.path), FileManager.default.fileExists(atPath: cli.path) else {
-            onConnection?("Runtime missing. Run npm run desktop:build to build the paired app."); return
+            fail("The bundled LUMI runtime is missing. Rebuild or reinstall this application."); return
         }
         let child = Process()
-        child.executableURL = node
-        child.arguments = [cli.path, "--desktop-worker"]
+        child.executableURL = node; child.arguments = [cli.path, "--desktop-worker"]
         child.currentDirectoryURL = folder
         child.environment = environment.merging(["NO_COLOR": "1", "TERM": "dumb"]) { _, new in new }
-        child.standardInput = input
-        child.standardOutput = output
-        child.standardError = diagnostic
+        child.standardInput = input; child.standardOutput = output; child.standardError = diagnostic
         output.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard let self else { return }
-            self.io.async { self.receive(data) }
+            if data.isEmpty { handle.readabilityHandler = nil }
+            self.deliveryLock.lock()
+            self.pendingDeliveries += data.count
+            let overflow = self.pendingDeliveries > 4 * 1024 * 1024
+            self.deliveryLock.unlock()
+            if overflow {
+                handle.readabilityHandler = nil
+                DispatchQueue.main.async { [weak self] in self?.fail("Output exceeded the display queue. LUMI is stopping; reconnect to inspect its recorded state.") }
+            } else { self.io.async { self.receive(data) } }
         }
         diagnostic.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil; return }
             guard let self else { return }
-            self.io.async {
-                self.diagnosticTail.append(data)
-                if self.diagnosticTail.count > 16_384 { self.diagnosticTail.removeFirst(self.diagnosticTail.count - 16_384) }
-            }
+            self.diagnosticLock.lock()
+            self.diagnosticTail.append(data.suffix(16_384))
+            if self.diagnosticTail.count > 16_384 { self.diagnosticTail.removeFirst(self.diagnosticTail.count - 16_384) }
+            self.diagnosticLock.unlock()
         }
         child.terminationHandler = { [weak self] child in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isReady = false
-                self.output.fileHandleForReading.readabilityHandler = nil
-                self.diagnostic.fileHandleForReading.readabilityHandler = nil
-                let reason = self.io.sync { String(data: self.diagnosticTail, encoding: .utf8) ?? "" }
-                let message = child.terminationStatus == 0 ? "Disconnected · worker stopped" : "Disconnected · last outcome unknown. \(reason.suffix(1600))"
-                self.onConnection?(message)
-                let waiting = self.callbacks; self.callbacks.removeAll()
-                waiting.values.forEach { $0(.failure(BridgeError.message(message))) }
-                self.onExit?()
+            guard let self else { return }
+            self.io.async {
+                self.diagnosticLock.lock()
+                let reason = String(data: self.diagnosticTail, encoding: .utf8) ?? ""
+                self.diagnosticLock.unlock()
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.output.fileHandleForReading.readabilityHandler = nil
+                    self.diagnostic.fileHandleForReading.readabilityHandler = nil
+                    self.fail(self.failure ?? (child.terminationStatus == 0 ? "Disconnected · LUMI stopped." : "LUMI stopped unexpectedly. Last outcome may be unknown. \(reason.suffix(1200))"))
+                    self.onExit?()
+                }
             }
         }
         do {
-            try child.run()
-            process = child
-            // Close the parent's copies of the child endpoints so EOF is observable.
-            try? input.fileHandleForReading.close()
-            try? output.fileHandleForWriting.close()
-            try? diagnostic.fileHandleForWriting.close()
+            try child.run(); process = child
+            let descriptor = dup(input.fileHandleForWriting.fileDescriptor)
+            guard descriptor >= 0 else { throw BridgeError.message("Could not open LUMI's private input channel.") }
+            writer = DispatchIO(type: .stream, fileDescriptor: descriptor, queue: io) { _ in close(descriptor) }
+            try? input.fileHandleForWriting.close()
+            try? input.fileHandleForReading.close(); try? output.fileHandleForWriting.close(); try? diagnostic.fileHandleForWriting.close()
             onConnection?("Connecting to LUMI…")
             request("hello") { [weak self] result in
                 guard let self else { return }
@@ -109,78 +139,135 @@ final class RuntimeClient {
                 case .success(let hello):
                     guard hello["protocol"] as? Int == 1, let ws = hello["workspace"] as? String,
                           let session = hello["session"] as? String, let runtime = hello["runtime"] as? String else {
-                        self.fail("Incompatible CLI. Rebuild the app and runtime together."); return
+                        self.fail("This app and LUMI use incompatible protocols. Install a matching version pair."); return
                     }
-                    self.workspace = ws; self.session = session; self.runtime = runtime; self.isReady = true
-                    self.onConnection?("Connected")
-                    self.requestSnapshot()
+                    self.workspace = ws; self.session = session; self.runtime = runtime
+                    self.requestSnapshot { [weak self] in
+                        guard let self, !self.closed else { return }
+                        self.isReady = true; self.onConnection?("Connected")
+                    }
                 case .failure(let error): self.fail(error.localizedDescription)
                 }
             }
-        } catch { onConnection?("Could not start LUMI: \(error.localizedDescription)") }
+        } catch { fail("Could not start LUMI: \(error.localizedDescription)") }
     }
-
     func request(_ method: String, params: [String: Any] = [:], id: String = UUID().uuidString, completion: @escaping (Result<[String: Any], Error>) -> Void = { _ in }) {
-        guard process?.isRunning == true, !closed, callbacks.count < 128 else { completion(.failure(BridgeError.message("Runtime is unavailable or busy; your draft is preserved."))); return }
-        let frame: [String: Any] = ["v": 1, "kind": "request", "id": id, "workspace": workspace, "session": session, "method": method, "params": params]
+        guard process?.isRunning == true, !closed, callbacks.count < 64, callbacks[id] == nil, let writer else {
+            completion(.failure(RuntimeFailure(message: "LUMI is unavailable or has too many pending requests. Your draft is preserved.", acceptanceUnknown: false))); return
+        }
         do {
-            var data = try JSONSerialization.data(withJSONObject: frame)
-            guard data.count <= FrameParser.limit else { throw BridgeError.message("Instruction is too large. Please shorten it.") }
+            var data = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "request", "id": id, "workspace": workspace, "session": session, "method": method, "params": params])
+            guard data.count <= FrameParser.limit, pendingWrites + data.count < 4 * 1024 * 1024 else { throw BridgeError.message("The input queue is full. Your draft is preserved; try again after LUMI catches up.") }
             data.append(10)
-            callbacks[id] = completion
-            io.async { [weak self] in
-                do { try self?.input.fileHandleForWriting.write(contentsOf: data) }
-                catch { DispatchQueue.main.async { self?.fail("Control channel lost; the last confirmed outcome is preserved.") } }
+            let timeout = DispatchWorkItem { [weak self] in
+                guard let self, self.callbacks[id] != nil else { return }
+                self.fail("LUMI did not confirm \(method == "task.submit" ? "the instruction" : "the request") in time. It is stopping; reconnect to reconcile recorded state.")
+            }
+            callbacks[id] = Pending(method: method, completion: completion, deadline: timeout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + requestTimeout, execute: timeout)
+            pendingWrites += data.count
+            let count = data.count
+            let bytes = data.withUnsafeBytes { DispatchData(bytes: $0) }
+            writer.write(offset: 0, data: bytes, queue: io) { [weak self] done, _, error in
+                if done { DispatchQueue.main.async { self?.pendingWrites -= count } }
+                if error != 0 { DispatchQueue.main.async { self?.fail("The control channel closed. Reconnect to check the last confirmed outcome.") } }
             }
         } catch { completion(.failure(error)) }
     }
-
-    func requestSnapshot() {
+    func requestSnapshot(completion: (() -> Void)? = nil) {
+        guard !snapshotPending else { return }; snapshotPending = true
         request("snapshot") { [weak self] result in
-            if case .success(let snapshot) = result { self?.onEvent?(["kind": "snapshot", "payload": snapshot]) }
+            guard let self else { return }; self.snapshotPending = false
+            switch result {
+            case .success(let snapshot):
+                guard snapshot["workspace"] as? String == self.workspace, snapshot["session"] as? String == self.session, snapshot["runtime"] as? String == self.runtime else { self.fail("The snapshot belongs to another workspace. LUMI has been disconnected."); return }
+                self.onEvent?(["kind": "snapshot", "payload": snapshot]); completion?()
+            case .failure(let error): self.fail(error.localizedDescription)
+            }
         }
     }
     private func receive(_ data: Data) {
-        guard !data.isEmpty else {
-            output.fileHandleForReading.readabilityHandler = nil
-            let reason: String
-            do { try parser.finish(); reason = "Disconnected · control channel closed; last confirmed state is preserved." }
-            catch { reason = error.localizedDescription }
-            DispatchQueue.main.async { [weak self] in self?.fail(reason) }
-            return
-        }
         do {
+            if data.isEmpty {
+                try parser.finish()
+                DispatchQueue.main.async { [weak self] in self?.fail("Disconnected · control channel closed. Last confirmed state is preserved.") }; return
+            }
             let messages = try parser.append(data)
-            deliveryLock.lock(); pendingDeliveries += data.count; let overflow = pendingDeliveries > 4 * 1024 * 1024; deliveryLock.unlock()
-            if overflow { throw BridgeError.message("Presentation queue exceeded its limit; reconnect to inspect recorded state.") }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.deliveryLock.lock(); self.pendingDeliveries -= data.count; self.deliveryLock.unlock()
+                guard !self.closed else { return }
                 for message in messages {
-                    if message["kind"] as? String == "response", let id = message["id"] as? String, let callback = self.callbacks.removeValue(forKey: id) {
-                        if let error = message["error"] as? [String: Any] { callback(.failure(BridgeError.message(error["message"] as? String ?? "Runtime request failed"))) }
-                        else { callback(.success(message["result"] as? [String: Any] ?? [:])) }
+                    if message["kind"] as? String == "response", let id = message["id"] as? String, let pending = self.callbacks[id] {
+                        if let error = message["error"] as? [String: Any], let explanation = error["message"] as? String {
+                            self.callbacks.removeValue(forKey: id); pending.deadline.cancel()
+                            pending.completion(.failure(RuntimeFailure(message: explanation, acceptanceUnknown: false)))
+                        } else if let result = message["result"] as? [String: Any], self.validResult(result, for: pending.method) {
+                            self.callbacks.removeValue(forKey: id); pending.deadline.cancel(); pending.completion(.success(result))
+                        } else {
+                            self.fail("LUMI sent an invalid response to \(pending.method). Execution is disconnected; recorded state must be reconciled."); return
+                        }
                     } else if message["kind"] as? String == "event" {
                         guard message["workspace"] as? String == self.workspace, message["session"] as? String == self.session, message["runtime"] as? String == self.runtime else { continue }
+                        if let type = message["type"] as? String, ["run.state", "run.accepted", "approval.requested", "approval.resolved"].contains(type) {
+                            guard let payload = message["payload"] as? [String: Any], self.validRun(payload), message["seq"] is NSNumber else { self.fail("LUMI sent an invalid state event. Reconnect to recover recorded state."); return }
+                        }
                         self.onEvent?(message)
-                    } else if message["kind"] as? String == "protocol.error" { self.fail("Runtime protocol error. Rebuild the paired application.") }
+                    } else if message["kind"] as? String == "protocol.error" { self.fail("LUMI reported a protocol error. Reinstall a matching app and runtime pair.") }
                 }
             }
         } catch { DispatchQueue.main.async { [weak self] in self?.fail(error.localizedDescription) } }
     }
+    private func validRun(_ run: [String: Any]) -> Bool {
+        guard run["id"] is String, run["text"] is String, run["session"] as? String == session,
+              let state = run["state"] as? String, ["queued", "running", "awaiting_approval", "cancelling", "completed", "failed", "cancelled", "timed_out", "interrupted"].contains(state),
+              run["createdAt"] is NSNumber else { return false }
+        if state == "awaiting_approval" {
+            guard let approval = run["approval"] as? [String: Any], approval["operation"] is String, approval["tool"] is String, approval["args"] is String, approval["scope"] is String else { return false }
+        }
+        return true
+    }
+    private func validResult(_ result: [String: Any], for method: String) -> Bool {
+        switch method {
+        case "task.submit": return result["accepted"] as? Bool == true && (result["run"] as? [String: Any]).map(validRun) == true
+        case "task.lookup":
+            guard let found = result["found"] as? Bool else { return false }
+            return !found || (result["run"] as? [String: Any]).map(validRun) == true
+        case "snapshot", "history.list": return (result["runs"] as? [[String: Any]]).map { $0.allSatisfy(validRun) } == true
+        case "task.cancel": return result["requested"] as? Bool == true
+        case "approval.resolve": return result["resolved"] as? Bool == true
+        case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
+        case "files.list", "changes.list": return result["entries"] is [[String: Any]]
+        default: return true
+        }
+    }
     private func fail(_ message: String) {
-        isReady = false; onConnection?(message)
+        let wasOpen = !closed
+        isReady = false
+        if failure == nil { failure = message }
         closeInput()
+        if wasOpen { onConnection?(failure ?? message) }
+        let waiting = callbacks; callbacks.removeAll()
+        for pending in waiting.values {
+            pending.deadline.cancel()
+            pending.completion(.failure(RuntimeFailure(message: failure ?? message, acceptanceUnknown: pending.method == "task.submit")))
+        }
     }
     func closeInput() {
         guard !closed else { return }; closed = true
-        io.async { [weak self] in try? self?.input.fileHandleForWriting.close() }
+        writer?.close(flags: .stop); writer = nil
+        try? input.fileHandleForWriting.close()
     }
-    func shutdown() { request("shutdown"); closeInput() }
+    func shutdown() {
+        request("shutdown") { [weak self] _ in self?.closeInput() }
+    }
     func forceStop() {
-        // Process retains the actual child handle. Never match or kill by name.
         if let child = process, child.isRunning { kill(child.processIdentifier, SIGKILL) }
         closeInput()
     }
-    deinit { output.fileHandleForReading.readabilityHandler = nil; diagnostic.fileHandleForReading.readabilityHandler = nil; try? input.fileHandleForWriting.close() }
+    deinit {
+        callbacks.values.forEach { $0.deadline.cancel() }
+        output.fileHandleForReading.readabilityHandler = nil; diagnostic.fileHandleForReading.readabilityHandler = nil
+        writer?.close(flags: .stop); try? input.fileHandleForWriting.close()
+    }
 }
