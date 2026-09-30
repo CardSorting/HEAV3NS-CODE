@@ -27,3 +27,13 @@ The repository also contains a separately licensed nested component:
 The complete repository boundary is summarized in
 LICENSE-MAP.md. Project acknowledgments for referenced research or
 software are kept in NOTICE and the provenance records under .wiki/ip/.
+
+## HEAV3NS-CODE native integration preview
+
+The local `.app` builder bundles the official Node.js 22.22.0 darwin-arm64
+runtime. Preserve `Contents/Resources/NODE-LICENSE`, which contains the
+upstream MIT license and the runtime's third-party component notices.
+The included TypeScript package retains its own license and notices in
+`Contents/Resources/runtime/node_modules/typescript`. Existing CLI dependency
+notices remain controlling. This local packaging proof does not clear the
+repository's outstanding source-provenance release gate.

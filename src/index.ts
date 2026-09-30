@@ -5267,7 +5267,12 @@ ${modelCommands}
 	}
 
 	let stateManagerInitialized = false
+	let workspaceOwner: Awaited<ReturnType<typeof import("./desktop/workspace-owner.js").acquireWorkspace>> | undefined
 	;(async () => {
+		if (primaryCmd === "--desktop-worker") {
+			await (await import("./desktop/worker.js")).runDesktopWorker()
+			return
+		}
 		if (providerFlagIndex >= 0 && !providerFlagValue) throw new Error("--provider requires a provider ID")
 		if (modelFlagIndex >= 0 && !modelFlagValue) throw new Error("--model requires a model route")
 		if (configuredProviderValue && !supportedCliProviders.has(configuredProvider)) {
@@ -5287,6 +5292,7 @@ ${modelCommands}
 				`Could not initialize HEAV3NS CLI storage at "${getStorageDataDirectory()}". Check that the directory is writable or set DIETCODE_DIR to a writable location. ${detail}`,
 			)
 		}
+		workspaceOwner = await (await import("./desktop/workspace-owner.js")).acquireWorkspace(process.cwd())
 		const lumi = new LumiMonolith(configuredProviderValue ? { provider: configuredProvider } : {})
 		if (configuredModelValue) {
 			lumi.setModel(configuredModelValue)
@@ -5481,5 +5487,6 @@ ${modelCommands}
 					process.exitCode = 1
 				}
 			}
+			await workspaceOwner?.release()
 		})
 }

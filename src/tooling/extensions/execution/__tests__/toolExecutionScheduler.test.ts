@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { setImmediate } from "node:timers/promises"
 import type { IToolRegistry, ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
 import { type ScheduledToolCall, ToolExecutionScheduler } from "../tool-execution-scheduler.js"
+import { ToolApprovalDeniedError } from "../tool-confirmation-gatekeeper.js"
 
 function deferred() {
 	let resolve!: () => void
@@ -28,6 +29,14 @@ function call(id: string, name = "view_file", args: Record<string, unknown> = { 
 }
 
 describe("ToolExecutionScheduler ready-queue throughput", () => {
+	it("reports a permission denial without treating it as a tool crash or retry", async () => {
+		let calls = 0
+		const tools = registry(async () => { calls++; throw new ToolApprovalDeniedError("Denied for this operation") })
+		const { results } = await new ToolExecutionScheduler().executeBatch([call("denied")], tools, process.cwd(), { enableCache: false })
+		assert.equal(calls, 1)
+		assert.equal(results[0].denied, true)
+		assert.deepEqual(results[0].output, { denied: true, reason: "Denied for this operation" })
+	})
 	it("starts independent I/O when a slot opens without waiting for the slowest prior read", async () => {
 		const slow = deferred()
 		const started: string[] = []

@@ -445,6 +445,7 @@ export class ToolExecutionScheduler {
 		// 3. Execute Tool with execution authority options
 		let rawResult: unknown = null
 		let isSuccess = true
+		let denied = false
 		let exitCode: number | undefined
 
 		const execOptions: ToolExecutionOptions = {
@@ -473,9 +474,13 @@ export class ToolExecutionScheduler {
 			}
 		} catch (err: unknown) {
 			isSuccess = false
+			denied = err instanceof Error && err.name === "ToolApprovalDeniedError"
 			// 4. Model-Facing Diagnostic Auto-Healing
-			const healed = this.healer.diagnoseAndHeal(call.name, parsedArgs, err, cwd, toolDef)
-			rawResult = this.healer.formatForModel(healed)
+			if (denied) rawResult = { denied: true, reason: (err as Error).message }
+			else {
+				const healed = this.healer.diagnoseAndHeal(call.name, parsedArgs, err, cwd, toolDef)
+				rawResult = this.healer.formatForModel(healed)
+			}
 		}
 
 		const elapsed = Date.now() - callStart
@@ -493,6 +498,7 @@ export class ToolExecutionScheduler {
 			output: finalOutput,
 			durationMs: elapsed,
 			success: isSuccess,
+			...(denied ? { denied: true } : {}),
 			exitCode,
 		}
 	}

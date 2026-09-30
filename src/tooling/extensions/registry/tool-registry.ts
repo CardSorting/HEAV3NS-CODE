@@ -22,7 +22,7 @@ import { ToolOutputGovernor } from "../execution/tool-output-governor.js";
 import { ToolErrorAutoHealer } from "../execution/tool-error-auto-healer.js";
 import { ToolTransactionJournal } from "../execution/tool-transaction-journal.js";
 import { ToolSafetyPolicyManager } from "../execution/tool-safety-policy-manager.js";
-import { ToolConfirmationGatekeeper } from "../execution/tool-confirmation-gatekeeper.js";
+import { ToolConfirmationGatekeeper, ToolApprovalDeniedError } from "../execution/tool-confirmation-gatekeeper.js";
 import { ToolLoopBreaker } from "../execution/tool-loop-breaker.js";
 import { ToolTelemetryLedger } from "../execution/tool-telemetry-ledger.js";
 import { MultiFileAtomicPatchOrchestrator } from "../execution/multi-file-atomic-patch-orchestrator.js";
@@ -503,6 +503,13 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
   readonly journal: ToolTransactionJournal;
   readonly safetyPolicy: ToolSafetyPolicyManager;
   readonly confirmationGatekeeper: ToolConfirmationGatekeeper;
+  private hostInteractivePolicy = false;
+
+  /** Pins the existing confirmation gate for all nested desktop tool calls. */
+  public requireInteractiveHost(hook: import("../execution/tool-confirmation-gatekeeper.js").ConfirmationHook): void {
+    this.hostInteractivePolicy = true;
+    this.confirmationGatekeeper.setRequiredHostHook(hook);
+  }
   readonly loopBreaker: ToolLoopBreaker;
   readonly telemetryLedger: ToolTelemetryLedger;
   readonly atomicPatchOrchestrator: MultiFileAtomicPatchOrchestrator;
@@ -643,6 +650,9 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     cwd: string,
     options?: ToolExecutionOptions
   ): Promise<unknown> {
+    // A native host may pin the existing interactive policy. Nested tools cannot
+    // elevate it by passing autonomous execution options.
+    if (this.hostInteractivePolicy) options = { ...options, executionAuthority: "interactive", bypassConfirmation: false, bypassThreatDetection: false, autoHeal: false };
     const canonicalName = this.getTool(name)?.name ?? name;
     const effectiveAuthority = options?.executionAuthority ?? this.currentAuthority;
     const isAutonomous = effectiveAuthority === "autonomous" || effectiveAuthority === "high_throughput";
@@ -758,8 +768,9 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         authority: effectiveAuthority,
       }
     );
+    options?.signal?.throwIfAborted();
     if (!confirmation.approved) {
-      throw new Error(confirmation.rejectionFeedback || `Execution of tool '${canonicalName}' was blocked by confirmation policy.`);
+      throw new ToolApprovalDeniedError(confirmation.rejectionFeedback || `Execution of tool '${canonicalName}' was denied by confirmation policy.`);
     }
 
     // Check speculative prefetch cache
@@ -3706,10 +3717,10 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       parameters: {
         command: { type: "string", required: true, description: "Shell command string" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         const command = String(args.command);
         const effectiveCwd = typeof args.cwd === "string" ? args.cwd : cwd;
-        return hands.runCommand(command, effectiveCwd);
+        return hands.runCommand(command, effectiveCwd, { signal: options?.signal, timeoutMs: options?.timeoutMs });
       },
     });
 

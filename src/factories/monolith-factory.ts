@@ -630,6 +630,8 @@ import { AcpDashboardModal } from "../tui/components/acp-dashboard-modal.js"
 
 export interface MonolithFactoryOptions {
 	cwd?: string
+	/** An already-owned workspace kernel, used by the desktop session adapter. */
+	databaseKernel?: BroccoliDatabaseKernel
 	sessionId?: string
 	config?: AgentConfig
 	provider?: AgentProviderId
@@ -1329,7 +1331,8 @@ export class MonolithFactory {
 		const mutationSubstrate = new NativeMutationTransactionSubstrate(cwd)
 		const writeCoalescer = new WriteCoalescerSubstrate()
 		const convergenceEngine = new ConvergenceEngineSubstrate()
-		const databaseKernel = new BroccoliDatabaseKernel({ workspaceRoot: cwd })
+		const databaseKernel = options.databaseKernel ?? new BroccoliDatabaseKernel({ workspaceRoot: cwd })
+		if (databaseKernel.workspaceRoot !== cwd) throw new Error("Database kernel must belong to the selected workspace")
 		const broccoliConnectionPool = new BroccoliConnectionPool()
 		const broccoliLockAuthority = new BroccoliLockAuthority()
 		const broccoliQueryOptimizer = new BroccoliQueryOptimizer()

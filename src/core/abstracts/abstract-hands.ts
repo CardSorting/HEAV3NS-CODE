@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { exec } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import type { IHands } from "../contracts/tooling.contracts.js";
 
@@ -10,6 +10,7 @@ export interface ProcessExecutionOptions {
   timeoutMs?: number;
   env?: NodeJS.ProcessEnv;
   maxBuffer?: number;
+  signal?: AbortSignal;
 }
 
 export interface ReplacementChunk {
@@ -242,6 +243,7 @@ export abstract class AbstractHands implements IHands {
     cwd: string,
     options?: ProcessExecutionOptions
   ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
+    if (options?.signal) return this.runOwnedProcess(command, cwd, options);
     const startedAt = performance.now();
     try {
       const maxBuffer = options?.maxBuffer ?? 10 * 1024 * 1024; // 10MB execution buffer
@@ -266,5 +268,41 @@ export abstract class AbstractHands implements IHands {
         durationMs,
       };
     }
+  }
+
+  /** A cancellable shell owns its process group; never terminate by executable name. */
+  private runOwnedProcess(command: string, cwd: string, options: ProcessExecutionOptions) {
+    const started = performance.now();
+    options.signal?.throwIfAborted();
+    return new Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }>((resolve, reject) => {
+      const child = spawn(command, { cwd, shell: true, detached: process.platform !== "win32", env: { ...process.env, ...options.env }, stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "", stderr = "", bytes = 0;
+      let forceTimer: NodeJS.Timeout | undefined;
+      let timeout: NodeJS.Timeout | undefined;
+      let stopping = false;
+      const terminate = (signal: NodeJS.Signals) => {
+        if (!child.pid) return;
+        try { if (process.platform !== "win32") process.kill(-child.pid, signal); else child.kill(signal); }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") stderr += `\nCleanup unresolved: ${String(error)}`; }
+      };
+      const stop = () => {
+        if (stopping) return; stopping = true;
+        terminate("SIGTERM");
+        forceTimer = setTimeout(() => terminate("SIGKILL"), 1000);
+      };
+      const consume = (chunk: string, error: boolean) => {
+        bytes += Buffer.byteLength(chunk);
+        if (bytes > (options.maxBuffer ?? 10 * 1024 * 1024)) { if (!stopping) stderr += "\n[Output limit reached; evidence incomplete.]"; stop(); return; }
+        if (error) stderr += chunk; else stdout += chunk;
+      };
+      child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+      child.stdout.on("data", chunk => consume(chunk, false)); child.stderr.on("data", chunk => consume(chunk, true));
+      const cleanup = () => { clearTimeout(forceTimer); clearTimeout(timeout); options.signal?.removeEventListener("abort", stop); };
+      child.once("error", error => { cleanup(); reject(error); });
+      child.once("close", (code, signal) => { cleanup(); resolve({ stdout, stderr: stderr || (signal ? `Process terminated with signal ${signal}` : ""), exitCode: code ?? 1, durationMs: performance.now() - started }); });
+      options.signal?.addEventListener("abort", stop, { once: true });
+      if (options.signal?.aborted) stop();
+      if (options.timeoutMs) timeout = setTimeout(stop, options.timeoutMs);
+    });
   }
 }

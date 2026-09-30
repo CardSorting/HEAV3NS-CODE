@@ -13,6 +13,10 @@ import type { ToolRiskTier, ToolSafetyAssessment } from "./tool-safety-policy-ma
 
 export type ConfirmationDecision = "allow" | "allow_all_session" | "deny";
 
+export class ToolApprovalDeniedError extends Error {
+  constructor(message: string) { super(message); this.name = "ToolApprovalDeniedError"; }
+}
+
 export interface ConfirmationRequest {
   readonly toolName: string;
   readonly args: Record<string, unknown>;
@@ -49,6 +53,11 @@ export interface ConfirmationCheckResult {
 export class ToolConfirmationGatekeeper {
   private allowedSessionTools = new Set<string>();
   private confirmationHook?: ConfirmationHook;
+  private requiredHostHook?: ConfirmationHook;
+
+  public setRequiredHostHook(hook: ConfirmationHook): void {
+    this.requiredHostHook = hook;
+  }
   private currentAuthority: ExecutionAuthorityLevel = "autonomous";
   private autoApprovePolicy: AutoApprovePolicy = {
     executionAuthority: "autonomous",
@@ -168,14 +177,14 @@ export class ToolConfirmationGatekeeper {
       return { approved: true };
     }
 
-    if (this.allowedSessionTools.has(toolName)) {
+    if (!this.requiredHostHook && this.allowedSessionTools.has(toolName)) {
       return { approved: true };
     }
 
     const effectiveAuthority = options?.authority ?? this.currentAuthority;
 
     // 1. Check explicit bypass options
-    if (options?.bypassConfirmation || this.autoApprovePolicy.bypassConfirmation) {
+    if (!this.requiredHostHook && (options?.bypassConfirmation || this.autoApprovePolicy.bypassConfirmation)) {
       return {
         approved: true,
         autoApproved: true,
@@ -184,7 +193,8 @@ export class ToolConfirmationGatekeeper {
     }
 
     // 2. If an interactive confirmation hook is attached, delegate to it
-    if (this.confirmationHook) {
+    const hook = this.requiredHostHook ?? this.confirmationHook;
+    if (hook) {
       const promptMessage = `Tool '${toolName}' requires confirmation (Risk: ${safety.riskTier}, Score: ${safety.riskScore}/100).\n${safety.warnings.join("\n")}`;
       const request: ConfirmationRequest = {
         toolName,
@@ -194,7 +204,7 @@ export class ToolConfirmationGatekeeper {
       };
 
       try {
-        const response = await this.confirmationHook(request);
+        const response = await hook(request);
         if (response.decision === "allow") {
           return {
             approved: true,
@@ -270,4 +280,3 @@ export class ToolConfirmationGatekeeper {
     this.allowedSessionTools.clear();
   }
 }
-

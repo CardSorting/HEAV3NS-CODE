@@ -1,0 +1,159 @@
+{
+  "build": "release; no debugger; ad-hoc Hardened Runtime",
+  "hardware": [
+    "MacBookPro18,1",
+    "17179869184",
+    "Apple M1 Pro"
+  ],
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+  "windows": 4,
+  "workers": 4,
+  "warmupSeconds": 5,
+  "samplingSeconds": 60,
+  "start": {
+    "sampledAt": 1790726434,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 23830,
+        "footprintBytes": 44434344,
+        "residentBytes": 119717888,
+        "userTicks": 14003725,
+        "systemTicks": 1830870
+      },
+      {
+        "pid": 23831,
+        "footprintBytes": 195195744,
+        "residentBytes": 228769792,
+        "userTicks": 18755581,
+        "systemTicks": 1200818
+      },
+      {
+        "pid": 23832,
+        "footprintBytes": 194818936,
+        "residentBytes": 228376576,
+        "userTicks": 18266659,
+        "systemTicks": 1250241
+      },
+      {
+        "pid": 23833,
+        "footprintBytes": 195245088,
+        "residentBytes": 228687872,
+        "userTicks": 18241914,
+        "systemTicks": 1312805
+      },
+      {
+        "pid": 23834,
+        "footprintBytes": 194884376,
+        "residentBytes": 228507648,
+        "userTicks": 18637728,
+        "systemTicks": 1330269
+      }
+    ],
+    "aggregateFootprintBytes": 824578488
+  },
+  "end": {
+    "sampledAt": 1790726494,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 23830,
+        "footprintBytes": 56378328,
+        "residentBytes": 126451712,
+        "userTicks": 20093474,
+        "systemTicks": 3602182
+      },
+      {
+        "pid": 23831,
+        "footprintBytes": 174188696,
+        "residentBytes": 211156992,
+        "userTicks": 21949833,
+        "systemTicks": 1529158
+      },
+      {
+        "pid": 23832,
+        "footprintBytes": 173205632,
+        "residentBytes": 210059264,
+        "userTicks": 21565296,
+        "systemTicks": 1598705
+      },
+      {
+        "pid": 23833,
+        "footprintBytes": 173877448,
+        "residentBytes": 210763776,
+        "userTicks": 21530706,
+        "systemTicks": 1752568
+      },
+      {
+        "pid": 23834,
+        "footprintBytes": 161474424,
+        "residentBytes": 211763200,
+        "userTicks": 21901011,
+        "systemTicks": 1813877
+      }
+    ],
+    "aggregateFootprintBytes": 739124528
+  },
+  "cpuPercentOfOneCore": 1.5629305555555555,
+  "note": "Summed process footprints are not unique physical RAM. No fixture tools running. This is not a 30-minute soak.",
+  "memoryPressure": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 57%",
+  "swap": "vm.swapusage: total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)",
+  "standaloneCLI": {
+    "sampledAt": 1790726426,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 23807,
+        "footprintBytes": 194851848,
+        "residentBytes": 228311040,
+        "userTicks": 17735763,
+        "systemTicks": 927576
+      }
+    ],
+    "aggregateFootprintBytes": 194851848
+  },
+  "versionPair": {
+    "sourceBase": "4930239eb4257d5060fa17753ceae9a81efd4e00",
+    "workingTreeModified": true,
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "f2412e37d14b4cdcde765715902bc14840a4d6d0c8c71e8255cc1828aed6d4a4",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "1f65f5701e748dabbdd416d1269861c861e308aa048b439079f201660bb95a12",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "scripts/benchmark-desktop.mjs": "1f9eb334594f005ac5ff321c5862a5eb8218e1245e08340ebd5481b5c53cdbe9"
+    }
+  },
+  "cleanup": {
+    "remainingWorkers": []
+  },
+  "sourceDirectory": "build/desktop-four-1790726423149",
+  "perProcessCPUPercent": [
+    {
+      "pid": 23830,
+      "role": "GUI",
+      "percentOfOneCore": 0.5459070138888888
+    },
+    {
+      "pid": 23831,
+      "role": "worker",
+      "percentOfOneCore": 0.24462444444444442
+    },
+    {
+      "pid": 23832,
+      "role": "worker",
+      "percentOfOneCore": 0.25327090277777775
+    },
+    {
+      "pid": 23833,
+      "role": "worker",
+      "percentOfOneCore": 0.25892743055555556
+    },
+    {
+      "pid": 23834,
+      "role": "worker",
+      "percentOfOneCore": 0.2602007638888889
+    }
+  ]
+}

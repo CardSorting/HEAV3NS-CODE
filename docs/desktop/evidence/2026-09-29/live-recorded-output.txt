@@ -1,0 +1,65 @@
+Created `result.txt` with the uppercase source text:
+
+```text
+NATIVE WORKSPACE PROOF
+```
+
+Verification command:
+
+```sh
+expected=$(tr '[:lower:]' '[:upper:]' < fixture.txt) && actual=$(cat result.txt) && [ "$actual" = "$expected" ] && printf 'PASS: result.txt exactly matches uppercase fixture.txt\n'
+```
+
+Actual result (exit code `0`):
+
+```text
+PASS: result.txt exactly matches uppercase fixture.txt
+```
+
+{
+  "name": "view_file",
+  "callId": "call_RCFTRJON50wZ0ICL3ukEZ29A",
+  "args": {
+    "path": "fixture.txt"
+  },
+  "output": {
+    "path": "build/desktop-live-1790726397936/workspace/fixture.txt",
+    "content": "native workspace proof\n",
+    "totalLines": 2,
+    "truncated": false
+  },
+  "durationMs": 3,
+  "success": true
+}
+
+{
+  "name": "write_file",
+  "callId": "call_VeAX31N3iu7e4cgHx08G4T6P",
+  "args": {
+    "path": "result.txt",
+    "content": "NATIVE WORKSPACE PROOF\n"
+  },
+  "output": {
+    "success": true,
+    "path": "build/desktop-live-1790726397936/workspace/result.txt"
+  },
+  "durationMs": 1,
+  "success": true
+}
+
+{
+  "name": "run_command",
+  "callId": "call_7GdhSsGCx34FX7fysNGinsCW",
+  "args": {
+    "command": "expected=$(tr '[:lower:]' '[:upper:]' < fixture.txt) && actual=$(cat result.txt) && [ \"$actual\" = \"$expected\" ] && printf 'PASS: result.txt exactly matches uppercase fixture.txt\\n'"
+  },
+  "output": {
+    "stdout": "PASS: result.txt exactly matches uppercase fixture.txt\n",
+    "stderr": "",
+    "exitCode": 0,
+    "durationMs": 34.641084000000774
+  },
+  "durationMs": 37,
+  "success": true,
+  "exitCode": 0
+}

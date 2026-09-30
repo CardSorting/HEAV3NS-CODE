@@ -89,6 +89,8 @@ private_key*.json
 # ==============================================================================
 dist/
 build/
+.build/
+.swiftpm/
 out/
 bin/
 *.tsbuildinfo

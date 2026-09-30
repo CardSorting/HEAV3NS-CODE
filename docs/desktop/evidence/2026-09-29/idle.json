@@ -1,0 +1,51 @@
+{
+  "appPID": 23782,
+  "capturedAt": "2026-09-30T00:00:20Z",
+  "harness": "native composer and actual LUMI worker",
+  "windowHeight": 699,
+  "windowWidth": 1280,
+  "workerPID": 23783,
+  "workspace": "build/desktop-idle-1790726418936/workspace",
+  "mode": "idle",
+  "memory": {
+    "sampledAt": 1790726422,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 23782,
+        "footprintBytes": 27935632,
+        "residentBytes": 102842368,
+        "userTicks": 5782347,
+        "systemTicks": 1016522
+      },
+      {
+        "pid": 23783,
+        "footprintBytes": 195490560,
+        "residentBytes": 229130240,
+        "userTicks": 17804306,
+        "systemTicks": 936158
+      }
+    ],
+    "aggregateFootprintBytes": 223426192
+  },
+  "node": "22.22.0",
+  "build": "release, ad-hoc Hardened Runtime",
+  "debugger": false,
+  "sampleCount": 1,
+  "versionPair": {
+    "sourceBase": "4930239eb4257d5060fa17753ceae9a81efd4e00",
+    "workingTreeModified": true,
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "f2412e37d14b4cdcde765715902bc14840a4d6d0c8c71e8255cc1828aed6d4a4",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "1f65f5701e748dabbdd416d1269861c861e308aa048b439079f201660bb95a12",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "scripts/verify-desktop.mjs": "cd12aa50966db814d0b518223ae24ad8c1489c0279cd7073cc422be71ea0d5fb"
+    }
+  },
+  "cleanup": {
+    "workerExitedAfterGUIExit": true,
+    "workerPID": 23783
+  },
+  "sourceDirectory": "build/desktop-idle-1790726418936"
+}

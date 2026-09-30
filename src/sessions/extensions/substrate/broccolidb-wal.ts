@@ -32,6 +32,7 @@ export class BroccoliWriteAheadLog {
   private totalFramesLogged = 0;
   private lastSyncTimestamp = 0;
   private isStarted = false;
+  private flushFailure: unknown;
 
   private readonly debounceMs: number;
 
@@ -111,15 +112,26 @@ export class BroccoliWriteAheadLog {
       this.flushTimer = null;
     }
 
-    if (this.writeBuffer.length === 0) return;
-
     await this.mutex.runLocked(async () => {
+      if (this.flushFailure) throw this.flushFailure;
       if (this.writeBuffer.length === 0) return;
       const batch = this.writeBuffer;
       this.writeBuffer = [];
 
       const serializedLines = batch.map((f) => JSON.stringify(f)).join("\n") + "\n";
-      await fs.appendFile(this.walPath, serializedLines, "utf-8");
+      try {
+        // Acceptance barriers must reach storage, not just the OS write cache.
+        // A partial append is ambiguous: poison this writer instead of replaying
+        // a possibly written mutation on the next flush.
+        const handle = await fs.open(this.walPath, "a", 0o600);
+        try {
+          await handle.writeFile(serializedLines, "utf-8");
+          await handle.sync();
+        } finally { await handle.close(); }
+      } catch (error) {
+        this.flushFailure = error;
+        throw error;
+      }
       this.lastSyncTimestamp = Date.now();
     });
   }

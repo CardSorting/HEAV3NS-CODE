@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic wire examples, not execution evidence. Identity strings are placeholders.",
+  "requests": [
+    {"v":1,"kind":"request","id":"hello-1","workspace":"","session":"","method":"hello","params":{}},
+    {"v":1,"kind":"request","id":"task-1","workspace":"workspace-sha256","session":"session-uuid","method":"task.submit","params":{"text":"Read fixture.txt","attachments":[]}},
+    {"v":1,"kind":"request","id":"stop-1","workspace":"workspace-sha256","session":"session-uuid","method":"task.cancel","params":{"run":"run-sha256"}},
+    {"v":1,"kind":"request","id":"approval-1","workspace":"workspace-sha256","session":"session-uuid","method":"approval.resolve","params":{"run":"run-sha256","operation":"operation-uuid","decision":"deny"}}
+  ],
+  "events": [
+    {"v":1,"kind":"event","runtime":"runtime-uuid","workspace":"workspace-sha256","session":"session-uuid","run":"run-sha256","seq":2,"type":"run.state","payload":{"id":"run-sha256","state":"running","verification":"not_run","review":"not_reviewed"}},
+    {"v":1,"kind":"event","runtime":"runtime-uuid","workspace":"workspace-sha256","session":"session-uuid","run":"run-sha256","type":"activity","payload":{"activityId":"stable-action-id","phase":"tool","status":"denied","message":"Denied run_command","timestamp":1790725000000,"sequence":3}}
+  ]
+}

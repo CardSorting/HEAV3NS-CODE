@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-29 America/Denver",
+  "checks": [
+    {
+      "command": "npm run check",
+      "result": "passed"
+    },
+    {
+      "command": "npm test",
+      "result": "passed",
+      "unitTests": 2535,
+      "flightScenarios": 5,
+      "note": "Existing proto-lint wrapper printed import and duplicate-definition diagnostics but returned success."
+    },
+    {
+      "command": "npm run desktop:test",
+      "result": "passed",
+      "tests": 11
+    },
+    {
+      "command": "npm run desktop:test:native",
+      "result": "passed",
+      "tests": 3
+    },
+    {
+      "command": "npm run ip:check",
+      "result": "passed",
+      "surfaces": 449
+    },
+    {
+      "command": "npm run provenance:check",
+      "result": "blocked",
+      "reason": "Existing source-release manifest: 96 unverified historical markers and 8 attributed localized files."
+    },
+    {
+      "command": "npm run license:check",
+      "result": "blocked",
+      "reason": "Existing checker references absent scripts/check-package-boundary.mjs."
+    }
+  ]
+}

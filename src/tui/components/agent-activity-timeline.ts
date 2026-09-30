@@ -364,6 +364,7 @@ export class AgentActivityTimeline implements Component {
 			case "failed":
 				return { icon: "✗", color: "\x1b[31m" }
 			case "cancelled":
+			case "denied":
 				return { icon: "■", color: "\x1b[33m" }
 			case "started":
 			case "in_progress":

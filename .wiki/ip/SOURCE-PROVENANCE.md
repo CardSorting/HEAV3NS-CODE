@@ -34,6 +34,14 @@ silently swept into the first-party Apache grant.
 | src/core/joyride/** | Retained as a separately licensed nested component. | Preserve src/core/joyride/LICENSE (MIT); the root Apache-2.0 label does not relicense this subtree. |
 | locales/** and translated documentation | Present in the repository with embedded attribution that is not sufficient to establish chain of title. | Verify the source repository, applicable license, and permission before shipping translations or treating them as first-party Apache-2.0 material. |
 
+## Native integration preview — September 29, 2026
+
+- `native/`, `src/desktop/`, and the desktop build/verification scripts were authored for the user-supplied HEAV3NS-CODE v0.1 specification with AI coding assistance. AppKit platform documentation informed API usage; no VS Code asset set or external desktop implementation was copied. Existing repository provenance restrictions still apply to the reused CLI bundle.
+- The local application build includes the official Node **22.22.0 darwin-arm64** archive from `https://nodejs.org/dist/v22.22.0/node-v22.22.0-darwin-arm64.tar.gz`, SHA-256 `5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640`. Its MIT license and bundled component notices are preserved verbatim as `HEAV3NS-CODE.app/Contents/Resources/NODE-LICENSE`.
+- The app also bundles the existing production CLI and its pinned dependencies, and copies the installed TypeScript package with its license files. `package-lock.json` controls those versions; bundling does not resolve outstanding source-release findings.
+- SwiftTerm was consulted as the intended terminal component but is not included in this preview. No SwiftTerm dependency or license completion claim is made.
+- Native captures and measurement records were generated from the actual local preview and disposable fixtures. Published text evidence makes absolute workspace paths repository-relative. These artifacts establish only the measured checks described in `docs/desktop/RELEASE-EVIDENCE.md`.
+
 ## Release rule
 
 If a release contains material whose author or license cannot be established,

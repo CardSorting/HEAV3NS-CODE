@@ -1,0 +1,43 @@
+{
+  "appPID": 16740,
+  "capturedAt": "2026-09-29T23:51:13Z",
+  "harness": "native composer and actual LUMI worker",
+  "state": "completed",
+  "windowHeight": 458,
+  "windowWidth": 720,
+  "workerPID": 16741,
+  "workspace": "build/desktop-live-1790725488331/workspace",
+  "mode": "restore",
+  "memory": {
+    "sampledAt": 1790725873,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 16740,
+        "footprintBytes": 36864960,
+        "residentBytes": 110870528,
+        "userTicks": 7442351,
+        "systemTicks": 1556332
+      },
+      {
+        "pid": 16741,
+        "footprintBytes": 194769688,
+        "residentBytes": 228376576,
+        "userTicks": 17113486,
+        "systemTicks": 1679437
+      }
+    ],
+    "aggregateFootprintBytes": 231634648
+  },
+  "node": "22.22.0",
+  "build": "release, ad-hoc Hardened Runtime",
+  "debugger": false,
+  "sampleCount": 1,
+  "cleanup": {
+    "workerExitedAfterGUIExit": true,
+    "workerPID": 16741
+  },
+  "sourceDirectory": "build/desktop-restore-1790725869473",
+  "note": "Restoration and scoped visual review were performed on an earlier preview build; binary hashes were not recorded for that run. No layout code changed after that review."
+}

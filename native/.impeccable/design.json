@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T23:55:45Z",
+  "title": "Design System: HEAV3NS-CODE Native",
+  "extensions": {
+    "native": {
+      "framework": "AppKit",
+      "platform": "macOS",
+      "status": "first integration preview",
+      "scope": "native/ only; no authority over the root CLI design system",
+      "authority": [
+        "Sources/Heav3nsCode/App.swift",
+        "Sources/Heav3nsCode/WorkspaceWindow.swift",
+        "Sources/Heav3nsCode/RuntimeClient.swift",
+        "Sources/Heav3nsCode/IntegrationProbe.swift",
+        "PRODUCT.md"
+      ],
+      "representation": "Native APIs and AppKit point units are preserved here because the portable CSS-oriented frontmatter cannot express them faithfully. No HTML/CSS substitutes or synthetic tonal ramps are provided.",
+      "colorBindings": [
+        { "api": "NSColor.labelColor", "purpose": "Conversation titles and response text." },
+        { "api": "NSColor.secondaryLabelColor", "purpose": "Connection status, activity titles and details, composer hint, launcher detail." },
+        { "api": "NSColor.textBackgroundColor", "purpose": "Transcript table background." },
+        { "api": "AppKit defaults", "purpose": "Window, text views, button bezels, segmented control, separator, disabled state, selection, and focus; no custom accent or forced appearance." }
+      ],
+      "fontBindings": [
+        { "role": "launcher-heading", "api": "NSFont.systemFont", "size": 26, "weight": "semibold", "unit": "AppKit point" },
+        { "role": "workspace-heading", "api": "NSFont.systemFont", "size": 15, "weight": "semibold", "unit": "AppKit point" },
+        { "role": "conversation-composer-detail", "api": "NSFont.systemFont", "size": 14, "weight": "regular", "unit": "AppKit point" },
+        { "role": "section-heading", "api": "NSFont.systemFont", "size": 13, "weight": "semibold", "unit": "AppKit point" },
+        { "role": "row-label", "api": "NSFont.systemFont", "size": 12, "weight": "semibold", "unit": "AppKit point" },
+        { "role": "status-activity", "api": "NSFont.systemFont", "size": 12, "weight": "regular", "unit": "AppKit point" },
+        { "role": "composer-hint", "api": "NSFont.systemFont", "size": 11, "weight": "regular", "unit": "AppKit point" },
+        { "role": "inspection", "api": "NSFont.monospacedSystemFont", "size": 12, "weight": "regular", "unit": "AppKit point" },
+        { "role": "approval-detail", "api": "NSFont.monospacedSystemFont", "size": 11, "weight": "regular", "unit": "AppKit point" }
+      ],
+      "layout": {
+        "unit": "AppKit point",
+        "workspaceInitialContentSize": { "width": 1280, "height": 800 },
+        "launcherInitialContentSize": { "width": 780, "height": 520 },
+        "minimumWindowFrameSize": { "width": 720, "height": 480 },
+        "narrowWindowFrameThreshold": 1000,
+        "toolbarHeight": 48,
+        "navigationWidth": 188,
+        "navigationActionWidth": 164,
+        "navigationItemWidth": 160,
+        "transcriptMinimumWidth": 320,
+        "inspectorMinimumWidth": 260,
+        "workMinimumHeight": 60,
+        "composerHeight": 76,
+        "approvalDetailHeight": 82,
+        "stackGap": 8,
+        "workPaneGap": 12,
+        "toolbarInsets": { "top": 10, "left": 12, "bottom": 10, "right": 12 },
+        "navigationInsets": { "top": 14, "left": 12, "bottom": 12, "right": 12 },
+        "centerInsets": { "top": 12, "left": 12, "bottom": 12, "right": 16 },
+        "composerTextInset": { "width": 10, "height": 10 },
+        "inspectionTextInset": { "width": 12, "height": 12 },
+        "transcriptCellInsets": { "left": 16, "right": 16, "top": 8 },
+        "transcriptTitleBodyGap": 5,
+        "transcriptIntercellGap": 12,
+        "transcriptMinimumRowHeight": 48,
+        "followLatestThreshold": 35,
+        "resizeBehavior": "Capture pre-resize bottom proximity and clip origin; after layout, follow latest or restore origin. Follow-latest resize correction reviewed; deliberate earlier-position retention unverified.",
+        "narrowBehavior": "Hide navigation during adaptation. Show Agent/Inspect segmented switching when inspection is open. Keep the composer below the active work surface. Widening does not automatically restore navigation."
+      },
+      "shapeBindings": [
+        "NSButton.bezelStyle = .rounded",
+        "NSButton.bezelStyle = .inline for launcher recent workspaces and file entries",
+        "NSScrollView.borderType = .bezelBorder for composer",
+        "NSBox.boxType = .separator",
+        "NSSegmentedControl(trackingMode: .selectOne)"
+      ],
+      "depth": "No custom shadows, gradients, or materials; AppKit window and control depth only.",
+      "motion": "No authored decorative animation or transition tokens.",
+      "review": {
+        "capturesRelativeToNativeRoot": ["../.impeccable/review/desktop.png", "../.impeccable/review/narrow.png"],
+        "captureContent": "Restored actual provider task in the built native window.",
+        "harness": "Actual composer and LUMI bridge; owned-window capture with native chrome; no supplied agent output.",
+        "disposition": "ship",
+        "dispositionScope": "Single resize correction resolved; not an alpha-readiness disposition.",
+        "detectorRun": false,
+        "unverified": ["keyboard walkthrough", "VoiceOver", "approval layout", "dark appearance", "deliberate scroll retention"]
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Native Action Button",
+      "kind": "button",
+      "description": "Rounded AppKit buttons for Send/Queue, Stop/Force Stop, inspector controls, navigation actions, and approval decisions. Native control states and typography are inherited.",
+      "native": { "api": "NSButton", "bezelStyle": "rounded", "source": "Sources/Heav3nsCode/WorkspaceWindow.swift" }
+    },
+    {
+      "name": "Inline Item Button",
+      "kind": "button",
+      "description": "Recent workspace and file-list items use inline native buttons. Long paths and filenames truncate in the middle.",
+      "native": { "api": "NSButton", "bezelStyle": "inline", "source": ["Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"] }
+    },
+    {
+      "name": "Workspace Navigation",
+      "kind": "nav",
+      "description": "Files / Changes / Sessions actions with SF Symbols, a separator, and a scrollable list. No persistent selected-navigation appearance is implemented.",
+      "native": { "api": ["NSStackView", "NSButton", "NSBox", "NSScrollView"], "symbols": ["folder", "point.3.connected.trianglepath.dotted", "clock"], "source": "Sources/Heav3nsCode/WorkspaceWindow.swift" }
+    },
+    {
+      "name": "Instruction Composer",
+      "kind": "input",
+      "description": "Plain NSTextView in a bordered vertical scroll region. Return submits, Shift–Return inserts a line, and marked text prevents submission. Send becomes Queue while work is outstanding.",
+      "native": { "api": ["ComposerView: NSTextView", "NSScrollView"], "accessibilityLabel": "Instruction to LUMI", "source": "Sources/Heav3nsCode/WorkspaceWindow.swift", "verification": "Source-backed; keyboard walkthrough unverified." }
+    },
+    {
+      "name": "Conversation and Activity",
+      "kind": "custom",
+      "description": "Headerless single-column native table with wrapping titles and selectable plain-text bodies. Activity uses secondary text. Result labels distinguish command evidence from review.",
+      "native": { "api": ["NSTableView", "NSTextField", "TranscriptScrollView: NSScrollView"], "accessibilityLabel": "Agent conversation and tool activity", "selectionHighlightStyle": "none", "source": "Sources/Heav3nsCode/WorkspaceWindow.swift" }
+    },
+    {
+      "name": "Read-only Inspector",
+      "kind": "custom",
+      "description": "Title and Close control above selectable plain monospaced text. Next Page appears for runtime-paginated content and replaces the current page. No editor or styled diff is implemented.",
+      "native": { "api": ["NSStackView", "NSTextView", "NSScrollView", "NSButton"], "isEditable": false, "isSelectable": true, "isRichText": false, "source": "Sources/Heav3nsCode/WorkspaceWindow.swift" }
+    },
+    {
+      "name": "Compact Surface Switch",
+      "kind": "nav",
+      "description": "Agent / Inspect segmented control shown below the narrow-window threshold while inspection is open.",
+      "native": { "api": "NSSegmentedControl", "trackingMode": "selectOne", "source": "Sources/Heav3nsCode/WorkspaceWindow.swift" }
+    },
+    {
+      "name": "Approval Region",
+      "kind": "custom",
+      "description": "Approval required heading, scrollable tool/scope/arguments/reason text, and Deny / Allow Once buttons. Hidden unless a run awaits approval.",
+      "native": { "api": ["NSStackView", "NSTextView", "NSScrollView", "NSButton"], "source": "Sources/Heav3nsCode/WorkspaceWindow.swift", "verification": "Source-backed; approval layout visually unverified." }
+    },
+    {
+      "name": "Native Dialogs and Menus",
+      "kind": "custom",
+      "description": "NSOpenPanel selects a workspace. NSAlert handles workspace actions and active-work close/quit decisions. NSMenu supplies the defined application shortcuts.",
+      "native": { "api": ["NSOpenPanel", "NSAlert", "NSMenu"], "source": ["Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"], "verification": "No searchable command palette; keyboard and VoiceOver walkthroughs unverified." }
+    }
+  ],
+  "narrative": {
+    "northStar": "A native workspace for LUMI",
+    "overview": "The native client is a compact macOS operating surface. Familiar window chrome, system typography, semantic colors, and standard AppKit controls establish its character. The composer is the primary working input; conversation, tool activity, and read-only evidence carry the useful content.",
+    "keyCharacteristics": [
+      "System typography and appearance, with restrained emphasis.",
+      "Compact Files / Changes / Sessions navigation.",
+      "An immediately available composer and selectable, read-only inspection.",
+      "Plain-text task state, tool activity, and verification labels.",
+      "Standard native controls and window behavior."
+    ],
+    "rules": [
+      { "name": "The Semantic Appearance Rule", "body": "Preserve the native semantic bindings. A light capture does not establish fixed white, gray, or accent tokens. The implementation does not force an appearance; dark appearance remains visually unverified.", "section": "colors" },
+      { "name": "The Evidence Type Rule", "body": "Use readable system text for conversation and monospaced system text for inspection. Transcript responses are wrapping plain text; backticks and code fences remain literal characters in the current implementation.", "section": "typography" }
+    ],
+    "dos": [
+      "Do preserve AppKit system fonts, semantic color APIs, native controls, and standard window chrome.",
+      "Do keep the composer immediately available and file/output inspection selectable and read-only.",
+      "Do use the current Files / Changes / Sessions vocabulary and compact native control density.",
+      "Do distinguish recorded completion, command evidence, and independent review in task labels.",
+      "Do retain the verified resize behavior while treating untested interaction paths as unverified."
+    ],
+    "donts": [
+      "Don't replace the native surface with a web shell, landing-page composition, or decorative metrics.",
+      "Don't derive fixed colors, synthetic tonal ramps, or a radius scale from AppKit screenshots.",
+      "Don't introduce an empty editor as the starting point or imply that read-only inspection edits files.",
+      "Don't document a Markdown renderer, searchable command palette, selected sidebar state, or styled diff that the source does not implement.",
+      "Don't promote this first integration proof or its scoped resize review into alpha or accessibility readiness."
+    ]
+  }
+}

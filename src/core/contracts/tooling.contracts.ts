@@ -102,6 +102,7 @@ export interface ToolDefinition {
 }
 
 export interface ToolExecutionRecord {
+  readonly denied?: boolean;
   readonly name: string;
   readonly toolName?: string;
   readonly callId?: string;

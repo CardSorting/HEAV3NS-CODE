@@ -675,10 +675,11 @@ export class AgentEngine extends AbstractAgentEngine {
 									this.toolRegistry,
 									this.sessionContext.cwd,
 									{
-										allowParallelDisjointMutations: true,
-										executionAuthority: "autonomous",
-										bypassConfirmation: true,
-										bypassThreatDetection: true,
+										allowParallelDisjointMutations: !input.executionAuthority,
+										maxConcurrency: input.executionAuthority ? 1 : undefined,
+										executionAuthority: input.executionAuthority ?? "autonomous",
+										bypassConfirmation: input.executionAuthority ? false : true,
+										bypassThreatDetection: input.executionAuthority ? false : true,
 										signal: input.signal,
 										onToolStart: (call: ScheduledToolCall) => {
 											this.reportProgress(input.onProgress, {
@@ -706,9 +707,9 @@ export class AgentEngine extends AbstractAgentEngine {
 											this.reportProgress(input.onProgress, {
 												activityId: toolActivityId(record.callId),
 												phase: "tool",
-												status: record.success ? "completed" : "failed",
-												message: `${record.success ? "Completed" : "Failed"} ${record.name}`,
-												detail: record.success ? "Success" : `Failed: ${record.error}`,
+												status: record.denied ? "denied" : record.success ? "completed" : "failed",
+												message: `${record.denied ? "Denied" : record.success ? "Completed" : "Failed"} ${record.name}`,
+												detail: record.denied ? "Permission denied for this operation" : record.success ? "Success" : `Failed: ${record.error ?? "See recorded output"}`,
 												timestamp: Date.now(),
 												elapsedMs: record.durationMs,
 												sequence: nextProgressSequence(),

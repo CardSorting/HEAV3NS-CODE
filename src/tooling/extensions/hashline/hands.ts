@@ -63,7 +63,7 @@ export class AnchoredHands extends AbstractHands {
   async runCommand(
     command: string,
     cwd?: string,
-    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv; maxBuffer?: number }
+    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv; maxBuffer?: number; signal?: AbortSignal }
   ): Promise<CommandResult> {
     const validation = this.permissionController.validateCommand(command);
     if (!validation.allowed) {

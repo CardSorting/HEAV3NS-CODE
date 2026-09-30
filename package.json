@@ -112,7 +112,10 @@
     "docs:tag-legacy-providers": "node scripts/tag-legacy-provider-docs.mjs",
     "docs:rename-file": "cd docs && npm run rename",
     "report-issue": "node scripts/report-issue.js",
-    "build:cli": "npm run build"
+    "build:cli": "npm run build",
+    "desktop:build": "bash scripts/build-desktop.sh",
+    "desktop:test": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json node --import tsx --import ./src/test/register-vscode-mock.mjs node_modules/mocha/bin/mocha.js --no-config --require ./src/test/requires.cjs --timeout 30000 'src/desktop/__tests__/*.test.ts'",
+    "desktop:test:native": "swift test --package-path native --scratch-path build/native-tests"
   },
   "lint-staged": {
     "src/shared/storage/state-keys.ts": [

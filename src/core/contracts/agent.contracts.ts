@@ -11,6 +11,7 @@ export type EngineProgressPhase =
   | "cancelled";
 
 export type EngineProgressStatus =
+  | "denied"
   | "started"
   | "in_progress"
   | "completed"
@@ -63,6 +64,8 @@ export interface EngineProgressEvent {
 
 export interface EngineTickInput {
   prompt: string;
+  /** Host-selected policy; provider output cannot elevate this authority. */
+  executionAuthority?: import("./tooling.contracts.js").ExecutionAuthorityLevel;
   /** Cancels an in-flight local provider turn. */
   signal?: AbortSignal;
   /** Receives structured lifecycle updates without exposing raw model reasoning. */
