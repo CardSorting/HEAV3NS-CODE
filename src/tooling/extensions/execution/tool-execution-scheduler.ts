@@ -6,10 +6,10 @@ import type {
 	ToolExecutionOptions,
 	ToolExecutionRecord,
 } from "../../../core/contracts/tooling.contracts.js"
+import { ToolCallArgParser } from "../registry/tool-call-arg-parser.js"
+import { ToolErrorAutoHealer } from "./tool-error-auto-healer.js"
 import { ToolExecutionCache } from "./tool-execution-cache.js"
 import { ToolOutputGovernor } from "./tool-output-governor.js"
-import { ToolErrorAutoHealer } from "./tool-error-auto-healer.js"
-import { ToolCallArgParser } from "../registry/tool-call-arg-parser.js"
 
 export interface ScheduledToolCall {
 	readonly id: string
@@ -141,7 +141,7 @@ export class ToolExecutionScheduler {
 		const waves: ScheduledToolCall[][] = []
 
 		let currentWave: ScheduledToolCall[] = []
-		let currentWaveResources = new Set<string>()
+		const currentWaveResources = new Set<string>()
 		let currentWaveHasMutations = false
 
 		for (const call of calls) {
@@ -461,6 +461,8 @@ export class ToolExecutionScheduler {
 			if (typeof rawResult === "object" && rawResult !== null) {
 				const obj = rawResult as Record<string, unknown>
 				if (typeof obj.exitCode === "number") exitCode = obj.exitCode
+				denied = obj.denied === true
+				isSuccess = !denied && obj.success !== false && (exitCode === undefined || exitCode === 0)
 			}
 
 			// If mutating tool, invalidate affected cache entries
@@ -468,7 +470,7 @@ export class ToolExecutionScheduler {
 			if (isMutating && enableCache) {
 				const paths = this.cache.extractPaths(parsedArgs, cwd)
 				this.cache.invalidatePaths(paths, cwd)
-			} else if (enableCache) {
+			} else if (enableCache && isSuccess) {
 				// Cache read-only result
 				this.cache.set(call.name, parsedArgs, cwd, rawResult)
 			}

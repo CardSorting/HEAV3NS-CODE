@@ -68,6 +68,7 @@ export class AnchoredHands extends AbstractHands {
     const validation = this.permissionController.validateCommand(command);
     if (!validation.allowed) {
       return {
+        denied: true,
         exitCode: 126,
         stdout: "",
         stderr: `Permission Controller Blocked Execution: ${validation.reason}`,

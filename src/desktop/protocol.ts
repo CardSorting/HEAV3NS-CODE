@@ -39,6 +39,7 @@ export const requestSchema = z
 			"project.start",
 			"project.stop",
 			"project.status",
+			"project.healing",
 			"artifact.read",
 			"files.list",
 			"files.search",

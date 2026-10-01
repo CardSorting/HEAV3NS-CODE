@@ -4,7 +4,13 @@ import { mkdir, open, realpath, stat } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
 import { z } from "zod"
-import type { EngineProgressEvent, EngineTickResult, IAgentEngine } from "../core/contracts/agent.contracts.js"
+import { workspaceRevision } from "../agents/extensions/execution/workspace-verification.js"
+import type {
+	EngineProgressEvent,
+	EngineTickResult,
+	IAgentEngine,
+	WorkspaceRuntimeObservation,
+} from "../core/contracts/agent.contracts.js"
 import { StateManager } from "../core/storage/StateManager.js"
 import { HostProvider } from "../hosts/host-provider.js"
 import { LumiMonolith } from "../index.js"
@@ -15,9 +21,9 @@ import { createStorageContext } from "../shared/storage/storage-context.js"
 import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
+import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
 import { WorkspaceInspection } from "./inspection.js"
-import { WorkspaceCheckpoints, CHECKPOINT_SCOPE } from "./checkpoints.js"
-import { ProjectRunner, type ProjectConfiguration } from "./project-runner.js"
+import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
 	type DesktopRequest,
@@ -28,6 +34,7 @@ import {
 	requestSchema,
 } from "./protocol.js"
 import { DesktopRequestScheduler } from "./request-scheduler.js"
+import { desktopToolPath } from "./tool-environment.js"
 import { acquireWorkspace } from "./workspace-owner.js"
 
 const exec = promisify(execFile)
@@ -43,12 +50,14 @@ type Run = Record<string, unknown> & {
 	revision?: number
 	session: string
 	conversation?: string
+	continuation?: { run: string; revision: number; instruction: string; previousOutcome: string }
+	projectRepair?: { launch: string; observation: WorkspaceRuntimeObservation; automatic?: boolean }
 	response?: string
 	activities: EngineProgressEvent[]
 	activitySequence?: number
 	activityCount?: number
 	approval?: Record<string, unknown>
-	verification: "not_run" | "evidence_available"
+	verification: "not_run" | "evidence_available" | "passed" | "failed" | "unavailable" | "cancelled" | "not_required"
 	review: "not_reviewed"
 }
 const shortText = (text: string, limit = 24_000) => {
@@ -69,6 +78,9 @@ const projectRun = (run: Run) => ({
 	request: run.request,
 	session: run.session,
 	conversation: run.conversation ?? run.session,
+	continuedFrom: run.continuation?.run,
+	repairingLaunch: run.projectRepair?.launch,
+	origin: run.projectRepair?.automatic ? "automatic_repair" : "user",
 	text: shortText(run.text, 2000),
 	state: run.state,
 	createdAt: run.createdAt,
@@ -86,6 +98,7 @@ const projectRun = (run: Run) => ({
 	activityRetained: Math.min(ACTIVITY_LIMIT, run.activities.length),
 	approval: run.approval,
 	verification: run.verification,
+	workspaceVerification: run.workspaceVerification,
 	review: run.review,
 	outputLimited: run.outputLimited,
 	toolCount: run.toolCount,
@@ -118,6 +131,19 @@ type DesktopLifecycle = {
 	restoreContext?: (context: ConversationContext) => void
 }
 
+type HealingEpisode = {
+	id: string
+	conversation: string
+	target: ProjectTarget
+	launch?: string
+	attempts: number
+	phase: "watching" | "waiting" | "repairing" | "restarting" | "paused" | "attention"
+	reason?: string
+	repair?: string
+}
+type HealingLimits = { attempts: number; backoffMs: number; repairMs: number }
+const healingDefaults: HealingLimits = { attempts: 3, backoffMs: 1000, repairMs: 5 * 60_000 }
+
 /** This adapter schedules existing ticks. It has no provider, prompt, or tool implementation. */
 export class DesktopSession {
 	readonly runtime = randomUUID()
@@ -142,6 +168,10 @@ export class DesktopSession {
 	private readonly project: ProjectRunner
 	private restorePlan?: { id: string; token: string; fingerprint: string; conversation: string; expires: number }
 	private projectEpoch = 0
+	private projectVersion = 0
+	private healingEnabled = true
+	private healing?: HealingEpisode
+	private healingTimer?: ReturnType<typeof setTimeout>
 	private inspection: WorkspaceInspection
 	private submissions: Promise<unknown> = Promise.resolve()
 	private queueMutations = 0
@@ -166,6 +196,7 @@ export class DesktopSession {
 		send: (frame: unknown) => void,
 		lifecycle?: DesktopLifecycle,
 		readBaseline = readGitBaseline,
+		private readonly healingLimits: HealingLimits = healingDefaults,
 	) {
 		this.workspace = workspace
 		this.engine = engine
@@ -175,7 +206,7 @@ export class DesktopSession {
 		this.readBaseline = readBaseline
 		this.inspection = new WorkspaceInspection(workspace.path)
 		this.checkpointFiles = new WorkspaceCheckpoints(workspace.path)
-		this.project = new ProjectRunner(workspace.path)
+		this.project = new ProjectRunner(workspace.path, () => this.projectExited())
 		this.runs = database.getTable<Run>("desktop.runs.v1")
 		this.metadata = database.getTable("desktop.metadata.v1")
 		this.approvals = database.getTable("desktop.approvals.v1")
@@ -184,6 +215,7 @@ export class DesktopSession {
 	}
 	async start() {
 		await this.database.start()
+		this.healingEnabled = this.metadata.get("project-healing")?.enabled !== false
 		const meta = this.metadata.get("session")
 		this.session = typeof meta?.session === "string" ? meta.session : (this.lifecycle?.sessionId ?? randomUUID())
 		this.seq = typeof meta?.seq === "number" ? meta.seq : 0
@@ -247,6 +279,7 @@ export class DesktopSession {
 			this.metadata.put("session", { session: this.session, seq })
 			await this.database.flush()
 			this.event(type, projectRun(projection), run.id, seq)
+			if (run.projectRepair && type !== "run.progress") this.projectChanged()
 		})
 		const guarded = operation.catch((error) => {
 			this.closing = true
@@ -291,6 +324,223 @@ export class DesktopSession {
 			(a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
 		)
 	}
+	private repairReceipt(launch: string) {
+		return `project-repair:${this.conversation}:${launch}`
+	}
+	private projectStatus() {
+		const status = this.project.status()
+		const receipt = status.launch ? this.metadata.get(this.repairReceipt(status.launch)) : undefined
+		const repairID =
+			typeof receipt?.run === "string"
+				? receipt.run
+				: status.state !== "failed" && this.healing?.conversation === this.conversation
+					? this.healing.repair
+					: undefined
+		const repair = repairID ? this.runs.get(repairID) : undefined
+		return {
+			...status,
+			revision: this.projectVersion,
+			healing: {
+				enabled: this.healingEnabled,
+				phase: this.healing?.phase ?? (this.healingEnabled ? "watching" : "paused"),
+				reason: this.healing?.reason,
+				attempts: this.healing?.attempts ?? 0,
+				limit: this.healingLimits.attempts,
+			},
+			conversation: this.conversation,
+			repair:
+				repair && (repair.conversation ?? repair.session) === this.conversation
+					? { run: repair.id, state: repair.state }
+					: undefined,
+		}
+	}
+	private projectChanged() {
+		this.projectVersion++
+		if (!this.closing) this.event("project.state", this.projectStatus())
+	}
+	private pauseHealing(reason: string) {
+		clearTimeout(this.healingTimer)
+		this.healingTimer = undefined
+		const launching = this.healing?.phase === "restarting"
+		if (this.healing) {
+			this.healing.phase = "paused"
+			this.healing.reason = reason
+		}
+		if (launching)
+			void this.project.stop().catch((error) => {
+				this.closing = true
+				this.controller?.abort(error)
+			})
+		this.projectChanged()
+	}
+	private projectExited() {
+		const episode = this.healing,
+			status = this.project.status()
+		if (
+			episode &&
+			status.launch === episode.launch &&
+			episode.phase === "watching" &&
+			(status.state === "failed" || (status.state === "running" && Boolean(status.diagnostic))) &&
+			this.healingEnabled
+		) {
+			episode.phase = status.state === "running" || episode.attempts < this.healingLimits.attempts ? "waiting" : "attention"
+			episode.reason = episode.phase === "attention" ? "attempt_limit" : undefined
+		}
+		if (episode?.phase === "waiting" && status.state === "running" && !status.diagnostic) {
+			clearTimeout(this.healingTimer)
+			this.healingTimer = undefined
+			episode.phase = "watching"
+		}
+		this.projectChanged()
+		this.wakeHealing()
+	}
+	private healingAllowed(episode: HealingEpisode) {
+		return (
+			this.healing === episode &&
+			this.healingEnabled &&
+			!this.closing &&
+			!this.cancellingAll &&
+			episode.conversation === this.conversation &&
+			episode.launch === this.project.status().launch &&
+			(!this.project.running || (episode.phase === "waiting" && Boolean(this.project.status().diagnostic)))
+		)
+	}
+	private wakeHealing() {
+		const episode = this.healing
+		if (!episode || this.closing) return
+		if (episode.conversation !== this.conversation) {
+			this.pauseHealing("conversation_changed")
+			return
+		}
+		if (
+			this.healingTimer ||
+			this.active ||
+			this.queue.length ||
+			this.queueMutations ||
+			!this.healingAllowed(episode) ||
+			!["waiting", "restarting"].includes(episode.phase)
+		)
+			return
+		this.healingTimer = setTimeout(
+			() => {
+				this.healingTimer = undefined
+				void this.mutate(async () => {
+					if (!this.healingAllowed(episode) || this.active || this.queue.length) return
+					if (episode.phase === "restarting") {
+						await this.restartHealedProject(episode)
+						return
+					}
+					if (episode.phase !== "waiting") return
+					if (this.project.running) {
+						await this.project.stopForRepair(episode.launch!)
+						if (!this.healingAllowed(episode) || episode.phase !== "waiting") return
+					}
+					if (this.project.status().state !== "failed") return
+					if (
+						episode.attempts >= this.healingLimits.attempts ||
+						this.metadata.get(this.repairReceipt(episode.launch!))
+					) {
+						episode.phase = "attention"
+						episode.reason = episode.attempts >= this.healingLimits.attempts ? "attempt_limit" : "repair_recorded"
+						this.projectChanged()
+						return
+					}
+					await this.handleRequest(
+						{
+							v: 1,
+							kind: "request",
+							id: `auto-repair-${episode.id}-${episode.attempts + 1}`,
+							workspace: this.workspace.id,
+							session: this.session,
+							method: "task.submit",
+							params: {
+								text: "Automatically repair the app's compile or runtime failure, preserve existing work, and check the project before relaunch. Continue routine local diagnosis, edits and validation without asking the user to approve each retry.",
+								conversation: this.conversation,
+								repairProject: { launch: episode.launch },
+							},
+						},
+						episode,
+					)
+				}).catch((error) => {
+					if (this.healing === episode) {
+						episode.phase = "attention"
+						episode.reason = "repair_unavailable"
+						this.projectChanged()
+					}
+					Logger.error(
+						"[Desktop] Automatic app recovery stopped",
+						error instanceof Error ? error : new Error(String(error)),
+					)
+				})
+			},
+			episode.phase === "restarting" ? 0 : this.healingLimits.backoffMs * 2 ** episode.attempts,
+		)
+	}
+	private async restartHealedProject(episode: HealingEpisode) {
+		const run = episode.repair ? this.runs.get(episode.repair) : undefined
+		const verification = run?.workspaceVerification as EngineTickResult["workspaceVerification"]
+		const revision = await workspaceRevision(this.workspace.path)
+		if (!this.healingAllowed(episode) || episode.phase !== "restarting") return
+		if (!revision || revision !== verification?.revision) {
+			episode.phase = "attention"
+			episode.reason = "workspace_changed"
+			this.projectChanged()
+			return
+		}
+		const { targets } = await this.project.discover(this.metadata.get("project-command") as ProjectConfiguration | undefined)
+		if (!this.healingAllowed(episode) || episode.phase !== "restarting") return
+		const target = targets.find(
+			(item) => item.id === episode.target.id && item.command === episode.target.command && item.cwd === episode.target.cwd,
+		)
+		if (!target) {
+			episode.phase = "attention"
+			episode.reason = "command_changed"
+			this.projectChanged()
+			return
+		}
+		const started = await this.project.start(target)
+		if (
+			this.healing !== episode ||
+			!this.healingEnabled ||
+			episode.phase !== "restarting" ||
+			this.closing ||
+			this.cancellingAll
+		) {
+			await this.project.stop()
+			return
+		}
+		episode.launch = started.launch
+		episode.phase = "watching"
+		episode.reason = undefined
+		this.projectChanged()
+	}
+	private finishHealing(run: Run) {
+		const episode = this.healing
+		if (!episode || episode.repair !== run.id || episode.phase !== "repairing") return
+		const verification = run.workspaceVerification as EngineTickResult["workspaceVerification"]
+		episode.phase =
+			run.state === "completed" &&
+			verification?.status === "passed" &&
+			verification.scope === "workspace" &&
+			verification.checks > 0 &&
+			verification.revision
+				? "restarting"
+				: "attention"
+		episode.reason = episode.phase === "attention" ? "checks_incomplete" : undefined
+		this.projectChanged()
+	}
+	private mutate<T>(operation: () => Promise<T>): Promise<T> {
+		this.queueMutations++
+		const result = this.submissions.then(operation)
+		this.submissions = result
+			.catch(() => {})
+			.finally(() => {
+				this.queueMutations--
+				this.kick()
+				this.wakeHealing()
+			})
+		return result
+	}
 	async request(request: DesktopRequest): Promise<unknown> {
 		if (
 			[
@@ -307,19 +557,11 @@ export class DesktopSession {
 			].includes(request.method)
 		) {
 			if (this.cancellingAll) throw new Error("CANCELLING: wait for a confirmed stopping boundary")
-			this.queueMutations++
-			const result = this.submissions.then(() => this.handleRequest(request))
-			this.submissions = result
-				.catch(() => {})
-				.finally(() => {
-					this.queueMutations--
-					this.kick()
-				})
-			return result
+			return this.mutate(() => this.handleRequest(request))
 		}
 		return this.handleRequest(request)
 	}
-	private async handleRequest(request: DesktopRequest): Promise<unknown> {
+	private async handleRequest(request: DesktopRequest, automaticHealing?: HealingEpisode): Promise<unknown> {
 		if (request.method === "hello")
 			return {
 				protocol: 1,
@@ -331,6 +573,10 @@ export class DesktopSession {
 				capabilities: [
 					"native",
 					"snapshot",
+					"workspace-verification-v1",
+					"task-continuation-v1",
+					"project-repair-v1",
+					"project-self-healing-v1",
 					"queue:3",
 					"cancel",
 					"approval",
@@ -373,10 +619,34 @@ export class DesktopSession {
 			case "project.discover":
 				return this.project.discover(this.metadata.get("project-command") as ProjectConfiguration | undefined)
 			case "project.status":
-				return this.project.status()
+				await this.submissions
+				await this.commits
+				return this.projectStatus()
+			case "project.healing": {
+				const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(request.params)
+				this.healingEnabled = enabled
+				if (!enabled) {
+					this.pauseHealing("disabled")
+					if (this.active?.projectRepair?.automatic) await this.cancel(this.active.id)
+					for (const run of [...this.queue]) if (run.projectRepair?.automatic) await this.cancel(run.id)
+				}
+				this.metadata.put("project-healing", { enabled })
+				await this.database.flush()
+				if (enabled && this.healing?.phase === "paused" && this.healing.reason === "disabled") {
+					this.healing.phase = this.project.status().state === "failed" ? "waiting" : "watching"
+					this.healing.reason = undefined
+				}
+				this.projectExited()
+				return this.projectStatus()
+			}
 			case "project.stop":
+				this.pauseHealing("stopped")
+				if (this.active?.projectRepair?.automatic) await this.cancel(this.active.id)
+				for (const run of [...this.queue]) if (run.projectRepair?.automatic) await this.cancel(run.id)
 				this.projectEpoch++
-				return this.project.stop()
+				await this.project.stop()
+				this.projectChanged()
+				return this.projectStatus()
 			case "project.configure": {
 				const configuration = z
 					.object({
@@ -393,6 +663,8 @@ export class DesktopSession {
 				return { saved: true }
 			}
 			case "project.start": {
+				if (this.active?.projectRepair || this.queue.some((run) => run.projectRepair))
+					throw new Error("REPAIR_PENDING: finish or stop the app repair before starting the app")
 				const epoch = ++this.projectEpoch
 				const { id, revision } = z
 					.object({ id: z.string().max(512), revision: z.string().regex(/^[a-f0-9]{64}$/) })
@@ -406,7 +678,25 @@ export class DesktopSession {
 					throw new Error("PROJECT_CHANGED: refresh and review the updated run command")
 				if (this.closing) throw new Error("SHUTTING_DOWN")
 				if (epoch !== this.projectEpoch) throw new Error("PROJECT_CANCELLED: start was cancelled")
-				return this.project.start(target)
+				if (this.project.running) throw new Error("PROJECT_RUNNING: stop the current app before starting another")
+				this.pauseHealing("new_launch")
+				const episode: HealingEpisode = {
+					id: randomUUID(),
+					conversation: this.conversation,
+					target,
+					attempts: 0,
+					phase: this.healingEnabled ? "watching" : "paused",
+					reason: this.healingEnabled ? undefined : "disabled",
+				}
+				this.healing = episode
+				try {
+					episode.launch = (await this.project.start(target)).launch
+				} catch (error) {
+					this.pauseHealing("start_failed")
+					throw error
+				}
+				this.projectChanged()
+				return this.projectStatus()
 			}
 			case "checkpoint.list": {
 				await this.submissions
@@ -607,15 +897,24 @@ export class DesktopSession {
 						text: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
 						attachments: z.array(z.never()).max(0).default([]),
 						conversation: z.string().min(1).max(128).optional(),
+						continueFrom: z
+							.object({ run: z.string().regex(/^[a-f0-9]{64}$/), revision: z.number().int().positive() })
+							.strict()
+							.optional(),
+						repairProject: z.object({ launch: z.string().uuid() }).strict().optional(),
 					})
 					.strict()
 					.parse(request.params)
+				if (params.continueFrom && params.repairProject)
+					throw new Error("INVALID_RECOVERY: choose either saved work or an app failure")
 				if (params.conversation && params.conversation !== this.conversation)
 					throw new Error("CONVERSATION_CHANGED: reload the selected conversation before sending")
 				const fingerprint = createHash("sha256").update(JSON.stringify(params)).digest("hex")
 				const id = createHash("sha256").update(`${this.session}:${request.id}`).digest("hex")
 				const previous = this.runs.get(id)
 				if (previous) {
+					if ((previous.conversation ?? previous.session) !== this.conversation)
+						throw new Error("CONVERSATION_CHANGED: this instruction belongs to another conversation")
 					if (previous.fingerprint !== fingerprint)
 						throw new Error("REQUEST_ID_REUSED: the accepted instruction differs")
 					return { accepted: true, run: projectRun(previous), duplicate: true }
@@ -624,6 +923,57 @@ export class DesktopSession {
 					throw new Error("CANCELLING: wait for a confirmed stopping boundary")
 				if (this.queue.length >= DESKTOP_QUEUE_LIMIT)
 					throw new Error("QUEUE_FULL: three instructions are already queued; your draft has not been submitted")
+				let continuation: Run["continuation"]
+				let projectRepair: Run["projectRepair"]
+				if (params.repairProject) {
+					const status = this.project.status(),
+						observation = this.project.agentObservation()
+					if (
+						status.launch !== params.repairProject.launch ||
+						status.state !== "failed" ||
+						this.project.running ||
+						!observation
+					)
+						throw new Error("PROJECT_CHANGED: app status changed; refresh before requesting repair")
+					if (this.metadata.get(this.repairReceipt(params.repairProject.launch)))
+						throw new Error("REPAIR_ALREADY_RECORDED: open the recorded repair or continue its saved work")
+					if (this.active || this.queue.length)
+						throw new Error("WORK_PENDING: finish or stop current work before repairing the app")
+					projectRepair = { launch: params.repairProject.launch, observation, automatic: Boolean(automaticHealing) }
+				}
+				if (params.continueFrom) {
+					const source = this.runs.get(params.continueFrom.run)
+					if (
+						!source ||
+						source.session !== this.session ||
+						(source.conversation ?? source.session) !== this.conversation
+					)
+						throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
+					if (source.revision !== params.continueFrom.revision)
+						throw new Error("STALE_RUN: the recorded work changed; refresh before continuing")
+					if (!terminalStates.has(source.state) || source.state === "completed")
+						throw new Error("NOT_CONTINUABLE: choose unfinished work to continue")
+					if (this.active || this.queue.length)
+						throw new Error("WORK_PENDING: finish or stop current work before continuing")
+					const newer = this.runs
+						.getAll()
+						.some(
+							(candidate) =>
+								candidate.session === this.session &&
+								(candidate.conversation ?? candidate.session) === this.conversation &&
+								(candidate.createdAt > source.createdAt ||
+									(candidate.createdAt === source.createdAt &&
+										(Number(candidate.queueOrder ?? 0) > Number(source.queueOrder ?? 0) ||
+											(candidate.queueOrder === source.queueOrder && candidate.id > source.id)))),
+						)
+					if (newer) throw new Error("CONTINUATION_SUPERSEDED: newer work is recorded; continue the latest instruction")
+					continuation = {
+						...params.continueFrom,
+						instruction: source.continuation?.instruction ?? source.text,
+						previousOutcome: source.state,
+					}
+					projectRepair = source.projectRepair ? { ...source.projectRepair, automatic: false } : undefined
+				}
 				const run: Run = {
 					id,
 					request: request.id,
@@ -631,6 +981,8 @@ export class DesktopSession {
 					text: params.text,
 					session: this.session,
 					conversation: this.conversation,
+					continuation,
+					projectRepair,
 					state: "queued",
 					queueOrder: this.seq + 1,
 					createdAt: Date.now(),
@@ -645,7 +997,26 @@ export class DesktopSession {
 					title: conversation?.title === "New conversation" ? params.text.slice(0, 100) : conversation?.title,
 					updatedAt: run.createdAt,
 				})
+				// The repair receipt and evidence share the acceptance WAL boundary.
+				if (projectRepair) this.metadata.put(this.repairReceipt(projectRepair.launch), { run: id })
+				if (
+					projectRepair &&
+					this.healingEnabled &&
+					this.healing?.launch === projectRepair.launch &&
+					this.healing.conversation === this.conversation &&
+					!["paused"].includes(this.healing.phase)
+				) {
+					this.healing.repair = id
+					this.healing.phase = "repairing"
+					this.healing.reason = undefined
+					if (automaticHealing) this.healing.attempts++
+				}
 				await this.commit(run, "run.accepted")
+				if (automaticHealing && (!this.healingAllowed(automaticHealing) || automaticHealing.phase !== "repairing")) {
+					run.state = "cancelled"
+					await this.commit(run, "run.state")
+					return { accepted: true, run: projectRun(run) }
+				}
 				this.queue.push(run)
 				this.kick()
 				return { accepted: true, run: projectRun(run) }
@@ -676,7 +1047,8 @@ export class DesktopSession {
 				await this.submissions
 				await this.commits
 				const run = this.runs.get(createHash("sha256").update(`${this.session}:${params.request}`).digest("hex"))
-				return { found: Boolean(run), run: run ? projectRun(run) : undefined }
+				const visible = run && (run.conversation ?? run.session) === this.conversation
+				return { found: Boolean(visible), run: visible ? projectRun(run) : undefined }
 			}
 			case "task.cancel": {
 				const { run, ifQueued } = z
@@ -885,6 +1257,7 @@ export class DesktopSession {
 			.finally(() => {
 				this.pumping = undefined
 				if (this.queue.length && !this.closing && !this.cancellingAll) this.kick()
+				this.wakeHealing()
 			})
 	}
 	private async pump() {
@@ -893,6 +1266,17 @@ export class DesktopSession {
 			this.active = run
 			const controller = new AbortController()
 			this.controller = controller
+			const repairTimer = run.projectRepair?.automatic
+				? setTimeout(() => {
+						if (this.closing || this.active?.id !== run.id) return
+						this.pauseHealing("time_limit")
+						void this.cancel(run.id).catch((error) => {
+							this.closing = true
+							controller.abort(error)
+						})
+					}, this.healingLimits.repairMs)
+				: undefined
+			repairTimer?.unref()
 			run.state = "running"
 			run.startedAt = Date.now()
 			await this.commit(run, "run.state")
@@ -911,6 +1295,14 @@ export class DesktopSession {
 				executionStarted = true
 				const result = await this.engine.tick({
 					prompt: run.text,
+					verifyWorkspace: true,
+					workspaceCheckScope: run.continuation || run.projectRepair ? "workspace" : "changes",
+					workspaceRuntimeFailure: run.projectRepair?.observation,
+					workspaceRepairOrigin: run.projectRepair?.automatic ? "automatic" : "user",
+					continuation: run.continuation
+						? { instruction: run.continuation.instruction, previousOutcome: run.continuation.previousOutcome }
+						: undefined,
+					readWorkspaceRuntime: () => this.project.agentObservation(),
 					executionAuthority: "interactive",
 					signal: controller.signal,
 					onProgress: (e) => this.progress(run, e),
@@ -940,7 +1332,9 @@ export class DesktopSession {
 					run.checkpointError = `The final checkpoint could not be saved: ${String(error)}`
 				}
 			}
+			clearTimeout(repairTimer)
 			await this.commit(run, "run.state")
+			this.finishHealing(run)
 			this.active = undefined
 			this.controller = undefined
 		}
@@ -1126,9 +1520,12 @@ export class DesktopSession {
 	}
 	private async saveResult(run: Run, result: EngineTickResult) {
 		run.response = shortText(result.response)
-		run.verification = result.toolResults.length ? "evidence_available" : "not_run"
+		run.verification = result.workspaceVerification?.status ?? "not_run"
+		run.workspaceVerification = result.workspaceVerification
 		run.toolCount = result.toolResults.length
-		run.commandCount = result.toolResults.filter((tool) => tool.name === "run_command").length
+		run.commandCount = result.toolResults.filter(
+			(tool) => tool.name === "run_command" || tool.name === "workspace_check",
+		).length
 		const folder = path.join(this.workspace.path, ".broccolidb", "desktop-output")
 		await mkdir(folder, { recursive: true, mode: 0o700 })
 		if ((await realpath(folder)) !== folder)
@@ -1215,6 +1612,7 @@ export class DesktopSession {
 		return decision
 	}
 	async cancel(id: string) {
+		if (id === this.healing?.repair && this.healing.phase !== "paused") this.pauseHealing("stopped")
 		const queued = this.queue.find((r) => r.id === id)
 		if (queued) {
 			this.queue = this.queue.filter((r) => r.id !== id)
@@ -1233,6 +1631,7 @@ export class DesktopSession {
 		} else if (!this.runs.get(id)) throw new Error("UNKNOWN_RUN")
 	}
 	private cancelAll(): Promise<void> {
+		this.pauseHealing("stopped")
 		if (this.cancellation) return this.cancellation
 		// Close admission and the pump synchronously. An acceptance already
 		// crossing its flush boundary is included before cancellation completes.
@@ -1291,6 +1690,9 @@ export class DesktopSession {
 }
 
 export async function runDesktopWorker(): Promise<void> {
+	// Normalize before creating the engine so compiler commands and Run resolve
+	// the same installed tools even when launched by Finder rather than a shell.
+	process.env.PATH = desktopToolPath()
 	const redactor = new DeterministicSecretRedactor()
 	const sanitize = (value: unknown): unknown => {
 		if (typeof value === "string") return redactor.redact(value).sanitizedText

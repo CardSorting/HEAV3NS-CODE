@@ -299,7 +299,7 @@ export abstract class AbstractHands implements IHands {
       child.stdout.on("data", chunk => consume(chunk, false)); child.stderr.on("data", chunk => consume(chunk, true));
       const cleanup = () => { clearTimeout(forceTimer); clearTimeout(timeout); options.signal?.removeEventListener("abort", stop); };
       child.once("error", error => { cleanup(); reject(error); });
-      child.once("close", (code, signal) => { cleanup(); resolve({ stdout, stderr: stderr || (signal ? `Process terminated with signal ${signal}` : ""), exitCode: code ?? 1, durationMs: performance.now() - started }); });
+      child.once("close", (code, signal) => { cleanup(); resolve({ stdout, stderr: stderr || (signal ? `Process terminated with signal ${signal}` : stopping ? "Process stopped before completion" : ""), exitCode: stopping ? (code || 1) : code ?? 1, durationMs: performance.now() - started }); });
       options.signal?.addEventListener("abort", stop, { once: true });
       if (options.signal?.aborted) stop();
       if (options.timeoutMs) timeout = setTimeout(stop, options.timeoutMs);

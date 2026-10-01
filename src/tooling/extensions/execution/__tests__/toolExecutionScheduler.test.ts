@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { setImmediate } from "node:timers/promises"
 import type { IToolRegistry, ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
-import { type ScheduledToolCall, ToolExecutionScheduler } from "../tool-execution-scheduler.js"
 import { ToolApprovalDeniedError } from "../tool-confirmation-gatekeeper.js"
+import { type ScheduledToolCall, ToolExecutionScheduler } from "../tool-execution-scheduler.js"
 
 function deferred() {
 	let resolve!: () => void
@@ -29,10 +29,34 @@ function call(id: string, name = "view_file", args: Record<string, unknown> = { 
 }
 
 describe("ToolExecutionScheduler ready-queue throughput", () => {
+	it("keeps nonzero exit codes and structured tool failures unsuccessful on repeated calls", async () => {
+		for (const output of [
+			{ exitCode: 2, stderr: "Type error" },
+			{ success: false, error: "Could not read" },
+			{ denied: true },
+		]) {
+			let executions = 0
+			const tools = registry(async () => {
+				executions++
+				return output
+			})
+			const scheduler = new ToolExecutionScheduler()
+			for (let attempt = 0; attempt < 2; attempt++) {
+				const { results } = await scheduler.executeBatch([call("failure")], tools, process.cwd())
+				assert.equal(results[0].success, false)
+			}
+			assert.equal(executions, 2)
+		}
+	})
 	it("reports a permission denial without treating it as a tool crash or retry", async () => {
 		let calls = 0
-		const tools = registry(async () => { calls++; throw new ToolApprovalDeniedError("Denied for this operation") })
-		const { results } = await new ToolExecutionScheduler().executeBatch([call("denied")], tools, process.cwd(), { enableCache: false })
+		const tools = registry(async () => {
+			calls++
+			throw new ToolApprovalDeniedError("Denied for this operation")
+		})
+		const { results } = await new ToolExecutionScheduler().executeBatch([call("denied")], tools, process.cwd(), {
+			enableCache: false,
+		})
 		assert.equal(calls, 1)
 		assert.equal(results[0].denied, true)
 		assert.deepEqual(results[0].output, { denied: true, reason: "Denied for this operation" })

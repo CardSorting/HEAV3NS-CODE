@@ -1,10 +1,14 @@
-import { spawn, type ChildProcess } from "node:child_process"
-import { createHash } from "node:crypto"
+import { type ChildProcess, spawn } from "node:child_process"
+import { createHash, randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { lstat, readdir, readFile, realpath } from "node:fs/promises"
 import path from "node:path"
 import { StringDecoder } from "node:string_decoder"
+import { redactCredentialText } from "../core/utilities/progress-sanitizer.js"
+import { packageManagerLockfiles, projectPackageManager } from "../core/utilities/project-package-manager.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
+import { ProjectDiagnostics } from "./project-diagnostics.js"
+import { desktopToolPath } from "./tool-environment.js"
 
 export type ProjectTarget = { id: string; title: string; command: string; cwd: string; revision: string; preview?: string }
 export type ProjectConfiguration = { command: string; cwd: string; preview?: string }
@@ -52,10 +56,18 @@ export class ProjectRunner {
 	private exitCode?: number | null
 	private preview?: string
 	private startedAt?: number
+	private launch?: string
 	private starting = false
 	private generation = 0
+	private diagnostics = new Map<string, ProjectDiagnostics>()
+	private diagnostic?: string
+	private diagnosticTimer?: ReturnType<typeof setTimeout>
 	private readonly redactor = new DeterministicSecretRedactor()
-	constructor(workspace: string) {
+	constructor(
+		workspace: string,
+		private readonly onExit?: () => void,
+		private readonly diagnosticDelayMs = 1500,
+	) {
 		this.workspace = realpathSync(workspace)
 	}
 	get running() {
@@ -95,6 +107,8 @@ export class ProjectRunner {
 	async discover(custom?: ProjectConfiguration): Promise<{ targets: ProjectTarget[]; message: string }> {
 		const targets: ProjectTarget[] = [],
 			directories = ["."]
+		const manifests = new Map<string, string>(),
+			lockfiles = new Set<string>()
 		for (let i = 0; i < directories.length && i < 40; i++) {
 			const relative = directories[i],
 				directory = await this.directory(relative)
@@ -114,16 +128,18 @@ export class ProjectRunner {
 					})
 			}
 			const pkg = await this.manifest(directory, "package.json")
+			if (pkg !== undefined) manifests.set(path.posix.join(relative, "package.json"), pkg)
+			await Promise.all(
+				packageManagerLockfiles.map(async (file) => {
+					if (await this.hasFile(directory, file)) lockfiles.add(path.posix.join(relative, file))
+				}),
+			)
 			if (pkg) {
 				try {
 					const data = JSON.parse(pkg)
-					const manager = (await this.hasFile(directory, "pnpm-lock.yaml"))
-						? "pnpm"
-						: (await this.hasFile(directory, "yarn.lock"))
-							? "yarn"
-							: "npm"
+					const manager = projectPackageManager(relative, manifests, (file) => lockfiles.has(file))
 					for (const name of ["dev", "start"])
-						if (typeof data.scripts?.[name] === "string")
+						if (typeof data.scripts?.[name] === "string" && data.scripts[name].trim())
 							add(name === "dev" ? "Development server" : "Start app", `${manager} run ${name}`, pkg)
 				} catch {
 					/* Malformed package metadata is not executable configuration. */
@@ -182,16 +198,20 @@ export class ProjectRunner {
 		if (ticket !== this.generation) throw new Error("PROJECT_CANCELLED: start was cancelled")
 		this.target = target
 		this.output = ""
+		clearTimeout(this.diagnosticTimer)
+		this.diagnostics.clear()
+		this.diagnostic = undefined
 		this.totalBytes = 0
 		this.exitCode = undefined
 		this.preview = target.preview
 		this.startedAt = Date.now()
+		this.launch = randomUUID()
 		const env = Object.fromEntries(
 			Object.entries(process.env).filter(
 				([key]) => !/KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|^GIT_|^NODE_OPTIONS$|^NODE_PATH$/i.test(key),
 			),
 		)
-		env.PATH = `${process.env.PATH ?? "/usr/bin:/bin"}:/opt/homebrew/bin:/usr/local/bin`
+		env.PATH = desktopToolPath()
 		env.FORCE_COLOR = "0"
 		env.NO_COLOR = "1"
 		const child = spawn(process.execPath, ["-e", guardian, JSON.stringify({ command: target.command, cwd })], {
@@ -201,10 +221,24 @@ export class ProjectRunner {
 		})
 		this.process = child
 		this.state = "running"
-		const append = (value: string) => {
+		const append = (value: string, channel = "stderr") => {
 			const clean = value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
 			this.totalBytes += Buffer.byteLength(clean)
 			this.output = (this.output + this.redactor.redact(clean).sanitizedText).slice(-24_000)
+			if (this.state === "running") {
+				const detector = this.diagnostics.get(channel) ?? new ProjectDiagnostics()
+				this.diagnostics.set(channel, detector)
+				if (detector.push(clean)) {
+					// A successful rebuild clears failures from both output streams.
+					if (!detector.issue) this.diagnostics.clear()
+					this.diagnostic = [...this.diagnostics.values()].find((entry) => entry.issue)?.issue
+					clearTimeout(this.diagnosticTimer)
+					this.diagnosticTimer = setTimeout(() => {
+						if (this.process === child && this.state === "running") this.onExit?.()
+					}, this.diagnosticDelayMs)
+					this.diagnosticTimer.unref()
+				}
+			}
 			if (!this.preview)
 				for (const match of this.output.matchAll(
 					/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d+(?:\/[^\s<>"']*)?/g,
@@ -213,10 +247,13 @@ export class ProjectRunner {
 					if (url) this.preview = url
 				}
 		}
-		for (const stream of [child.stdout, child.stderr]) {
+		for (const [channel, stream] of [
+			["stdout", child.stdout],
+			["stderr", child.stderr],
+		] as const) {
 			const decoder = new StringDecoder("utf8")
-			stream?.on("data", (data: Buffer) => append(decoder.write(data)))
-			stream?.on("end", () => append(decoder.end()))
+			stream?.on("data", (data: Buffer) => append(decoder.write(data), channel))
+			stream?.on("end", () => append(decoder.end(), channel))
 		}
 		child.stdin?.on("error", () => {})
 		this.ending = new Promise((resolve) => {
@@ -225,10 +262,12 @@ export class ProjectRunner {
 				this.state = "failed"
 			})
 			child.on("close", (code) => {
+				clearTimeout(this.diagnosticTimer)
 				this.exitCode = code
 				this.state = this.state === "stopping" ? "stopped" : code === 0 ? "completed" : "failed"
 				this.process = undefined
 				resolve()
+				this.onExit?.()
 			})
 		})
 		return this.status()
@@ -236,15 +275,39 @@ export class ProjectRunner {
 	status() {
 		return {
 			state: this.state,
+			diagnostic: this.diagnostic ? redactCredentialText(this.redactor.redact(this.diagnostic).sanitizedText) : undefined,
+			launch: this.launch,
 			target: this.target,
-			output: this.redactor.redact(this.output).sanitizedText,
+			output: redactCredentialText(this.redactor.redact(this.output).sanitizedText),
 			outputLimited: this.totalBytes > Buffer.byteLength(this.output),
 			exitCode: this.exitCode,
-			preview: this.running ? this.preview : undefined,
+			preview: this.running && !this.diagnostic ? this.preview : undefined,
 			startedAt: this.startedAt,
 		}
 	}
+	/** The model sees the same owned process evidence as the native console. Reading never starts work. */
+	agentObservation() {
+		if (!this.target) return undefined
+		const current = this.status()
+		return {
+			state: current.state,
+			command: redactCredentialText(this.redactor.redact(this.target.command).sanitizedText),
+			cwd: this.target.cwd,
+			startedAt: current.startedAt,
+			exitCode: current.exitCode,
+			output: current.output.slice(-8000),
+			outputLimited: current.outputLimited || current.output.length > 8000,
+			diagnostic: current.diagnostic,
+		}
+	}
+	/** Stop only the owned failing process, preserving its diagnostic for repair admission. */
+	async stopForRepair(launch: string) {
+		if (this.launch !== launch || !this.diagnostic || this.state !== "running") return
+		await this.stop()
+		if (this.launch === launch && this.diagnostic) this.state = "failed"
+	}
 	async stop() {
+		clearTimeout(this.diagnosticTimer)
 		this.generation++
 		if (this.process) {
 			this.state = "stopping"

@@ -68,6 +68,18 @@ export interface EngineProgressEvent {
 
 export interface EngineTickInput {
   prompt: string;
+  /** Host-owned opt-in: validate changed code and return diagnostics to this turn. */
+  verifyWorkspace?: boolean;
+  /** Host-selected recovery scope: recheck existing sources, including work from earlier turns. */
+  workspaceCheckScope?: "changes" | "workspace";
+  /** Durable continuation context selected by the host, never by provider output. */
+  continuation?: { instruction: string; previousOutcome: string };
+  /** Immutable, redacted app failure selected by an explicit native repair action. */
+  workspaceRuntimeFailure?: WorkspaceRuntimeObservation;
+  /** Host-owned provenance; automatic repair retains ordinary tool permissions. */
+  workspaceRepairOrigin?: "automatic" | "user";
+  /** Read-only host observation of the app launched from this workspace's Run panel. */
+  readWorkspaceRuntime?: () => WorkspaceRuntimeObservation | undefined;
   /** Host-selected policy; provider output cannot elevate this authority. */
   executionAuthority?: import("./tooling.contracts.js").ExecutionAuthorityLevel;
   /** Cancels an in-flight local provider turn. */
@@ -76,7 +88,29 @@ export interface EngineTickInput {
   onProgress?: (event: EngineProgressEvent) => void;
 }
 
+export interface WorkspaceRuntimeObservation {
+  diagnostic?: string;
+  state: string;
+  command: string;
+  cwd: string;
+  startedAt?: number;
+  exitCode?: number | null;
+  output: string;
+  outputLimited: boolean;
+}
+
 export type EngineTickOutcome = "completed" | "failed" | "cancelled";
+
+/** Evidence for detected checks at a specific revision, never a claim of full correctness. */
+export interface WorkspaceVerificationSummary {
+  status: "not_required" | "passed" | "failed" | "unavailable" | "cancelled";
+  scope?: "changes" | "workspace";
+  checks: number;
+  attempts: number;
+  checkedAt?: number;
+  revision?: string;
+  reason?: "permission_denied" | "repair_limit" | "checks_failed" | "checks_unavailable";
+}
 
 export interface EngineTickResult {
   frameIndex: number;
@@ -88,6 +122,7 @@ export interface EngineTickResult {
   composedPrompt: string;
   response: string;
   toolResults: Array<{ name: string; output: unknown }>;
+  workspaceVerification?: WorkspaceVerificationSummary;
   durationMs?: number;
 }
 

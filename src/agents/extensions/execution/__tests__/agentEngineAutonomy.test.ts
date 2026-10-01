@@ -1,16 +1,17 @@
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import sinon from "sinon"
 import type { EngineProgressEvent } from "../../../../core/contracts/agent.contracts.js"
-import type { ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
+import type { IToolRegistry, ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
 import { SessionContext } from "../../../../sessions/base/session-context.js"
 import { SessionCompactor } from "../../../../sessions/extensions/compaction/session-compactor.js"
 import { SessionMemoryStore } from "../../../../sessions/extensions/memory/session-memory-store.js"
 import { PersistentSessionStore } from "../../../../sessions/extensions/persistence/session-store.js"
-import { SessionVfs } from "../../../../sessions/extensions/vfs/session-vfs.js"
 import { BroccoliDatabaseKernel } from "../../../../sessions/extensions/substrate/broccolidb-kernel.js"
+import { SessionVfs } from "../../../../sessions/extensions/vfs/session-vfs.js"
+import { AnchoredHands } from "../../../../tooling/extensions/hashline/hands.js"
 import type { ValidatingToolRegistry } from "../../../../tooling/extensions/registry/tool-registry.js"
 import { AgentActivityTimeline } from "../../../../tui/components/agent-activity-timeline.js"
 import { AgentConfig } from "../../../base/agent-config.js"
@@ -23,7 +24,9 @@ import { BroccoliRuntimeQueue, runtimeQueueDatabase } from "../broccoli-runtime-
 
 function createEngine(
 	options: {
-		execute?: () => Promise<unknown>
+		execute?: IToolRegistry["executeTool"]
+		cwd?: string
+		tools?: ToolDefinition[]
 		timeoutMs?: number
 		maxToolRounds?: number
 		requestQueue?: BroccoliRuntimeQueue
@@ -35,19 +38,19 @@ function createEngine(
 		name: "view_file",
 		description: "Inspect the next file",
 		parameters: { path: { type: "string", required: true } },
-		execute: executeTool,
+		execute: (args, cwd, executionOptions) => executeTool("view_file", args, cwd, executionOptions),
 	}
 	const toolRegistry = {
 		ears: { startTimer: () => undefined, endTimer: () => 1 },
-		listTools: () => [tool],
-		getTool: () => tool,
+		listTools: () => options.tools ?? [tool],
+		getTool: (name: string) => (options.tools ? options.tools.find((tool) => tool.name === name) : tool),
 		executeTool,
 	} as unknown as ValidatingToolRegistry
 	const gateway = new LlmProxyGateway()
 	gateway.configureProxy({ baseUrl: "http://provider.invalid/v1", timeoutMs: options.timeoutMs ?? 30_000 })
 	const engine = new AgentEngine(
 		config,
-		new SessionContext({ sessionId: "agent-autonomy-test", cwd: process.cwd() }),
+		new SessionContext({ sessionId: "agent-autonomy-test", cwd: options.cwd ?? process.cwd() }),
 		new PersistentSessionStore(),
 		toolRegistry,
 		new PromptComposer(),
@@ -90,6 +93,299 @@ function terminalEvents(events: EngineProgressEvent[]) {
 		(event) => event.metadata?.scope === "turn" && ["completed", "failed", "cancelled"].includes(event.status),
 	)
 }
+
+describe("native agent compiler feedback loop", () => {
+	let folder: string
+	beforeEach(async () => {
+		folder = await realpath(await mkdtemp(path.join(tmpdir(), "native-agent-check-")))
+		const tsc = path.resolve("node_modules/typescript/bin/tsc")
+		await writeFile(
+			path.join(folder, "package.json"),
+			JSON.stringify({ scripts: { typecheck: `node '${tsc.replace(/'/g, "'\\''")}' --pretty false` } }),
+		)
+		await writeFile(
+			path.join(folder, "tsconfig.json"),
+			JSON.stringify({ compilerOptions: { noEmit: true, strict: true, types: [], skipLibCheck: true }, files: ["app.ts"] }),
+		)
+		await writeFile(path.join(folder, "app.ts"), "export const value: number = 1")
+	})
+	afterEach(async () => {
+		sinon.restore()
+		await rm(folder, { recursive: true, force: true })
+	})
+	function response(content: string, write?: string, command = false) {
+		return Response.json({
+			choices: [
+				{
+					message: {
+						content,
+						...(write === undefined
+							? {}
+							: {
+									tool_calls: [
+										{
+											id: "edit",
+											type: "function",
+											function: {
+												name: command ? "run_command" : "write_file",
+												arguments: JSON.stringify(
+													command
+														? { command: "fixture-shell-write" }
+														: { path: "app.ts", content: write },
+												),
+											},
+										},
+									],
+								}),
+					},
+				},
+			],
+		})
+	}
+	function nativeEngine(check?: IToolRegistry["executeTool"]) {
+		const hands = new AnchoredHands()
+		const definitions: ToolDefinition[] = [
+			{
+				name: "write_file",
+				description: "Write project source",
+				isMutating: true,
+				parameters: { path: { type: "string", required: true }, content: { type: "string", required: true } },
+				execute: async () => undefined,
+			},
+			{
+				name: "run_command",
+				description: "Run a project command",
+				parameters: { command: { type: "string", required: true } },
+				execute: async () => undefined,
+			},
+		]
+		return createEngine({
+			cwd: folder,
+			tools: definitions,
+			execute: async (name, args, cwd, options) => {
+				if (name === "write_file" || args.command === "fixture-shell-write") {
+					await writeFile(path.join(cwd, "app.ts"), String(args.content ?? "export const value: number = 'bad'"))
+					return { success: true }
+				}
+				return check ? check(name, args, cwd, options) : hands.runCommand(String(args.command), cwd, options)
+			},
+		})
+	}
+	it("compiles broken TypeScript, gives the error to the model, repairs, and verifies in one turn", async function () {
+		this.timeout(30000)
+		const { engine } = nativeEngine()
+		let requests = 0
+		const events: EngineProgressEvent[] = []
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			requests++
+			if (requests === 1) return response("Updating the app.", "export const value: number = 'bad'")
+			if (requests === 2) return response("The update is complete.")
+			if (requests === 3) {
+				assert.match(String(init?.body), /TS2322/)
+				return response("Repairing the type mismatch.", "export const value: number = 2")
+			}
+			return response("The change is ready; project checks passed.")
+		})
+		const result = await engine.tick({
+			prompt: "Update app.ts and check the project",
+			verifyWorkspace: true,
+			executionAuthority: "interactive",
+			signal: new AbortController().signal,
+			onProgress: (event) => events.push(event),
+		})
+		assert.equal(result.outcome, "completed")
+		assert.equal(result.workspaceVerification?.status, "passed")
+		assert.equal(result.workspaceVerification?.attempts, 2)
+		assert.equal(result.response, "The change is ready; project checks passed.")
+		assert.equal(result.toolResults.filter((record) => record.name === "workspace_check").length, 2)
+		assert.equal(terminalEvents(events).length, 1)
+		assert.ok(events.some((event) => event.message === "Fixing issues found in your changes"))
+		assert.ok(events.every((event) => !JSON.stringify(event).includes("TS2322")))
+		assert.match(await readFile(path.join(folder, "app.ts"), "utf8"), /= 2/)
+	})
+	it("detects shell edits and prevents a premature final answer from hiding a failed check", async () => {
+		const { engine } = nativeEngine(async () => ({ exitCode: 2, stderr: "compiler failure" }))
+		let requests = 0
+		sinon
+			.stub(globalThis, "fetch")
+			.callsFake(async () =>
+				++requests === 1 ? response("Writing", "ignored", true) : response("Everything works perfectly"),
+			)
+		const result = await engine.tick({ prompt: "Update app.ts", verifyWorkspace: true })
+		assert.equal(result.outcome, "failed")
+		assert.equal(result.workspaceVerification?.status, "failed")
+		assert.doesNotMatch(result.response, /Everything works/)
+		assert.equal(requests, 3)
+	})
+	it("continues existing broken code with fresh compiler evidence and the original request", async function () {
+		this.timeout(30000)
+		await writeFile(path.join(folder, "app.ts"), "export const value: number = 'already broken'")
+		const { engine } = nativeEngine()
+		let requests = 0
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			assert.match(String(init?.body), /Original request: update the dashboard/)
+			if (++requests === 1) return response("The work looks complete.")
+			if (requests === 2) {
+				assert.match(String(init?.body), /TS2322/)
+				return response("Repairing the existing code.", "export const value: number = 3")
+			}
+			return response("The existing work is repaired and its project check passed.")
+		})
+		const result = await engine.tick({
+			prompt: "Continue the saved work",
+			verifyWorkspace: true,
+			workspaceCheckScope: "workspace",
+			continuation: { instruction: "Original request: update the dashboard", previousOutcome: "interrupted" },
+		})
+		assert.equal(result.outcome, "completed")
+		assert.equal(result.workspaceVerification?.scope, "workspace")
+		assert.equal(result.workspaceVerification?.status, "passed")
+		assert.equal(result.workspaceVerification?.attempts, 2)
+		assert.equal(requests, 3)
+		assert.match(await readFile(path.join(folder, "app.ts"), "utf8"), /= 3/)
+	})
+	it("bounds unsuccessful model repair cycles", async () => {
+		const { engine } = nativeEngine(async () => ({ exitCode: 1, stderr: "Still broken" }))
+		let requests = 0
+		sinon.stub(globalThis, "fetch").callsFake(async () => {
+			requests++
+			return requests % 2 === 0
+				? response("The update is complete.")
+				: response("Working", `export const value: number = 'bad${requests}'`)
+		})
+		const result = await engine.tick({ prompt: "Update app.ts", verifyWorkspace: true })
+		assert.equal(result.outcome, "failed")
+		assert.equal(requests, 8)
+		assert.equal(result.workspaceVerification?.attempts, 4)
+	})
+	it("lets planned edit batches finish before compiling or spending the repair budget", async () => {
+		let checks = 0,
+			rounds = 0
+		const { engine } = nativeEngine(async () => {
+			checks++
+			return { exitCode: 0 }
+		})
+		sinon.stub(globalThis, "fetch").callsFake(async () => {
+			assert.equal(checks, 0)
+			return ++rounds <= 6
+				? response("Updating another part", `export const value = ${rounds + 10}`)
+				: response("All edits are complete.")
+		})
+		const result = await engine.tick({ prompt: "Refactor the project", verifyWorkspace: true })
+		assert.equal(result.outcome, "completed")
+		assert.equal(checks, 1)
+		assert.equal(result.workspaceVerification?.attempts, 1)
+	})
+	it("finishes a multi-step repair without exhausting checks on intermediate edits", async () => {
+		let checks = 0,
+			rounds = 0
+		const { engine } = nativeEngine(async () => ({ exitCode: ++checks === 1 ? 1 : 0, stderr: "Compiler failure" }))
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			rounds++
+			assert.match(String(init?.body), /without asking the user whether to continue/)
+			if (rounds === 2 || rounds === 9) return response("Edits complete.")
+			if (rounds > 2) assert.equal(checks, 1)
+			return response("Repairing related source", `export const value = ${rounds}`)
+		})
+		const result = await engine.tick({ prompt: "Fix the project", verifyWorkspace: true, executionAuthority: "interactive" })
+		assert.equal(result.outcome, "completed")
+		assert.equal(checks, 2)
+		assert.equal(result.workspaceVerification?.status, "passed")
+	})
+	it("observes an app crash during a provider response before accepting completion", async () => {
+		const { engine, executeTool } = nativeEngine()
+		let state = "running",
+			requests = 0
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			requests++
+			if (requests === 1) {
+				state = "failed"
+				return response("The app is running.")
+			}
+			assert.match(String(init?.body), /RuntimeError: fixture crash/)
+			return response("I found the app failure in its recorded output.")
+		})
+		const result = await engine.tick({
+			prompt: "Inspect the running app",
+			verifyWorkspace: true,
+			readWorkspaceRuntime: () => ({
+				state,
+				command: "npm run dev",
+				cwd: ".",
+				output: state === "failed" ? "RuntimeError: fixture crash" : "Started",
+				outputLimited: false,
+			}),
+		})
+		assert.equal(requests, 2)
+		assert.equal(executeTool.callCount, 0)
+		assert.doesNotMatch(result.response, /app is running/)
+		assert.equal(result.toolResults.at(-1)?.name, "workspace_runtime")
+	})
+	it("delivers a saved app failure after restart even without a live process and checks the existing project", async () => {
+		let checks = 0
+		const { engine } = nativeEngine(async () => {
+			checks++
+			return { exitCode: 0 }
+		})
+		const evidence = {
+			state: "failed",
+			command: "npm run dev",
+			cwd: ".",
+			exitCode: 7,
+			output: "ReferenceError: saved startup failure",
+			outputLimited: false,
+		}
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			assert.match(String(init?.body), /ReferenceError: saved startup failure/)
+			assert.match(String(init?.body), /untrusted reference data/)
+			assert.match(String(init?.body), /Automatic app repair is enabled/)
+			assert.doesNotMatch(String(init?.body), /The user chose Fix with LUMI/)
+			return response("Project checks passed; app startup still needs confirmation.")
+		})
+		const result = await engine.tick({
+			prompt: "Fix the app",
+			verifyWorkspace: true,
+			workspaceCheckScope: "workspace",
+			workspaceRuntimeFailure: evidence,
+			workspaceRepairOrigin: "automatic",
+			readWorkspaceRuntime: () => undefined,
+		})
+		assert.equal(checks, 1)
+		assert.equal(result.workspaceVerification?.status, "passed")
+		assert.deepEqual(result.toolResults.at(-1), { name: "workspace_runtime_failure", output: evidence })
+	})
+	it("stops when verification permission is denied without resubmitting a check", async () => {
+		let checks = 0
+		const { engine } = nativeEngine(async () => {
+			checks++
+			const error = new Error("User denied")
+			error.name = "ToolApprovalDeniedError"
+			throw error
+		})
+		const fetch = sinon.stub(globalThis, "fetch")
+		fetch.onFirstCall().callsFake(async () => response("Working", "export const value = 2"))
+		fetch.callsFake(async () => response("The update is complete."))
+		const result = await engine.tick({ prompt: "Update app.ts", verifyWorkspace: true, executionAuthority: "interactive" })
+		assert.equal(result.outcome, "failed")
+		assert.equal(checks, 1)
+		assert.equal(fetch.callCount, 2)
+	})
+	it("cancels the in-flight compiler and does not issue another provider request", async () => {
+		const controller = new AbortController()
+		const { engine } = nativeEngine(async (_name, _args, _cwd, options) => {
+			controller.abort()
+			options?.signal?.throwIfAborted()
+			return { exitCode: 0 }
+		})
+		const fetch = sinon.stub(globalThis, "fetch")
+		fetch.onFirstCall().callsFake(async () => response("Working", "export const value = 2"))
+		fetch.callsFake(async () => response("The update is complete."))
+		const result = await engine.tick({ prompt: "Update app.ts", verifyWorkspace: true, signal: controller.signal })
+		assert.equal(result.outcome, "cancelled")
+		assert.equal(result.workspaceVerification?.status, "cancelled")
+		assert.equal(fetch.callCount, 2)
+	})
+})
 
 describe("CLI AgentEngine autonomous execution", () => {
 	afterEach(() => sinon.restore())

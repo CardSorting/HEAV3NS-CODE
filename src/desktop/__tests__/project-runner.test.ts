@@ -1,11 +1,11 @@
 import { strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
-import { ProjectRunner, localPreview, type ProjectTarget } from "../project-runner.js"
+import { localPreview, ProjectRunner, type ProjectTarget } from "../project-runner.js"
 
 const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`
 describe("workspace project runner", () => {
@@ -37,6 +37,7 @@ describe("workspace project runner", () => {
 		assert.notEqual((await runner.discover()).targets[0].revision, first.revision)
 	})
 	it("shows failure and bounded console output without launching a second concurrent command", async () => {
+		assert.equal(runner.agentObservation(), undefined)
 		await runner.start(
 			target(
 				`${quote(process.execPath)} -e ${quote("process.stdout.write('x'.repeat(100000)); setTimeout(()=>process.exit(7),300)")}`,
@@ -48,6 +49,11 @@ describe("workspace project runner", () => {
 		assert.equal(runner.status().exitCode, 7)
 		assert.equal(runner.status().outputLimited, true)
 		assert.ok(runner.status().output.length <= 24_000)
+		const observation = runner.agentObservation()!
+		assert.equal(observation.state, "failed")
+		assert.equal(observation.exitCode, 7)
+		assert.equal(observation.outputLimited, true)
+		assert.ok(observation.output.length <= 8000)
 	})
 	it("stops the owned process group and exposes only local preview URLs", async () => {
 		await runner.start(
@@ -66,6 +72,14 @@ describe("workspace project runner", () => {
 		assert.equal(localPreview("http://user:password@localhost:3000"), undefined)
 		assert.equal(localPreview("http://0.0.0.0:3000"), "http://127.0.0.1:3000/")
 	})
+	it("redacts both command and console credentials before exposing app evidence to the model", async () => {
+		await runner.start(target("printf 'Bearer fixture-private-value\\n'; exit 1"))
+		await wait(() => !runner.running)
+		const observation = runner.agentObservation()
+		assert.equal(observation?.state, "failed")
+		assert.doesNotMatch(JSON.stringify(observation), /fixture-private-value/)
+		assert.match(JSON.stringify(observation), /redacted/)
+	})
 	it("rejects project paths outside the workspace and external custom preview URLs", async () => {
 		await assert.rejects(runner.discover({ cwd: "../", command: "echo no" }), /PROJECT_PATH/)
 		await assert.rejects(runner.discover({ cwd: ".", command: "echo no", preview: "https://example.com" }), /PROJECT_URL/)
@@ -74,6 +88,23 @@ describe("workspace project runner", () => {
 		await writeFile(path.join(folder, "package.json"), JSON.stringify({ scripts: { dev: "echo fixture" } }))
 		await writeFile(path.join(folder, "pnpm-lock.yaml"), "#".repeat(300_000))
 		assert.equal((await runner.discover()).targets[0].command, "pnpm run dev")
+	})
+	it("uses the monorepo's declared package manager and nearest override, including Bun", async () => {
+		await mkdir(path.join(folder, "apps/web"), { recursive: true })
+		await writeFile(path.join(folder, "package.json"), JSON.stringify({ packageManager: "pnpm@10.0.0" }))
+		await writeFile(path.join(folder, "apps/web/package.json"), JSON.stringify({ scripts: { dev: "vite", start: "  " } }))
+		const inherited = (await runner.discover()).targets
+		assert.equal(inherited.length, 1)
+		assert.equal(inherited[0].command, "pnpm run dev")
+		await writeFile(path.join(folder, "apps/web/bun.lock"), "{}")
+		const overridden = (await runner.discover()).targets[0]
+		assert.equal(overridden.command, "bun run dev")
+		assert.notEqual(overridden.revision, inherited[0].revision)
+		await writeFile(
+			path.join(folder, "apps/web/package.json"),
+			JSON.stringify({ packageManager: "yarn@4.0.0", scripts: { dev: "vite" } }),
+		)
+		assert.equal((await runner.discover()).targets[0].command, "yarn run dev")
 	})
 	it("cancels an in-flight start before launching the project", async () => {
 		const starting = runner.start(target("echo SHOULD_NOT_RUN"))

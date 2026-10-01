@@ -1,4 +1,6 @@
 export interface CommandResult {
+  /** A policy/user denial is distinct from a process that exits with an error. */
+  denied?: boolean;
   stdout: string;
   stderr: string;
   exitCode: number;

@@ -15,7 +15,15 @@ const inspectionMethods = new Set([
 	"project.discover",
 	"project.status",
 ])
-const controlMethods = new Set(["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop"])
+const controlMethods = new Set([
+	"task.cancel",
+	"task.cancelAll",
+	"approval.resolve",
+	"snapshot",
+	"shutdown",
+	"project.stop",
+	"project.healing",
+])
 interface Waiting {
 	run: () => void
 	cancel: () => void

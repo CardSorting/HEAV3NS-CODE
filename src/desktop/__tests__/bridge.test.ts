@@ -212,6 +212,31 @@ describe("desktop runtime boundary", () => {
 		await bridge.stop()
 		await rm(folder, { recursive: true, force: true })
 	})
+	it("requests native verification and records actual evidence independently of tool counts", async () => {
+		execute = async (input) => {
+			assert.equal(input.verifyWorkspace, true)
+			return { ...completed(), toolResults: [{ name: "view_file", output: "contents" }] }
+		}
+		const first = await request("task.submit", { text: "Read the project" })
+		await waitFor(() => events.some((event) => event.payload?.id === first.run.id && event.payload.state === "completed"))
+		assert.equal((await request("history.read", { run: first.run.id })).run.verification, "not_run")
+		const summary = { status: "passed" as const, checks: 2, attempts: 2, checkedAt: Date.now(), revision: "revision" }
+		execute = async () => ({
+			...completed(),
+			workspaceVerification: summary,
+			toolResults: [{ name: "workspace_check", output: { exitCode: 0 } }],
+		})
+		const second = await request("task.submit", { text: "Update and check the project" })
+		await waitFor(() => events.some((event) => event.payload?.id === second.run.id && event.payload.state === "completed"))
+		const run = (await request("history.read", { run: second.run.id })).run
+		assert.equal(run.verification, "passed")
+		assert.deepEqual(run.workspaceVerification, summary)
+		assert.equal(run.commandCount, 1)
+		assert.deepEqual(
+			(await request("snapshot")).runs.find((item: any) => item.id === second.run.id).workspaceVerification,
+			summary,
+		)
+	})
 	it("accepts one task durably and returns the same acceptance after restart", async () => {
 		const first = await request("task.submit", { text: "Read the fixture", attachments: [] }, "repeat")
 		await waitFor(() => events.some((e) => e.payload?.state === "completed"))
@@ -687,6 +712,23 @@ describe("desktop runtime boundary", () => {
 		const result = await task
 		assert.notEqual(result.exitCode, 0)
 		assert.ok(Date.now() - started < 3000, "cancellation must not wait for sleep to finish")
+	})
+	it("preserves policy denial separately from a real shell exit status", async () => {
+		const hands = new AnchoredHands()
+		const executionFailure = await hands.runCommand("exit 126", folder, { signal: new AbortController().signal })
+		assert.equal(executionFailure.exitCode, 126)
+		assert.notEqual(executionFailure.denied, true)
+		hands.permissionController.validateCommand = () => ({ allowed: false, reason: "Fixture policy denial" })
+		const denied = await hands.runCommand("printf harmless", folder)
+		assert.equal(denied.denied, true)
+		assert.equal(denied.stdout, "")
+	})
+	it("does not promote a timeout to success when the shell traps termination with exit zero", async () => {
+		const result = await new AnchoredHands().runCommand("trap 'exit 0' TERM; sleep 30", folder, {
+			signal: new AbortController().signal,
+			timeoutMs: 100,
+		})
+		assert.notEqual(result.exitCode, 0)
 	})
 	it("checkpoints ongoing work, coalesces a progress flood and retains structured activity after completion", async () => {
 		let release!: () => void
