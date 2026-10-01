@@ -67,7 +67,7 @@ final class RuntimeClient {
     private var snapshotPending = false
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
-    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop"]
+    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
     private static let inspections: Set<String> = ["files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
@@ -241,6 +241,9 @@ final class RuntimeClient {
                         if let type = message["type"] as? String, ["run.state", "run.progress", "run.accepted", "approval.requested", "approval.resolved"].contains(type) {
                             guard let payload = message["payload"] as? [String: Any], self.validRun(payload), message["seq"] is NSNumber else { self.fail("LUMI sent an invalid state event. Reconnect to recover recorded state."); return }
                         }
+                        if message["type"] as? String == "project.state" {
+                            guard let payload = message["payload"] as? [String: Any], self.validResult(payload, for: "project.status"), payload["revision"] is NSNumber else { self.fail("LUMI sent an invalid app state. Reconnect to check its status."); return }
+                        }
                         self.onEvent?(message)
                     } else if message["kind"] as? String == "protocol.error" { self.fail("LUMI reported a protocol error. Reinstall a matching app and runtime pair.") }
                 }
@@ -271,7 +274,7 @@ final class RuntimeClient {
         case "checkpoint.list": return result["checkpoints"] is [[String: Any]] && result["more"] is Bool
         case "checkpoint.preview": return result["token"] is String && result["changes"] is [[String: Any]] && result["total"] is NSNumber
         case "project.discover": return result["targets"] is [[String: Any]]
-        case "project.status", "project.start", "project.stop": return ["idle", "running", "stopping", "stopped", "completed", "failed"].contains(result["state"] as? String ?? "") && result["output"] is String
+        case "project.status", "project.start", "project.stop", "project.healing": return ["idle", "running", "stopping", "stopped", "completed", "failed"].contains(result["state"] as? String ?? "") && result["output"] is String
         case "files.search": return result["entries"] is [[String: Any]] && result["matched"] is NSNumber && result["more"] is Bool && result["scanLimited"] is Bool && ["git", "workspace"].contains(result["scope"] as? String ?? "")
         case "approval.resolve": return result["resolved"] as? Bool == true
         case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber

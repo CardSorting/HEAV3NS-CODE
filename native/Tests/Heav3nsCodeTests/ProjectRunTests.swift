@@ -13,7 +13,8 @@ final class ProjectRunTests: XCTestCase {
 
 private final class RunHarness {
     var replies = [(String, (Result<[String: Any], Error>) -> Void)]()
-    lazy var view = ProjectRunView(request: { [weak self] method, _, reply in self?.replies.append((method, reply)) }, ready: { true })
+    var requests = [(String, [String: Any])] ()
+    lazy var view = ProjectRunView(request: { [weak self] method, params, reply in self?.requests.append((method, params)); self?.replies.append((method, reply)) }, ready: { true })
     let target: [String: Any] = ["id": "dev", "title": "Development server", "command": "npm run dev", "cwd": ".", "revision": "1"]
     func answer(_ method: String, _ result: Result<[String: Any], Error>) {
         guard let index = replies.firstIndex(where: { $0.0 == method }) else { XCTFail("No pending \(method)"); return }
@@ -39,6 +40,110 @@ private final class RunHarness {
 }
 
 extension ProjectRunTests {
+    func testAutomaticRepairHasAStopControlBeforeTheAgentStartsAndRejectsStaleStatus() {
+        let h = RunHarness(); h.ready()
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Ready", automaticSupported: true)
+        h.view.navigateProbe("poll")
+        h.view.receiveProjectState(["state": "failed", "revision": 2, "launch": UUID().uuidString, "output": "Crash", "healing": ["enabled": true, "phase": "waiting", "attempts": 0]])
+        h.answer("project.status", .success(["state": "idle", "revision": 1]))
+        XCTAssertEqual(h.view.diagnostics["state"] as? String, "failed")
+        XCTAssertEqual(h.view.diagnostics["automaticVisible"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["automaticEnabled"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, false)
+        XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, false)
+        XCTAssertEqual(h.view.diagnostics["stopEnabled"] as? Bool, true)
+        h.view.navigateProbe("stop")
+        XCTAssertEqual(h.requests.last?.0, "project.stop")
+        h.answer("project.stop", .success(["state": "failed", "revision": 3, "healing": ["enabled": true, "phase": "paused"]]))
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, true)
+    }
+    func testAutomaticRepairPreferenceWaitsForConfirmedStatusAndSendsTheChosenValue() {
+        let h = RunHarness(); h.ready()
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Ready", automaticSupported: true)
+        h.view.receiveProjectState(["state": "idle", "revision": 1, "healing": ["enabled": true, "phase": "watching"]])
+        h.view.navigateProbe("automatic")
+        XCTAssertEqual(h.requests.last?.0, "project.healing")
+        XCTAssertEqual(h.requests.last?.1["enabled"] as? Bool, false)
+        h.answer("project.healing", .success(["state": "idle", "revision": 2, "healing": ["enabled": false, "phase": "paused"]]))
+        XCTAssertEqual(h.view.diagnostics["automaticEnabled"] as? Bool, false)
+        h.view.navigateProbe("poll"); h.answer("project.status", .failure(NSError(domain: "offline", code: 1)))
+        let count = h.requests.count
+        h.view.navigateProbe("automatic")
+        XCTAssertEqual(h.requests.count, count)
+    }
+    func testRepeatedFailureShowsBoundedRecoveryAndRestoredAppStillLinksItsRepair() {
+        let h = RunHarness(); h.ready()
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Ready", automaticSupported: true)
+        let launch = UUID().uuidString
+        h.view.receiveProjectState(["state": "failed", "revision": 1, "launch": launch, "healing": ["enabled": true, "phase": "attention", "reason": "attempt_limit", "attempts": 3]])
+        XCTAssertTrue((h.view.diagnostics["status"] as? String ?? "").contains("repeated failures"))
+        XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, true)
+        h.view.receiveProjectState(["state": "running", "revision": 2, "launch": launch, "conversation": "current", "healing": ["enabled": true, "phase": "watching", "attempts": 1], "repair": ["run": "saved", "state": "completed"]])
+        XCTAssertEqual(h.view.diagnostics["repairTitle"] as? String, "View Repair")
+        XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, true)
+    }
+    func testFailureOffersAgentRepairWithDetailsCollapsedAndNoManualDebuggingInstruction() {
+        let h = RunHarness(); h.ready()
+        let launch = UUID().uuidString
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Your draft is preserved.")
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "failed", "launch": launch, "conversation": "current", "output": "ReferenceError: startup failure", "exitCode": 7]))
+        var repairs = [String](); h.view.onRepair = { repairs.append($0) }
+        XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["repairEnabled"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["detailsVisible"] as? Bool, false)
+        XCTAssertFalse((h.view.diagnostics["status"] as? String ?? "").contains("console"))
+        h.view.navigateProbe("repair")
+        XCTAssertEqual(repairs, [launch])
+        h.view.navigateProbe("details")
+        XCTAssertEqual(h.view.diagnostics["detailsVisible"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["output"] as? String, "ReferenceError: startup failure")
+    }
+    func testRepairWaitsForKnownStatusAndAvailableAgentAndHonorsCapability() {
+        let h = RunHarness(); h.ready()
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "failed", "launch": UUID().uuidString]))
+        var requests = 0; h.view.onRepair = { _ in requests += 1 }
+        XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, false)
+        h.view.setRepairAvailability(supported: true, enabled: false, canOpen: true, conversation: "current", hint: "Finish current work.")
+        h.view.navigateProbe("repair"); XCTAssertEqual(requests, 0)
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Ready")
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .failure(NSError(domain: "timeout", code: 1)))
+        h.view.navigateProbe("repair"); XCTAssertEqual(requests, 0)
+        XCTAssertEqual(h.view.diagnostics["repairEnabled"] as? Bool, false)
+    }
+    func testRecordedRepairOpensProgressAndBlocksRelaunchUntilSettled() {
+        let h = RunHarness(); h.ready()
+        h.view.setRepairAvailability(supported: true, enabled: false, canOpen: true, conversation: "current", hint: "Working")
+        let failed: [String: Any] = ["state": "failed", "launch": UUID().uuidString, "conversation": "current"]
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(failed.merging(["repair": ["run": "saved", "state": "running"]]) { _, new in new }))
+        var opened = [String](); h.view.onShowRepair = { opened.append($0) }
+        h.view.navigateProbe("repair"); h.view.navigateProbe("start")
+        XCTAssertEqual(opened, ["saved"])
+        XCTAssertEqual(h.view.diagnostics["repairTitle"] as? String, "View Repair")
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, false)
+        XCTAssertFalse(h.replies.contains { $0.0 == "project.start" })
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(failed.merging(["repair": ["run": "saved", "state": "completed"]]) { _, new in new }))
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, true)
+        XCTAssertTrue((h.view.diagnostics["status"] as? String ?? "").contains("check startup"))
+    }
+    func testConversationChangeCannotOpenAnOldRepairReceipt() {
+        let h = RunHarness(); h.ready()
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "new", hint: "Ready")
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "failed", "launch": UUID().uuidString, "conversation": "old", "repair": ["run": "private", "state": "failed"]]))
+        var opened = false; h.view.onShowRepair = { _ in opened = true }
+        XCTAssertEqual(h.view.diagnostics["repairTitle"] as? String, "Fix with LUMI")
+        h.view.navigateProbe("repair"); XCTAssertFalse(opened)
+        for state in ["idle", "running", "stopping", "stopped", "completed"] {
+            h.view.navigateProbe("poll")
+            h.answer("project.status", .success(["state": state, "launch": UUID().uuidString]))
+            XCTAssertEqual(h.view.diagnostics["repairVisible"] as? Bool, false)
+        }
+    }
     func testDraftSurvivesRefreshTabSwitchAndFailedSaveUntilExplicitDiscard() {
         let h = RunHarness(); h.ready(); h.edit("npm run custom")
         h.view.navigateProbe("refresh")

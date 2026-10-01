@@ -31,13 +31,13 @@ final class InspectionNavigationTests: XCTestCase {
         XCTAssertTrue(details.text.contains(instruction))
         XCTAssertTrue(details.text.hasPrefix("Cancelled\n"))
         XCTAssertTrue(details.text.contains("No output was recorded"))
-        XCTAssertTrue(details.text.contains("Checks were not recorded"))
+        XCTAssertTrue(details.text.contains("Checks not confirmed"))
         XCTAssertFalse(details.outputAvailable)
     }
     func testAvailableEvidenceDoesNotClaimSuccessfulVerification() {
         let details = RunDetails(["run": ["text": "Run checks", "state": "completed", "response": "One check failed", "verification": "evidence_available", "outputLimited": true], "outputAvailable": true])
         XCTAssertTrue(details.text.contains("One check failed"))
-        XCTAssertTrue(details.text.contains("Recorded evidence is incomplete"))
+        XCTAssertTrue(details.text.contains("Recorded output incomplete"))
         XCTAssertTrue(details.outputAvailable)
     }
 }

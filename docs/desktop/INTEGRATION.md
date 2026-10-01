@@ -34,6 +34,8 @@ Do not rebuild the bundle while it or the native transport tests are running: re
 | Progress | Existing `EngineTickInput.onProgress`, `EngineProgressEvent.activityId`, attempt and timing metadata |
 | Cancellation | Existing tick `AbortSignal`; now propagated through `run_command` into an owned shell process group |
 | Confirmation | Existing `ToolSafetyPolicyManager` and `ToolConfirmationGatekeeper`; desktop pins the interactive host hook, including nested calls |
+| Workspace verification | Native ticks opt into the runtime's `WorkspaceVerification` gate; compiler/lint failures feed back into the same model turn before completion |
+| App runtime evidence | Read-only observations from the owned Run process reach the model between rounds and before completion; console text is bounded and redacted |
 | Credentials | Existing `StateManager`, CLI setup/auth resolution; Swift has no provider configuration or credential store |
 | Runtime store | Existing `BroccoliDatabaseKernel`, WAL, workspace-local `.broccolidb`; factory accepts that same already-owned kernel |
 | Context | Existing `PersistentSessionStore` selection and compaction; adapter persists the runtime-selected active messages, never reconstructing context in Swift |
@@ -68,6 +70,109 @@ Run, session and approval records remain in BroccoliDB. Recorded output lives in
 
 Working-tree inspection states its Git baseline explicitly. It includes pre-existing and external changes and does not claim exact per-run attribution. Message-linked file restoration is a separate negotiated capability with a reviewed comparison, safety copy, durable journal and new conversation; see [Checkpoints and Run](CHECKPOINTS-AND-RUN.md) for its exclusions and recovery boundaries.
 
+## Agent-owned project checks
+
+App launch failures also have a durable native handoff through `project-repair-v1`.
+**Fix with LUMI** pins the failed launch's redacted evidence to an ordinary agent
+task, preserving it through explicit continuation and reconnect reconciliation.
+It uses full workspace check scope and the existing permission path. See
+[app failure recovery](CHECKPOINTS-AND-RUN.md#run-console-and-preview) for admission and UX boundaries.
+
+`workspace-verification-v1` advertises the runtime verification gate. The native
+client requests verification on each live agent turn. The engine observes source
+and configuration contents before work and before accepting a final answer.
+Mutation batches invalidate prior evidence. Full checks run at completion
+boundaries for both initial changes and repairs, so unfinished multi-file edits do not exhaust the
+repair budget. This catches writes made through shell tools
+as well as file tools. Checks use the normal `run_command` registry path, pinned
+permissions, cancellation signal and owned process group. No second execution or
+approval system is introduced.
+
+`task-continuation-v1` adds a native **Continue repair** / **Continue work** action
+for the latest failed, stopped or interrupted instruction. It creates a new,
+explicitly requested turn through the existing durable `task.submit` path. The
+runtime validates the source run, revision and current conversation, rejects
+superseded history or pending work, and retains the original instruction through
+successive continuations. A stable request ID makes repeated clicks and reconnect
+reconciliation idempotent. Restoring the app never triggers the action.
+
+Continuation uses `workspaceCheckScope: "workspace"`: existing source contents
+are checked even if the new turn has not edited them. This prevents an earlier
+failure becoming an unchecked baseline. Ordinary turns keep the narrower changed
+source scope. Both modes retain the same time, scan, permission and repair limits.
+The original request is model reference context; the agent must inspect current
+state and avoid replaying completed side effects. Prior permission denials are not
+carried forward as approvals. A shell execution error (including exit 126) remains
+repairable; an explicit policy/user denial stops the turn.
+
+The action lives next to the recorded outcome in Walkthrough and in Workspace
+Actions. It remains visible at compact sizes, disables while offline or busy,
+and leaves the composer's independent draft intact, including after acceptance
+reconciliation. Historical instructions cannot supersede newer work. Submission
+lookup and replay enforce the same conversation boundary as history inspection.
+
+Finder launches and Run share installed-tool path discovery. An inherited absolute
+PATH keeps precedence, followed by standard system/Homebrew locations, common user
+tool bins/shims and the bundled Node directory. Empty/relative path entries are
+excluded. This never sources shell startup files or installs a toolchain; missing
+compilers still produce an explicit unavailable/failed check.
+
+For affected projects and their ancestor workspaces, detection selects an existing
+`typecheck`, `type-check`, `check-types` or `check` script, plus `lint` and `build`.
+It honors npm, pnpm, yarn and bun package-manager metadata/lockfiles, and supports
+`swift build`, `cargo check --locked`, and `go build ./...`. Watch and auto-fixing
+scripts are not accepted as finite checks. Dependencies are not silently installed.
+Missing tools, unsupported projects, removed checks and incomplete coverage are
+reported to the agent as unavailable verification, never success.
+
+Failed checks return bounded, redacted command evidence to the model inside the
+current turn. The agent repairs through its ordinary tools, then the runtime
+rechecks. Four failed verification passes end the turn as failed; a denied check
+ends it immediately. A final answer cannot bypass a failed check without repair.
+Each pass admits at most 12 checks, gives each command at most 120 seconds, and
+stops admitting checks after 180 seconds. Stop retains cancellation authority
+through the check process tree. An interrupted command that exits zero while
+handling termination is still unsuccessful.
+
+Successful evidence names an observed source revision and check count. Source
+changes during validation invalidate it. Content scans cover known source/config
+extensions, honor `.gitignore`, skip generated/dependency directories, and cap at
+20,000 entries, 64 MiB total, 2 MiB per file and five seconds per scan. Redirected,
+unreadable and over-budget inputs cannot produce a passed result. These are scoped
+project checks, not proof of every language, test, runtime behavior or ignored file.
+
+The desktop stores `workspaceVerification` alongside run history and projects its
+status through snapshots and run details. Raw diagnostics stay in runtime tool
+evidence and bounded model context for subsequent repair. Tool use alone no longer
+counts as verification. The native transcript, Walkthrough and run details share
+plain-language labels for checking, repair, passed, unfinished, unavailable and
+stopped checks. Historical `evidence_available` rows remain explicitly unverified.
+
+The model also receives the most recent owned Run process state, command, exit code
+and up to 8,000 characters of redacted output. A process failure arriving during a
+provider response is delivered before accepting that response. Observation neither
+launches nor restarts an app. This pass does not implement an idle repair daemon,
+a general LSP server manager, debugger traces, browser-console collection, or
+automatic recovery after a worker restart. Reopened unfinished work remains
+interrupted; repairs occur during an authorized agent turn.
+
+This follows the execution/result separation used by [VS Code tasks and problem
+matchers](https://code.visualstudio.com/docs/debugtest/tasks), with revision-bound
+evidence informed by [LSP diagnostic lifecycle semantics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/).
+The native surface uses ordinary progress and outcome text; diagnostics belong to
+the agent's working context.
+
+Regression coverage includes a real TypeScript compiler failure/repair/recheck
+inside a scripted provider turn, shell edits, stale revisions, deletion/new
+projects, removed checks, bounded recovery, denial, cancellation, app-runtime
+observations, durable evidence projection and native status rendering.
+`scripts/verify-desktop-walkthrough.ts --verification` captures repair, passed and
+unfinished states at wide dark and compact light sizes, then clicks Continue repair
+and verifies the new turn's scope, preserved original request and untouched draft.
+Those UI fixtures do not invoke a provider or compiler. Engine regressions use an
+actual TypeScript compiler with a scripted provider to verify fresh failure,
+repair and recheck for already-written source code.
+
 ## Protocol v1
 
 The app launches one lazily attached worker with `--desktop-worker`. Stdin/stdout are private inherited pipes for newline-delimited UTF-8 JSON. Stderr is drained independently as bounded diagnostics. There is no listening port and no ANSI state parsing. The existing runtime redactor sanitizes structured presentation strings and console diagnostics before they reach Swift.
@@ -78,7 +183,7 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 |---|---|
 | `hello` | Protocol, runtime/workspace/session IDs, actual capabilities, and authoritative `limits.queuedInstructions` / `limits.instructionLength` |
 | `workspace.attach`, `snapshot` | Latest bounded run projection, durable cursor, active/queued identities |
-| `task.submit` | `{text, attachments: []}`; durable acceptance or explicit queue rejection |
+| `task.submit` | `{text, attachments: [], conversation?, continueFrom?: {run, revision}}`; durable acceptance or explicit rejection; continuation requires `task-continuation-v1` and the latest unfinished instruction |
 | `task.edit` | `{run, text, revision}`; change a waiting instruction after a durable write; reject stale versions and runs that have started |
 | `task.lookup` | `{request}`; reconcile the original request ID without scheduling execution |
 | `task.cancel` | `{run, ifQueued?}`; cancellation request; `ifQueued: true` prevents a stale Remove action from stopping active work |

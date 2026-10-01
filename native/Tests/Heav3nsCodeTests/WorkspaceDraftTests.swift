@@ -39,6 +39,15 @@ final class WorkspaceDraftTests: XCTestCase {
         try Data("{truncated".utf8).write(to: drafts.file)
         XCTAssertThrowsError(try drafts.load())
     }
+    func testContinuationRecoveryKeepsAnIndependentDraftAndReadsOlderSubmissions() throws {
+        let pending = WorkspaceDraft.Submission(id: "continue-recorded-run", text: "Continue saved work", preservesDraft: true)
+        try store().save(text: "My unsent instruction 🌱", submission: pending)
+        let restored = try XCTUnwrap(store().load())
+        XCTAssertEqual(restored.text, "My unsent instruction 🌱")
+        XCTAssertEqual(restored.submission, pending)
+        let legacy = Data(#"{"id":"older-request","text":"Original draft"}"#.utf8)
+        XCTAssertNil(try JSONDecoder().decode(WorkspaceDraft.Submission.self, from: legacy).preservesDraft)
+    }
     func testClosingAndReopeningRestoresTheDraftWithoutStartingWork() throws {
         _ = NSApplication.shared
         let drafts = store()

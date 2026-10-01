@@ -57,7 +57,7 @@ async function main() {
 		let sequence = 0
 		const emit = (
 			activityId: string,
-			phase: "thinking" | "tool" | "writing",
+			phase: "thinking" | "tool" | "writing" | "verifying",
 			status: "in_progress" | "completed" | "failed",
 			message: string,
 			detail: string,
@@ -87,6 +87,95 @@ async function main() {
 				const timer = setTimeout(done, ms)
 				input.signal?.addEventListener("abort", done, { once: true })
 			})
+		if (mode === "project-repair") {
+			if (!input.workspaceRuntimeFailure)
+				return { ...result(), response: "The fixture app is ready to run. No provider was contacted." }
+			await writeFile(
+				path.join(workspace, "fixture-project-repair.json"),
+				JSON.stringify({ evidence: input.workspaceRuntimeFailure, scope: input.workspaceCheckScope }),
+			)
+			await writeFile(path.join(workspace, "fixture-app.cjs"), "console.log('Fixture app started after repair');\n")
+			emit(
+				"repair",
+				"verifying",
+				"completed",
+				"Project checks passed",
+				"Scripted repair; no compiler or provider invoked.",
+				{ itemType: "workspace_check" },
+			)
+			return {
+				...result(),
+				response:
+					"The fixture startup issue is repaired. Run the app to confirm it starts. This is a scripted repair; no provider or compiler was invoked.",
+				workspaceVerification: {
+					status: "passed",
+					scope: "workspace",
+					checks: 1,
+					attempts: 1,
+					revision: "f".repeat(64),
+					checkedAt: Date.now(),
+				},
+			}
+		}
+		if (mode.startsWith("verification-")) {
+			if (input.continuation) {
+				await writeFile(
+					path.join(workspace, "fixture-continuation.json"),
+					JSON.stringify({ continuation: input.continuation, scope: input.workspaceCheckScope }),
+				)
+				emit(
+					"verification",
+					"verifying",
+					"completed",
+					"Project checks passed",
+					"Scripted continuation; no compiler or provider invoked.",
+					{ itemType: "workspace_check" },
+				)
+				return {
+					...result(),
+					response: "The saved work is ready. Its project checks passed. This is a scripted recovery fixture.",
+					workspaceVerification: {
+						status: "passed",
+						scope: "workspace",
+						checks: 3,
+						attempts: 1,
+						revision: "e".repeat(64),
+						checkedAt: Date.now(),
+					},
+				}
+			}
+			const repair = mode === "verification-repair"
+			emit(
+				"verification",
+				repair ? "writing" : "verifying",
+				repair ? "in_progress" : mode === "verification-passed" ? "completed" : "failed",
+				repair
+					? "Fixing issues found in your changes"
+					: mode === "verification-passed"
+						? "Project checks passed"
+						: "Changes need more work",
+				"Scripted verification presentation; no compiler or provider is running.",
+				{ itemType: repair ? "workspace_repair" : "workspace_check" },
+			)
+			if (repair) {
+				await wait(120000)
+				return result("cancelled")
+			}
+			const passed = mode === "verification-passed"
+			return {
+				...result(passed ? "completed" : "failed"),
+				response: passed
+					? "Your changes are ready. The detected project checks passed. This is a presentation fixture."
+					: "Your changes are saved, but some project checks still fail after LUMI’s repair attempts. Ask LUMI to continue from here. This is a presentation fixture.",
+				workspaceVerification: {
+					status: passed ? "passed" : "failed",
+					checks: 3,
+					attempts: 2,
+					checkedAt: Date.now(),
+					revision: passed ? "fixture-revision" : undefined,
+				},
+			}
+		}
 		if (mode === "project") {
 			await writeFile(path.join(workspace, "fixture.txt"), "Updated by the scripted agent.\n")
 			context = { jsonl: "Scripted context after the user's instruction", turnCount: 1 }

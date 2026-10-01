@@ -77,6 +77,7 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
     var onOutput: ((String) -> Void)?
     var onReview: (() -> Void)?
     var onRetryLoad: (() -> Void)?
+    var onContinue: ((WorkspaceContinuation) -> Void)?
     private let picker = NSPopUpButton()
     private let stageIcon = NSImageView()
     private let spinner = NSProgressIndicator()
@@ -94,6 +95,14 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
     private lazy var output = JourneyButton("Run details", symbol: "doc.text") { [weak self] in guard let self, let id = self.selectedID else { return }; self.onOutput?(id) }
     private lazy var review = JourneyButton("Review request…", symbol: "hand.raised") { [weak self] in self?.onReview?() }
     private lazy var retry = JourneyButton("Retry activity load") { [weak self] in self?.onRetryLoad?() }
+    private lazy var resume: JourneyButton = JourneyButton("Continue work", symbol: "arrow.right") { [weak self] in
+        guard let self, !self.resume.isHidden, self.resume.isEnabled, let continuation = self.continuation else { return }
+        self.onContinue?(continuation)
+    }
+    private var continuation: WorkspaceContinuation?
+    private var recoverySupported = false
+    private var recoveryEnabled = false
+    private var recoveryHint = ""
     private var menuRuns = [[String: Any]]()
     private var allActivities = [WalkthroughActivity]()
     private var visibleActivities = [WalkthroughActivity]()
@@ -143,12 +152,12 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         latest.bezelStyle = .rounded; latest.controlSize = .small; latest.target = self; latest.action = #selector(jumpLatest)
         latest.isHidden = true
         let actions = JourneyStyle.stack([changes, output], vertical: false, spacing: 8)
-        let root = JourneyStyle.stack([picker, stageRow, stageDetail, JourneyStyle.rule(), filters, empty, scroll, latest, coverage, retry, review, evidence, actions], spacing: 9)
+        let root = JourneyStyle.stack([picker, stageRow, stageDetail, resume, JourneyStyle.rule(), filters, empty, scroll, latest, coverage, retry, review, evidence, actions], spacing: 9)
         addSubview(root); JourneyStyle.pin(root, to: self)
         for view in root.arrangedSubviews { view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true }
         scroll.setContentHuggingPriority(.init(1), for: .vertical); scroll.setContentCompressionResistancePriority(.init(1), for: .vertical)
         coverage.maximumNumberOfLines = 2; evidence.maximumNumberOfLines = 2
-        retry.isHidden = true; review.isHidden = true
+        retry.isHidden = true; review.isHidden = true; resume.isHidden = true
         preferenceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.updateMotion() }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
@@ -196,7 +205,11 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         case "awaiting_approval": title = "Your review is needed"; detail = "This operation is paused until you allow or deny it."; symbol = "hand.raised"
         case "cancelling": title = "Stopping safely"; detail = "Waiting for the agent to confirm it has stopped."; symbol = "stop.circle"
         case "completed": title = "Response ready"; detail = "Continue in the conversation. Review any workspace changes before using them."; symbol = "checkmark.circle"
-        case "failed": title = "Instruction failed"; detail = "Inspect the issues and run details. Send a follow-up when you’re ready."; symbol = "exclamationmark.circle"
+        case "failed":
+            let verification = run?["verification"] as? String ?? ""
+            title = ["failed", "unavailable"].contains(verification) ? "Changes need more work" : "Instruction failed"
+            detail = ["failed", "unavailable"].contains(verification) ? "Your changes are saved. LUMI can continue checking and repairing them." : "The recorded work is preserved. LUMI can continue from here."
+            symbol = "exclamationmark.circle"
         case "interrupted", "timed_out": title = "Work was interrupted"; detail = "The last recorded activity is preserved. Nothing was restarted."; symbol = "pause.circle"
         case "cancelled": title = "Stopped"; detail = "Existing edits are retained. Send a follow-up to continue."; symbol = "stop.circle"
         case "running": title = current?.stage ?? "Starting"; detail = current?.message ?? "Preparing this instruction in your workspace."; symbol = current?.symbol ?? "bolt"
@@ -224,15 +237,26 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         let count = run?["activityCount"] as? Int ?? allActivities.count
         coverage.stringValue = loadMessage ?? (count > allActivities.count ? "Showing \(allActivities.count) of \(count) recorded activities. Earlier activity may not be retained." : "\(allActivities.count) recorded \(allActivities.count == 1 ? "activity" : "activities")")
         retry.isHidden = loadMessage == nil
-        let commands = run?["commandCount"] as? Int ?? 0
-        evidence.stringValue = run == nil ? "Files and changes open as read-only previews." : "\(commands > 0 ? "\(commands) command \(commands == 1 ? "result" : "results") recorded" : "Checks not confirmed") · Not reviewed\(run?["outputLimited"] as? Bool == true ? " · Output incomplete" : "")"
+        evidence.stringValue = run.map { "\(WorkspaceVerificationPresentation.label($0)) · Not reviewed" } ?? "Files and changes open as read-only previews."
         changes.isEnabled = connected; output.isEnabled = connected && nextID != nil
         review.isHidden = selectedState != "awaiting_approval"; review.isEnabled = connected
+        continuation = WorkspaceContinuation.latest(in: runs)
+        updateRecovery()
         reloadActivities(resetScroll: switched)
         if oldConnected != connected || oldLive != runIsLive || oldState != selectedState { table.reloadData() }
         if switched { onSelection?(nextID) }
     }
     func setSurfaceVisible(_ visible: Bool) { visibleSurface = visible; updateMotion() }
+    func setRecoveryAvailability(supported: Bool, enabled: Bool, hint: String) {
+        recoverySupported = supported; recoveryEnabled = enabled; recoveryHint = hint; updateRecovery()
+    }
+    private func updateRecovery() {
+        resume.isHidden = !recoverySupported || continuation == nil || continuation?.run != selectedID
+        resume.isEnabled = recoveryEnabled && connected
+        resume.title = continuation?.title ?? "Continue work"
+        resume.setAccessibilityLabel(resume.title)
+        resume.toolTip = recoveryHint
+    }
     func setCompact(_ compact: Bool) { stageDetail.isHidden = compact; evidence.isHidden = compact }
     func tick(now: Double = Date().timeIntervalSince1970 * 1000) {
         let quiet = Int(max(0, now - newestTimestamp) / 1000)
@@ -249,6 +273,11 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         pinnedID = picker.selectedItem?.representedObject as? String
         update(runs: menuRuns, connected: connected)
     }
+    func selectRecordedRun(_ id: String) {
+        guard menuRuns.contains(where: { $0["id"] as? String == id }) else { return }
+        pinnedID = id; search.stringValue = ""; issues.state = .off
+        update(runs: menuRuns, connected: connected)
+    }
     func navigateProbe(_ action: String) {
         switch action {
         case "expand":
@@ -258,6 +287,7 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         case "follow": pinnedID = nil; search.stringValue = ""; issues.state = .off; update(runs: menuRuns, connected: connected)
         case "file": if let path = allActivities.flatMap(\.files).first { onOpenFile?(path) }
         case "reduced": reduceMotionOverride = true; updateMotion()
+        case "continue": resume.performClick(nil)
         default: break
         }
     }
@@ -312,6 +342,6 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         if changed { table.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<visibleActivities.count)) }
     }
     var diagnostics: [String: Any] {
-        ["selectedRun": selectedID ?? "", "pinnedRun": pinnedID ?? "", "stage": stage, "animating": isAnimating, "visibleActivities": visibleActivities.count, "expandedActivities": expanded.count, "reduceMotion": reduceMotionOverride ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]
+        ["selectedRun": selectedID ?? "", "pinnedRun": pinnedID ?? "", "stage": stage, "animating": isAnimating, "visibleActivities": visibleActivities.count, "expandedActivities": expanded.count, "reduceMotion": reduceMotionOverride ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, "continuationVisible": !resume.isHidden, "continuationEnabled": resume.isEnabled, "continuationTitle": resume.title]
     }
 }

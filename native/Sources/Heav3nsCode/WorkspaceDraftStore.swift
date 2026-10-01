@@ -5,6 +5,7 @@ struct WorkspaceDraft: Codable, Equatable {
     struct Submission: Codable, Equatable {
         let id: String
         let text: String
+        var preservesDraft: Bool? = nil
     }
     let version: Int
     let workspace: String

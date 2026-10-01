@@ -100,6 +100,9 @@ async function verifyPackagedRuntime() {
 		assert.ok(hello.capabilities.includes("file-search-v1"))
 		assert.ok(hello.capabilities.includes("checkpoints-v1"))
 		assert.ok(hello.capabilities.includes("project-run-v1"))
+		assert.ok(hello.capabilities.includes("project-repair-v1"))
+		assert.ok(hello.capabilities.includes("workspace-verification-v1"))
+		assert.ok(hello.capabilities.includes("task-continuation-v1"))
 		assert.equal((await request("checkpoint.list")).checkpoints.length, 0)
 		await request("project.configure", { command: "printf 'packaged-project-run\\n'", cwd: "." })
 		const target = (await request("project.discover")).targets.find((item: { id: string }) => item.id === "custom")
@@ -169,7 +172,7 @@ async function main() {
 	const root = process.cwd(),
 		output = path.join(root, "build", `desktop-walkthrough-${Date.now()}`)
 	const binary = path.join(root, "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE")
-	const cases: Record<string, string[]> = process.argv.includes("--project")
+	let cases: Record<string, string[]> = process.argv.includes("--project")
 		? {
 				project: [
 					"dark",
@@ -292,6 +295,51 @@ async function main() {
 						"walkthrough-recovered",
 					],
 				}
+	if (process.argv.includes("--verification"))
+		cases = Object.fromEntries(
+			["verification-repair", "verification-passed", "verification-failed"].map((mode) => [
+				mode,
+				[
+					"dark",
+					"wide",
+					"walkthrough",
+					"narrow",
+					"light",
+					"walkthrough-compact",
+					...(mode === "verification-failed"
+						? ["draft", "walkthrough-continue", "walkthrough-continued", "wide", "dark", "walkthrough-continued-wide"]
+						: []),
+				],
+			]),
+		)
+	if (process.argv.includes("--project-repair"))
+		cases = {
+			"project-repair": [
+				"dark",
+				"wide",
+				"project",
+				"project-start",
+				"project-failed",
+				"narrow",
+				"light",
+				"project-failed-compact",
+				"project-details",
+				"project-diagnostics",
+				"project-details",
+				"draft",
+				"project-repair",
+				"walkthrough-repaired",
+				"wide",
+				"dark",
+				"walkthrough-repaired-wide",
+				"project",
+				"project-recorded-repair",
+				"project-view-repair",
+				"project",
+				"project-start",
+				"project-relaunched",
+			],
+		}
 	for (const [mode, steps] of Object.entries(cases)) {
 		const directory = path.join(output, mode),
 			workspace = path.join(directory, "Workspace")
@@ -301,14 +349,16 @@ async function main() {
 			"import AppKit\n\nfinal class WorkspaceExample: NSView {\n    func focusConversation() {\n        window?.makeFirstResponder(nil)\n    }\n}\n",
 		)
 		await writeFile(path.join(workspace, "fixture.txt"), "Walkthrough capture fixture.\n")
-		if (mode === "project") {
+		if (["project", "project-repair"].includes(mode)) {
 			await writeFile(
 				path.join(workspace, "package.json"),
 				JSON.stringify({ name: "native-run-fixture", private: true, scripts: { dev: "node fixture-app.cjs" } }),
 			)
 			await writeFile(
 				path.join(workspace, "fixture-app.cjs"),
-				"const http = require('node:http'); const server = http.createServer((req,res)=>res.end('Native project fixture')); server.listen(0, '127.0.0.1',()=>console.log('Preview: http://127.0.0.1:'+server.address().port));\n",
+				mode === "project-repair"
+					? "console.log('Bearer fixture-private-value'); throw new Error('Fixture startup failure');\n"
+					: "const http = require('node:http'); const server = http.createServer((req,res)=>res.end('Native project fixture')); server.listen(0, '127.0.0.1',()=>console.log('Preview: http://127.0.0.1:'+server.address().port));\n",
 			)
 		}
 		if (mode === "navigation") {
@@ -347,7 +397,7 @@ async function main() {
 							: [],
 					draftRoot: path.join(directory, "drafts"),
 					navigationPass: true,
-					captureWalkthroughStages: !["navigation", "project"].includes(mode),
+					captureWalkthroughStages: !["navigation", "project", "project-repair"].includes(mode),
 					...(mode === "navigation"
 						? {}
 						: {
@@ -390,7 +440,85 @@ async function main() {
 			}
 			assert.ok(report, `${mode} capture timed out: ${diagnostic}`)
 			await writeFile(path.join(directory, "diagnostic.txt"), diagnostic)
-			if (mode === "live") {
+			if (mode === "project-repair") {
+				const load = async (step: string) => JSON.parse(await readFile(path.join(directory, `ui-${step}.json`), "utf8"))
+				for (const step of ["project-failed", "project-failed-compact"]) {
+					const failed = (await load(step)).layout.projectRun
+					assert.equal(failed.state, "failed")
+					assert.equal(failed.repairVisible, true)
+					assert.equal(failed.repairEnabled, true)
+					assert.equal(failed.repairTitle, "Fix with LUMI")
+					assert.equal(failed.detailsVisible, false)
+				}
+				assert.equal((await load("project-diagnostics")).layout.projectRun.detailsVisible, true)
+				const repaired = (await load("walkthrough-repaired-wide")).layout
+				assert.equal(repaired.walkthrough.stage, "Response ready")
+				assert.equal(repaired.messageContentFits, true, JSON.stringify(repaired.messageLayoutIssues))
+				assert.equal(repaired.composerUTF16Count, (await load("draft")).layout.composerUTF16Count)
+				assert.ok(repaired.composerUTF16Count > 0)
+				assert.equal((await load("project-recorded-repair")).layout.projectRun.repairTitle, "View Repair")
+				assert.equal((await load("project-view-repair")).layout.walkthrough.stage, "Response ready")
+				assert.equal(report.layout.projectRun.state, "completed")
+				assert.equal(report.layout.projectRun.repairVisible, false)
+				const recovery = JSON.parse(await readFile(path.join(workspace, "fixture-project-repair.json"), "utf8"))
+				assert.equal(recovery.scope, "workspace")
+				assert.equal(recovery.evidence.exitCode, 1)
+				assert.match(recovery.evidence.output, /Fixture startup failure/)
+				assert.doesNotMatch(JSON.stringify(recovery), /fixture-private-value/)
+				assert.ok(!diagnostic.includes("Unable to simultaneously satisfy constraints"), diagnostic)
+				await writeFile(
+					path.join(directory, "verification.json"),
+					JSON.stringify(
+						{
+							nativeRepair: "passed",
+							realAppCrashAndRelaunch: "passed",
+							draftPreserved: true,
+							providerInvoked: false,
+							compilerInvoked: false,
+						},
+						null,
+						2,
+					),
+				)
+			} else if (mode.startsWith("verification-")) {
+				const expected =
+					mode === "verification-repair"
+						? "Fixing issues"
+						: mode === "verification-passed"
+							? "Response ready"
+							: "Changes need more work"
+				const original = JSON.parse(await readFile(path.join(directory, "ui-walkthrough.json"), "utf8"))
+				const compact = JSON.parse(await readFile(path.join(directory, "ui-walkthrough-compact.json"), "utf8"))
+				assert.equal(original.layout.walkthrough.stage, expected)
+				for (const layout of [original.layout, compact.layout, report.layout])
+					assert.equal(
+						layout.messageContentFits,
+						true,
+						`Conversation text must fit after resizing: ${JSON.stringify(layout.messageLayoutIssues)}`,
+					)
+				assert.equal(compact.layout.walkthrough.continuationVisible, mode === "verification-failed")
+				if (mode === "verification-failed") {
+					assert.equal(compact.layout.walkthrough.continuationEnabled, true)
+					assert.equal(compact.layout.walkthrough.continuationTitle, "Continue repair")
+					assert.equal(report.layout.walkthrough.stage, "Response ready")
+					assert.equal(report.layout.walkthrough.continuationVisible, false)
+					const draft = JSON.parse(await readFile(path.join(directory, "ui-draft.json"), "utf8"))
+					assert.equal(report.layout.composerUTF16Count, draft.layout.composerUTF16Count)
+					assert.ok(report.layout.composerUTF16Count > 0)
+					const resumed = JSON.parse(await readFile(path.join(workspace, "fixture-continuation.json"), "utf8"))
+					assert.equal(resumed.scope, "workspace")
+					assert.match(resumed.continuation.instruction, /improve workspace navigation/)
+				}
+				assert.ok(!diagnostic.includes("Unable to simultaneously satisfy constraints"), diagnostic)
+				await writeFile(
+					path.join(directory, "verification.json"),
+					JSON.stringify(
+						{ stage: expected, nativeChecks: "passed", providerInvoked: false, compilerInvoked: false },
+						null,
+						2,
+					),
+				)
+			} else if (mode === "live") {
 				const active = JSON.parse(await readFile(path.join(directory, "ui-walkthrough-queue.json"), "utf8"))
 				assert.equal(active.layout.walkthrough.stage, "Updating workspace")
 				const pinned = JSON.parse(await readFile(path.join(directory, "ui-walkthrough-history.json"), "utf8"))

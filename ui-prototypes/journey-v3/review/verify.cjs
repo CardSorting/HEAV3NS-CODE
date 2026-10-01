@@ -87,7 +87,7 @@ const screens = JSON.parse(fs.readFileSync(path.join(root, 'journey.json'), 'utf
   await capture('storyboard');
   const report = {date:'2026-09-29', scope:'Generated-image gallery only; no native app or runtime validation', desktop:{width:1440,height:1100}, mobile:{width:390,height:844}, storyboard:{width:1800,height:1100}, screens:screens.length, hotspots:screens.reduce((sum,screen)=>sum+screen.hotspots.length,0), checked:['all image decodes','all primary routes','every hotspot route or dialog','four recovery dialogs','Escape and focus restoration','selected navigation','full-size and prompt links','all local links','neutral approval action','hotspot toggle','unknown route fallback','desktop and mobile overflow','page errors'], captures, failures};
   fs.writeFileSync(path.join(root,'review','verification.json'), JSON.stringify(report,null,2)+'\n');
-  console.log(JSON.stringify(report,null,2));
+  process.stdout.write(JSON.stringify(report,null,2) + '\n');
   await browser.close();
   if (failures.length) process.exit(1);
-})().catch(error => { console.error(error); process.exit(1); });
+})().catch(error => { process.stderr.write(String(error.stack || error) + '\n'); process.exit(1); });
