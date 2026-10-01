@@ -1,0 +1,14 @@
+{
+  "identity": "Workspace conversation",
+  "concept": "A familiar folder silhouette with a conversation-shaped aperture.",
+  "tool": "Built-in image_gen",
+  "master": "AppIcon-Master.png",
+  "masterPixels": [
+    1254,
+    1254
+  ],
+  "prompt": "Use case: logo-brand.\nAsset type: finished production macOS application icon for HEAV3NS-CODE, a native workspace where people direct a coding agent through conversation.\nCreate a BRAND NEW identity unrelated to terminal chevrons, signal bars, robot faces, or the prior lime/cyan mark.\nConcept: \"a workspace you can talk to\". A SINGLE iconic white folder with a generous, unmistakable cobalt speech-bubble cutout centered in its front face. The familiar folder tab rises at upper left. The folder is broad and softly rounded. The cutout is one wide rounded rectangular conversation balloon with a short lower-left tail; no dots, text, lines, or symbols inside. It should read instantly as folder + conversation, not as an envelope or shopping bag. The white folder must stay a strong unified silhouette with substantial white material around the blue cutout.\nComposition: straight-on front view, centered and optically balanced, symbol fills about 62% of the canvas width. Rich cobalt blue rounded-square macOS tile occupying 88% of a 1024x1024 canvas with equal transparent padding. Large continuous rounded corners. Background outside the tile MUST be genuinely transparent, not a checkerboard illustration.\nMaterials and finish: refined contemporary native macOS icon; luminous cobalt enamel tile, subtly darker toward bottom, ivory ceramic folder with restrained bevel and soft directional contact shadow. Minimal, precise, calm and exceptionally legible. Almost-flat graphic construction with just enough tactile depth to feel native. Edges crisp. No excessive glossy reflections, no glass layers, no floating fragments, no decorative sparkles, no overlaid badge.\nPalette: cobalt #2459E0 to #1644B5; warm white #F9FBFF. Only these two color families. Strong contrast at 16 and 32 pixels.\nOutput: ONE icon only, 1024x1024 PNG with real alpha outside the rounded tile. No presentation board, no typography, no wordmark, no border frame, no watermark, no other app logos, no UI, no mockup device. All important symbol edges comfortably inside the tile. This is the final asset, not a concept sheet.",
+  "exports": "scripts/build-native-assets.swift",
+  "vectorCompanion": "Original flat geometric folder/conversation silhouette, intentionally distinct from the dimensional raster rendering.",
+  "previousIdentity": "Archive/Signal"
+}

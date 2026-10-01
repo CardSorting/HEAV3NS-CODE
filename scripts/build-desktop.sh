@@ -24,6 +24,8 @@ npm run build
 swift build --package-path native --configuration release --scratch-path build/native
 assert_bundle_idle
 cp build/native/release/HEAV3NS-CODE "$app/Contents/MacOS/HEAV3NS-CODE"
+cp native/Assets/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+cp -R build/native/release/HEAV3NS-CODE_Heav3nsCode.bundle "$app/Contents/Resources/"
 cp "build/downloads/node-v${node_version}-darwin-arm64/bin/node" "$app/Contents/Resources/runtime/node"
 cp -R dist/. "$app/Contents/Resources/runtime/dist/"
 mkdir -p "$app/Contents/Resources/runtime/node_modules"

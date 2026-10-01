@@ -29,6 +29,19 @@ Swift/AppKit remains the implementation. [PRODUCT.md](PRODUCT.md), [JOURNEY-V3.m
 
 ## Colors
 
+### Application identity
+
+The macOS app icon uses an ivory three-lobed cloud with paired code-bracket
+apertures on a deep ultramarine tile: **Cloud and code**. The cloud represents
+HEAV3NS and the familiar angle brackets represent CODE. It appears in the Dock, Finder, app
+switcher, and as a decorative 72-point image on welcome/preparation screens.
+Its flat SVG/PNG companion and monochrome PDF template share one geometric
+definition. Ultramarine `#2849bc` and ivory `#f7faff` belong to these brand assets;
+workspace controls retain the semantic colors below. The dimensional master,
+native size exports, origin, and regeneration instructions live in
+[`Assets/README.md`](Assets/README.md). Prior signal and folder artwork is archived and is
+not an active native identity.
+
 The palette follows semantic AppKit colors and window appearance. Captured shades are observations, not fixed palette tokens.
 
 ### Primary

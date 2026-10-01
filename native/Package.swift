@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "HEAV3NS-CODE", targets: ["Heav3nsCode"])],
     targets: [
-        .executableTarget(name: "Heav3nsCode"),
+        .executableTarget(name: "Heav3nsCode", resources: [.copy("Resources/Brand")]),
         .testTarget(name: "Heav3nsCodeTests", dependencies: ["Heav3nsCode"])
     ]
 )

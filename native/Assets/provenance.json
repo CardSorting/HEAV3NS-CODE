@@ -1,0 +1,17 @@
+{
+  "identity": "HEAV3NS-CODE — Cloud and code",
+  "concept": "An ivory cloud represents HEAV3NS; paired angle-bracket apertures represent CODE. One combined silhouette on deep ultramarine.",
+  "tool": "Built-in image_gen",
+  "master": "AppIcon-Master.png",
+  "masterPixels": [
+    1254,
+    1254
+  ],
+  "prompt": "Use case: logo-brand.\nAsset type: final native macOS app icon for HEAV3NS-CODE.\nPrimary request: a distinctive, immediately readable visual translation of the name HEAV3NS-CODE: a single beautifully proportioned white CLOUD with a bold CODE BRACKET PAIR cut out of its center. Cloud = heavens, angle brackets = code.\nDesign: one broad cloud silhouette with three deliberate rounded upper lobes, largest central lobe, smaller left and right shoulders, a softly rounded horizontal base. Inside the white cloud, two spacious thick dark-indigo angle-bracket apertures face each other, exactly < >, with a generous gap. Each bracket is a simple chevron without slash, dots, text, or terminal cursor. The blue cutouts are large enough to read at 32px. They sit in the broad lower body of the cloud, with ample white material around them. The combined cloud/code silhouette is the entire identity, not separate badges.\nComposition: straight-on, centered, no tilt or perspective. Cloud spans 66% of the canvas width, with the central peak slightly above center and bottom at 69% canvas height. Rich deep ultramarine/indigo macOS rounded-square tile with refined continuous corners fills 88% of the square canvas, even transparent padding around it. Outer tile edge perfectly smooth and clean, no detached pixels.\nFinish: premium native macOS icon, softly sculpted ivory ceramic cloud with restrained edge bevel, gentle directional contact shadow, deep blue enamel tile subtly lit from upper left. Mostly graphic and calm, strong silhouette, tactile but no excessive gloss or glass. The white symbol is the hero. Restrained two-color identity: ivory #F7FAFF and deep ultramarine #2849BC down to midnight indigo #172768. No cyan accents.\nActual transparent alpha outside the tile. No halo, wings, angel, sparkle, stars, space scene, sun, rainbow, folder, speech bubble, lightning, robot, letters, wordmark, numbers, extra ornament, watermark, presentation sheet, UI or device mockup. Avoid the Apple iCloud icon's exact contour: use a taller central arch and a compact symmetrical silhouette designed around the paired code apertures.\nDeliver ONE production icon, square 1024x1024 PNG with real alpha. This is the final artwork to ship, not a sketch.",
+  "exports": "scripts/build-native-assets.swift",
+  "vectorCompanion": "Original flat cloud/code geometry, intentionally distinct from the dimensional raster rendering.",
+  "previousIdentities": [
+    "Archive/Workspace-Conversation",
+    "Archive/Signal"
+  ]
+}

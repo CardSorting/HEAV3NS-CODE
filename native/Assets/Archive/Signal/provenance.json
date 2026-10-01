@@ -1,0 +1,18 @@
+{
+  "tool": "Built-in image_gen",
+  "images": [
+    {
+      "file": "Wallpapers/Signal-Graphite.png",
+      "prompt": "Use case: stylized-concept. Asset type: original macOS desktop wallpaper for the HEAV3NS-CODE agent workspace, 2560 by 1440 landscape. Primary request: a quiet, expertly art-directed abstract architectural still life derived from the existing brand's stacked right-facing signal chevrons and three vertical status bars. Scene: a wide near-black graphite studio, two substantial horizontal machined graphite ribbons folding into precise right-pointing chevrons, arranged in the lower-right half, their inner cut edges carrying restrained acid-lime (#d8ff5e) enamel; three small ice-cyan (#77e6ff) inset status bars to their right. Sculptural, tactile satin ceramic and anodized graphite, fine natural surface detail, realistic oblique softbox illumination from upper left, gentle grounded shadows. Upper half and left third remain calm near-black negative space so desktop labels stay readable. Cropped close architectural photography rather than a floating logo tile, precise editorial composition, refined industrial materials, subtle depth. No gradients as the subject, no cosmic clouds, no neon glow, no text, no letters, no numbers, no watermark, no interface, no mockup computer or app window, no stars, no extra icons. Brand colors only appear on the physical edges and insets, not as large colored backgrounds. This is a finished wallpaper asset, not a UI concept."
+    },
+    {
+      "file": "Wallpapers/Signal-Porcelain.png",
+      "prompt": "Use case: stylized-concept. Asset type: original light macOS desktop wallpaper for HEAV3NS-CODE, landscape 2560 by 1440. Primary request: a quiet abstract architectural still life echoing a stacked right-facing signal mark. Scene: a warm off-white studio, two substantial chalk-white porcelain ribbons folding into exact right-pointing chevrons in the lower-right half, with thin acid-lime (#d8ff5e) enamel inner edges and three small pale ice-cyan (#77e6ff) inset status bars nearby. Tactile unglazed porcelain, gently rounded machined edges, delicate grounded contact shadows. Wide, close architectural photography, soft daylight from upper left, restrained editorial composition, beautiful real material detail. Keep upper half and left third nearly empty warm off-white for desktop icons. Color only in the fine physical insets, not colored backgrounds. No text, no letters, no numbers, no logos added, no watermark, no interface, no mockup screen, no stars, no clouds, no neon glow. Finished desktop background, not an app UI concept."
+    }
+  ],
+  "icons": {
+    "source": "../../assets/icons/icon.svg",
+    "generator": "../../scripts/build-native-assets.swift",
+    "origin": "Origin: deterministic AppKit vector rendering by scripts/build-native-assets.swift; geometry and lime #d8ff5e / cyan #77e6ff colors derived from the existing assets/icons/icon.svg HEAV3NS signal mark. Native graphite tile, transparent outer padding, all iconset sizes rendered directly from paths. No image-generation model used."
+  }
+}

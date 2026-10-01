@@ -10,6 +10,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        if let icon = BrandAssets.appIcon { NSApp.applicationIconImage = icon }
         buildMenus()
         if let probe = IntegrationProbe() { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) } }
         let arguments = ProcessInfo.processInfo.arguments

@@ -66,8 +66,10 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         install(root)
     }
     private func showWelcome(checking: Bool = false) {
-        let mark = NSImageView(image: NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)!)
-        mark.contentTintColor = .controlAccentColor; mark.heightAnchor.constraint(equalToConstant: 58).isActive = true; mark.imageScaling = .scaleProportionallyUpOrDown
+        let mark = NSImageView()
+        mark.image = BrandAssets.appIcon ?? NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)
+        mark.setAccessibilityElement(false)
+        mark.heightAnchor.constraint(equalToConstant: 72).isActive = true; mark.imageScaling = .scaleProportionallyUpOrDown
         if checking {
             let progress = NSProgressIndicator(); progress.style = .spinning; progress.startAnimation(nil)
             centered([mark, JourneyStyle.label("HEAV3NS-CODE", size: 30, weight: .semibold), JourneyStyle.label("Preparing your workspace…", size: 15, secondary: true), progress]); return
