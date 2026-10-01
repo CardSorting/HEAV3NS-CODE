@@ -19,6 +19,7 @@ export interface OpenAiCodexHandlerOptions extends CommonApiHandlerOptions {
 	reasoningEffort?: string
 	thinkingBudgetTokens?: number
 	abortSignal?: AbortSignal
+	parallelToolCalls?: boolean
 }
 
 function isOpenAiTool(tool: DietCodeTool): tool is OpenAITool {
@@ -116,7 +117,7 @@ export class OpenAiCodexHandler implements ApiHandler {
 			stream: true,
 			store: false,
 			include: ["reasoning.encrypted_content"],
-			parallel_tool_calls: false,
+			parallel_tool_calls: this.options.parallelToolCalls ?? false,
 		}
 		if (responseTools.length > 0) {
 			requestParams.tools = responseTools
@@ -135,7 +136,9 @@ export class OpenAiCodexHandler implements ApiHandler {
 		while (true) {
 			let yieldedChunk = false
 			try {
-				const stream = await (await this.ensureClient()).responses.create(requestParams, { signal: this.options.abortSignal })
+				const stream = await (await this.ensureClient()).responses.create(requestParams, {
+					signal: this.options.abortSignal,
+				})
 				for await (const chunk of handleResponsesApiStreamResponse(stream, model.info, async () => 0)) {
 					yieldedChunk = true
 					yield chunk

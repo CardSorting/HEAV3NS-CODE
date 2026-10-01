@@ -43,6 +43,10 @@ export interface EngineProgressMetadata {
   exitCode?: number;
   completedSteps?: number;
   totalSteps?: number;
+  /** Observed command output, never an estimate of task completion. */
+  outputBytes?: number;
+  outputLines?: number;
+  outputIdleMs?: number;
   inputTokens?: number;
   outputTokens?: number;
   telemetry?: ProgressTelemetryMetrics;
@@ -56,6 +60,8 @@ export interface EngineProgressEvent {
   message: string;
   /** Optional safe, user-facing context. Never contains tool output or secrets. */
   detail?: string;
+  /** Bounded, redacted public code/command/output preview. Never model reasoning. */
+  preview?: { kind: "draft" | "code" | "command" | "output" | "message"; text: string; limited: boolean };
   timestamp: number;
   /** Time spent in this activity or in the overall turn. */
   elapsedMs?: number;

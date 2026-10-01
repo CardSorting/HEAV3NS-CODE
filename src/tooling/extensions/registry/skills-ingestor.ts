@@ -1,10 +1,6 @@
-import {
-	getResolvedSkillsForCwd,
-	getSkillContent,
-} from "../../../core/context/instructions/user-instructions/skills.js"
+import { getResolvedSkillsForCwd, getSkillContent } from "../../../core/context/instructions/user-instructions/skills.js"
 import type { SkillContent, SkillMetadata } from "../../../shared/skills.js"
 import type { Eyes } from "../../base/eyes.js"
-
 
 export interface SkillManifest {
 	name: string
@@ -41,16 +37,26 @@ export class SkillsIngestor {
 		| { success: false; error: string; availableSkills: string[] }
 	> {
 		const requestedName = skillName.trim()
-		const skills = await getResolvedSkillsForCwd(workspaceRoot)
+		let skills = await getResolvedSkillsForCwd(workspaceRoot)
 		if (!requestedName) {
-			return { success: false, error: "Provide the exact name of a skill to load.", availableSkills: skills.map((skill) => skill.name) }
+			return {
+				success: false,
+				error: "Provide the exact name of a skill to load.",
+				availableSkills: skills.map((skill) => skill.name),
+			}
 		}
+		// A skill can be installed or created after this turn's catalog was cached.
+		// Refresh once on a miss, sharing that refresh with concurrent activations.
+		const hasSkill = () => skills.some((skill) => skill.name.toLowerCase() === requestedName.toLowerCase())
+		if (!hasSkill()) skills = await getResolvedSkillsForCwd(workspaceRoot, true)
 
 		const content: SkillContent | null = await getSkillContent(requestedName, skills, { mode: "full" })
 		if (!content) {
 			return {
 				success: false,
-				error: `Skill \"${requestedName}\" was not found. Run /skills to see available skills.`,
+				error: hasSkill()
+					? `Skill \"${requestedName}\" could not be read. Inspect its SKILL.md and retry after repairing the file.`
+					: `Skill \"${requestedName}\" was not found after refreshing. Use list_skills to find an available skill by exact name.`,
 				availableSkills: skills.map((skill) => skill.name),
 			}
 		}

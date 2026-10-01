@@ -13,6 +13,9 @@ type SkillsCacheEntry = {
 }
 
 const skillsCache = new Map<string, SkillsCacheEntry>()
+const pendingDiscovery = new Map<string, { promise: Promise<SkillMetadata[]>; refresh: boolean }>()
+export const skillDiscoveryRuntime = { discover: discoverSkills }
+const copySkills = (skills: SkillMetadata[]) => skills.map((skill) => ({ ...skill }))
 
 const cacheMetrics = {
 	hits: 0,
@@ -28,9 +31,11 @@ function cacheKey(cwd: string): string {
 export function invalidateSkillsCache(cwd?: string): void {
 	if (!cwd) {
 		skillsCache.clear()
+		pendingDiscovery.clear()
 		return
 	}
 	skillsCache.delete(cacheKey(cwd))
+	pendingDiscovery.delete(cacheKey(cwd))
 }
 
 export function getSkillsCacheMetrics(): Readonly<{ hits: number; misses: number }> {
@@ -49,22 +54,42 @@ export function wasLastSkillsCacheHit(): boolean {
 
 export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false): Promise<SkillMetadata[]> {
 	const key = cacheKey(cwd)
+	const pending = pendingDiscovery.get(key)
+	if (pending && (!forceRefresh || pending.refresh)) {
+		cacheMetrics.hits++
+		cacheMetrics.lastHit = true
+		return copySkills(await pending.promise)
+	}
 	if (!forceRefresh) {
 		const cached = skillsCache.get(key)
 		if (cached && Date.now() - cached.cachedAt < SKILLS_CACHE_TTL_MS) {
 			cacheMetrics.hits++
 			cacheMetrics.lastHit = true
-			return cached.skills
+			return copySkills(cached.skills)
 		}
 	}
 
 	cacheMetrics.misses++
 	cacheMetrics.lastHit = false
 
-	const allSkills = await discoverSkills(cwd, true)
-	const resolved = getAvailableSkills(allSkills)
-	skillsCache.set(key, { skills: resolved, cachedAt: Date.now() })
-	return resolved
+	const entry = { promise: Promise.resolve([] as SkillMetadata[]), refresh: forceRefresh }
+	// Identity, rather than completion order, owns publication. Invalidated scans
+	// may finish for their original caller but cannot overwrite a newer catalog.
+	entry.promise = Promise.resolve()
+		.then(async () => {
+			const resolved = getAvailableSkills(await skillDiscoveryRuntime.discover(cwd, true))
+			if (pendingDiscovery.get(key) === entry) {
+				skillsCache.delete(key)
+				skillsCache.set(key, { skills: resolved, cachedAt: Date.now() })
+				while (skillsCache.size > 64) skillsCache.delete(skillsCache.keys().next().value!)
+			}
+			return resolved
+		})
+		.finally(() => {
+			if (pendingDiscovery.get(key) === entry) pendingDiscovery.delete(key)
+		})
+	pendingDiscovery.set(key, entry)
+	return copySkills(await entry.promise)
 }
 
 export function filterEnabledSkills(

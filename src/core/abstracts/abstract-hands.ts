@@ -11,6 +11,7 @@ export interface ProcessExecutionOptions {
   env?: NodeJS.ProcessEnv;
   maxBuffer?: number;
   signal?: AbortSignal;
+  onOutput?: (chunk: import("../contracts/environment.contracts.js").ExecutionOutputChunk) => void;
 }
 
 export interface ReplacementChunk {
@@ -243,7 +244,7 @@ export abstract class AbstractHands implements IHands {
     cwd: string,
     options?: ProcessExecutionOptions
   ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-    if (options?.signal) return this.runOwnedProcess(command, cwd, options);
+    if (options?.signal || options?.onOutput) return this.runOwnedProcess(command, cwd, options);
     const startedAt = performance.now();
     try {
       const maxBuffer = options?.maxBuffer ?? 10 * 1024 * 1024; // 10MB execution buffer
@@ -294,6 +295,8 @@ export abstract class AbstractHands implements IHands {
         bytes += Buffer.byteLength(chunk);
         if (bytes > (options.maxBuffer ?? 10 * 1024 * 1024)) { if (!stopping) stderr += "\n[Output limit reached; evidence incomplete.]"; stop(); return; }
         if (error) stderr += chunk; else stdout += chunk;
+        try { options.onOutput?.({ stream: error ? "stderr" : "stdout", text: chunk, elapsedMs: performance.now() - started }); }
+        catch { /* Output observers cannot interrupt the owned command. */ }
       };
       child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
       child.stdout.on("data", chunk => consume(chunk, false)); child.stderr.on("data", chunk => consume(chunk, true));

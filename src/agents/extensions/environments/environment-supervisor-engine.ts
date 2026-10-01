@@ -44,6 +44,7 @@ export class EnvironmentSupervisorEngine implements IEnvironmentSupervisorEngine
   }
 
   async execute(spec: ExecutionCommandSpec, sessionId?: string): Promise<ExecutionCommandResult> {
+    spec.signal?.throwIfAborted();
     const targetBackend = spec.backend ?? this.activeBackend;
     const adapter = this.adapters.get(targetBackend) ?? this.adapters.get("local");
 

@@ -26,6 +26,7 @@ export class LocalEnvironmentAdapter implements IExecutionEnvironmentAdapter {
   }
 
   async executeCommand(spec: ExecutionCommandSpec): Promise<ExecutionCommandResult> {
+    spec.signal?.throwIfAborted();
     const startedAt = Date.now();
     const timeoutMs = spec.timeoutMs ?? 30000;
     const cwd = spec.cwd ?? process.cwd();
@@ -39,20 +40,21 @@ export class LocalEnvironmentAdapter implements IExecutionEnvironmentAdapter {
       let stderr = "";
       let timedOut = false;
       let finished = false;
+      let stopping = false;
+      let forceTimer: NodeJS.Timeout | undefined;
 
       // Extract binary and args
-      const commandParts = spec.command.trim().split(/\s+/);
-      const executable = commandParts[0];
-      const inlineArgs = commandParts.slice(1);
-      const fullArgs = spec.args ? [...inlineArgs, ...spec.args] : inlineArgs;
+      const command = spec.command + (spec.args?.length ? " " + spec.args.map(arg => "'" + arg.replace(/'/g, "'\\''") + "'").join(" ") : "");
 
       // Spawn process
       let child: ReturnType<typeof spawn>;
       try {
-        child = spawn(executable, fullArgs, {
+        child = spawn(command, {
           cwd,
           env: cleanEnv,
           shell: true,
+          detached: process.platform !== "win32",
+          stdio: ["ignore", "pipe", "pipe"],
         });
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -67,37 +69,45 @@ export class LocalEnvironmentAdapter implements IExecutionEnvironmentAdapter {
         });
       }
 
-      // Timeout timer
-      const timer = setTimeout(() => {
-        if (!finished) {
-          timedOut = true;
-          try {
-            child.kill("SIGTERM");
-            setTimeout(() => {
-              if (!finished) child.kill("SIGKILL");
-            }, 1000);
-          } catch {
-            // Ignore kill errors
-          }
-        }
-      }, timeoutMs);
+      const terminate = (signal: NodeJS.Signals) => {
+        if (!child.pid) return;
+        try { if (process.platform !== "win32") process.kill(-child.pid, signal); else child.kill(signal); }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") stderr += `\nCleanup unresolved: ${String(error)}`; }
+      };
+      const stop = () => {
+        if (finished || stopping) return;
+        stopping = true;
+        terminate("SIGTERM");
+        forceTimer = setTimeout(() => terminate("SIGKILL"), 1000);
+      };
+      const timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer); clearTimeout(forceTimer);
+        spec.signal?.removeEventListener("abort", stop);
+        if (stopping) terminate("SIGKILL");
+      };
+      spec.signal?.addEventListener("abort", stop, { once: true });
+      if (spec.signal?.aborted) stop();
 
-      child.stdout?.on("data", (chunk: Buffer | string) => {
-        if (stdout.length < 500000) {
-          stdout += chunk.toString();
+      let bytes = 0;
+      const consume = (chunk: string, error: boolean) => {
+        bytes += Buffer.byteLength(chunk);
+        if (bytes > 500000) {
+          if (!stopping) stderr += "\n[Output limit reached; evidence incomplete.]";
+          stop(); return;
         }
-      });
-
-      child.stderr?.on("data", (chunk: Buffer | string) => {
-        if (stderr.length < 500000) {
-          stderr += chunk.toString();
-        }
-      });
+        if (error) stderr += chunk; else stdout += chunk;
+        try { spec.onOutput?.({ stream: error ? "stderr" : "stdout", text: chunk, elapsedMs: Date.now() - startedAt }); }
+        catch { /* A progress observer must not stop the process or lose its result. */ }
+      };
+      child.stdout?.setEncoding("utf8"); child.stderr?.setEncoding("utf8");
+      child.stdout?.on("data", chunk => consume(chunk, false));
+      child.stderr?.on("data", chunk => consume(chunk, true));
 
       child.on("error", (err) => {
         if (finished) return;
         finished = true;
-        clearTimeout(timer);
+        cleanup();
         resolve({
           stdout,
           stderr: `${stderr}\nProcess error: ${err.message}`.trim(),
@@ -112,11 +122,11 @@ export class LocalEnvironmentAdapter implements IExecutionEnvironmentAdapter {
       child.on("close", (exitCode) => {
         if (finished) return;
         finished = true;
-        clearTimeout(timer);
+        cleanup();
         resolve({
           stdout,
           stderr,
-          exitCode: exitCode ?? (timedOut ? 124 : 0),
+          exitCode: timedOut ? 124 : stopping ? (exitCode || 130) : exitCode ?? 1,
           durationMs: Date.now() - startedAt,
           timedOut,
           backendUsed: "local",

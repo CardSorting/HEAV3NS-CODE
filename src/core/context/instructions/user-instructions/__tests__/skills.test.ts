@@ -7,12 +7,13 @@ import { expect } from "chai"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import * as path from "path"
 import * as sinon from "sinon"
+import { setImmediate } from "node:timers/promises"
 
 import { diskRuntime } from "@/core/storage/disk"
 import { roadmapSkillRuntime } from "@/services/roadmap/RoadmapSkillInstall"
 import { Logger } from "@/shared/services/Logger"
 import { fsRuntime } from "@/utils/fs"
-import { discoverSkills, getAvailableSkills, getSkillContent, skillsRuntime } from "../skills"
+import { discoverSkills, discoverSkillsWithDiagnostics, getAvailableSkills, getSkillContent, skillsRuntime } from "../skills"
 
 describe("Skills Utility Functions", () => {
 	let sandbox: sinon.SinonSandbox
@@ -58,6 +59,47 @@ describe("Skills Utility Functions", () => {
 	})
 
 	describe("discoverSkills", () => {
+		it("bounds concurrent catalog reads, preserves order, and isolates a broken skill", async () => {
+			const names = Array.from({ length: 9 }, (_, index) => `skill-${index}`)
+			fileExistsStub.resolves(true)
+			isDirectoryStub.withArgs(GLOBAL_SKILLS_DIR).resolves(true)
+			readdirStub.withArgs(GLOBAL_SKILLS_DIR).resolves(names)
+			statStub.callsFake(async (filePath: string) => ({ isDirectory: () => !filePath.endsWith("SKILL.md"), size: 100 }))
+			let release!: () => void
+			const slow = new Promise<void>((resolve) => {
+				release = resolve
+			})
+			let active = 0,
+				maximum = 0
+			const finished: string[] = []
+			readFileStub.callsFake(async (filePath: string) => {
+				const name = path.basename(path.dirname(filePath))
+				active++
+				maximum = Math.max(maximum, active)
+				try {
+					if (name === names[0]) await slow
+					else await setImmediate()
+					if (name === names[3]) throw new Error("Unreadable skill")
+					finished.push(name)
+					return `---\nname: ${name}\ndescription: Test skill\n---\nInstructions`
+				} finally {
+					active--
+				}
+			})
+			const discovery = discoverSkillsWithDiagnostics(TEST_CWD)
+			try {
+				for (let tick = 0; tick < 12; tick++) await setImmediate()
+				expect(maximum).to.equal(4)
+				expect(finished).to.include(names[8])
+			} finally {
+				release()
+			}
+			const result = await discovery
+			expect(result.skills.map((skill) => skill.name)).to.deep.equal(names.filter((name) => name !== names[3]))
+			expect(
+				result.diagnostics.some((diagnostic) => diagnostic.dirName === names[3] && diagnostic.reason === "READ_ERROR"),
+			).to.equal(true)
+		})
 		it("should discover skills from global directory", async () => {
 			const skillDir = path.join(GLOBAL_SKILLS_DIR, "my-skill")
 			const skillMdPath = path.join(skillDir, "SKILL.md")

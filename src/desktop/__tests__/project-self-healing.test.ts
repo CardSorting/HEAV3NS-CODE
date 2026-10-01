@@ -105,7 +105,7 @@ describe("automatic native app recovery", () => {
 		await wait(() => project()?.state === "completed" && project()?.launch !== launched.launch)
 		assert.equal(calls.length, 1)
 		assert.equal(calls[0].workspaceRepairOrigin, "automatic")
-		assert.equal(calls[0].executionAuthority, "interactive")
+		assert.equal(calls[0].executionAuthority, "autonomous")
 		assert.equal(calls[0].workspaceCheckScope, "workspace")
 		assert.equal(calls[0].workspaceRuntimeFailure?.exitCode, 7)
 		assert.doesNotMatch(JSON.stringify(calls[0].workspaceRuntimeFailure), /fixture-private-value/)

@@ -4,7 +4,7 @@ Walkthrough is a native inspector over the CLI agent's actual `EngineProgressEve
 
 ## Interaction contract
 
-- **Follow current instruction** prefers running, approval-waiting or cancelling work over queued instructions. The picker can pin a previous loaded instruction; incoming work does not displace it. Recorded Runs supplies older history.
+- Walkthrough automatically follows running, approval-waiting or cancelling work before queued instructions, without an instruction dropdown. Repair links can open a specific recorded instruction; reopening Walkthrough or accepting a new instruction returns to current work. Recorded Runs supplies older history.
 - **Current stage** derives from structured phase and known tool operations. Reading, searching, editing, commands, verification, response, approval, disconnection and terminal outcomes have explicit labels. Commands are not automatically classified as successful tests.
 - **Project checks and repair** stay inside the agent turn. “Checking your changes” and “Fixing issues” describe runtime-owned validation and recovery without presenting compiler errors as user tasks. Transcript, Walkthrough and run details share the same scoped verification result; failed checks remain “Changes need more work.” See [agent-owned project checks](INTEGRATION.md#agent-owned-project-checks) for coverage and limits.
 - **Continue repair / Continue work** appears beside the latest unfinished outcome and in Workspace Actions. It preserves the original request and unsent draft, creates one durable follow-up, and requires fresh checks of existing code. It disables while offline, busy or awaiting submission reconciliation; opening a saved conversation never resumes work automatically.
@@ -18,9 +18,21 @@ Walkthrough is a native inspector over the CLI agent's actual `EngineProgressEve
 
 ## Event and persistence contract
 
-The shared agent engine calls `describeToolProgress` at real scheduler start/completion boundaries. Known schemas supply the operation and path hints; source contents, replacement text and raw command arguments are excluded from ordinary status labels. Unknown tools keep a generic tool label. The existing approval surface still presents exact arguments for a decision.
+The shared agent engine calls `describeToolProgress` at real scheduler start/completion boundaries. Known schemas supply the operation and path hints; source contents, replacement text and raw command arguments are excluded from ordinary status labels. Explicit code and command previews are separate bounded fields. Unknown tools keep a generic tool label and do not expose arbitrary argument payloads. The existing approval surface still presents exact arguments for a decision.
 
 The desktop adapter validates identity/phase/status/sequence, bounds and redacts text, allowlists metadata and admits only workspace-contained path hints. Inspection performs its own canonical-path and symlink authorization on every read; progress metadata grants no file access.
+
+## Live code and command previews
+
+The October 1 transparency pass takes its interaction reference from the local LUMI app's `ChatRow`, `CodeAccordian`, and `CommandOutputRow`: file-associated code, observable command output, and separate pending/completed states. The native implementation keeps the existing AppKit activity table and workspace navigation.
+
+Recognized edit actions name their affected file. Both `run_command` and `env_execute_command` are classified as commands. Expanded rows contain selectable, monospaced code or command/output excerpts, file-preview links, and **Inspect run details**. Captions disclose available previews. Newly observed active previews expand once and collapse after completion; manually opened records stay open. Subsequent updates respect a user's collapse and timeline scroll position. Failed actions retain the existing automatic disclosure.
+
+The ChatGPT transport now projects public response text and tool-argument drafts from its existing provider stream, at most every 200 ms per draft. Draft identity is separate from scheduler execution identity. Draft rows explicitly state that execution is recorded separately; receiving generated code is not evidence that a file was written or a command succeeded. Hidden reasoning is not projected. API-key/compatible endpoints and the current Claude bridge continue to expose previews at scheduler boundaries; this pass does not claim token streaming for those transports. Command output is captured at tool completion, not streamed stdout.
+
+Recognized incremental code fields publish complete lines, preserving newlines and decoded JSON escapes. The unfinished line is withheld. Long live drafts show a trailing excerpt; completed tool previews remain bounded excerpts. Credentials and terminal/control formatting are filtered before byte truncation. Unknown schemas are excluded. The desktop projection budgets previews against each complete activity so the full 120-activity response remains inside the 256 KiB protocol frame. Preview text is neither executable nor a file-access grant. Source-file links still use the existing authorized read service.
+
+See [native game workflow QA](GAME-E2E-QA.md) for the live-provider, generated-project acceptance procedure. Historical evidence and counts below retain their original scope.
 
 | Boundary | Behavior |
 |---|---|
@@ -94,3 +106,41 @@ The same script with `--runtime-only` checked the actual bundled Node/CLI for ca
 Captured evidence and the finish review are stored under `native/.impeccable/review/walkthrough-v1/`. The existing journey-v3 assets remain reference material. Physical keyboard/IME and a full VoiceOver session, long-running production-provider performance, Developer ID signing and notarization remain unverified by this pass.
 
 The fixture exercises activity recovery after restart, not ownership-lock recovery. Production workspaces retain the conservative existing rule for ambiguous stale owner records: confirm the previous owner and managed children are gone before manual reconciliation, as described in INTEGRATION.md.
+
+## Inspection and throughput refinement
+
+Activity kinds are explicit: Action, Draft, Agent, and Check. A received provider draft says **Received · Not executed** and uses a document symbol; it never borrows the executed-action checkmark. The kind menu filters All activity, Actions, Drafts, Agent updates, or Issues alongside text search. Event order, tool identity and timestamp remain available in the caption tooltip. **Copy excerpt** identifies a limited preview; **Copy** copies the complete displayed preview. Both operate locally without triggering agent work.
+
+Live row insertions and updates preserve the existing text view rather than rebuilding it. Selecting preview text pins its disclosure open through completion and suspends timeline following while the selection is active. A different activity cannot inherit another record's text selection. Public agent updates use a neutral fill, separate from teal actions and purple drafts. Skill-loading previews identify the loaded name, source and location; skill instructions are not copied into the activity feed. Wrapper-level command failures are included in output previews.
+
+Autonomous ChatGPT requests now permit parallel tool calls using the documented [Responses API setting](https://developers.openai.com/api/reference/typescript/resources/beta/subresources/responses/methods/create). The existing runtime scheduler still limits execution to four calls and orders commands and conflicting mutations. Interactive handlers retain sequential admission. This permits concurrency; it does not guarantee a model will choose multiple tools.
+
+Concurrent skill discovery shares one pending scan per normalized workspace. Explicit refresh and invalidation revoke older scans' authority to publish cached results; failures release pending entries for retry, and returned metadata cannot mutate the cache. Discovery remains independent between workspaces and the completed catalog cache is bounded to 64 workspace entries.
+
+## Filter recovery and execution consistency
+
+The inspector counts visible activities separately from internal run-status events. Active filters show **N of M activities**, and **Clear filters** clears both the query and kind selection without changing the selected instruction. Search matches visible status and role text as well as filenames, tool identity and the retained preview. Down Arrow moves from search into the first result; Escape in search clears the filters. A retention note and tooltip distinguish loaded activity from the complete recorded-event count. Clearing a load error restores current coverage instead of leaving stale error text.
+
+Paginated reads, batch reads, and the registered file-replacement tools now expose their file paths through the same bounded, validated navigation hints as ordinary reads. Skill results are labeled **Skill load result**; provider skill drafts retain their separate draft label. These refinements follow the scoped, clearable search pattern described in [Apple's search-field guidance](https://developer.apple.com/design/human-interface-guidelines/search-fields) and the inspectable tool activity described in [VS Code's tool guidance](https://code.visualstudio.com/docs/agents/run/tools), within the existing autonomous execution model.
+
+The scheduler invalidates affected reads after every attempted mutation, including a thrown partial failure or an invocation with read caching disabled. Shell effects still invalidate globally. Nested cache-key values are preserved and object-key ordering is canonical; array order remains significant. Mutation path tracking includes rename endpoints and file descriptors. `clear_file`, `touch_file`, `heal_and_apply_patch`, and `patch_json_config` explicitly declare their mutation behavior so registry caches and scheduling use the same contract.
+
+Each skill directory scan uses at most four concurrent metadata workers. Slow files do not prevent independent entries from loading, and results retain directory/precedence order regardless of completion order. A missing requested skill triggers one shared catalog refresh before reporting failure; recovery points the agent to `list_skills`, without asking the user to navigate a command menu. This improves admission and I/O scheduling; it is not a measured production latency claim.
+
+## Measured streaming progress
+
+Local `run_command` and `env_execute_command` actions publish output while their process is still running. The existing action row shows the command beside its newest captured output, with observed byte and complete-line counts. Updates coalesce at 200 ms and include the trailing burst even if the process then goes quiet. Completion records preserve the final exit status and measured counts; delayed callbacks cannot reopen the action. Docker and other adapters without output callbacks retain their completion-time previews.
+
+Output is buffered separately for stdout and stderr until a complete line can be redacted. Oversized unfinished lines are dropped through the next safe boundary. Preview memory, encoded wire size, and visible height remain bounded; limited content is labeled as an excerpt. The pane follows the newest output until the reader scrolls away. Selecting text holds the displayed excerpt and Copy contents stable as evidence continues to arrive. Clearing the selection resumes the latest preview. The command remains available in that same scrollable excerpt.
+
+The inspector reports **Current batch · N of M actions finished** only when a concrete tool batch supplies that denominator. Otherwise it summarizes the loaded action/check records. The conversation summary now says **Activity**, includes drafts and replies, and excludes internal turn-status rows from its count and disclosure. Draft receipt does not count as execution, and finished includes unsuccessful actions rather than implying verification passed. Provider silence reports elapsed time since the last stream update. None of these measurements claims an overall task-completion percentage.
+
+## Quiet work and reader-controlled following
+
+Each command owns one output-observation lifecycle. A five-second heartbeat reports elapsed execution and time without captured output when the command is quiet. It distinguishes no output received from no new output, keeps byte/line counts unchanged during silence, and never infers that the process is stalled or how much work remains. Coalescing, pending publication, and heartbeat timers close together on completion or batch cleanup. Public provider-wait details now appear in the stage explanation rather than remaining hidden in internal status events.
+
+Scrolling away from an output tail holds the displayed excerpt stable, including when the bounded stream buffer rotates. **Reading earlier output** and **Follow output** make the reading mode explicit. Following resumes on the local control or when the reader scrolls back to the end; no command is rerun. Text selection remains stable until cleared or following is resumed. **Latest activity** scrolls to the bottom of the activity table even when the last expanded row is taller than its viewport.
+
+Disconnected live summaries are labeled **Last recorded**. Expanded rows distinguish connection loss, paused work, and a terminal instruction with no recorded action completion; their earlier detail is explicitly a last update. The stream never promotes stale text to a fresh execution confirmation.
+
+These adaptations use native controls and the existing semantic colors. Reference patterns are inspectable steps, explicit outcomes and durations in [GitHub Actions logs](https://docs.github.com/en/actions/how-tos/monitor-workflows/use-workflow-run-logs), and deliberate scrollback/navigation in [VS Code's terminal](https://code.visualstudio.com/docs/terminal/basics#_navigating-the-buffer). They are interaction references, not claims of feature parity.

@@ -50,12 +50,12 @@ struct TranscriptMessageLayout {
 
 private final class TranscriptMessageSurface: NSView {
     var user = false
+    var activity = false
     override var isFlipped: Bool { true }
     override func draw(_ dirtyRect: NSRect) {
-        if user {
-            NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12).fill()
-        }
+        let color: NSColor = user ? .controlAccentColor : activity ? .systemTeal : .labelColor
+        color.withAlphaComponent(user ? 0.10 : activity ? 0.07 : 0.035).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12).fill()
     }
 }
 
@@ -73,7 +73,7 @@ final class TranscriptMessageCell: NSTableCellView {
     init(_ row: TranscriptRow, expanded: Bool, toggle: @escaping () -> Void, openCheckpoint: @escaping () -> Void) {
         self.row = row
         super.init(frame: .zero)
-        surface.user = row.user; addSubview(surface)
+        surface.user = row.user; surface.activity = row.activity; addSubview(surface)
         title.stringValue = row.title; title.font = .systemFont(ofSize: 12, weight: .semibold)
         title.textColor = row.activity ? .secondaryLabelColor : .labelColor
         body.stringValue = row.text; body.font = .systemFont(ofSize: row.activity ? 12 : 14)

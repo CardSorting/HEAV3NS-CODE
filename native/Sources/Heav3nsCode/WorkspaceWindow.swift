@@ -440,7 +440,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         let header = stack([titleLine, chatState], vertical: true, spacing: 5)
         let rule = JourneyStyle.rule()
         let modelBar = stack([modelButton, hint])
-        hint.toolTip = "Enter to send · Shift–Enter for a new line"
+        hint.toolTip = "Enter to send · Shift–Enter for a new line. Autonomous execution runs tools without approval prompts. Use Stop to interrupt."
         modelButton.widthAnchor.constraint(lessThanOrEqualTo: modelBar.widthAnchor, multiplier: 0.65).isActive = true
         modelButton.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
         let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, modelBar], vertical: true, spacing: 10)
@@ -505,12 +505,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc private func changeContext() {
         showingInspector = true; surfaces.selectedSegment = 1
-        if contextTabs.selectedSegment == 1 { navigation.select(.changes) }
+        if contextTabs.selectedSegment == 0 { walkthrough.followCurrentInstruction() }
+        else if contextTabs.selectedSegment == 1 { navigation.select(.changes) }
         else if contextTabs.selectedSegment == 2 { navigation.select(.files) }
         adapt()
     }
     @objc private func toggleContextBrowser() { browsingCompact.toggle(); adapt() }
-    @objc func showWalkthrough() { contextTabs.selectedSegment = 0; showingInspector = true; surfaces.selectedSegment = 1; switchSurface() }
+    @objc func showWalkthrough() { walkthrough.followCurrentInstruction(); contextTabs.selectedSegment = 0; showingInspector = true; surfaces.selectedSegment = 1; switchSurface() }
     @objc func showProjectRun() { contextTabs.selectedSegment = 3; showingInspector = true; surfaces.selectedSegment = 1; switchSurface() }
     @objc func showCheckpoints() { openCheckpoints(selected: nil) }
     private func openCheckpoints(selected: String?) {
@@ -874,6 +875,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 }
                 if submission.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == text { self.composer.string = "" }
                 self.rebuildRows()
+                self.walkthrough.followCurrentInstruction()
                 if repairLaunch != nil, let run = data["run"] as? [String: Any], let id = run["id"] as? String { self.showProjectRepair(id) }
             case .failure(let error):
                 if (error as? RuntimeFailure)?.acceptanceUnknown == true {
@@ -898,6 +900,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                     if uncertain.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == uncertain.text { self.composer.string = "" }
                     self.showNotice("LUMI recorded the instruction. Its recovered state is shown below; it was not resubmitted.")
                     self.rebuildRows()
+                    self.walkthrough.followCurrentInstruction()
                 } else { self.showNotice("LUMI has no acceptance record for that instruction. Review your draft and send it when ready.") }
                 self.saveDraft()
             case .failure(let error): self.showNotice(error.localizedDescription)
@@ -1077,7 +1080,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         } else if payload["id"] is String {
             if let conversation = payload["conversation"] as? String, conversation != currentConversation { return }
             mergeRun(payload); rebuildRows(); finishStopAndSend()
-            if event["type"] as? String == "run.accepted" { loadConversations() }
+            if event["type"] as? String == "run.accepted" { walkthrough.followCurrentInstruction(); loadConversations() }
             if let state = payload["state"] as? String, terminalStates.contains(state) { scheduleWorkspaceRefresh(); probe?.outcome(self, state: state) }
         } else if event["type"] as? String == "runtime.error" { showNotice(payload["message"] as? String ?? "Runtime state is unknown") }
     }
@@ -1093,12 +1096,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             let automatic = run["origin"] as? String == "automatic_repair"
             next.append(TranscriptRow(id: "\(id)-user", title: automatic ? "LUMI · Automatic repair" : state == "queued" ? "You · Queued" : "You", text: run["text"] as? String ?? "", activity: false, user: !automatic, checkpoint: run["checkpointBefore"] as? String, automatic: automatic))
             let activities = run["activities"] as? [[String: Any]] ?? []
+            let visibleActivities = activities.filter { ($0["metadata"] as? [String: Any])?["scope"] as? String != "turn" }
             let summaryID = "\(id)-activity"
             if !activities.isEmpty {
                 let latest = activities.max(by: { ($0["sequence"] as? Int ?? 0) < ($1["sequence"] as? Int ?? 0) })?["message"] as? String ?? "Recorded activity"
-                next.append(TranscriptRow(id: summaryID, title: "\(activities.count) recorded \(activities.count == 1 ? "activity" : "activities") · \(latest)", text: expandedActions.contains(summaryID) ? "Details below · full progress is in Walkthrough" : "", activity: true))
+                let count = visibleActivities.count
+                let coverage = (run["activityCount"] as? Int ?? activities.count) > activities.count ? "loaded" : "recorded"
+                next.append(TranscriptRow(id: summaryID, title: "Activity · \(count) \(coverage) · \(latest)", text: expandedActions.contains(summaryID) ? "Details below · code, commands and results are in Walkthrough" : "", activity: true))
             }
-            for activity in expandedActions.contains(summaryID) ? activities : [] {
+            for activity in expandedActions.contains(summaryID) ? visibleActivities : [] {
                 let aid = "\(id)-\(activity["activityId"] as? String ?? "")"
                 let phase = activity["status"] as? String ?? ""
                 let elapsed = (activity["elapsedMs"] as? Double).map { String(format: " · %.1fs", $0 / 1000) } ?? ""
@@ -1107,7 +1113,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if let response = run["response"] as? String {
                 let route = run["modelSelection"] as? [String: Any]
                 let model = route?["model"] as? String
-                let evidence = WorkspaceVerificationPresentation.label(run) + (model.map { " · Model: " + $0 } ?? "")
+                let evidence = WorkspaceVerificationPresentation.label(run) + (model.map { " · Model: " + $0 } ?? "") + (run["executionAuthority"] as? String == "autonomous" ? " · Autonomous" : "")
                 next.append(TranscriptRow(id: "\(id)-result", title: "LUMI · \(state.capitalized)", text: response, activity: false, checkpoint: run["checkpointAfter"] as? String, evidence: "\(evidence) · Not reviewed"))
             }
             if let error = run["checkpointError"] as? String { next.append(TranscriptRow(id: "\(id)-checkpoint-error", title: "Checkpoint unavailable", text: error, activity: false)) }
@@ -1172,7 +1178,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         sendButton.title = hasWork ? "Queue" : "Send"
         stopSendButton.isHidden = !hasWork || draft.isEmpty
         stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
-        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : "Enter to send · Shift–Enter for a new line"
+        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
         queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
         queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
         updateQueue()

@@ -30,6 +30,7 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 	const reads = new Set([
 		"view_file",
 		"read_file",
+		"file_view_paginated",
 		"list_dir",
 		"get_file_outline",
 		"file_info",
@@ -58,11 +59,14 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 		"create_directory",
 		"heal_and_apply_patch",
 		"patch_json_config",
+		"file_replace_content",
+		"file_multi_replace",
+		"file_write_atomic",
 	])
 	const editing = edits.has(name)
 	const operation = editing
 		? ("edit" as const)
-		: name === "run_command"
+		: ["run_command", "env_execute_command"].includes(name)
 			? ("command" as const)
 			: reads.has(name)
 				? ("read" as const)
@@ -70,9 +74,19 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 					? ("search" as const)
 					: undefined
 	const phase: EngineProgressPhase = editing ? "writing" : "tool"
+	if (name === "use_skill" || name === "list_skills") {
+		const skill = typeof args.skill_name === "string" ? sanitizeProgressText(args.skill_name, 160) : ""
+		return {
+			phase,
+			operation: "read" as const,
+			message: name === "list_skills" ? "Find relevant skills" : skill ? `Load skill · ${skill}` : "Load skill",
+			files: [],
+			detail: "Load instructions for the agent. Skill actions are recorded separately when they execute.",
+		}
+	}
 	const message = editing
 		? "Update workspace"
-		: name === "run_command"
+		: ["run_command", "env_execute_command"].includes(name)
 			? "Run command"
 			: reads.has(name)
 				? "Read workspace"
@@ -81,8 +95,20 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 					: `Use ${sanitizeProgressText(name, 100)}`
 	// Only known schemas may contribute paths. A tool's `target` may be source text.
 	const singleFile =
-		["view_file", "read_file", "get_file_outline", "file_hash"].includes(name) || (editing && name !== "create_directory")
-	const candidates: unknown[] = singleFile ? [args.path, args.targetFile] : []
+		["view_file", "read_file", "file_view_paginated", "get_file_outline", "file_hash", "file_info"].includes(name) ||
+		(editing && name !== "create_directory")
+	const candidates: unknown[] = singleFile ? [args.path, args.filePath, args.targetFile] : []
+	if (["batch_view_files", "fast_batch_read_files"].includes(name)) {
+		let paths = args.paths
+		if (typeof paths === "string") {
+			try {
+				paths = JSON.parse(paths)
+			} catch {
+				paths = [paths]
+			}
+		}
+		if (Array.isArray(paths)) candidates.push(...paths.slice(0, 32))
+	}
 	if (name === "copy_file" || name === "move_file") candidates.push(args.source, args.target)
 	if (
 		[
@@ -106,5 +132,6 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 		}
 	}
 	const files = workspaceProgressFiles(candidates, workspace)
-	return { phase, operation, message, files, detail: files.length ? files.join(" · ") : undefined }
+	const title = files.length ? `${message} · ${files[0]}${files.length > 1 ? ` +${files.length - 1}` : ""}` : message
+	return { phase, operation, message: title, files, detail: files.length ? files.join(" · ") : undefined }
 }

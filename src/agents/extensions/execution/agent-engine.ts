@@ -16,6 +16,8 @@ import {
 	isClaudeSubscriptionDirectSdkProvider,
 } from "../../../core/providers/provider-ids.js"
 import { sanitizeProgressText } from "../../../core/utilities/progress-sanitizer.js"
+import { progressPreview, streamedToolPreview, toolPreview } from "../../../core/utilities/tool-preview.js"
+import { CommandOutputStream } from "../../../core/utilities/command-output-stream.js"
 import { describeToolProgress } from "../../../core/utilities/tool-progress.js"
 import {
 	type ClaudeSubscriptionDirectSdkCompletionResponse,
@@ -410,14 +412,16 @@ export class AgentEngine extends AbstractAgentEngine {
 			const progressSource = usesClaudeSubscriptionDirectSdk ? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER : "openai-codex-api"
 
 			if (usesClaudeSubscriptionDirectSdk || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
+				const autonomous =
+					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
 					workspaceVerification = new WorkspaceVerification(
 						this.sessionContext.cwd,
 						this.toolRegistry,
 						{
-							executionAuthority: input.executionAuthority ?? "interactive",
-							bypassConfirmation: false,
-							bypassThreatDetection: false,
+							executionAuthority: input.executionAuthority ?? "autonomous",
+							bypassConfirmation: autonomous,
+							bypassThreatDetection: autonomous,
 							signal: input.signal,
 						},
 						(record) => accumulatedToolResults.push(record),
@@ -596,7 +600,7 @@ export class AgentEngine extends AbstractAgentEngine {
 								activityId: liveProgressActivityId,
 								phase: "thinking",
 								status: "in_progress",
-								message: `[${activeModel}] Deliberating action (step ${stepCount})`,
+								message: "Waiting for provider response",
 								detail: `Sending request to ${providerLabel}...`,
 								timestamp: Date.now(),
 								sequence: nextProgressSequence(),
@@ -607,16 +611,18 @@ export class AgentEngine extends AbstractAgentEngine {
 							const timeoutSignal = AbortSignal.timeout(providerTimeoutMs)
 							const requestSignal = input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal
 							const stepStartedAt = Date.now()
+							let lastProviderActivityAt = stepStartedAt
 							const stepHeartbeat = setInterval(() => {
-								const idle = Date.now() - stepStartedAt
+								const idle = Date.now() - lastProviderActivityAt
 								if (idle >= 10_000) {
 									const sec = Math.round(idle / 1000)
 									this.reportProgress(input.onProgress, {
 										activityId: liveProgressActivityId,
 										phase: "thinking",
 										status: "in_progress",
-										message: "Model deliberation in progress",
-										detail: `Quiet for ${sec}s · Awaiting response from ${providerLabel}`,
+										message: "Waiting for provider response",
+										detail: `No stream update for ${sec}s · Request open for ${Math.round((Date.now() - stepStartedAt) / 1000)}s`,
+										elapsedMs: Date.now() - stepStartedAt,
 										timestamp: Date.now(),
 										sequence: nextProgressSequence(),
 										metadata: { source: progressSource, scope: "turn", attempt: attempt + 1 },
@@ -648,6 +654,7 @@ export class AgentEngine extends AbstractAgentEngine {
 									const codexOAuthHandler = new OpenAiCodexHandler({
 										openAiCodexModelId: activeModel,
 										abortSignal: requestSignal,
+										parallelToolCalls: autonomous,
 									})
 									const { instructions, transcript } = toCodexOAuthTranscript(apiMessages)
 									const toolCalls = new Map<
@@ -665,12 +672,49 @@ export class AgentEngine extends AbstractAgentEngine {
 										{ id: string; text: string; summary?: unknown[]; redacted_data?: string }
 									>()
 									let content = ""
+									const draftPrefix = `lumi:${encodeURIComponent(this.sessionContext.sessionId)}:turn:${this.sessionContext.turnCount}:round:${totalProviderRounds}:draft:`
+									const draftClocks = new Map<string, number>()
+									const reportDraft = (id: string, name: string, text: string, done = false) => {
+										if (!done && Date.now() - (draftClocks.get(id) ?? 0) < 200) return
+										draftClocks.set(id, Date.now())
+										const activity = describeToolProgress(name, text, this.sessionContext.cwd)
+										const preview = name
+											? done
+												? toolPreview(name, text)
+												: streamedToolPreview(name, text)
+											: progressPreview("message", text)
+										this.reportProgress(input.onProgress, {
+											activityId: draftPrefix + encodeURIComponent(id),
+											phase: name ? "planning" : "responding",
+											status: done ? "completed" : "in_progress",
+											message: name
+												? `Drafting ${activity.operation === "edit" ? "code" : activity.operation === "command" ? "command" : "tool request"}${activity.files[0] ? ` · ${activity.files[0]}` : ""}`
+												: "Agent update",
+											detail: name
+												? `${done ? "Draft received" : "Receiving draft"} · ${text.length.toLocaleString()} characters. Execution is recorded separately.`
+												: "Public response text from the provider.",
+											preview: preview && name ? { ...preview, kind: "draft" } : preview,
+											timestamp: Date.now(),
+											sequence: nextProgressSequence(),
+											metadata: {
+												source: progressSource,
+												scope: "activity",
+												itemType: name || "assistant_message",
+												files: activity.files,
+												operation: activity.operation,
+											},
+										})
+									}
 									for await (const chunk of codexOAuthHandler.createMessage(
 										instructions,
 										transcript,
 										availableTools as DietCodeTool[],
 									)) {
-										if (chunk.type === "text") content += chunk.text
+										lastProviderActivityAt = Date.now()
+										if (chunk.type === "text") {
+											content += chunk.text
+											reportDraft("message", "", content)
+										}
 										if (chunk.type === "reasoning" && chunk.id) {
 											const item = reasoningItems.get(chunk.id) ?? { id: chunk.id, text: "" }
 											item.text += chunk.reasoning
@@ -699,7 +743,12 @@ export class AgentEngine extends AbstractAgentEngine {
 											else entry.finalArguments = args
 										}
 										toolCalls.set(itemId, entry)
+										if (entry.name)
+											reportDraft(itemId, entry.name, entry.finalArguments || entry.argumentDeltas)
 									}
+									if (content) reportDraft("message", "", content, true)
+									for (const [id, call] of toolCalls)
+										reportDraft(id, call.name, call.finalArguments || call.argumentDeltas, true)
 									data = {
 										choices: [
 											{
@@ -785,26 +834,77 @@ export class AgentEngine extends AbstractAgentEngine {
 									`${toolActivityPrefix}${encodeURIComponent(callId ?? "unknown")}`
 								const describe = (name: string, args: unknown) =>
 									describeToolProgress(name, args, this.sessionContext.cwd)
+								const outputEvidence = new Map<string, CommandOutputStream>()
+								const runningCalls = new Set<string>()
+								let finishedCalls = 0,
+									failedCalls = 0
+								const reportBatch = () =>
+									this.reportProgress(input.onProgress, {
+										activityId: liveProgressActivityId,
+										phase: "tool",
+										status: "in_progress",
+										message: `${finishedCalls} of ${scheduledCalls.length} actions finished`,
+										detail: `${runningCalls.size} running · ${Math.max(0, scheduledCalls.length - finishedCalls - runningCalls.size)} waiting · ${failedCalls} unsuccessful`,
+										timestamp: Date.now(),
+										sequence: nextProgressSequence(),
+										metadata: {
+											source: progressSource,
+											scope: "turn",
+											completedSteps: finishedCalls,
+											totalSteps: scheduledCalls.length,
+										},
+									})
 
-								const { results: batchResults } = await this.scheduler.executeBatch(
-									scheduledCalls,
-									this.toolRegistry,
-									this.sessionContext.cwd,
-									{
-										allowParallelDisjointMutations: !input.executionAuthority,
-										maxConcurrency: input.executionAuthority ? 1 : undefined,
+								const { results: batchResults } = await this.scheduler
+									.executeBatch(scheduledCalls, this.toolRegistry, this.sessionContext.cwd, {
+										allowParallelDisjointMutations: autonomous,
+										maxConcurrency: autonomous ? 4 : 1,
 										executionAuthority: input.executionAuthority ?? "autonomous",
-										bypassConfirmation: input.executionAuthority ? false : true,
-										bypassThreatDetection: input.executionAuthority ? false : true,
+										bypassConfirmation: autonomous,
+										bypassThreatDetection: autonomous,
 										signal: input.signal,
 										onToolStart: (call: ScheduledToolCall) => {
+											runningCalls.add(call.id)
+											reportBatch()
 											const activity = describe(call.name, call.args)
+											if (activity.operation === "command") {
+												outputEvidence.set(
+													call.id,
+													new CommandOutputStream(
+														toolPreview(call.name, call.args)?.text ?? "",
+														(snapshot) => {
+															if (!runningCalls.has(call.id) || input.signal?.aborted) return
+															this.reportProgress(input.onProgress, {
+																activityId: toolActivityId(call.id),
+																phase: "tool",
+																status: "in_progress",
+																message: activity.message,
+																detail: snapshot.detail,
+																preview: snapshot.preview,
+																elapsedMs: snapshot.elapsedMs,
+																timestamp: Date.now(),
+																sequence: nextProgressSequence(),
+																metadata: {
+																	source: progressSource,
+																	scope: "activity",
+																	itemType: call.name,
+																	operation: "command",
+																	outputBytes: snapshot.outputBytes,
+																	outputLines: snapshot.outputLines,
+																	outputIdleMs: snapshot.outputIdleMs,
+																},
+															})
+														},
+													),
+												)
+											}
 											this.reportProgress(input.onProgress, {
 												activityId: toolActivityId(call.id),
 												phase: activity.phase,
 												status: "in_progress",
 												message: activity.message,
 												detail: activity.detail,
+												preview: toolPreview(call.name, call.args),
 												timestamp: Date.now(),
 												elapsedMs: 0,
 												sequence: nextProgressSequence(),
@@ -818,7 +918,16 @@ export class AgentEngine extends AbstractAgentEngine {
 												},
 											})
 										},
+										onToolOutput: (call, chunk) => {
+											outputEvidence.get(call.id)?.append(chunk)
+										},
 										onToolComplete: (record: ToolExecutionRecord) => {
+											runningCalls.delete(record.callId ?? "")
+											finishedCalls++
+											if (!record.success) failedCalls++
+											const output = outputEvidence.get(record.callId ?? "")
+											output?.close()
+											const observed = output?.evidence.bytes ? output.evidence : undefined
 											accumulatedToolResults.push(record)
 											const activity = describe(
 												record.name,
@@ -829,6 +938,11 @@ export class AgentEngine extends AbstractAgentEngine {
 												phase: activity.phase,
 												status: record.denied ? "denied" : record.success ? "completed" : "failed",
 												message: activity.message,
+												preview: toolPreview(
+													record.name,
+													record.args ?? scheduledCalls.find((call) => call.id === record.callId)?.args,
+													record,
+												),
 												detail: record.denied
 													? "Permission denied for this operation"
 													: record.success
@@ -845,11 +959,17 @@ export class AgentEngine extends AbstractAgentEngine {
 													scope: "activity",
 													attempt: attempt + 1,
 													exitCode: record.exitCode,
+													outputBytes: observed?.bytes,
+													outputLines: observed?.lines,
 												},
 											})
+											reportBatch()
+											outputEvidence.delete(record.callId ?? "")
 										},
-									},
-								)
+									})
+									.finally(() => {
+										for (const stream of outputEvidence.values()) stream.close()
+									})
 
 								for (const br of batchResults) {
 									apiMessages.push({

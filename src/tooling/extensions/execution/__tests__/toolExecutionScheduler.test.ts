@@ -29,6 +29,142 @@ function call(id: string, name = "view_file", args: Record<string, unknown> = { 
 }
 
 describe("ToolExecutionScheduler ready-queue throughput", () => {
+	it("keeps nested read arguments distinct and canonicalizes object key order", async () => {
+		const scheduler = new ToolExecutionScheduler()
+		let reads = 0
+		const tools = registry(async (_name, args) => {
+			reads++
+			return JSON.stringify(args)
+		})
+		const files = [{ path: "one.ts", range: { start: 1, end: 10 } }]
+		const other = [{ path: "two.ts", range: { start: 1, end: 10 } }]
+		const reordered = [{ range: { end: 10, start: 1 }, path: "one.ts" }]
+		const { results } = await scheduler.executeBatch(
+			[
+				call("one", "batch_view_files", { files }),
+				call("two", "batch_view_files", { files: other }),
+				call("again", "batch_view_files", { files: reordered }),
+			],
+			tools,
+			process.cwd(),
+			{ maxConcurrency: 1 },
+		)
+		assert.equal(reads, 2)
+		assert.notEqual(results[0].output, results[1].output)
+		assert.equal(results[0].output, results[2].output)
+		assert.notEqual(
+			scheduler.cache.computeKey("batch_view_files", { files: [...files, ...other] }, "/w"),
+			scheduler.cache.computeKey("batch_view_files", { files: [...other, ...files] }, "/w"),
+		)
+	})
+	it("invalidates partially failed file mutations while preserving unrelated cached reads", async () => {
+		for (const mutation of [
+			{ name: "write_file", args: { path: "changed.ts" } },
+			{ name: "move_file", args: { source: "old.ts", target: "changed.ts" } },
+		]) {
+			const scheduler = new ToolExecutionScheduler()
+			let reads = 0
+			const tools = registry(async (name) => {
+				if (name === mutation.name) throw new Error("Write completed but follow-up operation failed")
+				return ++reads
+			})
+			await scheduler.executeBatch(
+				[call("changed", "view_file", { path: "changed.ts" }), call("unrelated")],
+				tools,
+				process.cwd(),
+			)
+			const { results } = await scheduler.executeBatch(
+				[
+					call("mutation", mutation.name, mutation.args),
+					call("changed", "view_file", { path: "changed.ts" }),
+					call("unrelated"),
+				],
+				tools,
+				process.cwd(),
+			)
+			assert.equal(results[0].success, false)
+			assert.equal(reads, 3)
+			assert.equal(results[1].output, 3)
+			assert.equal(results[2].output, 2)
+		}
+	})
+	it("invalidates reads through file descriptors and alternate mutation path fields", () => {
+		const scheduler = new ToolExecutionScheduler()
+		for (const field of ["targetFile", "targetPath", "filePath", "source", "target"]) {
+			scheduler.cache.set("batch_view_files", { files: [{ path: "src/app.ts" }] }, "/workspace", "old")
+			scheduler.cache.invalidatePaths(scheduler.cache.extractPaths({ [field]: "src/app.ts" }, "/workspace"), "/workspace")
+			assert.equal(scheduler.cache.size, 0)
+		}
+	})
+	it("invalidates an earlier read even when caching is disabled for the mutation", async () => {
+		const scheduler = new ToolExecutionScheduler()
+		let version = "before"
+		const tools = registry(async (name) => {
+			if (name === "write_file") {
+				version = "after"
+				return { success: true }
+			}
+			return version
+		})
+		await scheduler.executeBatch([call("shared")], tools, process.cwd())
+		await scheduler.executeBatch([call("edit", "write_file", { path: "shared.ts" })], tools, process.cwd(), {
+			enableCache: false,
+		})
+		const result = await scheduler.executeBatch([call("shared")], tools, process.cwd())
+		assert.equal(result.results[0].output, "after")
+	})
+	it("invalidates cached reads after a failed shell mutation despite a misleading path hint", async () => {
+		const scheduler = new ToolExecutionScheduler()
+		let reads = 0
+		const tools = registry(async (name) => {
+			if (name === "env_execute_command") return { success: false, result: { exitCode: 2, stderr: "Partially applied" } }
+			return ++reads
+		})
+		const result = await scheduler.executeBatch(
+			[
+				call("before"),
+				call("shell", "env_execute_command", { command: "build", path: "elsewhere" }),
+				call("after", "view_file", { path: "before.ts" }),
+			],
+			tools,
+			process.cwd(),
+		)
+		assert.equal(reads, 2)
+		assert.equal(result.results[1].success, false)
+		assert.equal(result.results[1].exitCode, 2)
+	})
+	it("treats native shell calls and aliases as barriers even with a path hint", async () => {
+		for (const commandName of ["env_execute_command", "shell_alias"]) {
+			const command = deferred()
+			const started: string[] = []
+			const tools = registry(async (name) => {
+				started.push(name)
+				if (name === commandName) await command.promise
+				return "Observed"
+			})
+			const getTool = tools.getTool.bind(tools)
+			tools.getTool = (name) => (name === "shell_alias" ? getTool("env_execute_command") : getTool(name))
+			const scheduler = new ToolExecutionScheduler()
+			const calls = [
+				call("command", commandName, { path: "src", command: "build" }),
+				call("skill", "use_skill", { skill_name: "qa" }),
+				call("read"),
+			]
+			assert.deepEqual(
+				scheduler.partitionWaves(calls, tools).map((wave) => wave.map((call) => call.id)),
+				[["command"], ["skill", "read"]],
+			)
+			const batch = scheduler.executeBatch(calls, tools, process.cwd(), { enableCache: false })
+			try {
+				await setImmediate()
+				assert.deepEqual(started, [commandName])
+			} finally {
+				command.resolve()
+				await batch
+			}
+			assert.deepEqual(started, [commandName, "use_skill", "view_file"])
+		}
+	})
 	it("keeps nonzero exit codes and structured tool failures unsuccessful on repeated calls", async () => {
 		for (const output of [
 			{ exitCode: 2, stderr: "Type error" },

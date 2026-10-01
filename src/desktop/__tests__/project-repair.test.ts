@@ -91,7 +91,7 @@ describe("native app failure recovery", () => {
 		assert.equal(run.repairingLaunch, source)
 		assert.equal(calls[0].workspaceCheckScope, "workspace")
 		assert.equal(calls[0].verifyWorkspace, true)
-		assert.equal(calls[0].executionAuthority, "interactive")
+		assert.equal(calls[0].executionAuthority, "autonomous")
 		assert.equal(calls[0].workspaceRuntimeFailure?.exitCode, 7)
 		assert.match(calls[0].workspaceRuntimeFailure!.output, /ReferenceError: fixture app crash/)
 		const stored = database.getTable("desktop.runs.v1").get(run.id)!

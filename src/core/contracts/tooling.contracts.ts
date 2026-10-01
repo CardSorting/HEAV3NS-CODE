@@ -170,6 +170,7 @@ export interface ToolExecutionOptions {
   readonly timeoutMs?: number;
   readonly autoHeal?: boolean;
   readonly signal?: AbortSignal;
+  readonly onOutput?: (chunk: import("./environment.contracts.js").ExecutionOutputChunk) => void;
 }
 
 export interface PipelinedStreamChunk {

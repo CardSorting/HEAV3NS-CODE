@@ -438,6 +438,90 @@ describe("CLI AgentEngine autonomous execution", () => {
 		}
 	})
 
+	it("publishes live command evidence before completion and rejects late output", async () => {
+		let release!: () => void, ready!: () => void, trailing!: () => void
+		const blocked = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const started = new Promise<void>((resolve) => {
+			ready = resolve
+		})
+		const trailingPublished = new Promise<void>((resolve) => {
+			trailing = resolve
+		})
+		let late: ((chunk: { stream: "stdout"; text: string; elapsedMs: number }) => void) | undefined
+		const { engine } = createEngine({
+			tools: [
+				{ name: "env_execute_command", description: "Execute command", isMutating: true, execute: async () => undefined },
+			],
+			execute: async (_name, _args, _cwd, options) => {
+				late = options?.onOutput
+				options?.onOutput?.({ stream: "stdout", text: "Built module one\nTOKEN=private-value\n", elapsedMs: 50 })
+				options?.onOutput?.({ stream: "stdout", text: "Built module two\n", elapsedMs: 55 })
+				ready()
+				await blocked
+				return {
+					success: true,
+					result: { stdout: "Built module one\nTOKEN=private-value\nBuilt module two\n", exitCode: 0 },
+				}
+			},
+		})
+		let requests = 0
+		sinon.stub(globalThis, "fetch").callsFake(async () =>
+			Response.json({
+				choices: [
+					{
+						message:
+							++requests === 1
+								? {
+										content: null,
+										tool_calls: [
+											{
+												id: "command",
+												type: "function",
+												function: {
+													name: "env_execute_command",
+													arguments: '{"command":"npm run build"}',
+												},
+											},
+										],
+									}
+								: { content: "Build finished." },
+					},
+				],
+			}),
+		)
+		const progress: EngineProgressEvent[] = []
+		const pending = engine.tick({
+			prompt: "Build the app",
+			onProgress: (event) => {
+				progress.push(event)
+				if (event.status === "in_progress" && event.metadata?.outputLines === 3) trailing()
+			},
+		})
+		try {
+			await started
+			const live = progress.find((event) => event.metadata?.outputBytes !== undefined)!
+			assert.ok(live)
+			assert.equal(live.status, "in_progress")
+			assert.match(live.preview?.text ?? "", /Built module one/)
+			assert.doesNotMatch(JSON.stringify(progress), /private-value/)
+			assert.ok(progress.some((event) => event.metadata?.totalSteps === 1 && event.metadata?.completedSteps === 0))
+			await trailingPublished
+			assert.match(progress.at(-1)?.preview?.text ?? "", /Built module two/)
+		} finally {
+			release()
+		}
+		assert.equal((await pending).outcome, "completed")
+		const completed = progress.find(
+			(event) => event.metadata?.itemType === "env_execute_command" && event.status === "completed",
+		)!
+		assert.equal(completed.metadata?.outputLines, 3)
+		assert.ok(progress.some((event) => event.metadata?.completedSteps === 1))
+		const count = progress.length
+		late?.({ stream: "stdout", text: "late\n", elapsedMs: 100 })
+		assert.equal(progress.length, count)
+	})
 	it("keeps parallel tool progress distinct through out-of-order completion and the final turn event", async () => {
 		const now = sinon.stub(Date, "now").returns(1_000)
 		let releaseSlow: (value: string) => void = () => undefined
@@ -458,7 +542,9 @@ describe("CLI AgentEngine autonomous execution", () => {
 		})
 		let executions = 0
 		const { engine } = createEngine({
-			execute: () => {
+			execute: (_name, _args, _cwd, options) => {
+				assert.equal(options?.executionAuthority, "autonomous")
+				assert.equal(options?.bypassConfirmation, true)
 				executions++
 				if (executions === 1) return slow
 				if (executions === 2) {
@@ -503,6 +589,7 @@ describe("CLI AgentEngine autonomous execution", () => {
 
 		const running = engine.tick({
 			prompt: "Inspect the independent files and verify the result",
+			executionAuthority: "autonomous",
 			onProgress: (event) => {
 				progress.push(event)
 				timeline.update(event)
@@ -513,7 +600,9 @@ describe("CLI AgentEngine autonomous execution", () => {
 		now.returns(1_030)
 		releaseFast("Observed the fast file")
 		await fastCompleted
-		const initialStarts = progress.filter((event) => event.phase === "tool" && event.status === "in_progress")
+		const initialStarts = progress.filter(
+			(event) => event.metadata?.scope === "activity" && event.phase === "tool" && event.status === "in_progress",
+		)
 		const firstCompleted = progress.find((event) => event.phase === "tool" && event.status === "completed")
 		now.returns(1_090)
 		releaseSlow("Observed the slow file")
@@ -524,7 +613,9 @@ describe("CLI AgentEngine autonomous execution", () => {
 		assert.notEqual(initialStarts[0].activityId, initialStarts[1].activityId)
 		assert.equal(firstCompleted?.activityId, initialStarts[1].activityId)
 		assert.equal(firstCompleted?.elapsedMs, 30)
-		const starts = progress.filter((event) => event.phase === "tool" && event.status === "in_progress")
+		const starts = progress.filter(
+			(event) => event.metadata?.scope === "activity" && event.phase === "tool" && event.status === "in_progress",
+		)
 		const completions = progress.filter((event) => event.phase === "tool" && event.status === "completed")
 		assert.equal(new Set(starts.map((event) => event.activityId)).size, 3)
 		assert.ok(starts.every((event) => event.activityId !== "lumi:turn" && event.elapsedMs === 0))
@@ -564,8 +655,8 @@ describe("CLI AgentEngine autonomous execution", () => {
 			const result = await engine.tick({ prompt: "Inspect the file", onProgress: (event) => events.push(event) })
 			assert.equal(result.outcome, "completed")
 		}
-		const firstTool = progress[0].find((event) => event.phase === "tool")
-		const laterTool = progress[1].find((event) => event.phase === "tool")
+		const firstTool = progress[0].find((event) => event.metadata?.scope === "activity" && event.phase === "tool")
+		const laterTool = progress[1].find((event) => event.metadata?.scope === "activity" && event.phase === "tool")
 		assert.ok(firstTool && laterTool)
 		assert.notEqual(firstTool.activityId, laterTool.activityId)
 	})

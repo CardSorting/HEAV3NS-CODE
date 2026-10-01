@@ -1,5 +1,6 @@
 import type { EngineProgressEvent } from "../core/contracts/agent.contracts.js"
 import { sanitizeProgressText } from "../core/utilities/progress-sanitizer.js"
+import { progressPreview } from "../core/utilities/tool-preview.js"
 import { workspaceProgressFiles } from "../core/utilities/tool-progress.js"
 
 export const ACTIVITY_LIMIT = 120
@@ -48,7 +49,7 @@ export function projectActivity(event: EngineProgressEvent, workspace: string): 
 	const files = workspaceProgressFiles(Array.isArray(metadata?.files) ? metadata.files : [], workspace)
 		.filter((file) => Buffer.byteLength(JSON.stringify(file)) <= 180)
 		.slice(0, 3)
-	return {
+	const projected: EngineProgressEvent = {
 		activityId: event.activityId,
 		phase: event.phase,
 		status: event.status,
@@ -72,8 +73,25 @@ export function projectActivity(event: EngineProgressEvent, workspace: string): 
 			files,
 			exitCode: Number.isSafeInteger(metadata?.exitCode) ? metadata?.exitCode : undefined,
 			attempt: Number.isSafeInteger(metadata?.attempt) && metadata!.attempt! > 0 ? metadata?.attempt : undefined,
+			...Object.fromEntries(
+				["completedSteps", "totalSteps", "outputBytes", "outputLines", "outputIdleMs"].flatMap((key) => {
+					const value = metadata?.[key as keyof typeof metadata]
+					return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? [[key, value]] : []
+				}),
+			),
 		},
 	}
+	if (
+		event.preview &&
+		["draft", "code", "command", "output", "message"].includes(event.preview.kind) &&
+		typeof event.preview.text === "string"
+	) {
+		// 120 retained activities must fit the 256 KiB control frame, even with escaped Unicode.
+		const budget = Math.min(1200, 2000 - Buffer.byteLength(JSON.stringify(projected)) - 100)
+		if (budget > 2)
+			projected.preview = progressPreview(event.preview.kind, event.preview.text, budget, event.preview.limited === true)
+	}
+	return projected
 }
 
 export type ActivityRun = {

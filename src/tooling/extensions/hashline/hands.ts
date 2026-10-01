@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import { AbstractHands } from "../../../core/abstracts/abstract-hands.js";
+import type { ProcessExecutionOptions } from "../../../core/abstracts/abstract-hands.js";
 import type { CommandResult, AnchoredEditResult } from "../../../core/contracts/tooling.contracts.js";
 import { CommandPermissionController } from "../permissions/command-permission-controller.js";
 
@@ -63,7 +64,7 @@ export class AnchoredHands extends AbstractHands {
   async runCommand(
     command: string,
     cwd?: string,
-    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv; maxBuffer?: number; signal?: AbortSignal }
+    options?: ProcessExecutionOptions
   ): Promise<CommandResult> {
     const validation = this.permissionController.validateCommand(command);
     if (!validation.allowed) {

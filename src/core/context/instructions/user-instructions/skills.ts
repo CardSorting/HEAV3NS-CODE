@@ -100,16 +100,24 @@ async function scanSkillsDirectoryWithDiagnostics(
 	}
 
 	try {
-		const entries = await skillsRuntime.readdir(dirPath)
-
-		for (const entryName of entries) {
-			if (!isValidSkillDirName(entryName)) continue
-
-			const entryPath = path.join(dirPath, entryName)
-			const stats = await skillsRuntime.stat(entryPath).catch(() => null)
-			if (!stats?.isDirectory()) continue
-
-			const result = await loadSkillMetadataWithDiagnostic(entryPath, source, entryName)
+		const entries = (await skillsRuntime.readdir(dirPath)).filter(isValidSkillDirName)
+		const results: Awaited<ReturnType<typeof loadSkillMetadataWithDiagnostic>>[] = new Array(entries.length)
+		let next = 0
+		// Four workers bound filesystem pressure. Results keep directory order so
+		// completion timing cannot change catalog ordering or override precedence.
+		await Promise.all(
+			Array.from({ length: Math.min(4, entries.length) }, async () => {
+				while (next < entries.length) {
+					const index = next++
+					const entryName = entries[index]
+					const entryPath = path.join(dirPath, entryName)
+					const stats = await skillsRuntime.stat(entryPath).catch(() => null)
+					if (stats?.isDirectory()) results[index] = await loadSkillMetadataWithDiagnostic(entryPath, source, entryName)
+				}
+			}),
+		)
+		for (const result of results) {
+			if (!result) continue
 			if (result.skill) {
 				skills.push(result.skill)
 			}

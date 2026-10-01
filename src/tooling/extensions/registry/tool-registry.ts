@@ -504,9 +504,18 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
   readonly safetyPolicy: ToolSafetyPolicyManager;
   readonly confirmationGatekeeper: ToolConfirmationGatekeeper;
   private hostInteractivePolicy = false;
+  private hostAutonomousPolicy = false;
+
+  /** Native host authority also applies to nested skill and workflow tools. */
+  public requireAutonomousHost(): void {
+    if (this.hostInteractivePolicy) throw new Error("Interactive host policy is already configured");
+    this.hostAutonomousPolicy = true;
+    this.setExecutionAuthority("autonomous");
+  }
 
   /** Pins the existing confirmation gate for all nested desktop tool calls. */
   public requireInteractiveHost(hook: import("../execution/tool-confirmation-gatekeeper.js").ConfirmationHook): void {
+    if (this.hostAutonomousPolicy) throw new Error("Autonomous host policy is already configured");
     this.hostInteractivePolicy = true;
     this.confirmationGatekeeper.setRequiredHostHook(hook);
   }
@@ -615,6 +624,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
    * Sets active execution authority across registry, gatekeeper, and security supervisors.
    */
   public setExecutionAuthority(authority: ExecutionAuthorityLevel): void {
+    authority = this.hostAutonomousPolicy ? "autonomous" : this.hostInteractivePolicy ? "interactive" : authority;
     this.currentAuthority = authority;
     this.confirmationGatekeeper.setExecutionAuthority(authority);
     if (authority === "autonomous" || authority === "high_throughput") {
@@ -653,6 +663,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     // A native host may pin the existing interactive policy. Nested tools cannot
     // elevate it by passing autonomous execution options.
     if (this.hostInteractivePolicy) options = { ...options, executionAuthority: "interactive", bypassConfirmation: false, bypassThreatDetection: false, autoHeal: false };
+    if (this.hostAutonomousPolicy) options = { ...options, executionAuthority: "autonomous", bypassConfirmation: true, bypassThreatDetection: true };
     const canonicalName = this.getTool(name)?.name ?? name;
     const effectiveAuthority = options?.executionAuthority ?? this.currentAuthority;
     const isAutonomous = effectiveAuthority === "autonomous" || effectiveAuthority === "high_throughput";
@@ -844,6 +855,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       this.circuitBreaker.recordFailure(canonicalName);
       this.telemetryLedger.recordSample(canonicalName, elapsed, false);
       throw err;
+    } finally {
+      if (["run_command", "env_execute_command", "env_switch_backend"].includes(canonicalName)) this.cache.invalidatePaths();
     }
   }
 
@@ -1177,6 +1190,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "clear_file",
       description: "Clear/truncate file content to 0 bytes on disk (Hands)",
+      isMutating: true,
       parameters: {
         path: { type: "string", required: true, description: "Path to file to truncate" },
       },
@@ -1511,6 +1525,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "heal_and_apply_patch",
       description: "Apply a multi-line code patch with whitespace- and indentation-tolerant fuzzy auto-matching and rollback protection (Patcher)",
+      isMutating: true,
       parameters: {
         path: { type: "string", required: true, description: "Target file path" },
         targetContent: { type: "string", required: true, description: "Exact or fuzzy code chunk to match and replace" },
@@ -3052,6 +3067,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "patch_json_config",
       description: "Apply dot-notation updates to JSON files with schema validation and dry-run previews (JSON Patcher)",
+      isMutating: true,
       parameters: {
         path: { type: "string", required: true, description: "Target JSON file path" },
         updates: { type: "object", required: true, description: "Key-value map of dot-notation updates (e.g. {'compilerOptions.strict': true})" },
@@ -3455,6 +3471,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "touch_file",
       description: "Create an empty file or update access/modification timestamps without altering content (Hands)",
+      isMutating: true,
       parameters: {
         path: { type: "string", required: true, description: "File path to touch" },
       },
@@ -3720,7 +3737,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       execute: async (args, cwd, options) => {
         const command = String(args.command);
         const effectiveCwd = typeof args.cwd === "string" ? args.cwd : cwd;
-        return hands.runCommand(command, effectiveCwd, { signal: options?.signal, timeoutMs: options?.timeoutMs });
+        return hands.runCommand(command, effectiveCwd, { signal: options?.signal, timeoutMs: options?.timeoutMs, onOutput: options?.onOutput });
       },
     });
 

@@ -83,6 +83,7 @@ const shortText = (text: string, limit = 24_000) => {
 const projectRun = (run: Run) => ({
 	id: run.id,
 	modelSelection: run.modelSelection,
+	executionAuthority: run.executionAuthority,
 	request: run.request,
 	session: run.session,
 	conversation: run.conversation ?? run.session,
@@ -595,6 +596,7 @@ export class DesktopSession {
 				limits: { queuedInstructions: DESKTOP_QUEUE_LIMIT, instructionLength: MAX_INSTRUCTION_LENGTH },
 				capabilities: [
 					"native",
+					"autonomous-execution-v1",
 					...(this.lifecycle?.models ? ["model-selection-v1"] : []),
 					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
 					"snapshot",
@@ -1060,6 +1062,7 @@ export class DesktopSession {
 					continuation,
 					projectRepair,
 					state: "queued",
+					executionAuthority: "autonomous",
 					modelSelection: this.lifecycle?.models?.current(),
 					queueOrder: this.seq + 1,
 					createdAt: Date.now(),
@@ -1355,6 +1358,7 @@ export class DesktopSession {
 				: undefined
 			repairTimer?.unref()
 			run.state = "running"
+			run.executionAuthority = "autonomous"
 			run.startedAt = Date.now()
 			await this.commit(run, "run.state")
 			let executionStarted = false
@@ -1380,7 +1384,7 @@ export class DesktopSession {
 						? { instruction: run.continuation.instruction, previousOutcome: run.continuation.previousOutcome }
 						: undefined,
 					readWorkspaceRuntime: () => this.project.agentObservation(),
-					executionAuthority: "interactive",
+					executionAuthority: "autonomous",
 					signal: controller.signal,
 					onProgress: (e) => this.progress(run, e),
 				})
@@ -1927,7 +1931,7 @@ export async function runDesktopWorker(): Promise<void> {
 				metadata.put("context", { ...readContext(), conversation: conversation ?? bridge!.conversation })
 			},
 		})
-		engine.toolRegistry.requireInteractiveHost((request) => bridge!.approve(request))
+		engine.toolRegistry.requireAutonomousHost()
 		await bridge.start()
 		const decoder = new FrameDecoder()
 		process.stdin.on("data", (data: Buffer) => {

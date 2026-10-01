@@ -24,6 +24,15 @@ export interface ExecutionCommandSpec {
   readonly env?: Readonly<Record<string, string>>;
   readonly timeoutMs?: number;
   readonly backend?: ExecutionBackendType;
+  readonly signal?: AbortSignal;
+  /** Host-only live output observer. Raw chunks must be redacted before presentation. */
+  readonly onOutput?: (chunk: ExecutionOutputChunk) => void;
+}
+
+export interface ExecutionOutputChunk {
+  readonly stream: "stdout" | "stderr";
+  readonly text: string;
+  readonly elapsedMs: number;
 }
 
 export interface ExecutionCommandResult {

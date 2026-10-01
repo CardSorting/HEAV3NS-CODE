@@ -70,7 +70,13 @@ export class ToolExecutionCache {
     args: Record<string, unknown>,
     cwd: string
   ): string {
-    const serializedArgs = JSON.stringify(args, Object.keys(args).sort());
+    // A replacer key array drops nested keys that aren't present at the root.
+    // Sort each object independently while retaining array order and every value.
+    const serializedArgs = JSON.stringify(args, (_key, value) =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+        : value
+    );
     const hash = crypto
       .createHash("sha256")
       .update(`${toolName}:${cwd}:${serializedArgs}`)
@@ -94,13 +100,20 @@ export class ToolExecutionCache {
 
     if (args.path) collectPath(args.path);
     if (args.filePath) collectPath(args.filePath);
+    if (args.targetFile) collectPath(args.targetFile);
+    if (args.targetPath) collectPath(args.targetPath);
+    if (args.source) collectPath(args.source);
+    if (args.target) collectPath(args.target);
     if (args.directory) collectPath(args.directory);
     if (args.dir) collectPath(args.dir);
     if (Array.isArray(args.paths)) {
       for (const p of args.paths) collectPath(p);
     }
     if (Array.isArray(args.files)) {
-      for (const p of args.files) collectPath(p);
+      for (const p of args.files) {
+        if (p && typeof p === "object") collectPath(p.path ?? p.filePath);
+        else collectPath(p);
+      }
     }
 
     return paths;

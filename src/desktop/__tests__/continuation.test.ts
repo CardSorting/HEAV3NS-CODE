@@ -81,7 +81,7 @@ describe("durable native work continuation", () => {
 		assert.equal(repaired.continuedFrom, original.id)
 		assert.equal(calls[1].workspaceCheckScope, "workspace")
 		assert.deepEqual(calls[1].continuation, { instruction: "Build the original dashboard", previousOutcome: "failed" })
-		assert.equal(calls[1].executionAuthority, "interactive")
+		assert.equal(calls[1].executionAuthority, "autonomous")
 		assert.ok(calls[1].signal)
 		const second = await request("task.submit", parameters(repaired))
 		await settled(second.run.id)

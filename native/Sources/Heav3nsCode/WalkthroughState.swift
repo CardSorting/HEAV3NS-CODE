@@ -1,6 +1,7 @@
 import Foundation
 
 struct WalkthroughActivity: Equatable {
+    enum Kind: String { case action = "Action", draft = "Draft", agent = "Agent", check = "Check" }
     let id: String
     let sequence: Int
     let order: Int
@@ -15,6 +16,12 @@ struct WalkthroughActivity: Equatable {
     let elapsed: Double?
     let exitCode: Int?
     let timestamp: Double
+    let outputBytes: Int?
+    let outputLines: Int?
+    let completedSteps: Int?
+    let totalSteps: Int?
+    struct Preview: Equatable { let kind: String; let text: String; let limited: Bool }
+    let preview: Preview?
 
     init?(_ value: [String: Any]) {
         guard let id = value["activityId"] as? String, !id.isEmpty, id.utf8.count <= 320,
@@ -29,8 +36,15 @@ struct WalkthroughActivity: Equatable {
         operation = metadata["operation"] as? String ?? ""
         files = Array((metadata["files"] as? [String] ?? []).filter(Self.safeRelativePath).prefix(3))
         exitCode = metadata["exitCode"] as? Int
+        func count(_ key: String) -> Int? { (metadata[key] as? Int).flatMap { $0 >= 0 ? $0 : nil } }
+        outputBytes = count("outputBytes"); outputLines = count("outputLines")
+        completedSteps = count("completedSteps"); totalSteps = count("totalSteps")
         elapsed = (value["elapsedMs"] as? Double).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         timestamp = value["timestamp"] as? Double ?? 0
+        if let raw = value["preview"] as? [String: Any], let kind = raw["kind"] as? String,
+           ["draft", "code", "command", "output", "message"].contains(kind), let text = raw["text"] as? String, text.utf8.count <= 1200 {
+            preview = Preview(kind: kind, text: text, limited: raw["limited"] as? Bool ?? false)
+        } else { preview = nil }
     }
     static func safeRelativePath(_ path: String) -> Bool {
         !path.isEmpty && path.utf8.count <= 2048 && !path.hasPrefix("/") && !path.contains("://") && !path.contains("\\")
@@ -39,11 +53,36 @@ struct WalkthroughActivity: Equatable {
     }
     var isIssue: Bool { ["failed", "denied", "cancelled"].contains(status) }
     var isActive: Bool { ["started", "in_progress"].contains(status) }
+    var kind: Kind {
+        if tool == "assistant_message" || (preview?.kind == "message" && tool != "use_skill") { return .agent }
+        if preview?.kind == "draft" || id.contains(":draft:") { return .draft }
+        if tool == "workspace_check" || tool == "workspace_verification" { return .check }
+        return .action
+    }
+    var displayTitle: String {
+        if tool == "env_execute_command", message == "Use env_execute_command" { return "Run command" }
+        if kind == .draft && !isActive {
+            return message.replacingOccurrences(of: "Drafting code", with: "Code draft").replacingOccurrences(of: "Drafting command", with: "Command draft").replacingOccurrences(of: "Drafting tool request", with: "Tool request draft")
+        }
+        return message
+    }
+    var previewTitle: String {
+        let label: String
+        switch (tool, preview?.kind) {
+        case (_, "draft"): label = "Provider draft · Execution recorded separately"
+        case ("use_skill", _): label = "Skill load result"
+        case (_, "code"): label = "Code sent to tool"
+        case (_, "command"): label = "Command"
+        case (_, "output"): label = isActive ? "Command · Latest output" : "Command and captured output"
+        default: label = "Agent update"
+        }
+        return label + (preview?.limited == true ? " · Excerpt" : "")
+    }
     var stage: String {
         switch phase {
         case "connecting": return "Connecting"
         case "thinking": return "Thinking"
-        case "planning": return "Planning"
+        case "planning": return preview?.kind == "draft" ? "Drafting an action" : "Planning"
         case "writing": return tool == "workspace_repair" ? "Fixing issues" : "Updating workspace"
         case "verifying": return tool == "workspace_check" ? "Checking your changes" : "Checking results"
         case "responding": return "Preparing response"
@@ -51,7 +90,7 @@ struct WalkthroughActivity: Equatable {
         case "failed": return "Reporting a problem"
         case "cancelled": return "Stopping"
         default:
-            if operation == "command" || tool == "run_command" { return "Running a command" }
+            if operation == "command" || ["run_command", "env_execute_command"].contains(tool) { return "Running a command" }
             if operation == "read" || ["view_file", "read_file", "list_dir"].contains(tool) { return "Reading workspace" }
             if operation == "search" || ["grep_search", "find_files_by_pattern", "find_files"].contains(tool) { return "Searching workspace" }
             return "Working"
@@ -59,6 +98,8 @@ struct WalkthroughActivity: Equatable {
     }
     var symbol: String {
         if isIssue { return status == "denied" ? "hand.raised" : "exclamationmark.circle" }
+        if kind == .draft { return "doc.text" }
+        if kind == .agent { return "text.bubble" }
         if status == "completed" { return "checkmark.circle" }
         switch phase {
         case "writing": return "pencil.line"
@@ -66,13 +107,37 @@ struct WalkthroughActivity: Equatable {
         case "planning": return "list.bullet.clipboard"
         case "connecting": return "network"
         case "responding": return "text.bubble"
-        default: return tool == "run_command" ? "terminal" : stage == "Reading workspace" ? "doc.text.magnifyingglass" : "magnifyingglass"
+        default: return ["run_command", "env_execute_command"].contains(tool) ? "terminal" : stage == "Reading workspace" ? "doc.text.magnifyingglass" : "magnifyingglass"
         }
     }
     func caption(runIsLive: Bool) -> String {
-        let state = isActive && !runIsLive ? "No completion recorded" : status == "in_progress" ? "In progress" : status.capitalized
+        let state = isActive && !runIsLive ? "No completion recorded" : kind == .draft && status == "completed" ? "Received · Not executed" : kind == .draft && isActive ? "Receiving" : status == "in_progress" ? "In progress" : status.capitalized
         let duration = elapsed.map { String(format: " · %.1fs", $0 / 1000) } ?? ""
-        return state + duration + (exitCode.map { " · Exit \($0)" } ?? "")
+        let content = preview == nil || kind == .draft ? "" : " · Preview"
+        let output = outputBytes.map { " · \(ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)) received" } ?? ""
+        return state + duration + (exitCode.map { " · Exit \($0)" } ?? "") + output + content
+    }
+    func presentedDetail(live: Bool, connected: Bool, paused: Bool) -> String {
+        let recorded = detail.isEmpty ? "No additional detail was recorded." : detail
+        guard isActive else { return recorded }
+        if !live { return "No completion recorded. Last update: \(recorded)" }
+        if !connected { return "Connection lost. Last update: \(recorded)" }
+        if paused { return "Paused for review. Last update: \(recorded)" }
+        return recorded
+    }
+}
+
+enum WalkthroughFilter: String, CaseIterable {
+    case all = "All activity", actions = "Actions", drafts = "Drafts", agent = "Agent updates", issues = "Issues"
+    func includes(_ activity: WalkthroughActivity) -> Bool {
+        guard activity.scope != "turn" else { return false }
+        switch self {
+        case .all: return true
+        case .actions: return activity.kind == .action || activity.kind == .check
+        case .drafts: return activity.kind == .draft
+        case .agent: return activity.kind == .agent
+        case .issues: return activity.isIssue
+        }
     }
 }
 
@@ -81,6 +146,23 @@ struct WalkthroughActivity: Equatable {
 enum WalkthroughProjection {
     static let limit = 120
     static let terminal: Set<String> = ["completed", "failed", "cancelled", "interrupted", "timed_out"]
+
+    static func progressSummary(_ activities: [WalkthroughActivity], live: Bool) -> String {
+        if live, let batch = activities.last(where: { $0.scope == "turn" }),
+           let total = batch.totalSteps, total > 0, let finished = batch.completedSteps, finished <= total {
+            return "Current batch · \(finished) of \(total) actions finished"
+        }
+        let actions = activities.filter { $0.scope != "turn" && ($0.kind == .action || $0.kind == .check) }
+        guard !actions.isEmpty else { return "" }
+        let running = actions.filter(\.isActive).count
+        let completed = actions.filter { $0.status == "completed" }.count
+        let issues = actions.filter(\.isIssue).count
+        var parts = [String]()
+        if running > 0 { parts.append("\(running) \(live ? "running" : "without a recorded finish")") }
+        if completed > 0 { parts.append("\(completed) completed") }
+        if issues > 0 { parts.append("\(issues) \(issues == 1 ? "issue" : "issues")") }
+        return parts.joined(separator: " · ")
+    }
 
     static func activities(_ run: [String: Any]) -> [WalkthroughActivity] {
         (run["activities"] as? [[String: Any]] ?? []).compactMap(WalkthroughActivity.init)

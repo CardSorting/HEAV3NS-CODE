@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "../../../core/contracts/tooling.contracts.js";
+import type { ToolDefinition, ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js";
 import type {
   ExecutionBackendType,
   IBroccoliEnvironmentSubstrate,
@@ -21,7 +21,8 @@ export class EnvironmentToolSuite {
     return [
       {
         name: "env_execute_command",
-        description: "Execute a shell command in the sandboxed execution environment (local or docker container).",
+        isMutating: true,
+        description: "Execute a shell command in the selected execution environment (local or docker container).",
         parameters: {
           command: {
             type: "string",
@@ -44,10 +45,11 @@ export class EnvironmentToolSuite {
             description: "Execution timeout in milliseconds (default 30000).",
           },
         },
-        execute: async (args: Record<string, unknown>) => this.executeTool("env_execute_command", args),
+        execute: async (args, cwd, options) => this.executeTool("env_execute_command", { ...args, cwd: args.cwd ?? cwd }, options),
       },
       {
         name: "env_switch_backend",
+        isMutating: true,
         description: "Switch the default execution environment backend (e.g. 'local' or 'docker').",
         parameters: {
           backend: {
@@ -67,10 +69,11 @@ export class EnvironmentToolSuite {
     ];
   }
 
-  async executeTool(name: string, args: Record<string, unknown>): Promise<{ success: boolean; result?: unknown; error?: string; executionTimeMs: number }> {
+  async executeTool(name: string, args: Record<string, unknown>, options?: ToolExecutionOptions): Promise<{ success: boolean; result?: unknown; error?: string; executionTimeMs: number }> {
     const startedAt = Date.now();
 
     try {
+      options?.signal?.throwIfAborted();
       if (name === "env_execute_command") {
         const command = String(args.command ?? "");
         const cwd = typeof args.cwd === "string" ? args.cwd : undefined;
@@ -82,6 +85,8 @@ export class EnvironmentToolSuite {
           cwd,
           backend,
           timeoutMs,
+          signal: options?.signal,
+          onOutput: options?.onOutput,
         });
 
         return {

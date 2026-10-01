@@ -1,4 +1,5 @@
 import * as path from "node:path"
+import type { ExecutionOutputChunk } from "../../../core/contracts/environment.contracts.js"
 import type {
 	ExecutionAuthorityLevel,
 	IToolRegistry,
@@ -28,6 +29,7 @@ export interface SchedulerOptions {
 	readonly signal?: AbortSignal
 	readonly onToolStart?: (call: ScheduledToolCall, wave: number) => void
 	readonly onToolComplete?: (record: ToolExecutionRecord) => void
+	readonly onToolOutput?: (call: ScheduledToolCall, chunk: ExecutionOutputChunk) => void
 }
 
 export interface SchedulerMetrics {
@@ -146,7 +148,7 @@ export class ToolExecutionScheduler {
 
 		for (const call of calls) {
 			const toolDef = registry.getTool(call.name)
-			const isMutating = toolDef?.isMutating === true || this.isKnownMutatingTool(call.name)
+			const isMutating = toolDef?.isMutating === true || this.isKnownMutatingTool(toolDef?.name ?? call.name)
 			const resources = this.extractTargetResources(call, cwd)
 
 			if (!isMutating) {
@@ -196,12 +198,7 @@ export class ToolExecutionScheduler {
 				const hasResourceConflict = resources.length > 0 && resources.some((r) => currentWaveResources.has(r))
 
 				// If command/process tool with unknown global impact, serialize
-				const isGlobalUnboundCommand =
-					((call.name === "run_command" || call.name === "terminal" || call.name === "bash") &&
-						resources.length === 0) ||
-					call.name === "delegate_task" ||
-					call.name === "delegate_batch" ||
-					call.name === "delegate_abort"
+				const isGlobalUnboundCommand = this.isGlobalTool(toolDef?.name ?? call.name)
 
 				if (hasResourceConflict || isGlobalUnboundCommand || currentWave.length >= maxConcurrency) {
 					// Conflict or global command: flush current wave
@@ -331,8 +328,10 @@ export class ToolExecutionScheduler {
 			? Math.max(1, Math.floor(requestedConcurrency))
 			: this.defaultMaxConcurrency
 		const targets = calls.map((call) => ({
-			mutating: registry.getTool(call.name)?.isMutating === true || this.isKnownMutatingTool(call.name),
-			global: ["run_command", "terminal", "bash", "delegate_task", "delegate_batch", "delegate_abort"].includes(call.name),
+			mutating:
+				registry.getTool(call.name)?.isMutating === true ||
+				this.isKnownMutatingTool(registry.getTool(call.name)?.name ?? call.name),
+			global: this.isGlobalTool(registry.getTool(call.name)?.name ?? call.name),
 			resources: this.extractTargetResources(call, cwd),
 		}))
 		const overlaps = (left: string, right: string): boolean => {
@@ -416,6 +415,7 @@ export class ToolExecutionScheduler {
 		const callStart = Date.now()
 		schedulerOptions.signal?.throwIfAborted()
 		const toolDef = registry.getTool(call.name)
+		const isMutating = toolDef?.isMutating === true || this.isKnownMutatingTool(toolDef?.name ?? call.name)
 
 		// 1. Parse & Repair Arguments
 		let parsedArgs: Record<string, unknown> = {}
@@ -427,7 +427,7 @@ export class ToolExecutionScheduler {
 		}
 
 		// 2. Check Read Cache
-		if (enableCache) {
+		if (enableCache && !isMutating) {
 			const cached = this.cache.get(call.name, parsedArgs, cwd)
 			if (cached !== null) {
 				return {
@@ -447,12 +447,21 @@ export class ToolExecutionScheduler {
 		let isSuccess = true
 		let denied = false
 		let exitCode: number | undefined
+		let acceptingOutput = true
 
 		const execOptions: ToolExecutionOptions = {
 			bypassConfirmation: schedulerOptions.bypassConfirmation ?? true,
 			bypassThreatDetection: schedulerOptions.bypassThreatDetection ?? true,
 			executionAuthority: schedulerOptions.executionAuthority ?? "autonomous",
 			...(schedulerOptions.signal ? { signal: schedulerOptions.signal } : {}),
+			onOutput: (chunk) => {
+				if (!acceptingOutput || schedulerOptions.signal?.aborted) return
+				try {
+					schedulerOptions.onToolOutput?.(call, chunk)
+				} catch {
+					/* Observers cannot fail execution. */
+				}
+			},
 		}
 
 		try {
@@ -461,16 +470,15 @@ export class ToolExecutionScheduler {
 			if (typeof rawResult === "object" && rawResult !== null) {
 				const obj = rawResult as Record<string, unknown>
 				if (typeof obj.exitCode === "number") exitCode = obj.exitCode
+				else if (call.name === "env_execute_command" && obj.result && typeof obj.result === "object") {
+					const nested = obj.result as Record<string, unknown>
+					if (typeof nested.exitCode === "number") exitCode = nested.exitCode
+				}
 				denied = obj.denied === true
 				isSuccess = !denied && obj.success !== false && (exitCode === undefined || exitCode === 0)
 			}
 
-			// If mutating tool, invalidate affected cache entries
-			const isMutating = toolDef?.isMutating === true || this.isKnownMutatingTool(call.name)
-			if (isMutating && enableCache) {
-				const paths = this.cache.extractPaths(parsedArgs, cwd)
-				this.cache.invalidatePaths(paths, cwd)
-			} else if (enableCache && isSuccess) {
+			if (!isMutating && enableCache && isSuccess) {
 				// Cache read-only result
 				this.cache.set(call.name, parsedArgs, cwd, rawResult)
 			}
@@ -482,6 +490,14 @@ export class ToolExecutionScheduler {
 			else {
 				const healed = this.healer.diagnoseAndHeal(call.name, parsedArgs, err, cwd, toolDef)
 				rawResult = this.healer.formatForModel(healed)
+			}
+		} finally {
+			acceptingOutput = false
+			// Mutations can partly succeed before throwing or being cancelled. Re-reads
+			// must observe those edits too; a shell's impact is never limited by path hints.
+			if (isMutating) {
+				const paths = this.isGlobalTool(toolDef?.name ?? call.name) ? undefined : this.cache.extractPaths(parsedArgs, cwd)
+				this.cache.invalidatePaths(paths, cwd)
 			}
 		}
 
@@ -505,9 +521,23 @@ export class ToolExecutionScheduler {
 		}
 	}
 
+	private isGlobalTool(name: string): boolean {
+		return [
+			"env_execute_command",
+			"env_switch_backend",
+			"run_command",
+			"terminal",
+			"bash",
+			"delegate_task",
+			"delegate_batch",
+			"delegate_abort",
+		].includes(name)
+	}
+
 	private isKnownMutatingTool(name: string): boolean {
 		const canonical = name.toLowerCase()
 		return (
+			this.isGlobalTool(canonical) ||
 			canonical.includes("write") ||
 			canonical.includes("replace") ||
 			canonical.includes("delete") ||
