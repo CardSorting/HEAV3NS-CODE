@@ -1,0 +1,7 @@
+{
+  "concurrentAgents": "passed",
+  "targetedStop": "passed",
+  "approvalVisibility": "passed",
+  "compact": "passed",
+  "providerInvoked": false
+}

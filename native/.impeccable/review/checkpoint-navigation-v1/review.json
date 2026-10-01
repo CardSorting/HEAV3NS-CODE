@@ -1,0 +1,61 @@
+{
+  "disposition": {
+    "decision": "ship",
+    "scope": "Bounded checkpoint-navigation refinement and attributable regressions only. No release, provider, performance, or accessibility certification.",
+    "recaptureRequired": false,
+    "rebuildRequired": false
+  },
+  "contractAssessment": {
+    "result": "met within the supplied feature evidence",
+    "navigation": "checkpoint.list searches all records before paging, including saved run text beyond truncated labels and revision strings, using NFKC normalization and lowercasing. All/Flagged/Safety filters, totals, 100-item paging, Newest, timestamp/ID ordering, and stale-offset clamp are implemented. Targeted desktop tests cover full-message tails, normalized accented text, filters, repeatable ordering, and stale offsets.",
+    "selectionResilience": "Message links clear search/filter state and request the exact ID. Pending search blocks selection actions and restore; the most recent queued link or filter/search intent controls the next load. Unflagging in Flagged clears the removed selection. Unavailable checkpoints leave no restore target; explicit Refresh recovers browsing. Native tests exercise these selection and recovery paths. The pending debounce guard is source-assessed rather than independently exercised in this review.",
+    "localGitMeaning": "Visible copy distinguishes local checkpoints from repository commits and states branch/staging preservation. Before message, After reply, and Safety copy labels, full detail date, snapshot count, local revision, Copy Revision, and workspace-specific title are present.",
+    "reviewedRestore": "Both restore captures retain changed-file review, exclusions, safety checkpoint language, original-conversation preservation, and Restore & Continue into a new conversation. Supplied flow verification records actual local restore. Existing backend recovery guarantees were not re-certified."
+  },
+  "materialFindings": {
+    "findings": [],
+    "requiredActions": [],
+    "assessment": "No material defect or attributable visual regression found in the seven required captures and targeted implementation."
+  },
+  "craftPlatformAssessment": {
+    "authority": [
+      "native/DESIGN.md",
+      "native/PRODUCT.md",
+      "/Users/bozoegg/.agents/skills/impeccable/reference/craft-floor.md",
+      "/Users/bozoegg/.agents/skills/impeccable/reference/ios.md"
+    ],
+    "assessment": "Preserves the incumbent AppKit identity: system type and semantic appearance, native search and segmented controls, native table selection, SF Symbols, selectable detail, and a protected restore sheet. Search and filters lead the browsing hierarchy; pagination, metadata, and review actions remain readable and reachable. Light compact and dark wide states show no clipped checkpoint controls or restore decisions. macOS conventions govern sizing and window behavior; iOS touch sizing and display-type prescriptions were not transplanted.",
+    "compactGeometry": "Compact workspace frames are 720 x 500 points. The modeless checkpoint panel may extend beyond its parent and remains fully represented in native window-group captures. Exterior transparency and parent edges are not application clipping. Exact 720 x 480 acceptance and the panel minimum-size extreme are not established.",
+    "webDetector": "Not applicable to the native AppKit surface; none ran."
+  },
+  "evidenceLimitations": {
+    "inspectedCaptures": [
+      "history-wide.png",
+      "flagged-wide.png",
+      "empty-search-wide.png",
+      "restore-wide.png",
+      "history-compact.png",
+      "restore-compact.png",
+      "safety-compact.png"
+    ],
+    "captureValidity": "All seven raw native window-group captures accepted; corresponding JSON agrees with displayed count, filter, selection, restore availability, and appearance. Wide workspace frames are 1312 x 731 points; compact frames are 720 x 500 points.",
+    "inspectedSources": [
+      "native/Sources/Heav3nsCode/CheckpointWindow.swift",
+      "src/desktop/worker.ts checkpoint.list",
+      "native/Tests/Heav3nsCodeTests/CheckpointWindowTests.swift",
+      "src/desktop/__tests__/conversations.test.ts targeted checkpoint tests",
+      "scripts/verify-desktop-walkthrough.ts targeted flow assertions"
+    ],
+    "suppliedVerification": "native-tests.log reports 61 passing tests; desktop-tests.log reports 69 passing tests. Provenance reports TypeScript, changed-file lint, native UI flow, and packaged runtime passing. verification.json records restore into a new conversation. packaged-runtime.json establishes bundled capability negotiation and empty checkpoint history, not a full populated-history navigation exercise.",
+    "provenanceValidation": "Independently matched all four supplied SHA-256 hashes: native checkpoint source, desktop worker source, built native executable, and bundled runtime dist/index.js.",
+    "execution": "Reviewer read screenshots, diagnostics, source, and supplied logs. Did not launch the app, rerun tests, rebuild, or execute a provider. Only this review.json was written.",
+    "unverified": [
+      "Manual VoiceOver and complete focus traversal",
+      "Physical keyboard and IME behavior",
+      "Measured contrast and increased-contrast appearance",
+      "Long-content, large-history performance and long sessions",
+      "Production providers and OAuth",
+      "Notarization, distribution, and release acceptance"
+    ]
+  }
+}

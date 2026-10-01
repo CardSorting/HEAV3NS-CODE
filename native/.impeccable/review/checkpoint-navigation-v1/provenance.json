@@ -1,0 +1,34 @@
+{
+  "kind": "Raw native window-group captures; scripted engine through production worker/client; real local app and file restoration",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790804958425/project",
+  "captures": [
+    "history-wide",
+    "flagged-wide",
+    "empty-search-wide",
+    "restore-wide",
+    "history-compact",
+    "restore-compact",
+    "safety-compact"
+  ],
+  "providerInvoked": false,
+  "tests": {
+    "native": 61,
+    "desktop": 69,
+    "typescript": "passed",
+    "changedFileLint": "passed",
+    "uiFlow": "passed including search, flag filtering, empty results, message links, restore and Safety filter",
+    "packagedRuntime": "passed"
+  },
+  "hashes": {
+    "native/Sources/Heav3nsCode/CheckpointWindow.swift": "efcfc78024b387f8b02d97bdf3fdf82c70821fb3bbd87568276ff3949f741fd7",
+    "src/desktop/worker.ts": "046d8b3c3316a98995afba8ea811ecb7f21a5073869dee0d9265e186ef480ad3",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "434c817dee0a7f8353f87b4171e9e51ee59e469de93c258498c7992092a34741",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "7a1ec152e70fdd7a6c44094c70ef16ae9f493b38f8ad4fd80fbeafbd74fad121"
+  },
+  "unverified": [
+    "Manual VoiceOver and physical keyboard/IME",
+    "Production provider execution",
+    "Measured contrast and long-session performance",
+    "Notarized release"
+  ]
+}

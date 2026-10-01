@@ -1,0 +1,25 @@
+{
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/pods-1790811633141",
+  "kind": "Raw native captures with independent workers and scripted activity; no provider",
+  "providerInvoked": false,
+  "clockSimulation": "pods-longrun-clock overrides only display timestamps for the active pod to 27 hours elapsed and 5 minutes quiet; worker state and stored timestamps unchanged. Not a multi-day soak test.",
+  "validation": {
+    "native": 71,
+    "finalFocusedNative": 5,
+    "desktop": 77,
+    "typescript": "passed",
+    "lint": "passed",
+    "threeProjectFixture": "passed",
+    "localSignature": "codesign --verify --deep --strict passed",
+    "finishReview": "ship; scoped source and capture review, see review.md"
+  },
+  "hashes": {
+    "native/Sources/Heav3nsCode/PodsWindow.swift": "d0f507f23c773a63044904b40bf18290e2bd029608dac4a66be00a18d791438c",
+    "native/Sources/Heav3nsCode/PodLiveView.swift": "fe3964acd251dd8f1de89adf594d66df03b7e2ca45312fc2a6086827bdd7866e",
+    "native/Sources/Heav3nsCode/PodMonitoring.swift": "0751777ade3ba1b1676bf5cb8a759a51e3f5e61abf80be6b5c86c23e95016a9a",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "2c81e8fc1dba9f20c2e574bd268fe24cf14b6319d778512f66b1fc8dbad97fae",
+    "native/Sources/Heav3nsCode/App.swift": "723a34e835ed41f4297463423652e0f09a468b54e28af18f2da998bbdc73b574",
+    "src/desktop/worker.ts": "8494e821e867d95edc3f2a40aea160cdd081e040dfcd05c1d06f14b2d2dc27df",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "b7f4f76456c3b7936b00d7625148d66a2e1f68d8b0bdf85703a52e5fb6bc45c4"
+  }
+}

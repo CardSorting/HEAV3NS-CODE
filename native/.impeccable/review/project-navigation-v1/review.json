@@ -1,0 +1,16 @@
+{
+  "reviewer": "/root/project_navigation_finish_reviewer",
+  "initialDisposition": "fix",
+  "finding": "P2: Walkthrough and Run did not hide revealed compact sidebar when selecting Task context",
+  "fix": "Both entrypoints route through switchSurface",
+  "verdict": "resolved",
+  "disposition": "ship",
+  "captureValidity": "Six captures valid; source and build hashes matched",
+  "scope": "Scored fix and attributable regressions only; not whole-surface or release certification",
+  "limits": [
+    "Physical keyboard and VoiceOver not verified",
+    "Measured contrast, long paths and all twelve menu entries not verified",
+    "Pinned/duplicate-name rendered states not captured; source/unit-test assessed",
+    "Native AppKit; no HTML/CSS detector ran"
+  ]
+}

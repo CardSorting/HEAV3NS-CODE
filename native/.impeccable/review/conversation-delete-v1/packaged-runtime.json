@@ -1,0 +1,11 @@
+{
+  "bundle": "/Users/bozoegg/Desktop/LUMI-NEW/build/HEAV3NS-CODE.app/Contents/Resources/runtime",
+  "capabilities": "walkthrough-v1 negotiated",
+  "activity": "metadata and paths preserved",
+  "fileRead": "passed",
+  "fileSearch": "file-search-v1 negotiated; real filename search passed",
+  "conversationBoundary": "foreign history rejected; original restored; active deletion and safe retry verified",
+  "providerInvoked": false,
+  "checkpoints": "checkpoints-v1 negotiated; empty history verified",
+  "projectRun": "project-run-v1 negotiated; custom command saved, discovered, executed and completed with expected output"
+}

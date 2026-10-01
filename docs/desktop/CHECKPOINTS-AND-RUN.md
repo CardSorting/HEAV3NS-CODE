@@ -1,0 +1,66 @@
+# Message checkpoints and running projects
+
+The native conversation distinguishes right-aligned **You** messages on a tinted surface from left-aligned **LUMI** replies. Role labels and SF Symbols carry the distinction independently of color. Tool activity retains its separate presentation. Code remains supporting context. Agent completion and role appear on one line, with check/review evidence on a separate line so compact windows retain that distinction. **Jump to Latest** sits in a stable navigation row below the transcript instead of covering message text.
+
+## Message-linked local history
+
+The desktop worker saves a Git checkpoint immediately before admitting each instruction to the engine and after the engine settles. Queued instructions get their starting checkpoint when they begin, so their snapshots include earlier instructions' work. A failed starting checkpoint prevents engine admission; a failed final checkpoint leaves the result visible with an explicit warning. Existing historical messages do not acquire retroactive checkpoints.
+
+**Checkpoint before message** and **Checkpoint after reply** open the matching checkpoint. **Checkpoints** in the chat header, Actions, or Command–7 opens workspace-wide history. Before, After, and Safety entries show their instruction, time, file count and Git revision. Flags persist locally. Pages contain up to 100 entries. Search matches message text or checkpoint revision across the full local history, with Unicode normalization and case-insensitive matching, including the full saved message beyond the abbreviated checkpoint label. All, Flagged, and Safety views combine with search; counts describe the matching history, and Newest returns to its first page. Equal timestamps use checkpoint IDs as a deterministic tie-breaker. Shrinking results clamp stale page offsets to a valid page. Removing the last flag clears the selection instead of attempting to restore an entry outside the filter. Message links clear search/filter state and locate the requested checkpoint across pages and retarget an already-open history panel. Before message, After reply, and Before restore · Safety copy labels distinguish the moments. Details show the full timestamp, snapshot file count (not a count of changed files), and local checkpoint revision; Copy Revision copies that identifier from LUMI’s isolated store. An unavailable checkpoint is reported explicitly and cannot silently select a different version; Refresh then returns to browsable history. The panel title identifies its parent workspace. Search requests are debounced, pending search disables restore against old results, and the newest navigation intent wins over an in-flight response.
+
+**Review Restore…** compares the selected version with the current files. The confirmation reports the changed paths, scope and total, with Cancel as the default action. **Restore & Continue** saves and flags a safety checkpoint, restores the included files and engine context, then opens a new conversation. The original conversation remains available. Switching conversations alone does not restore files. Any retained checkpoint, including an After or Safety entry, can be restored again.
+
+Snapshots live in `.broccolidb/desktop-checkpoints.git`, an isolated local Git object store with a durable ref for each checkpoint. It never stages files, commits to the user's branch, changes HEAD, clears the index or pushes. A workspace without its own Git repository is supported. Git must be available locally.
+
+### Restore boundaries
+
+- Included: regular project files, file contents, executable bit, additions and deletions, and the runtime's saved conversation context. Working-tree contents are captured even when they differ from the Git index.
+- Excluded: ignored untracked files; known generated directories (`node_modules`, `.build`, `.next`, `.venv`, `venv`, `build`, `dist`, `target`, `coverage`, `__pycache__`); `.git`, `.broccolidb`, symlinks, `.env*`, PEM/key files, common SQLite/database files and their WAL/SHM sidecars. Exclusion is path-based, not a guarantee that arbitrary source files contain no secrets. Tracked files remain eligible regardless of Git ignore rules, except for these explicit exclusions.
+- Databases, dependencies, remote services, credentials and external effects are not restored. Permissions beyond the executable bit, extended attributes, empty directories and symlinks are not versioned. Restoring a directory as a file refuses to remove excluded files inside it. A file that became ignored after an older checkpoint is protected: if restoring would overwrite a current file absent from the safety snapshot, restoration refuses the conflict before changing files.
+- A snapshot is limited to 20,000 eligible paths, 32 MiB per file and 256 MiB total, with an 8 MiB context limit. An oversized snapshot fails rather than silently dropping files. Git subprocesses have time and output bounds. History is retained; automatic age/disk pruning is not implemented.
+
+Restore is available only while LUMI, its queue, and the project runner are idle. A single-use preview token expires after two minutes and is tied to the selected conversation and current file fingerprint. New edits invalidate it. Another scan checks for edits while the safety copy is being prepared. Individual file reads reject concurrent changes; these checks do not lock out external editors. Stop external writers before restoring.
+
+A durable restore journal and safety checkpoint precede file mutation. Replacement files are synced and renamed in place, and paths are checked for traversal and symlink redirection. An application error attempts immediate recovery; a pending journal is recovered before engine admission on the next startup. If recovery cannot complete, the worker fails closed and preserves the safety copy. This is recoverable multi-file restoration, not a filesystem-wide atomic transaction or a backup service. Workspace-owner lock reconciliation after an unclean exit remains subject to the integration document's existing policy.
+
+## Run, console and preview
+
+**Run Project** in the toolbar, Actions, or Command–R opens **Run** in the supporting context panel. In a compact window it opens the Inspect region. It does not execute a command until the user presses **Run**.
+
+Discovery reads metadata in a bounded workspace search: up to 40 directories, 24 detected targets, with common generated directories skipped. Supported defaults are Node package `dev`/`start` scripts (npm, pnpm or Yarn), Swift packages, Rust packages, Python `main.py`/`app.py`, and static `index.html` projects. The popup shows the project folder for nested targets. **Set Run Command…** saves a custom command, workspace-relative folder and optional localhost preview URL; saving does not run it. Configuration persists per workspace. Unfinished edits remain in the open workspace window across Refresh, Run-tab changes, and runtime reconnections. An unsaved-edit note and **Discard Edits** make the save boundary explicit; edits are not persisted across closing the window until **Save Command** succeeds. Discovery never silently replaces a dirty form.
+
+The literal command and folder are visible before execution. Starting rechecks the target's metadata revision so a changed package script requires Refresh and another Run action. Commands execute locally with the user's permissions. Dependencies are not installed automatically, and no web hosting or deployment is implied.
+
+The console shows bounded recent output and the process state/exit code. **Open Preview** opens an explicitly configured or detected HTTP(S) loopback URL in the user's browser. It does not embed the browser or certify server readiness. Credentials and external URLs are rejected. The preview action is disabled when the process stops, while a start/stop request is pending, or when current status cannot be confirmed. A failed status check preserves the console, reports that it is retrying, and disables Run until a fresh status arrives. **Refresh** also requests current status. A failed command reports its exit code and directs the user to the console before retrying.
+
+The command display follows the actual running target, including a command whose metadata has since disappeared. **Starting…** and **Stopping…** expose pending operations and suppress repeat submissions. A timed-out mutation requests authoritative status before another launch is permitted; a late status reply from before a new start cannot overwrite the newer process state.
+
+One app runs per workspace. **Stop App** stops its owned process group; **Stop LUMI** stops agent work. Closing the workspace stops both. A small parent-pipe guardian stops the project group if its worker dies without cleanup, escalating TERM to KILL. Deliberately detached/daemonized descendants are outside that ownership guarantee. Agent credentials and common secret environment variables are removed from the inherited environment, and console strings pass through the runtime redactor; project commands can still read files permitted to the user.
+
+## Verification
+
+```sh
+npm run desktop:test
+npm run desktop:test:native
+npx tsc --noEmit
+npm run desktop:build
+TSX_TSCONFIG_PATH=./tsconfig.unit-test.json node --import tsx scripts/verify-desktop-walkthrough.ts --project
+```
+
+Regression coverage includes dirty Git index preservation; binary/Unicode/executable/empty files; path shape changes; exclusion and symlink boundaries; size limits; before/after linkage; restore branching and roll-forward; stale preview rejection; checkpoint links across history pages and existing panels; full-message/Unicode history search, flag/safety filters, stable ordering, stale-page clamping, and unavailable-link recovery; partial-restore recovery and restart recovery; command discovery/revision; bounded output and exit status; startup cancellation; normal group shutdown; worker-death cleanup; local preview URL validation; preservation and explicit discard of unsaved command drafts; status-loss recovery; active-target reconciliation; duplicate-action prevention; and late-response ordering.
+
+The native probe uses a scripted engine through the production worker/client, a disposable workspace, and a real local HTTP server. It checks message roles, checkpoint creation, review/restore into a new conversation, Run/Stop, preview availability, and editing/refreshing/saving a custom command at wide/dark and compact/light sizes. It invokes no model provider and does not constitute manual VoiceOver, keyboard-only, arbitrary-framework or long-session certification. Captures and assertions remain under `build/desktop-walkthrough-*`.
+
+The interaction model draws on [Replit's checkpoints and rollback](https://docs.replit.com/features/version-control/checkpoints-and-rollbacks) and [Run/Console workflows](https://docs.replit.com/features/workspace-tools/workflows). LUMI's restore scope is deliberately shown in its own interface and differs from Replit's environment recovery. Storage uses Git's documented [fast-import](https://git-scm.com/docs/git-fast-import) and [cat-file](https://git-scm.com/docs/git-cat-file) plumbing.
+
+The Run-panel refinement also follows familiar [VS Code task selection and explicit command configuration](https://code.visualstudio.com/docs/debugtest/tasks), and its [terminal failure guidance](https://code.visualstudio.com/docs/supporting/troubleshoot-terminal-launch): keep the actual command, folder, output and exit status available for diagnosis. These are interaction references, not a claim of feature parity.
+
+### Checkpoint integrity and restore admission
+
+Snapshot fingerprints use a canonical path order independent of Git tree traversal and JavaScript/UTF-8 ordering. Reading a saved snapshot verifies each blob's SHA-1 against its recorded Git object identity, batch framing, and trailing data before the snapshot can reach restore. Capture detects inode/device replacement, mode changes, and modification/change-time changes while reading each file.
+
+Restore preflights all paths and re-scans the included project files before admitting filesystem changes. Its durable journal distinguishes `prepared` (no file writes admitted) from `applying`. A preflight failure or restart with a prepared journal clears that journal without rolling files back; newer external edits are preserved. An applying journal, including legacy journals without a phase, retains safety-copy recovery. Temporary restore files are cleaned up even when writing or syncing fails.
+
+This is not an atomic filesystem snapshot or a lock on other editors/processes. Concurrent changes after the final scan or during file application can still race with restore; stop project processes and avoid external edits during restoration. Existing file exclusions, safety checkpoints, and repository/index isolation remain in effect.
+
+Regression coverage includes Unicode/tree-order round trips, a decompressible Git object with mismatched contents, stale restore admission, preserving an external edit when preflight aborts, and recovery after partial writes/restart.

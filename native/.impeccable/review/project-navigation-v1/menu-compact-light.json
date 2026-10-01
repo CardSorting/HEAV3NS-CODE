@@ -1,0 +1,173 @@
+{
+  "appPID" : 77518,
+  "capturedAt" : "2026-09-30T22:43:37Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : true
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "checkpoints" : {
+
+    },
+    "composerFocused" : true,
+    "composerUTF16Count" : 57,
+    "contextVisible" : false,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 434,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 632,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 604,
+        "y" : 456
+      },
+      "transcript" : {
+        "height" : 132,
+        "visibleWithinWindow" : true,
+        "width" : 456,
+        "x" : 242,
+        "y" : 196
+      }
+    },
+    "conversation" : "walkthrough-fixture",
+    "conversationCount" : 2,
+    "conversationSidebarVisible" : true,
+    "deleteSheetVisible" : false,
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "0–87 \/ 87 bytes · Read only",
+    "inspectionPreview" : "import Foundation\n\nfinal class WorkspaceCoordinator {\n    func openConversation() {}\n}\n",
+    "inspectionTitle" : "Sources\/WorkspaceCoordinator.swift",
+    "messageRoles" : [
+      "user",
+      "agent"
+    ],
+    "navigationVisible" : false,
+    "projectNavigation" : [
+      {
+        "current" : false,
+        "enabled" : true,
+        "path" : "",
+        "title" : "Switch Project"
+      },
+      {
+        "current" : true,
+        "enabled" : false,
+        "path" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790808196675\/navigation\/Workspace",
+        "title" : "Workspace"
+      },
+      {
+        "current" : false,
+        "enabled" : false,
+        "path" : "",
+        "title" : ""
+      },
+      {
+        "current" : false,
+        "enabled" : false,
+        "path" : "",
+        "title" : "Recent Projects"
+      },
+      {
+        "current" : false,
+        "enabled" : false,
+        "path" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790808196675\/navigation\/Workspace\/Missing project",
+        "title" : "Missing project (Unavailable)"
+      },
+      {
+        "current" : false,
+        "enabled" : true,
+        "path" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790808196675\/navigation\/Workspace\/Sources",
+        "title" : "Sources"
+      },
+      {
+        "current" : false,
+        "enabled" : false,
+        "path" : "",
+        "title" : ""
+      },
+      {
+        "current" : false,
+        "enabled" : true,
+        "path" : "",
+        "title" : "Open Folder…"
+      },
+      {
+        "current" : false,
+        "enabled" : true,
+        "path" : "",
+        "title" : "Project Library…"
+      }
+    ],
+    "projectRun" : {
+      "command" : "Choose a command to run this project.",
+      "draftChanged" : false,
+      "output" : "",
+      "previewEnabled" : false,
+      "runEnabled" : false,
+      "state" : "idle",
+      "status" : "Checking app status…",
+      "statusKnown" : false,
+      "stopEnabled" : false,
+      "targets" : 0
+    },
+    "quickOpen" : {
+      "count" : 3,
+      "paths" : [
+        "Sources\/WorkspaceCoordinator.swift",
+        "Sources\/WorkspaceCoordinatorWithAnIntentionallyLongNameForNativeTruncation.swift",
+        "WorkspaceExample.swift"
+      ],
+      "query" : "swift",
+      "scope" : "Project files · Git ignore rules apply. File contents aren’t searched.",
+      "status" : "3 files",
+      "visible" : false
+    },
+    "recordedOutputAvailable" : false,
+    "selectedSurface" : 0,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage" : "Response ready",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 500,
+    "windowFrameWidth" : 720,
+    "workspaceKey" : true
+  },
+  "windowHeight" : 448,
+  "windowWidth" : 720,
+  "workerPID" : 77530,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790808196675\/navigation\/Workspace"
+}

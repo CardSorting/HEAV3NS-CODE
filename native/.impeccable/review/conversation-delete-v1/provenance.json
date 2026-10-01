@@ -1,0 +1,26 @@
+{
+  "kind": "Raw native window captures; isolated scripted engine using production worker and native client",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790806307595/project",
+  "captures": [
+    "sidebar-wide-dark",
+    "confirmation-wide",
+    "deleted-wide",
+    "sidebar-compact",
+    "confirmation-compact"
+  ],
+  "providerInvoked": false,
+  "tests": {
+    "native": 62,
+    "desktop": 71,
+    "typescript": "passed",
+    "lint": "passed",
+    "uiFlow": "passed: cancellation preserves draft, confirmed deletion clears draft and opens fresh chat, compact confirmation visible",
+    "packagedRuntime": "passed"
+  },
+  "hashes": {
+    "native/Sources/Heav3nsCode/ConversationSidebar.swift": "abfd290dc0a21c4c9a1471a7c36b724dda97411cc5b0f1c1e1a5b5ed74143692",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "519e1c8698fd1cfc24887630cba66c757bd4f353368999db634c801f7036f8e4",
+    "src/desktop/worker.ts": "a69b6bd19188f4fcb0afcc3d8756ca67a6168f07099c4dbcf0fd237dd2e8cb21",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "f390eb6f3a1a6b67dde0e4a0594f022b2d32f2c9f9c6163fa7838210961ae245"
+  }
+}

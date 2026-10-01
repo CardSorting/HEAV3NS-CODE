@@ -1,0 +1,9 @@
+{
+  "concurrentAgents": "passed",
+  "targetedStop": "passed",
+  "approvalVisibility": "passed",
+  "inlineDecision": "passed",
+  "liveActivity": "passed",
+  "compact": "passed",
+  "providerInvoked": false
+}

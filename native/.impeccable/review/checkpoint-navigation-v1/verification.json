@@ -1,0 +1,9 @@
+{
+  "messageRoles": "passed",
+  "automaticCheckpoints": "passed",
+  "nativeRestoreIntoNewConversation": "passed",
+  "realProjectProcess": "passed",
+  "localPreview": "passed",
+  "projectStop": "passed",
+  "providerInvoked": false
+}

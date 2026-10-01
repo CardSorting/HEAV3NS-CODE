@@ -1,0 +1,107 @@
+{
+  "appPID" : 53422,
+  "capturedAt" : "2026-09-30T22:11:55Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : true
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "checkpoints" : {
+
+    },
+    "composerFocused" : true,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 671,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 869,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1196,
+        "y" : 687
+      },
+      "transcript" : {
+        "height" : 397,
+        "visibleWithinWindow" : true,
+        "width" : 693,
+        "x" : 242,
+        "y" : 196
+      }
+    },
+    "conversation" : "walkthrough-fixture",
+    "conversationCount" : 1,
+    "deleteSheetVisible" : false,
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "Choose a file, change, or recorded instruction to inspect.",
+    "inspectionTitle" : "Inspect",
+    "messageRoles" : [
+      "user",
+      "agent",
+      "user",
+      "agent"
+    ],
+    "navigationVisible" : false,
+    "projectRun" : {
+      "command" : "Choose a command to run this project.",
+      "draftChanged" : false,
+      "output" : "",
+      "previewEnabled" : false,
+      "runEnabled" : false,
+      "state" : "idle",
+      "status" : "Checking app status…",
+      "statusKnown" : false,
+      "stopEnabled" : false,
+      "targets" : 0
+    },
+    "quickOpen" : {
+
+    },
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "a4e9bffef39fa43c767ef3785a092cb904faac6cf5d3521316ad21bd2e97a65d",
+      "stage" : "Response ready",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1312,
+    "workspaceKey" : true
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1312,
+  "workerPID" : 53426,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790806307595\/project\/Workspace"
+}

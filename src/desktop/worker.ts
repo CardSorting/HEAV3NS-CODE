@@ -16,6 +16,8 @@ import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/exten
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
 import { WorkspaceInspection } from "./inspection.js"
+import { WorkspaceCheckpoints, CHECKPOINT_SCOPE } from "./checkpoints.js"
+import { ProjectRunner, type ProjectConfiguration } from "./project-runner.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
 	type DesktopRequest,
@@ -88,6 +90,9 @@ const projectRun = (run: Run) => ({
 	outputLimited: run.outputLimited,
 	toolCount: run.toolCount,
 	commandCount: run.commandCount,
+	checkpointBefore: run.checkpointBefore,
+	checkpointAfter: run.checkpointAfter,
+	checkpointError: run.checkpointError,
 })
 
 const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<string> => {
@@ -132,6 +137,11 @@ export class DesktopSession {
 	private metadata
 	private approvals
 	private conversations
+	private checkpoints
+	private readonly checkpointFiles: WorkspaceCheckpoints
+	private readonly project: ProjectRunner
+	private restorePlan?: { id: string; token: string; fingerprint: string; conversation: string; expires: number }
+	private projectEpoch = 0
 	private inspection: WorkspaceInspection
 	private submissions: Promise<unknown> = Promise.resolve()
 	private queueMutations = 0
@@ -164,10 +174,13 @@ export class DesktopSession {
 		this.lifecycle = lifecycle
 		this.readBaseline = readBaseline
 		this.inspection = new WorkspaceInspection(workspace.path)
+		this.checkpointFiles = new WorkspaceCheckpoints(workspace.path)
+		this.project = new ProjectRunner(workspace.path)
 		this.runs = database.getTable<Run>("desktop.runs.v1")
 		this.metadata = database.getTable("desktop.metadata.v1")
 		this.approvals = database.getTable("desktop.approvals.v1")
 		this.conversations = database.getTable("desktop.conversations.v1")
+		this.checkpoints = database.getTable("desktop.checkpoints.v1")
 	}
 	async start() {
 		await this.database.start()
@@ -187,6 +200,7 @@ export class DesktopSession {
 				updatedAt: Date.now(),
 			})
 		}
+		await this.recoverRestore()
 		// Never resume accepted or uncertain work merely because the app reopened.
 		for (const run of this.runs.getAll()) {
 			if (!run.conversation) {
@@ -278,7 +292,20 @@ export class DesktopSession {
 		)
 	}
 	async request(request: DesktopRequest): Promise<unknown> {
-		if (["task.submit", "task.edit", "conversation.create", "conversation.select"].includes(request.method)) {
+		if (
+			[
+				"task.submit",
+				"task.edit",
+				"conversation.create",
+				"conversation.select",
+				"conversation.delete",
+				"checkpoint.preview",
+				"checkpoint.restore",
+				"checkpoint.flag",
+				"project.configure",
+				"project.start",
+			].includes(request.method)
+		) {
 			if (this.cancellingAll) throw new Error("CANCELLING: wait for a confirmed stopping boundary")
 			this.queueMutations++
 			const result = this.submissions.then(() => this.handleRequest(request))
@@ -317,7 +344,11 @@ export class DesktopSession {
 					"queue-edit",
 					"queue-remove",
 					"walkthrough-v1",
-					...(this.lifecycle?.restoreContext && this.lifecycle.readContext ? ["conversations"] : []),
+					"project-run-v1",
+					...(this.lifecycle?.restoreContext && this.lifecycle.readContext ? ["checkpoints-v1"] : []),
+					...(this.lifecycle?.restoreContext && this.lifecycle.readContext
+						? ["conversations", "conversation-delete-v1"]
+						: []),
 				],
 				terminal: false,
 			}
@@ -339,15 +370,155 @@ export class DesktopSession {
 					active: this.active?.id,
 					queued: this.queue.map((r) => r.id),
 				}
+			case "project.discover":
+				return this.project.discover(this.metadata.get("project-command") as ProjectConfiguration | undefined)
+			case "project.status":
+				return this.project.status()
+			case "project.stop":
+				this.projectEpoch++
+				return this.project.stop()
+			case "project.configure": {
+				const configuration = z
+					.object({
+						command: z.string().trim().min(1).max(2000),
+						cwd: z.string().max(512).default("."),
+						preview: z.string().max(2048).optional(),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.project.running) throw new Error("PROJECT_RUNNING: stop the app before changing its command")
+				await this.project.discover(configuration)
+				this.metadata.put("project-command", configuration)
+				await this.database.flush()
+				return { saved: true }
+			}
+			case "project.start": {
+				const epoch = ++this.projectEpoch
+				const { id, revision } = z
+					.object({ id: z.string().max(512), revision: z.string().regex(/^[a-f0-9]{64}$/) })
+					.strict()
+					.parse(request.params)
+				const { targets } = await this.project.discover(
+					this.metadata.get("project-command") as ProjectConfiguration | undefined,
+				)
+				const target = targets.find((entry) => entry.id === id)
+				if (!target || target.revision !== revision)
+					throw new Error("PROJECT_CHANGED: refresh and review the updated run command")
+				if (this.closing) throw new Error("SHUTTING_DOWN")
+				if (epoch !== this.projectEpoch) throw new Error("PROJECT_CANCELLED: start was cancelled")
+				return this.project.start(target)
+			}
+			case "checkpoint.list": {
+				await this.submissions
+				const params = z
+					.object({
+						offset: z.number().int().min(0).default(0),
+						selected: z.string().uuid().optional(),
+						query: z.string().max(200).default(""),
+						filter: z.enum(["all", "flagged", "safety"]).default("all"),
+					})
+					.strict()
+					.parse(request.params)
+				const records = [...this.checkpoints.getAll()]
+				const query = params.query.trim().normalize("NFKC").toLowerCase()
+				const all = records
+					.filter(
+						(item) =>
+							(params.filter === "all" ||
+								(params.filter === "flagged" ? item.flagged === true : item.moment === "safety")) &&
+							(!query ||
+								[item.label, item.commit, this.runs.get(String(item.run))?.text].some((value) =>
+									String(value ?? "")
+										.normalize("NFKC")
+										.toLowerCase()
+										.includes(query),
+								)),
+					)
+					.sort((a, b) => Number(b.createdAt) - Number(a.createdAt) || String(a.id).localeCompare(String(b.id)))
+				let offset = Math.min(
+					Math.floor(params.offset / 100) * 100,
+					Math.max(0, Math.floor((all.length - 1) / 100) * 100),
+				)
+				if (params.selected) {
+					const index = all.findIndex((item) => item.id === params.selected)
+					if (index < 0)
+						throw new Error("UNKNOWN_CHECKPOINT: this checkpoint is unavailable; choose another from history")
+					offset = Math.floor(index / 100) * 100
+				}
+				return {
+					checkpoints: all.slice(offset, offset + 100).map((item) => this.projectCheckpoint(item)),
+					offset,
+					more: all.length > offset + 100,
+					total: all.length,
+					workspaceTotal: records.length,
+					scope: CHECKPOINT_SCOPE,
+				}
+			}
+			case "checkpoint.flag": {
+				const { id, flagged } = z.object({ id: z.string().uuid(), flagged: z.boolean() }).strict().parse(request.params)
+				const checkpoint = this.checkpoints.get(id)
+				if (!checkpoint) throw new Error("UNKNOWN_CHECKPOINT")
+				this.checkpoints.put(id, { ...checkpoint, flagged })
+				await this.database.flush()
+				return { saved: true }
+			}
+			case "checkpoint.preview": {
+				this.assertCanRestore()
+				const { id } = z.object({ id: z.string().uuid() }).strict().parse(request.params)
+				const checkpoint = this.checkpoints.get(id)
+				if (!checkpoint) throw new Error("UNKNOWN_CHECKPOINT")
+				const current = await this.checkpointFiles.scan(),
+					target = await this.checkpointFiles.read(String(checkpoint.commit))
+				const changes = this.checkpointFiles.changes(current, target),
+					token = randomUUID()
+				const shown: typeof changes = []
+				let bytes = 0
+				for (const change of changes.slice(0, 100)) {
+					const size = Buffer.byteLength(JSON.stringify(change))
+					if (bytes + size > 64_000) break
+					shown.push(change)
+					bytes += size
+				}
+				this.restorePlan = {
+					id,
+					token,
+					fingerprint: current.fingerprint,
+					conversation: this.conversation,
+					expires: Date.now() + 120_000,
+				}
+				return {
+					checkpoint: this.projectCheckpoint(checkpoint),
+					token,
+					changes: shown,
+					total: changes.length,
+					more: changes.length > shown.length,
+					scope: CHECKPOINT_SCOPE,
+				}
+			}
+			case "checkpoint.restore": {
+				this.assertCanRestore()
+				const { id, token } = z.object({ id: z.string().uuid(), token: z.string().uuid() }).strict().parse(request.params)
+				const plan = this.restorePlan
+				this.restorePlan = undefined
+				if (
+					!plan ||
+					plan.id !== id ||
+					plan.token !== token ||
+					plan.expires < Date.now() ||
+					plan.conversation !== this.conversation
+				)
+					throw new Error("RESTORE_EXPIRED: review the checkpoint again")
+				return this.restoreCheckpoint(id, plan.fingerprint)
+			}
 			case "conversation.list": {
 				await this.submissions
 				const { offset } = z
 					.object({ offset: z.number().int().min(0).default(0) })
 					.strict()
 					.parse(request.params)
-				const all = [...this.conversations.getAll()].sort(
-					(a, b) => Number(b.updatedAt) - Number(a.updatedAt) || String(a.id).localeCompare(String(b.id)),
-				)
+				const all = [...this.conversations.getAll()]
+					.filter((item) => !item.deletedAt)
+					.sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt) || String(a.id).localeCompare(String(b.id)))
 				return {
 					active: this.conversation,
 					conversations: all.slice(offset, offset + 100).map(({ id, title, updatedAt }) => ({ id, title, updatedAt })),
@@ -355,7 +526,8 @@ export class DesktopSession {
 				}
 			}
 			case "conversation.create":
-			case "conversation.select": {
+			case "conversation.select":
+			case "conversation.delete": {
 				if (!this.lifecycle?.restoreContext || !this.lifecycle.readContext)
 					throw new Error("UNSUPPORTED: this runtime cannot switch conversations")
 				if (this.active || this.queue.length || this.cancellingAll)
@@ -369,7 +541,44 @@ export class DesktopSession {
 								.parse(request.params)
 				const id = "id" in params ? String(params.id) : randomUUID()
 				const target = this.conversations.get(id)
-				if (request.method === "conversation.select" && !target) throw new Error("UNKNOWN_CONVERSATION")
+				const deleting = request.method === "conversation.delete"
+				if (request.method !== "conversation.create" && (!target || (!deleting && target.deletedAt)))
+					throw new Error("UNKNOWN_CONVERSATION")
+				if (deleting && (target?.deletedAt || id !== this.conversation)) {
+					await this.commits
+					if (!target?.deletedAt) {
+						this.conversations.put(id, { ...target, deletedAt: Date.now() })
+						try {
+							await this.database.flush()
+						} catch (error) {
+							this.closing = true
+							throw error
+						}
+					}
+					return { conversation: this.conversation }
+				}
+				if (deleting) {
+					await this.commits
+					this.lifecycle.restoreContext({ jsonl: "", turnCount: 0 })
+					const replacement = randomUUID()
+					this.conversations.put(id, { ...target, deletedAt: Date.now() })
+					this.conversations.put(replacement, {
+						id: replacement,
+						title: "New conversation",
+						createdAt: Date.now(),
+						updatedAt: Date.now(),
+					})
+					this.metadata.put("activeConversation", { id: replacement })
+					try {
+						this.lifecycle.saveContext(replacement)
+						await this.database.flush()
+					} catch (error) {
+						this.closing = true
+						throw error
+					}
+					this.conversation = replacement
+					return { conversation: replacement }
+				}
 				if (id === this.conversation) return { conversation: id }
 				await this.commits
 				const prior = this.lifecycle.readContext()
@@ -690,6 +899,11 @@ export class DesktopSession {
 			let executionStarted = false
 			try {
 				controller.signal.throwIfAborted()
+				if (this.lifecycle?.readContext) {
+					const checkpoint = await this.saveCheckpoint(run, "before", controller.signal)
+					run.checkpointBefore = checkpoint.id
+					await this.commit(run, "run.progress")
+				}
 				run.baseline = await this.readBaseline(this.workspace.path, controller.signal)
 				// Stop may arrive during Git preflight. Never hand an already-aborted
 				// instruction to the engine or wait for an abort event that has passed.
@@ -719,10 +933,145 @@ export class DesktopSession {
 			}
 			this.approvalResolvers.clear()
 			run.approval = undefined
+			if (executionStarted && this.lifecycle?.readContext) {
+				try {
+					run.checkpointAfter = (await this.saveCheckpoint(run, "after")).id
+				} catch (error) {
+					run.checkpointError = `The final checkpoint could not be saved: ${String(error)}`
+				}
+			}
 			await this.commit(run, "run.state")
 			this.active = undefined
 			this.controller = undefined
 		}
+	}
+	private projectCheckpoint(item: Record<string, unknown>) {
+		const { id, run, conversation, moment, label, createdAt, commit, files, bytes, flagged } = item
+		return { id, run, conversation, moment, label, createdAt, commit, files, bytes, flagged: flagged === true }
+	}
+	private async saveCheckpoint(run: Run, moment: "before" | "after", signal?: AbortSignal) {
+		const context = this.lifecycle!.readContext!()
+		if (Buffer.byteLength(JSON.stringify(context)) > 8 * 1024 * 1024)
+			throw new Error("CHECKPOINT_LIMIT: conversation context exceeds 8 MiB")
+		const saved = await this.checkpointFiles.capture(
+			`${moment === "before" ? "Before" : "After"}: ${run.text}`,
+			undefined,
+			signal,
+		)
+		const checkpoint = {
+			...saved,
+			context,
+			run: run.id,
+			conversation: this.conversation,
+			moment,
+			label: run.text.slice(0, 200),
+			flagged: false,
+		}
+		this.checkpoints.put(saved.id, checkpoint)
+		await this.database.flush()
+		return checkpoint
+	}
+	private assertCanRestore() {
+		if (!this.lifecycle?.readContext || !this.lifecycle.restoreContext)
+			throw new Error("UNSUPPORTED: conversation checkpoints are unavailable")
+		if (this.active || this.queue.length || this.cancellingAll)
+			throw new Error("WORK_PENDING: finish or stop LUMI before restoring")
+		if (this.project.running) throw new Error("PROJECT_RUNNING: stop the project before restoring its files")
+	}
+	private async restoreCheckpoint(id: string, fingerprint: string) {
+		const checkpoint = this.checkpoints.get(id)
+		if (!checkpoint) throw new Error("UNKNOWN_CHECKPOINT")
+		const current = await this.checkpointFiles.scan()
+		if (current.fingerprint !== fingerprint)
+			throw new Error("WORKSPACE_CHANGED: files changed after the preview; review again")
+		const target = await this.checkpointFiles.read(String(checkpoint.commit))
+		const prior = this.lifecycle!.readContext!(),
+			original = this.conversation
+		// Validate engine admission (including staged agent edits) before changing files.
+		this.lifecycle!.restoreContext!(prior)
+		const safety = await this.checkpointFiles.capture("Safety copy before restore", current)
+		if ((await this.checkpointFiles.scan()).fingerprint !== fingerprint)
+			throw new Error("WORKSPACE_CHANGED: files changed while preparing the safety checkpoint; review again")
+		this.checkpoints.put(safety.id, {
+			...safety,
+			context: prior,
+			conversation: original,
+			moment: "safety",
+			label: "Before restoring a checkpoint",
+			flagged: true,
+		})
+		const journal = { pending: true, safety: safety.id, conversation: original, context: prior }
+		this.metadata.put("restore-journal", { ...journal, phase: "prepared" })
+		await this.database.flush()
+		let writesAdmitted = false
+		try {
+			await this.checkpointFiles.apply(target, current, async () => {
+				this.metadata.put("restore-journal", { ...journal, phase: "applying" })
+				await this.database.flush()
+				writesAdmitted = true
+			})
+			this.lifecycle!.restoreContext!(checkpoint.context as ConversationContext)
+			const conversation = randomUUID()
+			this.conversations.put(original, { ...this.conversations.get(original), context: prior })
+			this.conversations.put(conversation, {
+				id: conversation,
+				title: `Restored: ${String(checkpoint.label).slice(0, 80)}`,
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+				context: checkpoint.context,
+				restoredFrom: id,
+			})
+			this.lifecycle!.saveContext(conversation)
+			this.metadata.put("activeConversation", { id: conversation })
+			await this.database.flush()
+			this.metadata.put("restore-journal", { pending: false })
+			await this.database.flush()
+			this.conversation = conversation
+			this.inspection.clear()
+			return {
+				conversation,
+				restored: this.projectCheckpoint(checkpoint),
+				safety: this.projectCheckpoint(this.checkpoints.get(safety.id)!),
+				message:
+					"Project files restored in a new conversation. Original conversations and the safety checkpoint are preserved.",
+			}
+		} catch (error) {
+			try {
+				if (!writesAdmitted) this.metadata.put("restore-journal", { ...journal, phase: "prepared" })
+				await this.recoverRestore()
+			} catch {
+				this.closing = true
+				throw new Error(
+					"RESTORE_INTERRUPTED: recovery is incomplete; reconnect before working. The safety checkpoint is retained.",
+				)
+			}
+			throw error
+		}
+	}
+	private async recoverRestore() {
+		const journal = this.metadata.get("restore-journal")
+		if (!journal?.pending) return
+		if (journal.phase === "prepared") {
+			// No filesystem mutation was admitted. In particular, retain edits
+			// that caused preflight to fail instead of overwriting them.
+			this.metadata.put("restore-journal", { pending: false, abortedBeforeWrite: true })
+			await this.database.flush()
+			return
+		}
+		if (!this.lifecycle?.restoreContext) throw new Error("RESTORE_INTERRUPTED: this runtime cannot recover a pending restore")
+		const checkpoint = this.checkpoints.get(String(journal.safety))
+		if (!checkpoint) throw new Error("RESTORE_INTERRUPTED: safety checkpoint missing")
+		await this.checkpointFiles.apply(
+			await this.checkpointFiles.read(String(checkpoint.commit)),
+			await this.checkpointFiles.scan(),
+		)
+		this.lifecycle.restoreContext(journal.context as ConversationContext)
+		this.conversation = String(journal.conversation)
+		this.lifecycle.saveContext(this.conversation)
+		this.metadata.put("activeConversation", { id: this.conversation })
+		await this.database.flush()
+		this.metadata.put("restore-journal", { pending: false, recoveredAt: Date.now() })
+		await this.database.flush()
 	}
 	private progress(run: Run, event: EngineProgressEvent) {
 		if (this.closing || this.active !== run || terminalStates.has(run.state)) return
@@ -850,6 +1199,7 @@ export class DesktopSession {
 		const operation = randomUUID()
 		const approval = {
 			operation,
+			createdAt: Date.now(),
 			tool: request.toolName,
 			args: argsText,
 			scope: this.workspace.path,
@@ -858,7 +1208,7 @@ export class DesktopSession {
 		if (Buffer.byteLength(JSON.stringify(approval)) > 64_000)
 			return { decision: "deny", feedback: "Operation exceeds the review limit. Split it into smaller operations." }
 		run.approval = approval
-		this.approvals.put(operation, { ...run.approval, run: run.id, decision: "pending", createdAt: Date.now() })
+		this.approvals.put(operation, { ...run.approval, run: run.id, decision: "pending" })
 		run.state = "awaiting_approval"
 		const decision = new Promise<ConfirmationResponse>((resolve) => this.approvalResolvers.set(operation, resolve))
 		await this.commit(run, "approval.requested")
@@ -904,10 +1254,16 @@ export class DesktopSession {
 	}
 	async stop() {
 		this.closing = true
+		this.projectEpoch++
 		clearTimeout(this.activityCheckpoint)
 		clearTimeout(this.activityDelivery)
 		this.inspection.clear()
 		let failure: unknown
+		try {
+			await this.project.stop()
+		} catch (error) {
+			failure = error
+		}
 		try {
 			await this.cancelAll()
 		} catch (error) {

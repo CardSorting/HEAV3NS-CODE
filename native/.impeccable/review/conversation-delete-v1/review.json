@@ -1,0 +1,14 @@
+{
+  "disposition": "ship",
+  "reviewer": "/root/conversation_delete_finish_reviewer",
+  "captureValidity": "All five required captures valid; source and build hashes matched",
+  "contract": "Native sidebar deletion, protected confirmation, draft disposition, and retained files/checkpoints meet scoped contract",
+  "materialFindings": [],
+  "scope": "Conversation deletion refinement and attributable regressions only",
+  "limits": [
+    "Inactive deletion source-assessed; active deletion captured",
+    "Tests and packaged-runtime verification reported, not independently rerun by reviewer",
+    "Physical keyboard/default-button behavior, full focus traversal, VoiceOver, measured contrast, long-title stress, provider behavior and release readiness not verified",
+    "Native AppKit: no HTML/CSS detector ran"
+  ]
+}

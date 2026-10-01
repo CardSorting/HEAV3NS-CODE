@@ -1,0 +1,94 @@
+{
+  "appPID" : 22487,
+  "capturedAt" : "2026-09-30T21:19:03Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : true
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "checkpoints" : {
+
+    },
+    "composerFocused" : true,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 671,
+        "x" : 253,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 253,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 869,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 1196,
+        "y" : 687
+      }
+    },
+    "conversation" : "walkthrough-fixture",
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "Choose a file, change, or recorded instruction to inspect.",
+    "inspectionTitle" : "Inspect",
+    "messageRoles" : [
+      "user",
+      "agent",
+      "user",
+      "agent"
+    ],
+    "navigationVisible" : false,
+    "projectRun" : {
+      "command" : "Choose a command to run this project.",
+      "output" : "",
+      "previewEnabled" : false,
+      "state" : "idle",
+      "status" : "Connect to LUMI to run this project.",
+      "targets" : 0
+    },
+    "quickOpen" : {
+
+    },
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "75f4eb384f603e97bbb38ef5cdb89e3659b9b4232d53c0b6c331fd7dbf624eef",
+      "stage" : "Response ready",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 731,
+    "windowFrameWidth" : 1312,
+    "workspaceKey" : true
+  },
+  "windowHeight" : 679,
+  "windowWidth" : 1312,
+  "workerPID" : 22508,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790803136070\/project\/Workspace"
+}

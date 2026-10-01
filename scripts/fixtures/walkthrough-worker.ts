@@ -11,7 +11,12 @@ import { BroccoliDatabaseKernel } from "../../src/sessions/extensions/substrate/
 
 async function main() {
 	const workspace = process.cwd(),
-		mode = process.env.WALKTHROUGH_FIXTURE ?? "live"
+		mode =
+			process.env.WALKTHROUGH_FIXTURE === "pods"
+				? path.basename(workspace) === "Mobile"
+					? "approval"
+					: "live"
+				: (process.env.WALKTHROUGH_FIXTURE ?? "live")
 	const database = new BroccoliDatabaseKernel({ workspaceRoot: workspace })
 	await database.start()
 	const metadata = database.getTable("desktop.metadata.v1")
@@ -82,6 +87,15 @@ async function main() {
 				const timer = setTimeout(done, ms)
 				input.signal?.addEventListener("abort", done, { once: true })
 			})
+		if (mode === "project") {
+			await writeFile(path.join(workspace, "fixture.txt"), "Updated by the scripted agent.\n")
+			context = { jsonl: "Scripted context after the user's instruction", turnCount: 1 }
+			return {
+				...result(),
+				response:
+					"I updated the project and saved a checkpoint. Your request stays separate from this response, and both points in the conversation can be revisited.\n\nUse Run to start the sample app. The console shows its local address; Open Preview opens that address in your browser.\n\nThis is a scripted UI fixture. No provider was contacted.",
+			}
+		}
 		emit("read", "tool", "in_progress", "Read workspace", "Inspect the native conversation view.", {
 			itemType: "view_file",
 			files: ["WorkspaceExample.swift"],
@@ -118,7 +132,15 @@ async function main() {
 		if (mode === "approval") {
 			await bridge.approve({
 				toolName: "run_command",
-				args: { command: "node --test fixture.test.cjs" },
+				args: {
+					command: "node --test fixture.test.cjs",
+					...(process.env.PODS_CONTAINMENT === "1"
+						? {
+								fixtureOnly: "LongArgument🌙".repeat(300),
+								files: Array.from({ length: 100 }, (_, index) => `tests/fixture-${index}.test.ts`),
+							}
+						: {}),
+				},
 				promptMessage: "UI fixture: review this command. No command will execute.",
 			} as Parameters<DesktopSession["approve"]>[0])
 			return result("cancelled")
@@ -127,22 +149,45 @@ async function main() {
 			await wait(1800)
 			process.exit(73)
 		}
+		if (process.env.WALKTHROUGH_FIXTURE === "pods") {
+			if (process.env.PODS_CONTAINMENT === "1") {
+				for (let index = 0; index < 60 && !input.signal?.aborted; index++) {
+					emit(
+						`burst-${index}`,
+						"tool",
+						"completed",
+						`Inspect workspace batch ${index + 1}`,
+						`Scripted burst ${index + 1}: ${"unbroken-output-🌙".repeat(160)}`,
+						{ itemType: "read_file", files: ["WorkspaceExample.swift"] },
+					)
+				}
+			}
+			await wait(3800)
+			if (!input.signal?.aborted)
+				emit(
+					"check",
+					"tool",
+					"in_progress",
+					"Verify project",
+					"Live update received while the command station stays open.",
+					{ itemType: "run_command" },
+				)
+		}
 		await wait(60000)
 		return result(input.signal?.aborted ? "cancelled" : "completed")
 	}
 	let context = { jsonl: "", turnCount: 0 }
-	const lifecycle =
-		mode === "navigation"
-			? {
-					sessionId: "walkthrough-fixture",
-					readContext: () => ({ ...context }),
-					restoreContext: (value: typeof context) => {
-						context = { ...value }
-					},
-					saveContext: (conversation?: string) =>
-						metadata.put("context", { ...context, conversation: conversation ?? bridge.conversation }),
-				}
-			: undefined
+	const lifecycle = ["navigation", "project"].includes(mode)
+		? {
+				sessionId: "walkthrough-fixture",
+				readContext: () => ({ ...context }),
+				restoreContext: (value: typeof context) => {
+					context = { ...value }
+				},
+				saveContext: (conversation?: string) =>
+					metadata.put("context", { ...context, conversation: conversation ?? bridge.conversation }),
+			}
+		: undefined
 	bridge = new DesktopSession({ id: "walkthrough-fixture", path: workspace }, { tick }, database, send, lifecycle)
 	await bridge.start()
 	const decoder = new FrameDecoder(),

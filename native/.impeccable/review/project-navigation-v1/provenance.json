@@ -1,0 +1,27 @@
+{
+  "kind": "Raw native window captures including actual tracked project menus; isolated project fixture",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790808196675/navigation",
+  "captures": [
+    "menu-wide-dark",
+    "menu-compact-light",
+    "code-wide-dark",
+    "code-compact-light",
+    "walkthrough-compact-light",
+    "run-compact-light"
+  ],
+  "tests": {
+    "native": 63,
+    "typescript": "passed",
+    "lint": "passed",
+    "nativeNavigation": "passed including menu availability and compact tab/sidebar transitions",
+    "signature": "passed",
+    "reviewerFix": "Walkthrough and Run from revealed compact sidebar: selectedSurface 1, context visible, sidebar hidden; passed"
+  },
+  "providerInvoked": false,
+  "hashes": {
+    "native/Sources/Heav3nsCode/ConversationSidebar.swift": "d3553c1a61b042adb95524fccbfd04ef41b1fa36c48583c1be131c4435ec308f",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "e831439f4d9323d5025a90e403cff00952d80204db4c85fdb3242fa53bf67337",
+    "native/Sources/Heav3nsCode/App.swift": "89e92861e6b1d8a3776c224272c6fde74e94e5c757b6cab7be19f5edfbd3d47a",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "70c7b438f8ec9ac7c609b0e33a1e2e4c908cac3e7439ef087cc79088b6c1033b"
+  }
+}

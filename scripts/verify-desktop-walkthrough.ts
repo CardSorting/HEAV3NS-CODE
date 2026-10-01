@@ -98,6 +98,22 @@ async function verifyPackagedRuntime() {
 		sessionID = hello.session
 		assert.ok(hello.capabilities.includes("walkthrough-v1"))
 		assert.ok(hello.capabilities.includes("file-search-v1"))
+		assert.ok(hello.capabilities.includes("checkpoints-v1"))
+		assert.ok(hello.capabilities.includes("project-run-v1"))
+		assert.equal((await request("checkpoint.list")).checkpoints.length, 0)
+		await request("project.configure", { command: "printf 'packaged-project-run\\n'", cwd: "." })
+		const target = (await request("project.discover")).targets.find((item: { id: string }) => item.id === "custom")
+		assert.ok(target)
+		await request("project.start", { id: target.id, revision: target.revision })
+		let project
+		for (let attempt = 0; attempt < 50; attempt++) {
+			project = await request("project.status")
+			if (project.state === "completed") break
+			await new Promise((resolve) => setTimeout(resolve, 100))
+		}
+		assert.equal(project.state, "completed")
+		assert.equal(project.exitCode, 0)
+		assert.equal(project.output, "packaged-project-run\n")
 		const snapshot = await request("snapshot")
 		assert.equal(snapshot.runs.at(-1).activities[0].metadata.operation, "read")
 		const activity = await request("activity.list", { run: id })
@@ -115,6 +131,11 @@ async function verifyPackagedRuntime() {
 		await assert.rejects(request("artifact.read", { run: id }), /UNKNOWN_RUN/)
 		await request("conversation.select", { id: initialConversation })
 		assert.equal((await request("history.read", { run: id })).run.id, id)
+		const deleted = await request("conversation.delete", { id: initialConversation })
+		assert.notEqual(deleted.conversation, initialConversation)
+		assert.equal((await request("snapshot")).runs.length, 0)
+		await assert.rejects(request("conversation.select", { id: initialConversation }), /UNKNOWN_CONVERSATION/)
+		assert.equal((await request("conversation.delete", { id: initialConversation })).conversation, deleted.conversation)
 		await writeFile(
 			path.join(workspace, "verification.json"),
 			JSON.stringify(
@@ -124,8 +145,11 @@ async function verifyPackagedRuntime() {
 					activity: "metadata and paths preserved",
 					fileRead: "passed",
 					fileSearch: "file-search-v1 negotiated; real filename search passed",
-					conversationBoundary: "foreign run details and output rejected; original history restored",
+					conversationBoundary: "foreign history rejected; original restored; active deletion and safe retry verified",
 					providerInvoked: false,
+					checkpoints: "checkpoints-v1 negotiated; empty history verified",
+					projectRun:
+						"project-run-v1 negotiated; custom command saved, discovered, executed and completed with expected output",
 				},
 				null,
 				2,
@@ -145,74 +169,129 @@ async function main() {
 	const root = process.cwd(),
 		output = path.join(root, "build", `desktop-walkthrough-${Date.now()}`)
 	const binary = path.join(root, "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE")
-	const cases: Record<string, string[]> = process.argv.includes("--navigation")
+	const cases: Record<string, string[]> = process.argv.includes("--project")
 		? {
-				navigation: [
+				project: [
 					"dark",
 					"wide",
-					"draft",
-					"quick-open:Workspace",
-					"quick-open-select",
-					"quick-open:zzz-no-match",
-					"quick-open-focus",
-					"new-conversation",
-					"previous-conversation",
+					"messages-wide",
+					"checkpoints",
+					"checkpoint-flag",
+					"checkpoint-flagged",
+					"checkpoint-search",
+					"checkpoint-search-empty",
+					"checkpoint-all",
+					"checkpoint-link-before",
+					"checkpoint-link-after",
+					"checkpoint-review",
+					"checkpoint-close",
+					"project",
+					"project-start",
+					"project-running",
 					"narrow",
 					"light",
-					"quick-open:swift",
-					"quick-open-select-compact",
-					"walkthrough",
+					"project-compact",
+					"project-stop",
+					"project-configure",
+					"project-draft",
+					"project-refresh",
+					"project-configure-scroll",
+					"project-configure-save",
 					"conversation",
+					"checkpoints-compact",
+					"checkpoint-review-compact",
+					"checkpoint-restore",
+					"restore-settle",
+					"restored",
+					"checkpoints-after-restore",
+					"checkpoint-safety",
+					"checkpoint-close",
+					"wide",
+					"conversation-new",
+					"draft",
+					"conversation-delete-sheet",
+					"conversation-delete-cancel",
+					"conversation-delete-sheet",
+					"conversation-delete-confirm",
+					"narrow",
+					"conversation-sidebar",
+					"conversation-delete-sheet-compact",
+					"conversation-delete-cancel-compact",
 				],
 			}
-		: {
-				live: [
-					"dark",
-					"wide",
-					"walkthrough-expand",
-					"walkthrough-queue",
-					"walkthrough-history",
-					"walkthrough-follow",
-					"walkthrough-file",
-					"walkthrough",
-					"walkthrough-reduced",
-					"narrow",
-					"walkthrough-expand",
-					"light",
-					"walkthrough-compact",
-				],
-				failure: [
-					"dark",
-					"wide",
-					"walkthrough",
-					"walkthrough",
-					"walkthrough-issues",
-					"narrow",
-					"light",
-					"walkthrough-failed-compact",
-				],
-				approval: [
-					"dark",
-					"wide",
-					"walkthrough",
-					"walkthrough-paused",
-					"narrow",
-					"light",
-					"walkthrough-approval-compact",
-					"walkthrough-deny",
-				],
-				crash: [
-					"dark",
-					"wide",
-					"walkthrough",
-					"walkthrough",
-					"walkthrough",
-					"walkthrough-disconnected",
-					"walkthrough-reconnect",
-					"light",
-					"walkthrough-recovered",
-				],
-			}
+		: process.argv.includes("--navigation")
+			? {
+					navigation: [
+						"dark",
+						"wide",
+						"draft",
+						"quick-open:Workspace",
+						"quick-open-select",
+						"quick-open:zzz-no-match",
+						"quick-open-focus",
+						"new-conversation",
+						"previous-conversation",
+						"narrow",
+						"light",
+						"quick-open:swift",
+						"quick-open-select-compact",
+						"conversation-sidebar",
+						"task-context",
+						"conversation-sidebar",
+						"walkthrough",
+						"conversation-sidebar",
+						"project",
+						"conversation",
+					],
+				}
+			: {
+					live: [
+						"dark",
+						"wide",
+						"walkthrough-expand",
+						"walkthrough-queue",
+						"walkthrough-history",
+						"walkthrough-follow",
+						"walkthrough-file",
+						"walkthrough",
+						"walkthrough-reduced",
+						"narrow",
+						"walkthrough-expand",
+						"light",
+						"walkthrough-compact",
+					],
+					failure: [
+						"dark",
+						"wide",
+						"walkthrough",
+						"walkthrough",
+						"walkthrough-issues",
+						"narrow",
+						"light",
+						"walkthrough-failed-compact",
+					],
+					approval: [
+						"dark",
+						"wide",
+						"walkthrough",
+						"walkthrough-paused",
+						"narrow",
+						"light",
+						"walkthrough-approval-compact",
+						"walkthrough-deny",
+					],
+					crash: [
+						"dark",
+						"wide",
+						"walkthrough",
+						"walkthrough",
+						"walkthrough",
+						"walkthrough-disconnected",
+						"walkthrough-reconnect",
+						"light",
+						"walkthrough-recovered",
+					],
+				}
 	for (const [mode, steps] of Object.entries(cases)) {
 		const directory = path.join(output, mode),
 			workspace = path.join(directory, "Workspace")
@@ -222,6 +301,16 @@ async function main() {
 			"import AppKit\n\nfinal class WorkspaceExample: NSView {\n    func focusConversation() {\n        window?.makeFirstResponder(nil)\n    }\n}\n",
 		)
 		await writeFile(path.join(workspace, "fixture.txt"), "Walkthrough capture fixture.\n")
+		if (mode === "project") {
+			await writeFile(
+				path.join(workspace, "package.json"),
+				JSON.stringify({ name: "native-run-fixture", private: true, scripts: { dev: "node fixture-app.cjs" } }),
+			)
+			await writeFile(
+				path.join(workspace, "fixture-app.cjs"),
+				"const http = require('node:http'); const server = http.createServer((req,res)=>res.end('Native project fixture')); server.listen(0, '127.0.0.1',()=>console.log('Preview: http://127.0.0.1:'+server.address().port));\n",
+			)
+		}
 		if (mode === "navigation") {
 			await mkdir(path.join(workspace, "Sources"), { recursive: true })
 			await writeFile(
@@ -252,12 +341,21 @@ async function main() {
 			JSON.stringify(
 				{
 					output: directory,
+					projectPaths:
+						mode === "navigation"
+							? [workspace, path.join(workspace, "Sources"), path.join(workspace, "Missing project")]
+							: [],
 					draftRoot: path.join(directory, "drafts"),
 					navigationPass: true,
-					captureWalkthroughStages: mode !== "navigation",
+					captureWalkthroughStages: !["navigation", "project"].includes(mode),
 					...(mode === "navigation"
 						? {}
-						: { instruction: "UI fixture: improve workspace navigation and explain each stage of the work." }),
+						: {
+								instruction:
+									mode === "project"
+										? "Make my app easier to understand. Keep my messages distinct from your replies, save a checkpoint, and show me how to run the project."
+										: "UI fixture: improve workspace navigation and explain each stage of the work.",
+							}),
 					steps,
 				},
 				null,
@@ -281,7 +379,7 @@ async function main() {
 			diagnostic = (diagnostic + String(data)).slice(-18000)
 		})
 		try {
-			const deadline = Date.now() + 45000
+			const deadline = Date.now() + Math.max(45000, steps.length * 2200)
 			while (Date.now() < deadline) {
 				try {
 					report = JSON.parse(await readFile(path.join(directory, `ui-${steps.at(-1)}.json`), "utf8"))
@@ -299,6 +397,82 @@ async function main() {
 				assert.equal(pinned.layout.walkthrough.pinnedRun, "1".repeat(64))
 				assert.equal(report.layout.walkthrough.animating, false)
 				assert.equal(report.layout.walkthrough.reduceMotion, true)
+			} else if (mode === "project") {
+				const load = async (step: string) => JSON.parse(await readFile(path.join(directory, `ui-${step}.json`), "utf8"))
+				assert.ok((await load("messages-wide")).layout.messageRoles.includes("user"))
+				assert.equal((await load("checkpoints")).layout.checkpoints.count, 2)
+				assert.equal((await load("checkpoint-flagged")).layout.checkpoints.count, 1)
+				assert.equal((await load("checkpoint-flagged")).layout.checkpoints.filter, "flagged")
+				assert.equal((await load("checkpoint-search")).layout.checkpoints.count, 1)
+				assert.equal((await load("checkpoint-search-empty")).layout.checkpoints.count, 0)
+				assert.equal((await load("checkpoint-search-empty")).layout.checkpoints.restoreEnabled, false)
+				assert.equal((await load("checkpoint-all")).layout.checkpoints.count, 2)
+				assert.equal((await load("checkpoint-safety")).layout.checkpoints.filter, "safety")
+				assert.equal((await load("checkpoint-safety")).layout.checkpoints.count, 1)
+				assert.equal((await load("conversation-delete-sheet")).layout.deleteSheetVisible, true)
+				assert.equal((await load("conversation-delete-cancel")).layout.deleteSheetVisible, false)
+				assert.ok((await load("conversation-delete-cancel")).layout.composerUTF16Count > 0)
+				assert.equal((await load("conversation-delete-confirm")).layout.composerUTF16Count, 0)
+				assert.equal((await load("conversation-delete-sheet-compact")).layout.deleteSheetVisible, true)
+				assert.equal(
+					(await load("conversation-delete-cancel")).layout.conversation,
+					(await load("conversation-new")).layout.conversation,
+				)
+				assert.notEqual(
+					(await load("conversation-delete-confirm")).layout.conversation,
+					(await load("conversation-new")).layout.conversation,
+				)
+				assert.equal(
+					(await load("conversation-delete-confirm")).layout.conversationCount,
+					(await load("conversation-new")).layout.conversationCount,
+				)
+				assert.notEqual(
+					(await load("checkpoint-link-before")).layout.checkpoints.selected,
+					(await load("checkpoint-link-after")).layout.checkpoints.selected,
+				)
+				assert.equal(
+					(await load("checkpoint-link-after")).layout.checkpoints.selected,
+					(await load("checkpoints")).layout.checkpoints.selected,
+				)
+				assert.equal((await load("project-running")).layout.projectRun.state, "running")
+				assert.equal((await load("project-running")).layout.projectRun.previewEnabled, true)
+				assert.equal((await load("project-stop")).layout.projectRun.state, "stopped")
+				const compactControls = (await load("project-compact")).layout.controls
+				assert.ok(compactControls.jumpLatest.visibleWithinWindow)
+				assert.ok(
+					compactControls.jumpLatest.y + compactControls.jumpLatest.height <= compactControls.transcript.y,
+					"Jump to Latest must not cover conversation text",
+				)
+				assert.equal((await load("project-refresh")).layout.projectRun.draftChanged, true)
+				assert.equal((await load("project-configure-save")).layout.projectRun.draftChanged, false)
+				assert.equal(
+					(await load("project-configure-save")).layout.projectRun.command,
+					"npm run dev -- --host 127.0.0.1\nIn .",
+				)
+				assert.equal((await load("project-configure-save")).layout.projectRun.targets, 2)
+				assert.equal(report.layout.switchingConversation, false)
+				assert.notEqual(report.layout.conversation, "walkthrough-fixture")
+				assert.equal(
+					await readFile(path.join(workspace, "fixture.txt"), "utf8"),
+					"Walkthrough capture fixture.\nUncommitted change for inspection.\n",
+				)
+				assert.ok(!diagnostic.includes("Unable to simultaneously satisfy constraints"), diagnostic)
+				await writeFile(
+					path.join(directory, "verification.json"),
+					JSON.stringify(
+						{
+							messageRoles: "passed",
+							automaticCheckpoints: "passed",
+							nativeRestoreIntoNewConversation: "passed",
+							realProjectProcess: "passed",
+							localPreview: "passed",
+							projectStop: "passed",
+							providerInvoked: false,
+						},
+						null,
+						2,
+					),
+				)
 			} else if (mode === "crash") {
 				assert.equal(report.layout.walkthrough.stage, "Work was interrupted")
 				assert.equal(report.layout.walkthrough.animating, false)
@@ -317,6 +491,13 @@ async function main() {
 				assert.ok((await load("previous-conversation")).layout.composerUTF16Count > 0)
 				assert.equal((await load("quick-open:swift")).layout.quickOpen.visible, true)
 				assert.ok((await load("quick-open-select-compact")).layout.inspectionPreview.includes("import Foundation"))
+				assert.equal((await load("task-context")).layout.contextVisible, true)
+				assert.equal((await load("task-context")).layout.conversationSidebarVisible, false)
+				for (const step of ["walkthrough", "project"]) {
+					assert.equal((await load(step)).layout.selectedSurface, 1)
+					assert.equal((await load(step)).layout.contextVisible, true)
+					assert.equal((await load(step)).layout.conversationSidebarVisible, false)
+				}
 				assert.ok(!diagnostic.includes("Unable to simultaneously satisfy constraints"), diagnostic)
 				await writeFile(
 					path.join(directory, "verification.json"),

@@ -8,8 +8,13 @@ struct ConversationSummary {
 
 final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     var onNew: (() -> Void)?
+    var onDelete: ((String) -> Void)?
+    var supportsDeletion = false
+    private var deleteButtons = [NSButton]()
     var onSelect: ((String) -> Void)?
     var onProjects: (() -> Void)?
+    var onPods: (() -> Void)?
+    private lazy var pods = JourneyButton("Pods", symbol: "square.grid.2x2") { [weak self] in self?.onPods?() }
     var onAccount: (() -> Void)?
     var onMore: (() -> Void)?
     var onRecent: (() -> Void)?
@@ -42,10 +47,11 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         table.setAccessibilityLabel("Conversations")
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true; scroll.drawsBackground = false
         scroll.setContentHuggingPriority(.init(1), for: .vertical)
-        let projects = JourneyButton("Projects", symbol: "folder") { [weak self] in self?.onProjects?() }
+        pods.toolTip = "See every loaded project and agent workflow together"
+        let projects = JourneyButton("Project Library…", symbol: "folder") { [weak self] in self?.onProjects?() }
         let account = JourneyButton("Account", symbol: "person.crop.circle") { [weak self] in self?.onAccount?() }
         for button in [create, projects, account] { button.alignment = .left; button.bezelStyle = .inline; button.heightAnchor.constraint(equalToConstant: 32).isActive = true }
-        let root = JourneyStyle.stack([heading, JourneyStyle.rule(), create, JourneyStyle.label("Conversations", size: 11, weight: .semibold, secondary: true), search, scroll, message, more, recent, JourneyStyle.rule(), projects, account], spacing: 12)
+        let root = JourneyStyle.stack([heading, pods, JourneyStyle.rule(), create, JourneyStyle.label("Conversations", size: 11, weight: .semibold, secondary: true), search, scroll, message, more, recent, JourneyStyle.rule(), projects, account], spacing: 12)
         addSubview(root); JourneyStyle.pin(root, to: self, inset: 14)
         for view in root.arrangedSubviews { view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true }
         more.isHidden = true; recent.isHidden = true; create.isEnabled = false
@@ -61,11 +67,13 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         render()
     }
     func setCanSwitch(_ allowed: Bool) {
+        deleteButtons.forEach { $0.isEnabled = allowed }
         create.isEnabled = allowed; table.isEnabled = allowed; more.isEnabled = allowed; recent.isEnabled = allowed
         create.toolTip = allowed ? "Start with a fresh conversation" : "Finish or stop current work before switching conversations"
     }
     private func render() {
         visible = all.filter { search.stringValue.isEmpty || $0.title.localizedCaseInsensitiveContains(search.stringValue) }
+        deleteButtons.removeAll()
         suppress = true; table.deselectAll(nil); table.reloadData()
         if let index = visible.firstIndex(where: { $0.id == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
         suppress = false
@@ -87,7 +95,20 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         let labels = JourneyStyle.stack([name, detail], spacing: 4)
         let icon = NSImageView(image: NSImage(systemSymbolName: "bubble.left", accessibilityDescription: nil)!)
         icon.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        let root = JourneyStyle.stack([icon, labels], vertical: false, spacing: 10)
+        let delete = JourneyButton("", symbol: "trash") { [weak self] in
+            guard let self, self.table.isEnabled else { return }
+            self.onDelete?(item.id)
+        }
+        delete.bezelStyle = .inline
+        delete.toolTip = "Delete conversation…"
+        delete.setAccessibilityLabel("Delete conversation: \(item.title)")
+        delete.isEnabled = table.isEnabled
+        delete.isHidden = !supportsDeletion
+        delete.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        delete.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        deleteButtons.append(delete)
+        labels.setContentCompressionResistancePriority(.init(1), for: .horizontal)
+        let root = JourneyStyle.stack([icon, labels, delete], vertical: false, spacing: 8)
         cell.addSubview(root); JourneyStyle.pin(root, to: cell, inset: 6)
         name.widthAnchor.constraint(equalTo: labels.widthAnchor).isActive = true
         detail.widthAnchor.constraint(equalTo: labels.widthAnchor).isActive = true

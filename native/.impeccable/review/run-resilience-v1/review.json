@@ -1,0 +1,86 @@
+{
+  "disposition": "ship",
+  "scope": "Bounded native macOS Run resilience refinement and attributable transcript layout changes; not a release or accessibility certification.",
+  "contract_assessment": [
+    {
+      "promise": "Native, chat-first workspace; supporting Run",
+      "result": "pass",
+      "evidence": "run-wide.png retains dominant conversation, persistent composer, and secondary Run panel. run-compact.png retains conversation and composer beside a 300-point task context."
+    },
+    {
+      "promise": "Unsaved command edits survive refresh, tab changes, reconnect and failed saves until save/discard during window lifetime",
+      "result": "pass",
+      "evidence": "draft-after-refresh-compact.png and JSON show retained custom input and draftChanged=true; ProjectRunView selectTarget/resetDraft guard and connect preserve draftChanged/fields. ProjectRunTests covers refresh, tab switch, failed save, explicit discard; reconnect preservation assessed from source, not a dedicated exercised test."
+    },
+    {
+      "promise": "Pending start/stop explicit; duplicates suppressed; stale replies ignored",
+      "result": "pass",
+      "evidence": "ProjectRunView pendingAction/busy/generation gates; ProjectRunTests testPendingStartAndStopPreventDuplicateRequestsAndShowProgress, testTimedOutStartReconcilesActualProcessBeforeAnotherRun, testLateStatusReplyCannotUndoNewerStart."
+    },
+    {
+      "promise": "Unknown status blocks launch and preview, retries, preserves console; actual active target remains visible",
+      "result": "pass",
+      "evidence": "statusKnown gates Run/Open Preview; poll failure retains current and console and advertises retry. Tests testUnknownStatusDisablesRunAndPreviewAndRecoversWithoutLosingConsole and testActiveTargetRemainsTruthfulWhenItDisappearsFromDiscovery pass in supplied native log."
+    },
+    {
+      "promise": "Separate role/completion from evidence/review status",
+      "result": "pass",
+      "evidence": "run-wide.png and run-compact.png show LUMI \u00b7 Completed separately above Checks not run \u00b7 Not reviewed; WorkspaceWindow.swift:957 supplies distinct evidence content."
+    },
+    {
+      "promise": "Stable Jump to Latest row cannot cover message text",
+      "result": "pass",
+      "evidence": "WorkspaceWindow.swift:344 reserves a 28-point row below transcript. All compact JSON reports place Jump at y=170, height=24 and transcript y=196, leaving a 2-point clearance; scripts/verify-desktop-walkthrough.ts:382 asserts this geometry."
+    },
+    {
+      "promise": "Save/discard reachable and saved command visibly confirmed",
+      "result": "pass",
+      "evidence": "save-visible-compact.png visibly exposes Unsaved edits, Save Command, and Discard Edits. saved-compact.png and JSON show My run command, the saved literal command, and draftChanged=false."
+    }
+  ],
+  "material_findings": [],
+  "craft_platform_assessment": {
+    "authority": "native/DESIGN.md and native/PRODUCT.md; refinement with no new approved comp.",
+    "type": "match: system prose and role hierarchy; monospaced literal command and console remain appropriate native technical evidence.",
+    "material": "match: AppKit chrome, native controls, semantic surfaces and SF Symbols; no simulated physical materials or web shell.",
+    "ground": "match: semantic dark wide and light compact appearances, consistent with incumbent authority; no invented fixed palette.",
+    "composition": "Conversation and composer remain available. Compact transcript uses a small scrolling viewport but the navigation control no longer overlays it. Run configuration uses its established scroll region to expose the final actions.",
+    "floor": "No material craft-floor violation in the required captures. Native AppKit conventions override iOS touch sizing and web display-font prescriptions. No additional decorative motion required for this utility refinement."
+  },
+  "evidence_and_limitations": {
+    "required_captures": [
+      "run-wide.png",
+      "run-compact.png",
+      "draft-after-refresh-compact.png",
+      "save-visible-compact.png",
+      "saved-compact.png"
+    ],
+    "capture_validity": "All five opened and visually inspected; valid native window captures matching named states. Wide frame 1312\u00d7731 points; compact frames 720\u00d7500 points. Corresponding JSON read. run-compact-before.png is comparison-only and not a required acceptance capture.",
+    "reviewed_sources": [
+      "native/Sources/Heav3nsCode/ProjectRunView.swift",
+      "native/Sources/Heav3nsCode/WorkspaceWindow.swift (targeted transcript layout and row construction)",
+      "native/Tests/Heav3nsCodeTests/ProjectRunTests.swift",
+      "scripts/verify-desktop-walkthrough.ts (targeted Run assertions)"
+    ],
+    "records_read": [
+      "verification.json",
+      "provenance.json",
+      "packaged-runtime.json",
+      "native-tests.log (completion summary)",
+      "desktop-tests.log (completion summary)"
+    ],
+    "reported_checks": "Supplied logs show 58 native and 68 desktop tests passed. Provenance reports TypeScript, changed-file lint, UI flow, and packaged runtime passed. Verification and packaged-runtime records cover real local process, local preview, stop, checkpoint/restore flow and bundled custom-command execution; providerInvoked=false.",
+    "provenance_integrity": "Independently computed SHA-256 of both reviewed native source files, built app executable, and bundled runtime dist/index.js; all match provenance.json.",
+    "detector": "No web detector ran; native manual craft review performed.",
+    "limitations": [
+      "Tests and live interaction were not independently rerun by reviewer.",
+      "Pending/error/reconnect behavior assessed through source and supplied test evidence, not additional captures or a physical interaction pass.",
+      "Manual VoiceOver, complete keyboard/focus traversal, physical keyboard/IME, measured contrast, increased contrast, and long-content stress remain unverified.",
+      "No production provider or OAuth task; scripted fixture is explicitly disclosed in conversation.",
+      "No acceptance for every framework runner, long sessions, notarization or distribution.",
+      "Drafts survive only the window lifetime; closing-window persistence is deliberately outside contract.",
+      "No exact 720\u00d7480 acceptance inferred from 720\u00d7500 compact evidence.",
+      "Unrelated historical dirty changes were not reviewed as new scope."
+    ]
+  }
+}

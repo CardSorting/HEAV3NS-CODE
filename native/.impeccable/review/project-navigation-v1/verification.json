@@ -1,0 +1,9 @@
+{
+  "nativeNavigation": "passed",
+  "scopedSearch": "passed",
+  "compactPreview": "passed",
+  "draftRestoration": "passed",
+  "staleHistoryCleared": "passed",
+  "composerFocusHandoff": "passed (before capture activates the window)",
+  "providerInvoked": false
+}

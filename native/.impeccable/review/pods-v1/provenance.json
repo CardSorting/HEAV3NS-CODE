@@ -1,0 +1,24 @@
+{
+  "kind": "Raw native window captures using three independent workspace workers and scripted agent events",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/pods-1790809615165",
+  "providerInvoked": false,
+  "captures": [
+    "pods-wide",
+    "pods-stopped",
+    "pods-compact"
+  ],
+  "hashes": {
+    "native/Sources/Heav3nsCode/PodsWindow.swift": "96e343cbeda8fd719972840a6ac4c27c074bd09a1eb0c3c312da0cf98cc30ee8",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "0573244898528def2f863b1bce42bfe894fdf8580ae8a6ebccd4b5bd3d8c9728",
+    "native/Sources/Heav3nsCode/App.swift": "96b27741bd482364cfc4e22928bd5df885b4f0b7e17d131c0be34df278c43742",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "60c9a9d1acebdbffbfff1b5f12d9552fe1da9d780f8bbeffbf7c56957c26e489"
+  },
+  "validation": {
+    "nativeTests": 63,
+    "typescript": "passed",
+    "fixtureLint": "passed",
+    "codesign": "passed",
+    "threeWorkspaceFixture": "passed",
+    "independentFinishReview": "ship, scoped to Pods overview and attributable native navigation"
+  }
+}

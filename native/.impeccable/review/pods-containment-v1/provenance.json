@@ -1,0 +1,34 @@
+{
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/pods-1790813850309",
+  "kind": "Raw native AppKit window captures, three independent real workspace workers with scripted burst activity and long approval arguments",
+  "providerInvoked": false,
+  "validation": {
+    "fullNative": 75,
+    "postCorrectionFocusedNative": 13,
+    "typescript": "passed",
+    "changedScriptLint": "passed without warnings",
+    "build": "passed",
+    "localSignature": "codesign --verify --deep --strict passed",
+    "threeWorkerBurstFixture": "passed",
+    "followLatestAfterReflow": "passed in GUI geometry assertions at every captured column count; same-text resize, deferred document reflow and paused selection tested"
+  },
+  "limits": [
+    "No provider, multi-day soak, or release certification",
+    "More menu actions and replacement-request behavior are source/unit reviewed, not GUI-exercised",
+    "No physical VoiceOver or keyboard-only end-to-end acceptance"
+  ],
+  "hashes": {
+    "native/Sources/Heav3nsCode/PodsWindow.swift": "2a6c5ada9123bbb123813515a8c83b1275e9b84279109c06baac0f31165c9432",
+    "native/Sources/Heav3nsCode/PodLiveView.swift": "4c0154494b63100eb5bab70bc90ccd793fa9c25eb1bebec5839a6f403b4c5b70",
+    "native/Sources/Heav3nsCode/PodLayout.swift": "f0a62b88d99ec9fb9723a95a9a68ba35d78ce828945c4f8e9a9ad2952c89d6e9",
+    "native/Sources/Heav3nsCode/PodMonitoring.swift": "0751777ade3ba1b1676bf5cb8a759a51e3f5e61abf80be6b5c86c23e95016a9a",
+    "native/Sources/Heav3nsCode/App.swift": "391b477bd1a651851afab0e4b364d7d8c815fc2e13c21fe14ad43d15496737ff",
+    "native/Sources/Heav3nsCode/IntegrationProbe.swift": "aff97e2e9f0a3c955c9fa13ac403148bc6b5045cea5a1917393b0c021b8acebf",
+    "native/Tests/Heav3nsCodeTests/PodsWindowTests.swift": "bcbb329d19cd8d76f4340da3ad225669a070f9d4f3e71553720cde5b61884258",
+    "scripts/verify-desktop-pods.ts": "af7c05a25b517afa3fc55a21f3fe32a50fef74f18bd35ffbaffb038a0eb58108",
+    "scripts/fixtures/walkthrough-worker.ts": "37066075b046a466ba4628032f2746a77b62394fb9b8ed1f715d591a94b94b19",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "984e20228d62cfdd59961e073ced77924745903e16094ea0616bfcd184b3f73e"
+  },
+  "initialReviewSource": "/Users/bozoegg/Desktop/LUMI-NEW/build/pods-1790813186788",
+  "reviewCorrection": "P2-1: coalesced tail updates follow both viewport and text-document frame changes, conditional on current pause/selection state. Native capture yields for post-layout work; unrelated workspace outcome captures are disabled for the Pods-only fixture."
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "Raw macOS native window-group captures; scripted engine through production DesktopSession and native client; real local project process",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790803136070/project",
+  "captures": [
+    "messages-wide",
+    "checkpoints-wide",
+    "restore-review-wide",
+    "run-wide",
+    "run-compact",
+    "run-configuration-compact",
+    "run-save-visible-compact",
+    "run-saved-compact",
+    "restore-review-compact",
+    "restored-compact"
+  ],
+  "providerInvoked": false,
+  "sizes": "Wide 1312x731 and compact 720x500; panels/sheets may exceed their parent and are captured as native window groups. Transparent exterior corners are not application content.",
+  "tests": {
+    "desktop": 68,
+    "native": 52,
+    "typescript": "passed",
+    "changedFileLint": "passed at error severity",
+    "uiFlow": "passed",
+    "packagedRuntime": "passed"
+  },
+  "build": "Ad-hoc development signature verified; not a notarized release",
+  "hashes": {
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "04ab6ef03d8ad1ba366d88a78fb2e8ef36c3c7749eb061d830529f2f4d0c2533",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "0bad9f9a57bab84793e2554bc7532d57c56da0fabfafa1f0817354d18f1c285b",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7"
+  },
+  "unverified": [
+    "Manual VoiceOver/focus order",
+    "Physical keyboard/IME",
+    "Production provider performance",
+    "All framework runners",
+    "Release acceptance"
+  ],
+  "capturedHashes": {
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "cbec2a7e7872830b541696af7a4318826f275588e0acfd27ced4ecb22398ed63",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "6399f2f041c157bb7a81cc72aa3baf4fc04e319884fd307bd9e50fd50e38af3d",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7"
+  },
+  "postCaptureRuntimeSafeguard": "Backend-only preflight refuses to overwrite an existing file absent from the safety snapshot (including a newly ignored file). Regression reproduced before correction and full desktop suite passed afterward. Native sources/binary UI unchanged since reviewer captures."
+}

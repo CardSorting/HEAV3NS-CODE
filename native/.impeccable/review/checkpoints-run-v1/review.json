@@ -1,0 +1,26 @@
+{
+  "disposition": "ship",
+  "dispositionScope": "Native feature finish review only; follow-up limited to the original P1 and attributable regressions. Not release certification.",
+  "evidence": {
+    "openedAllEightRequiredCaptures": true,
+    "validity": "Valid native macOS window-group captures at wide dark and compact light sizes. Exterior transparency and inactive controls are native capture states, not missing application content.",
+    "fixtureLimits": "Scripted engine, production worker/client, real local process; no provider invoked. Test and signature claims read from provenance, not independently rerun."
+  },
+  "directionAndCraft": "Preserves the incumbent AppKit system and conversation hierarchy. You messages have role, symbol, tint and alignment distinction. Checkpoint history and protected restore communicate scope, safety copy and new conversation. Run stays supporting context and distinguishes Stop App from agent execution. No visual rebuild needed.",
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Message checkpoint links can select a different checkpoint",
+      "status": "resolved",
+      "resolution": "Worker resolves the selected ID to its history page and rejects missing IDs. Native selection no longer falls back to another entry; the existing panel retargets, and newer link intent is retained during loading. Targeted native tests, desktop protocol coverage, and before/after native diagnostics support the correction. No attributable material regression found in the scoped follow-up.",
+      "locations": ["native/Sources/Heav3nsCode/CheckpointWindow.swift:55", "native/Sources/Heav3nsCode/CheckpointWindow.swift:67", "native/Sources/Heav3nsCode/WorkspaceWindow.swift:479"],
+      "evidence": "A new panel always requests offset zero and falls back to row zero when the requested selectedID is outside the latest 100 entries. An already-visible panel is merely focused and ignores the newly requested ID. Both routes can leave a different version selected after the user clicks a message checkpoint link.",
+      "correction": "Resolve and select the requested ID even across history pages and in an existing panel. If unavailable, report that explicitly and keep restore disabled instead of silently selecting another checkpoint. Verify both a link older than 100 entries and a second link while the history panel is open."
+    }
+  ],
+  "scopeAndUnverified": [
+    "Read-only visual and targeted-source review; implementation not modified.",
+    "Compact configuration evidence gap resolved: opened run-save-visible-compact.png showing the reachable Save Command and run-saved-compact.png showing the saved custom command. Follow-up also opened refreshed checkpoints-wide and both restore-review captures; original pass opened all eight required captures.",
+    "Manual VoiceOver, physical keyboard/IME, focus order, large-content stress, measured contrast, production provider behavior, all runner frameworks, long sessions and release certification remain unverified."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/pods-1790810616225",
+  "kind": "Raw native captures, real independent workers with scripted activity and approval",
+  "providerInvoked": false,
+  "compact": "Next Request navigates to waiting Mobile pod",
+  "hashes": {
+    "native/Sources/Heav3nsCode/PodsWindow.swift": "4a4fdc65858e60b5f7980decbe8a1e8ae5248e1838e71d041e1507000ffa0131",
+    "native/Sources/Heav3nsCode/PodLiveView.swift": "1080860189cf18b2a42bd6a1a4ee8aa70e9c72f06f596160b2bff0f6f86e9b31",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "19cf5433dc690a8ffa3cfdc9f16cb76dfdbf1482ecbe145d6f8c53659aa1c12c",
+    "native/Sources/Heav3nsCode/App.swift": "f550c4400f2d78f12da04f41858da8bbb71c85f3174aa5f0762d23a9b14f8190",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "c4a8bd3c4bf72c9f828ba67af2ee76bd7557398c64e9f4b458b13f231f475b01"
+  },
+  "reviewerFix": "Arguments first in inline approval details",
+  "validation": {
+    "nativeTests": 66,
+    "postFixFocusedTests": 3,
+    "typescript": "passed",
+    "fixtureLint": "passed",
+    "signature": "passed",
+    "threeProjectFixture": "passed",
+    "reviewerVerdict": "ship; listed approval arguments finding resolved"
+  }
+}

@@ -22,6 +22,9 @@ private struct TranscriptRow: Equatable {
     let title: String
     let text: String
     let activity: Bool
+    var user = false
+    var checkpoint: String?
+    var evidence: String?
 }
 
 private final class TranscriptScrollView: NSScrollView {
@@ -62,7 +65,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let chatTitle = JourneyStyle.label("New conversation", size: 21, weight: .semibold)
     private let chatState = JourneyStyle.label("Tell LUMI what you want to build.", size: 12, secondary: true)
     private let contextPanel = NSStackView()
-    private let contextTabs = NSSegmentedControl(labels: ["Walkthrough", "Changes", "Code"], trackingMode: .selectOne, target: nil, action: nil)
+    private let contextTabs = NSSegmentedControl(labels: ["Walkthrough", "Changes", "Code", "Run"], trackingMode: .selectOne, target: nil, action: nil)
+    private let projectRun = ProjectRunView()
+    private let projectRunScroll = NSScrollView()
+    private var checkpointWindow: CheckpointWindow?
+    private let checkpointsButton = NSButton(title: "Checkpoints", target: nil, action: nil)
     private let walkthrough = WalkthroughView()
     private var walkthroughLoaded: String?
     private var walkthroughLoadGeneration = 0
@@ -183,6 +190,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private func configureClient() {
         client.onConnection = { [weak self] value in
             guard let self else { return }; self.connection = value; self.updateStatus(); self.walkthroughLoaded = nil; self.updateWalkthrough()
+            self.projectRun.connect(self.client)
             if self.client.isReady {
                 self.reconnectButton.isHidden = true
                 if self.recovering && self.uncertainSubmission == nil { self.showNotice("Reconnected. Recorded history is restored; no work was restarted.") }
@@ -208,6 +216,32 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if self.closing { self.window?.close() }
             else { self.updateStatus() }
         }
+    }
+    func configurePods(_ show: @escaping () -> Void) { conversations.onPods = { [weak self] in guard let self, self.saveDraft() else { return }; show() } }
+    var podSnapshot: PodSnapshot {
+        let run = runs.first { $0["id"] as? String == active } ?? runs.last
+        let queued = runs.filter { $0["state"] as? String == "queued" }.count
+        let review = currentApproval != nil
+        let runState = run?["state"] as? String ?? ""
+        let activities = run?["activities"] as? [[String: Any]] ?? []
+        let disconnected = connection == "Preparing" || connection == "Connecting to LUMI…" ? "Connecting" : "Disconnected"
+        let terminalLabel = ["failed": "Failed", "interrupted": "Interrupted", "completed": "Completed", "cancelled": "Stopped", "timed_out": "Timed out"][runState] ?? "Idle"
+        let label = !client.isReady ? disconnected : switchingConversation ? "Opening thread" : cancelRequested ? "Stopping" : uncertainSubmission != nil ? "Check connection" : decidingApproval != nil ? "Saving decision" : review ? "Needs review" : pendingRequest != nil ? "Submitting" : hasWork ? "Working" : terminalLabel
+        return PodSnapshot(path: folder.path, thread: chatTitle.stringValue, status: label,
+            activity: !client.isReady ? "Open thread to reconnect" : (run?["activities"] as? [[String: Any]])?.last?["message"] as? String ?? (hasWork ? "Agent is working" : "Ready for another instruction"),
+            instruction: String((run?["text"] as? String ?? "").prefix(220)), response: String((run?["response"] as? String ?? "").prefix(300)),
+            queued: queued, running: client.isReady && hasWork && !review, needsReview: review,
+            canStop: client.isReady && hasWork && !cancelRequested && !closing,
+            stream: PodStreamProjection.text(run), streamIdentity: "\(currentConversation):\(run?["id"] as? String ?? "")",
+            approval: currentApproval, canDecide: client.isReady && decidingApproval == nil && !cancelRequested && !closing && !switchingConversation,
+            decisionPending: decidingApproval != nil, approvalError: approvalFailure,
+            connected: client.isReady, startedAt: run?["startedAt"] as? Double,
+            finishedAt: terminalStates.contains(runState) ? run?["updatedAt"] as? Double : nil,
+            lastActivityAt: activities.compactMap { $0["timestamp"] as? Double }.max(),
+            approvalRequestedAt: review ? (run?["approval"] as? [String: Any])?["createdAt"] as? Double : nil,
+            activityCount: max(run?["activityCount"] as? Int ?? 0, activities.count),
+            canReconnect: !client.isReady && client.process?.isRunning != true && !closing,
+            canOpenCheckpoints: client.isReady && client.capabilities.contains("checkpoints-v1") && !switchingConversation && !closing && window?.attachedSheet == nil)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func attach() { client.start(folder: folder); window?.makeFirstResponder(composer) }
@@ -237,6 +271,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         window?.toolbar = toolbar; window?.toolbarStyle = .unified
         navigation.useAsContextBrowser()
         conversations.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        conversations.onDelete = { [weak self] id in self?.confirmDeleteConversation(id) }
         conversations.onNew = { [weak self] in self?.newConversation() }
         conversations.onSelect = { [weak self] id in self?.selectConversation(id) }
         conversations.onProjects = { [weak self] in self?.onProjects?() }
@@ -271,8 +306,6 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
 
         inspector.orientation = .vertical; inspector.alignment = .leading; inspector.spacing = 10
         inspectorTitle.font = .systemFont(ofSize: 13, weight: .semibold)
-        let closeInspect = button("", #selector(closeInspection), symbol: "xmark")
-        closeInspect.imagePosition = .imageOnly; closeInspect.toolTip = "Close inspector"; closeInspect.setAccessibilityLabel("Close inspector")
         inspectorTitle.lineBreakMode = .byTruncatingMiddle
         inspectorTitle.setContentHuggingPriority(.init(100), for: .horizontal)
         inspectorTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -291,7 +324,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             control.setContentHuggingPriority(.required, for: .horizontal)
         }
         inspectionBack.isEnabled = false; inspectionForward.isEnabled = false
-        let inspectorBar = stack([inspectionBack, inspectionForward, inspectorTitle, inspectionFind, refreshInspect, closeInspect], spacing: 4)
+        let inspectorBar = stack([inspectionBack, inspectionForward, inspectorTitle, inspectionFind, refreshInspect], spacing: 4)
         inspector.addArrangedSubview(inspectorBar)
         inspectorBar.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
         breadcrumb.pathStyle = .standard; breadcrumb.isEditable = false; breadcrumb.target = self; breadcrumb.action = #selector(openBreadcrumb)
@@ -331,12 +364,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         transcriptScroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 270).isActive = true
 
         surfaces.selectedSegment = 0; surfaces.target = self; surfaces.action = #selector(switchSurface); surfaces.isHidden = true
-        let work = stack([transcriptScroll], spacing: 0)
-        work.alignment = .top
-        work.addSubview(jumpButton); jumpButton.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([jumpButton.trailingAnchor.constraint(equalTo: transcriptScroll.trailingAnchor, constant: -10), jumpButton.bottomAnchor.constraint(equalTo: transcriptScroll.bottomAnchor, constant: -8)])
-        transcriptScroll.heightAnchor.constraint(equalTo: work.heightAnchor).isActive = true
+        // Reserve a stable navigation row so the jump control never covers a reply
+        // or changes the reading position when it appears.
+        let transcriptNavigation = stack([NSView(), jumpButton], spacing: 8)
+        transcriptNavigation.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        let work = stack([transcriptScroll, transcriptNavigation], vertical: true, spacing: 0)
         transcriptScroll.widthAnchor.constraint(equalTo: work.widthAnchor).isActive = true
+        transcriptNavigation.widthAnchor.constraint(equalTo: work.widthAnchor).isActive = true
 
         approval.orientation = .vertical; approval.alignment = .leading; approval.spacing = 6; approval.isHidden = true
         let approvalTitle = NSTextField(labelWithString: "Approval required")
@@ -392,14 +426,19 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         composerScroll.widthAnchor.constraint(equalTo: composerGroup.widthAnchor).isActive = true
         composerBar.widthAnchor.constraint(equalTo: composerGroup.widthAnchor).isActive = true
         chatTitle.maximumNumberOfLines = 1; chatTitle.lineBreakMode = .byTruncatingTail
-        let header = stack([chatTitle, chatState], vertical: true, spacing: 5)
+        checkpointsButton.target = self; checkpointsButton.action = #selector(showCheckpoints); checkpointsButton.bezelStyle = .rounded
+        checkpointsButton.image = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil); checkpointsButton.imagePosition = .imageLeading
+        checkpointsButton.toolTip = "Restore project files before or after a message"
+        let titleLine = stack([chatTitle, checkpointsButton], spacing: 8)
+        chatTitle.setContentHuggingPriority(.init(1), for: .horizontal); checkpointsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let header = stack([titleLine, chatState], vertical: true, spacing: 5)
         let rule = JourneyStyle.rule()
         let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, hint], vertical: true, spacing: 10)
         center.setContentHuggingPriority(.init(1), for: .horizontal)
         work.setContentHuggingPriority(.init(1), for: .vertical)
         center.edgeInsets = NSEdgeInsets(top: 20, left: 22, bottom: 16, right: 22)
         for view in [header, rule, work, approval, noticeBar, composerSurface, hint] { view.widthAnchor.constraint(equalTo: center.widthAnchor, constant: -44).isActive = true }
-        chatTitle.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
+        titleLine.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
         chatState.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
         work.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
         buildContextPanel()
@@ -430,7 +469,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         openFileButton.toolTip = "Open a workspace file by name or path (⌘P)"
         let heading = stack([title, NSView(), openFileButton])
         contextTabs.target = self; contextTabs.action = #selector(changeContext); contextTabs.selectedSegment = 0
-        contextTabs.setAccessibilityLabel("Task context: Walkthrough, Changes or Code")
+        contextTabs.setAccessibilityLabel("Task context: Walkthrough, Changes, Code or Run")
         browseContext.target = self; browseContext.action = #selector(toggleContextBrowser); browseContext.bezelStyle = .rounded
         walkthrough.onSelection = { [weak self] _ in self?.loadWalkthrough() }
         walkthrough.onOpenFile = { [weak self] path in self?.readFile(path) }
@@ -439,7 +478,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         walkthrough.onReview = { [weak self] in self?.showApprovalReview() }
         walkthrough.onRetryLoad = { [weak self] in self?.walkthroughLoaded = nil; self?.loadWalkthrough() }
         let rule = JourneyStyle.rule()
-        [heading, contextTabs, rule, browseContext, walkthrough, navigation, inspector].forEach(contextPanel.addArrangedSubview)
+        projectRun.onState = { [weak self] in self?.checkpointWindow?.refreshAvailability() }
+        projectRunScroll.documentView = projectRun; projectRunScroll.hasVerticalScroller = true; projectRunScroll.drawsBackground = false
+        projectRun.widthAnchor.constraint(equalTo: projectRunScroll.contentView.widthAnchor).isActive = true
+        projectRun.heightAnchor.constraint(greaterThanOrEqualTo: projectRunScroll.contentView.heightAnchor).isActive = true
+        let fittingHeight = projectRun.heightAnchor.constraint(equalTo: projectRunScroll.contentView.heightAnchor); fittingHeight.priority = .defaultLow; fittingHeight.isActive = true
+        projectRunScroll.setContentHuggingPriority(.init(1), for: .vertical)
+        [heading, contextTabs, rule, browseContext, walkthrough, navigation, inspector, projectRunScroll].forEach(contextPanel.addArrangedSubview)
         for view in contextPanel.arrangedSubviews { view.widthAnchor.constraint(equalTo: contextPanel.widthAnchor, constant: -28).isActive = true }
         browserHeight = navigation.heightAnchor.constraint(equalToConstant: 236); browserHeight?.isActive = true
         walkthrough.setContentHuggingPriority(.init(1), for: .vertical)
@@ -452,7 +497,38 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         adapt()
     }
     @objc private func toggleContextBrowser() { browsingCompact.toggle(); adapt() }
-    @objc func showWalkthrough() { contextTabs.selectedSegment = 0; showingInspector = true; surfaces.selectedSegment = 1; adapt() }
+    @objc func showWalkthrough() { contextTabs.selectedSegment = 0; showingInspector = true; surfaces.selectedSegment = 1; switchSurface() }
+    @objc func showProjectRun() { contextTabs.selectedSegment = 3; showingInspector = true; surfaces.selectedSegment = 1; switchSurface() }
+    @objc func showCheckpoints() { openCheckpoints(selected: nil) }
+    private func openCheckpoints(selected: String?) {
+        guard client.isReady, client.capabilities.contains("checkpoints-v1"), !switchingConversation, let window, window.attachedSheet == nil else { return }
+        quickOpen?.dismiss(restoreFocus: false)
+        if let existing = checkpointWindow, existing.window?.isVisible == true { if let selected { existing.selectCheckpoint(selected) }; existing.window?.makeKeyAndOrderFront(nil); return }
+        checkpointWindow = CheckpointWindow(request: { [weak self] method, params, complete in self?.client.request(method, params: params, completion: complete) }, selected: selected, canRestore: { [weak self] in
+            guard let self else { return false }; return self.canSwitchConversation && !self.projectRun.running
+        }, restore: { [weak self] id, token, complete in self?.restoreCheckpoint(id, token: token, complete: complete) })
+        checkpointWindow?.present(for: window)
+    }
+    private func restoreCheckpoint(_ id: String, token: String, complete: @escaping (Result<Void, Error>) -> Void) {
+        guard canSwitchConversation, saveDraft() else { complete(.failure(BridgeError.message("Finish or stop LUMI before restoring. Your draft is preserved."))); return }
+        switchingConversation = true; expectedConversation = nil
+        navigationGeneration += 1; inspectionGeneration += 1; conversationGeneration += 1; walkthroughLoadGeneration += 1; updateStatus()
+        client.request("checkpoint.restore", params: ["id": id, "token": token]) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error): self.switchingConversation = false; self.expectedConversation = nil; self.updateStatus(); complete(.failure(error))
+            case .success(let data):
+                self.expectedConversation = data["conversation"] as? String
+                self.client.requestSnapshot(afterPending: true) { [weak self] in
+                    guard let self else { return }
+                    guard self.currentConversation == self.expectedConversation else { self.client.closeInput(); complete(.failure(BridgeError.message("Restore could not be confirmed. Reconnect before sending."))); return }
+                    self.switchingConversation = false; self.expectedConversation = nil
+                    self.showNotice(data["message"] as? String ?? "Restored in a new conversation."); self.loadConversations(); self.refreshNavigation(); self.updateStatus(); complete(.success(())); self.focusComposer()
+                }
+            }
+        }
+    }
+    @objc private func messageCheckpoint(_ sender: NSButton) { openCheckpoints(selected: sender.identifier?.rawValue) }
     private func updateWalkthrough() {
         walkthrough.update(runs: runs, connected: client.isReady)
         updateWalkthroughVisibility()
@@ -509,27 +585,51 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func renderConversations() {
+        conversations.supportsDeletion = client.capabilities.contains("conversation-delete-v1")
         conversations.show(conversationList, selected: currentConversation, canSwitch: canSwitchConversation, more: moreConversations, earlierPage: conversationOffset > 0)
         chatTitle.stringValue = conversationList.first(where: { $0.id == currentConversation })?.title ?? runs.first?["text"] as? String ?? "New conversation"
     }
     @objc func newConversation() { switchConversation(nil) }
     private func selectConversation(_ id: String) { switchConversation(id) }
-    private func switchConversation(_ id: String?) {
+    private func confirmDeleteConversation(_ id: String) {
+        guard canSwitchConversation, client.capabilities.contains("conversation-delete-v1"),
+              let item = conversationList.first(where: { $0.id == id }), let window, window.attachedSheet == nil else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete conversation?"
+        alert.informativeText = "“\(item.title)” will be removed from the sidebar and its draft discarded. Project files and saved checkpoints are kept.\n\n" + (id == currentConversation ? "A new conversation will open." : "Your current conversation will stay open.")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Delete Conversation").hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertSecondButtonReturn else { return }
+            self?.switchConversation(id, deleting: true)
+        }
+    }
+    private func switchConversation(_ id: String?, deleting: Bool = false) {
         guard canSwitchConversation, saveDraft() else { return }
         switchingConversation = true; expectedConversation = nil
         navigationGeneration += 1; inspectionGeneration += 1; conversationGeneration += 1
         walkthroughLoadGeneration += 1; quickOpen?.dismiss()
         updateStatus()
-        client.request(id == nil ? "conversation.create" : "conversation.select", params: id.map { ["id": $0] } ?? [:]) { [weak self] result in
+        client.request(deleting ? "conversation.delete" : (id == nil ? "conversation.create" : "conversation.select"), params: id.map { ["id": $0] } ?? [:]) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let data):
+                if deleting, let id {
+                    self.draftByConversation.removeValue(forKey: id)
+                    if self.currentConversation == id { self.composer.string = "" }
+                    self.savedDraftText = "\u{0}"
+                }
                 self.expectedConversation = data["conversation"] as? String
                 self.client.requestSnapshot(afterPending: true) { [weak self] in
                     guard let self else { return }
                     guard self.currentConversation == self.expectedConversation else {
                         self.showNotice("The conversation could not be confirmed. Reconnect before sending.")
                         self.client.closeInput(); return
+                    }
+                    if deleting, let id {
+                        self.draftByConversation.removeValue(forKey: id)
+                        self.savedDraftText = "\u{0}"
+                        if self.saveDraft() { self.showNotice("Conversation deleted. Project files and checkpoints are kept.") }
                     }
                     self.switchingConversation = false; self.expectedConversation = nil
                     self.loadConversations(); self.refreshNavigation(); self.updateStatus()
@@ -576,12 +676,16 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
 
     // The toolbar stays in native window chrome. Stop never enters overflow.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("navigation"), .flexibleSpace, .init("state"), .init("stop"), .init("actions")]
+        [.init("navigation"), .flexibleSpace, .init("project"), .init("state"), .init("stop"), .init("actions")]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier.rawValue {
+        case "project":
+            item.label = "Run Project"; item.toolTip = "Run Project (⌘R)"
+            item.image = NSImage(systemSymbolName: "play.circle", accessibilityDescription: "Run Project")
+            item.target = self; item.action = #selector(showProjectRun)
         case "navigation":
             item.label = "Navigation"; item.toolTip = "Toggle Navigation (⌘B)"
             item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Toggle Navigation")
@@ -589,7 +693,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "state":
             item.label = "Runtime State"; item.view = status
             status.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
-        case "stop": item.label = "Stop All Work"; item.view = stopButton; item.visibilityPriority = .user
+        case "stop": item.label = "Stop LUMI"; item.view = stopButton; item.visibilityPriority = .user
         case "actions":
             item.label = "Actions"; item.toolTip = "Workspace Actions (⌘⇧P)"
             item.image = NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: "Workspace Actions")
@@ -612,6 +716,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             WorkspaceAction(title: "Refresh Current Destination", shortcut: "") { [weak self] in self?.refreshNavigation() }
         ]
         if canOpenFile { actions.insert(WorkspaceAction(title: "Open File…", shortcut: "⌘P") { [weak self] in self?.showQuickOpen() }, at: 1) }
+        if client.capabilities.contains("project-run-v1") { actions.insert(WorkspaceAction(title: "Run Project", shortcut: "⌘R") { [weak self] in self?.showProjectRun() }, at: 1) }
+        if client.capabilities.contains("checkpoints-v1") { actions.insert(WorkspaceAction(title: "Checkpoints", shortcut: "⌘7") { [weak self] in self?.showCheckpoints() }, at: 1) }
         if canSwitchConversation { actions.insert(WorkspaceAction(title: "New Conversation", shortcut: "⌘N") { [weak self] in self?.newConversation() }, at: 1) }
         if hasWork { actions.insert(WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
         if canReviewApproval { actions.insert(WorkspaceAction(title: "Review Request…", shortcut: "⌘5") { [weak self] in self?.showApprovalReview() }, at: 1) }
@@ -632,6 +738,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc func focusComposer() {
         quickOpen?.dismiss(restoreFocus: false)
+        checkpointWindow?.close()
         surfaces.selectedSegment = 0; adapt()
         window?.makeKeyAndOrderFront(nil); window?.makeFirstResponder(composer)
     }
@@ -727,7 +834,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             self.updateStatus()
         }
     }
-    @objc private func reconnect() {
+    @objc func reconnect() {
         guard client.process?.isRunning != true, !closing else { return }
         client = RuntimeClient(); stopped = false; sequence = 0; cancelRequested = false; stopAcknowledged = true; cancellationToken = nil; forceAvailable = false; recovering = true
         configureClient(); reconnectButton.isHidden = true; client.start(folder: folder)
@@ -749,11 +856,38 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "files": showFiles(); readFile("fixture.txt")
         case "code", "compact-code": showFiles(); readFile("WorkspaceExample.swift")
         case "walkthrough": showWalkthrough()
+        case "checkpoints": showCheckpoints()
+        case "checkpoints-compact", "checkpoints-after-restore": showCheckpoints()
+        case "checkpoint-review", "checkpoint-review-compact": checkpointWindow?.navigateProbe("review")
+        case "checkpoint-flag": checkpointWindow?.navigateProbe("flag")
+        case "checkpoint-safety": checkpointWindow?.navigateProbe("safety")
+        case "checkpoint-flagged": checkpointWindow?.navigateProbe("flagged")
+        case "checkpoint-search": checkpointWindow?.navigateProbe("search:Make my app")
+        case "checkpoint-search-empty": checkpointWindow?.navigateProbe("search:no-such-message")
+        case "checkpoint-all": checkpointWindow?.navigateProbe("search:"); checkpointWindow?.navigateProbe("all")
+        case "checkpoint-restore": checkpointWindow?.navigateProbe("restore")
+        case "checkpoint-close": checkpointWindow?.navigateProbe("close"); focusComposer()
+        case "checkpoint-link-before": if let id = runs.last?["checkpointBefore"] as? String { openCheckpoints(selected: id) }
+        case "checkpoint-link-after": if let id = runs.last?["checkpointAfter"] as? String { openCheckpoints(selected: id) }
+        case "project": showProjectRun()
+        case "project-start": projectRun.navigateProbe("start")
+        case "project-stop": projectRun.navigateProbe("stop")
+        case "project-configure": projectRun.navigateProbe("configure")
+        case "project-draft": projectRun.navigateProbe("draft")
+        case "project-refresh": projectRun.navigateProbe("refresh")
+        case "project-configure-scroll": projectRun.navigateProbe("configuration-end")
+        case "project-configure-save": projectRun.navigateProbe("save")
         case "quick-open": showQuickOpen()
         case "quick-open-select", "quick-open-select-compact": quickOpen?.openSelectedProbe()
         case "quick-open-close": quickOpen?.dismiss()
         case "quick-open-focus": focusComposer()
         case "conversation": focusComposer()
+        case "conversation-new": newConversation()
+        case "conversation-sidebar": toggleNavigation()
+        case "task-context": surfaces.selectedSegment = 1; switchSurface()
+        case "conversation-delete-sheet", "conversation-delete-sheet-compact": if let id = currentConversation { confirmDeleteConversation(id) }
+        case "conversation-delete-cancel", "conversation-delete-cancel-compact": if let sheet = window?.attachedSheet { window?.endSheet(sheet, returnCode: NSApplication.ModalResponse.alertFirstButtonReturn) }
+        case "conversation-delete-confirm": if let sheet = window?.attachedSheet { window?.endSheet(sheet, returnCode: NSApplication.ModalResponse.alertSecondButtonReturn) }
         case "new-conversation": newConversation()
         case "previous-conversation": if let id = conversationList.last?.id { selectConversation(id) }
         case "draft", "draft-light": composer.string = "Keep the conversation in focus as you refine the sidebar."; updateStatus()
@@ -798,13 +932,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
+        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["quickOpen": quickOpen?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
+        return ["selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
@@ -867,7 +1001,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         for run in runs {
             guard let id = run["id"] as? String else { continue }
             let state = run["state"] as? String ?? "unknown"
-            next.append(TranscriptRow(id: "\(id)-user", title: "You · \(state.replacingOccurrences(of: "_", with: " ").capitalized)", text: run["text"] as? String ?? "", activity: false))
+            next.append(TranscriptRow(id: "\(id)-user", title: state == "queued" ? "You · Queued" : "You", text: run["text"] as? String ?? "", activity: false, user: true, checkpoint: run["checkpointBefore"] as? String))
             let activities = run["activities"] as? [[String: Any]] ?? []
             let summaryID = "\(id)-activity"
             if !activities.isEmpty {
@@ -882,8 +1016,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             }
             if let response = run["response"] as? String {
                 let evidence = run["outputLimited"] as? Bool == true ? "Evidence incomplete" : run["verification"] as? String == "evidence_available" ? "Tool results recorded" : "Checks not run"
-                next.append(TranscriptRow(id: "\(id)-result", title: "LUMI · \(state.capitalized) · \(evidence) · Not reviewed", text: response, activity: false))
+                next.append(TranscriptRow(id: "\(id)-result", title: "LUMI · \(state.capitalized)", text: response, activity: false, checkpoint: run["checkpointAfter"] as? String, evidence: "\(evidence) · Not reviewed"))
             }
+            if let error = run["checkpointError"] as? String { next.append(TranscriptRow(id: "\(id)-checkpoint-error", title: "Checkpoint unavailable", text: error, activity: false)) }
             if !terminalStates.contains(state), state != "queued" { active = id }
             if state == "awaiting_approval", let a = run["approval"] as? [String: Any], a["decision"] == nil, let operation = a["operation"] as? String {
                 currentApproval = ApprovalRequest(run: id, operation: operation, tool: a["tool"] as? String ?? "Operation", scope: a["scope"] as? String ?? folder.path, reason: a["reason"] as? String ?? "", arguments: a["args"] as? String ?? "")
@@ -919,6 +1054,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func updateStatus() {
+        checkpointsButton.isEnabled = client.isReady && client.capabilities.contains("checkpoints-v1") && !switchingConversation
+        checkpointWindow?.refreshAvailability()
         composer.needsDisplay = true
         composer.isEditable = !switchingConversation
         openFileButton.isEnabled = canOpenFile
@@ -1071,8 +1208,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         approvalReview?.present(for: window); updateApproval()
     }
     @objc private func deny() { if let request = currentApproval { resolveApproval(request, decision: "deny") } }
-    private func resolveApproval(_ approval: ApprovalRequest, decision: String) {
-        guard currentApproval?.identity == approval.identity, client.isReady, decidingApproval == nil, !cancelRequested, !closing else { return }
+    func resolveApproval(_ approval: ApprovalRequest, decision: String) {
+        guard ["allow", "deny"].contains(decision), currentApproval == approval, client.isReady, decidingApproval == nil, !cancelRequested, !closing, !switchingConversation else { return }
         decidingApproval = approval.identity; approvalFailure = nil; updateStatus()
         client.request("approval.resolve", params: ["operation": approval.operation, "run": approval.run, "decision": decision]) { [weak self] result in
             guard let self else { return }
@@ -1085,7 +1222,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc private func jumpLatest() { if !rows.isEmpty { transcript.scrollRowToVisible(rows.count - 1) }; jumpButton.isHidden = true }
     @objc func toggleNavigation() {
-        if (window?.frame.width ?? 1280) < 1000 { compactSidebarRevealed.toggle() } else { sidebarPreferred.toggle() }
+        if (window?.frame.width ?? 1280) < 1000 {
+            compactSidebarRevealed.toggle()
+            if compactSidebarRevealed { surfaces.selectedSegment = 0 }
+        } else { sidebarPreferred.toggle() }
         adapt()
     }
     @objc func showFiles() { contextTabs.selectedSegment = 2; navigation.select(.files) }
@@ -1330,8 +1470,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         guard url.path == folder.path || url.path.hasPrefix(folder.path + "/"), url != breadcrumb.url else { return }
         navigation.select(.files, notify: false); navigate(.files); loadDirectory(relative)
     }
-    @objc private func closeInspection() { inspectionGeneration += 1; showingInspector = false; surfaces.selectedSegment = 0; adapt() }
-    @objc private func switchSurface() { adapt() }
+    @objc private func switchSurface() {
+        if surfaces.selectedSegment == 1, (window?.frame.width ?? 1280) < 1000 {
+            compactSidebarRevealed = false; showingInspector = true
+        }
+        adapt()
+    }
     private func adapt() {
         let narrow = (window?.frame.width ?? 1280) < 1000
         let short = (window?.frame.height ?? 800) < 640
@@ -1342,12 +1486,14 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         contextSeparator.isHidden = contextPanel.isHidden
         contextWidth?.constant = narrow ? 300 : min(400, max(330, (window?.frame.width ?? 1280) * 0.27))
         browserHeight?.isActive = !short
-        browseContext.isHidden = !short || contextTabs.selectedSegment == 0
+        browseContext.isHidden = !short || ![1, 2].contains(contextTabs.selectedSegment)
         browseContext.title = browsingCompact ? "Back to preview" : (contextTabs.selectedSegment == 1 ? "Browse changed files" : "Browse files")
-        navigation.isHidden = contextTabs.selectedSegment == 0 || (short && !browsingCompact)
+        navigation.isHidden = ![1, 2].contains(contextTabs.selectedSegment) || (short && !browsingCompact)
         walkthrough.isHidden = contextTabs.selectedSegment != 0
         walkthrough.setCompact(short)
-        inspector.isHidden = contextTabs.selectedSegment == 0 || (short && browsingCompact)
+        inspector.isHidden = ![1, 2].contains(contextTabs.selectedSegment) || (short && browsingCompact)
+        projectRunScroll.isHidden = contextTabs.selectedSegment != 3
+        projectRun.setVisible(!contextPanel.isHidden && !projectRunScroll.isHidden)
         transcriptScroll.isHidden = false
         updateWalkthroughVisibility()
         if transcriptScroll.isHidden { jumpButton.isHidden = true }
@@ -1392,11 +1538,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         guard rows.indices.contains(row) else { return 40 }
         let value = rows[row]
-        let width = max(224, tableView.bounds.width - 36)
-        let titleHeight = (value.title as NSString).boundingRect(with: NSSize(width: width - (value.activity ? 25 : 0), height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)]).height
+        let width = messageWidth(tableView.bounds.width, user: value.user) - 24
+        let titleHeight = (value.title as NSString).boundingRect(with: NSSize(width: width - 25, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)]).height
+        let evidenceHeight = value.evidence.map { ($0 as NSString).boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: NSFont.systemFont(ofSize: 12)]).height + 5 } ?? 0
         let bodyHeight = (value.text as NSString).boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: NSFont.systemFont(ofSize: value.activity ? 12 : 14)]).height
-        return max(36, ceil(titleHeight + bodyHeight) + (value.text.isEmpty ? 18 : 28))
+        return max(46, ceil(max(20, titleHeight) + evidenceHeight + bodyHeight) + (value.text.isEmpty ? 28 : 34) + (value.checkpoint == nil ? 0 : 28))
     }
+    private func messageWidth(_ width: CGFloat, user: Bool) -> CGFloat { max(120, min(760, width - 24, user ? width * 0.86 : width)) }
     @objc private func toggleActivity(_ sender: NSButton) {
         guard let id = sender.identifier?.rawValue else { return }
         if expandedActions.contains(id) { expandedActions.remove(id) } else { expandedActions.insert(id) }
@@ -1409,7 +1557,14 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         title.font = .systemFont(ofSize: 12, weight: .semibold); title.textColor = value.activity ? .secondaryLabelColor : .labelColor
         let text = NSTextField(wrappingLabelWithString: value.text); text.isSelectable = true
         text.font = .systemFont(ofSize: value.activity ? 12 : 14); text.textColor = value.activity ? .secondaryLabelColor : .labelColor
-        var views: [NSView] = [title]
+        let icon = NSImageView(image: NSImage(systemSymbolName: value.user ? "person.crop.circle.fill" : "sparkles", accessibilityDescription: nil)!)
+        icon.contentTintColor = value.user ? .controlAccentColor : .secondaryLabelColor
+        icon.widthAnchor.constraint(equalToConstant: 16).isActive = true; icon.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        let role = stack([icon, title], spacing: 6)
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        role.alignment = .top
+        var views: [NSView] = [role]
         if value.activity {
             let disclosure = NSButton(image: NSImage(systemSymbolName: expandedActions.contains(value.id) ? "chevron.down" : "chevron.right", accessibilityDescription: "Toggle activity detail")!, target: self, action: #selector(toggleActivity))
             disclosure.bezelStyle = .inline; disclosure.isBordered = false; disclosure.identifier = .init(value.id); disclosure.setAccessibilityLabel("\(expandedActions.contains(value.id) ? "Collapse" : "Expand") \(value.title)")
@@ -1419,11 +1574,34 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             title.setContentHuggingPriority(.defaultLow, for: .horizontal)
             title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         }
+        if let evidence = value.evidence {
+            let label = JourneyStyle.label(evidence, size: 12, secondary: true)
+            label.setAccessibilityLabel(evidence); views.append(label)
+        }
         if !value.text.isEmpty { views.append(text) }
+        if let checkpoint = value.checkpoint {
+            let button = NSButton(title: value.user ? "Checkpoint before message" : "Checkpoint after reply", target: self, action: #selector(messageCheckpoint))
+            button.identifier = .init(checkpoint); button.bezelStyle = .inline; button.controlSize = .small
+            button.image = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil); button.imagePosition = .imageLeading
+            button.toolTip = "Review and restore project files at this point"
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            views.append(button)
+        }
         let content = stack(views, vertical: true, spacing: 5)
-        cell.addSubview(content)
-        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 16), content.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -16), content.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8)])
-        for view in views { view.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
+        let surface = NSBox(); surface.boxType = .custom; surface.borderType = .noBorder; surface.titlePosition = .noTitle; surface.cornerRadius = value.user ? 12 : 0
+        surface.fillColor = value.user ? NSColor.controlAccentColor.withAlphaComponent(0.10) : .clear
+        surface.contentViewMargins = .zero; surface.translatesAutoresizingMaskIntoConstraints = false
+        let inside = NSView(); surface.contentView = inside; inside.addSubview(content)
+        JourneyStyle.pin(content, to: inside, inset: 12)
+        cell.addSubview(surface)
+        let preferredWidth = surface.widthAnchor.constraint(equalTo: cell.widthAnchor, multiplier: value.user ? 0.86 : 1); preferredWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([preferredWidth, surface.widthAnchor.constraint(lessThanOrEqualTo: cell.widthAnchor, constant: -24), surface.widthAnchor.constraint(lessThanOrEqualToConstant: 760), surface.topAnchor.constraint(equalTo: cell.topAnchor, constant: 2), surface.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -2)])
+        if value.user { surface.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12).isActive = true } else { surface.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 12).isActive = true }
+        cell.setAccessibilityLabel(value.user ? "Your message" : value.activity ? "LUMI activity" : "LUMI response")
+        for view in views {
+            if view is NSButton { view.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor).isActive = true }
+            else { view.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
+        }
         return cell
     }
 }

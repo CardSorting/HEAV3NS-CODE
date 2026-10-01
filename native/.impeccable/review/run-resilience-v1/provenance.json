@@ -1,0 +1,35 @@
+{
+  "kind": "Raw native window captures; scripted engine through production worker/client; real local app process",
+  "source": "/Users/bozoegg/Desktop/LUMI-NEW/build/desktop-walkthrough-1790804190196/project",
+  "captures": [
+    "run-wide",
+    "run-compact",
+    "draft-after-refresh-compact",
+    "save-visible-compact",
+    "saved-compact"
+  ],
+  "providerInvoked": false,
+  "tests": {
+    "native": 58,
+    "desktop": 68,
+    "typescript": "passed",
+    "changedFileLint": "passed",
+    "uiFlow": "passed",
+    "packagedRuntime": "passed"
+  },
+  "hashes": {
+    "native/Sources/Heav3nsCode/ProjectRunView.swift": "03975d375bac0157cf563b182c36f567c2581ac2fe4837618ad5c3b0357545b5",
+    "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "89b2b13f952951c90a6d49c8c9eb8fb4a989c0945de6561a1668f4985833da01",
+    "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "0bad9f9a57bab84793e2554bc7532d57c56da0fabfafa1f0817354d18f1c285b",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "31eba05be743b890dca2b1ed73e2f4b623e230a596469b1732b0b88b2e9763b0"
+  },
+  "unverified": [
+    "Manual VoiceOver and physical keyboard/IME",
+    "Production provider execution",
+    "All framework runners",
+    "Notarized release",
+    "Draft persistence after closing the workspace (not implemented)"
+  ],
+  "correction": "Separate agent review evidence from the role/completion line; move Jump to Latest into a stable navigation row below the transcript. Native geometry assertion verifies no overlap.",
+  "beforeCapture": "run-compact-before.png from build/desktop-walkthrough-1790803996494/project/ui-project-compact.png"
+}

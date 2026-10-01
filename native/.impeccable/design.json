@@ -1,15 +1,46 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T20:05:07+00:00",
-  "sourceHash": "a9e77026b5bef820287f56141bd218e9a7dc1e76bafabc0ae7384bf4f7879169",
+  "generatedAt": "2026-10-01T00:23:56.530Z",
+  "sourceHash": "57e049f41373fcd1f6871c85f5709ab8a377dbf90a58aee71a416eeddc392b63",
   "title": "Design System: HEAV3NS-CODE Native",
   "extensions": {
     "native": {
       "framework": "Swift/AppKit",
       "platform": "macOS",
-      "status": "Built journey-v3, user-approved September 30, 2026, extended by live Walkthrough and native file/conversation navigation",
+      "status": "Built journey-v3, user-approved September 30, 2026, extended by live Walkthrough and native file/conversation navigation, message-linked checkpoints and supporting local project Run; refined Run draft/status resilience and compact conversation role/evidence with a stable transcript footer; refined checkpoint full-history search, filters, paging, exact selection and local Git meaning; refined sidebar conversation deletion with protected confirmation and retained project evidence; replaced the Switch Project menu with a native Pods overview for concurrent independent projects, removed inspector close control, and coherent compact sidebar/context entry points; refined Pods into a command station with structured live activity and guarded inline decisions; refined Pods for long-running work with honest timing, isolated filters, reader-controlled bounded feeds, guarded recovery and occlusion-aware refresh; refined Pods viewport containment with one to three columns, fixed card heights, bounded wrapping text panes, native More recovery actions and reflow-safe activity following",
       "scope": "native/ only; no authority over root CLI design docs or reference gallery",
-      "authority": ["PRODUCT.md", "../docs/desktop/JOURNEY-V3.md", "../docs/desktop/WALKTHROUGH.md", "Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/ProjectLibrary.swift", "Sources/Heav3nsCode/ConversationSidebar.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/JourneyStyle.swift", "Sources/Heav3nsCode/ApprovalReview.swift", "Sources/Heav3nsCode/CodeOutline.swift", "Sources/Heav3nsCode/AccountClient.swift", "Sources/Heav3nsCode/WorkspaceDraftStore.swift", "Sources/Heav3nsCode/NavigationSidebar.swift", "Sources/Heav3nsCode/IntegrationProbe.swift", "Sources/Heav3nsCode/WalkthroughView.swift", "Sources/Heav3nsCode/WalkthroughState.swift", "Sources/Heav3nsCode/RuntimeClient.swift", "Sources/Heav3nsCode/QuickOpenWindow.swift", "Sources/Heav3nsCode/KeyboardListView.swift"],
+      "authority": [
+        "PRODUCT.md",
+        "../docs/desktop/JOURNEY-V3.md",
+        "../docs/desktop/WALKTHROUGH.md",
+        "Sources/Heav3nsCode/App.swift",
+        "Sources/Heav3nsCode/LauncherWindow.swift",
+        "Sources/Heav3nsCode/ProjectLibrary.swift",
+        "Sources/Heav3nsCode/ConversationSidebar.swift",
+        "Sources/Heav3nsCode/WorkspaceWindow.swift",
+        "Sources/Heav3nsCode/JourneyStyle.swift",
+        "Sources/Heav3nsCode/ApprovalReview.swift",
+        "Sources/Heav3nsCode/CodeOutline.swift",
+        "Sources/Heav3nsCode/AccountClient.swift",
+        "Sources/Heav3nsCode/WorkspaceDraftStore.swift",
+        "Sources/Heav3nsCode/NavigationSidebar.swift",
+        "Sources/Heav3nsCode/IntegrationProbe.swift",
+        "Sources/Heav3nsCode/WalkthroughView.swift",
+        "Sources/Heav3nsCode/WalkthroughState.swift",
+        "Sources/Heav3nsCode/RuntimeClient.swift",
+        "Sources/Heav3nsCode/QuickOpenWindow.swift",
+        "Sources/Heav3nsCode/KeyboardListView.swift",
+        "../docs/desktop/CHECKPOINTS-AND-RUN.md",
+        "Sources/Heav3nsCode/CheckpointWindow.swift",
+        "Sources/Heav3nsCode/ProjectRunView.swift",
+        "../src/desktop/worker.ts",
+        "../docs/desktop/INTEGRATION.md",
+        "Sources/Heav3nsCode/PodsWindow.swift",
+        "Sources/Heav3nsCode/PodLiveView.swift",
+        "Sources/Heav3nsCode/PodMonitoring.swift",
+        "Sources/Heav3nsCode/PodLayout.swift",
+        "Tests/Heav3nsCodeTests/PodsWindowTests.swift"
+      ],
       "representation": "Native APIs and AppKit points extend identity-only portable frontmatter. No fixed CSS colors, HTML/CSS previews, synthetic tonal ramps, or raster concept assets.",
       "colorBindings": {
         "primary": "NSColor.controlAccentColor: entry/open/send actions, folder symbols, and native state",
@@ -21,7 +52,9 @@
         "material": "Clear source lists over NSVisualEffectView.sidebar with withinWindow blending",
         "syntax": "systemPurple keywords; systemRed strings/removals; systemGreen additions; systemBlue diff hunks",
         "defaults": "AppKit owns window grounds, controls, selection, focus, disabled and inactive state",
-        "walkthrough": "systemOrange issue/approval symbols; systemRed failed instruction; controlAccentColor other stages; text and symbols preserve meaning"
+        "walkthrough": "systemOrange issue/approval symbols; systemRed failed instruction; controlAccentColor other stages; text and symbols preserve meaning",
+        "messages": "You: controlAccentColor at 0.10 alpha; LUMI: clear. Role labels, SF Symbols and trailing/leading alignment also distinguish speakers.",
+        "pods": "controlBackgroundColor boxes with separatorColor borders; systemOrange review status, controlAccentColor running status, secondaryLabelColor otherwise and for timing/quiet/connection notes; status text also carries meaning"
       },
       "fontBindings": {
         "system": "NSFont.systemFont; AppKit points; native control defaults retained",
@@ -32,26 +65,226 @@
         "metadata": "12/11/10 regular according to context",
         "evidence": "NSFont.monospacedSystemFont 12 regular; exact tool identifier 11 regular",
         "walkthrough": "16 semibold stage; 12 medium activity message; 12 regular selectable detail; 11 regular status/duration/exit/coverage captions",
-        "limitations": "No bundled fonts or global tracking/line-height tokens; transcript is plain text"
+        "limitations": "No bundled fonts or global tracking/line-height tokens; transcript is plain text",
+        "projectTools": "11-point monospaced command, console and restore path list; system prose for checkpoint explanation and secondary metadata",
+        "pods": "22 semibold overview; 18 semibold project; 12 semibold status/activity heading; 12 medium context; 13 instruction and semibold request heading; 12 selectable activity and monospaced request details; 12 regular monospaced-digit timing and secondary notes; 11 identity. Single-line metadata with truncation and complete tooltips; project tooltip/accessibility help carries the full path. Short cards show the current user instruction in the context row."
       },
       "layoutPoints": {
-        "workspaceInitialContent": [1440, 880],
-        "launcherInitialContent": [1100, 740],
-        "minimumWindowFrame": [720, 480],
-        "entry": {"width": 490, "gap": 20},
-        "library": {"sidebarWidth": 200, "sidebarInset": 16, "mainInsets": [36, 32, 28, 32], "gap": 18, "rowHeight": 78, "mainFillsRemainder": true, "dateSingleLine": true},
-        "conversation": {"sidebarWidth": 220, "sidebarInset": 14, "rowHeight": 54, "mainInsets": [20, 22, 16, 22], "gap": 10, "transcriptRowGap": 20},
-        "context": {"wideWidth": "clamp(0.27 × window frame width, 330, 400)", "compactWidth": 300, "insets": [20, 14, 16, 14], "browserHeight": 236, "rowHeight": 32},
-        "composer": {"editorHeight": 64, "groupInset": 10, "gap": 8, "cornerRadius": 10, "borderWidth": 1, "editorTextInset": [0, 3]},
-        "disclosure": [20, 20],
-        "approvalInitialContent": [620, 380],
-        "responsive": {"compactBelowFrameWidth": 1000, "shortBelowFrameHeight": 640, "compact": "Conversation hides context; Task context reveals a 300-point panel alongside center. Transcript/composer persist; revealing navigation hides context.", "short": "Alternate Code/Changes browser and preview; release browser height. File selection requires activation so arrow navigation keeps the browser visible. Walkthrough hides secondary stage explanation and evidence summary, retaining stage, activity and actions."},
-        "captureFrames": {"wideWorkspace": [1440, 731], "compactDarkWorkspaceAndCode": [720, 480], "lightDraft": [720, 500], "lightApprovalParent": [720, 504], "wideLauncher": [1100, 731], "compactLauncher": [720, 480], "walkthroughWide": [1440, 731], "walkthroughCompact": [720, 500], "walkthroughApproval": [720, 504], "navigationWide": [1312, 731], "navigationCompact": [720, 500]},
+        "workspaceInitialContent": [
+          1440,
+          880
+        ],
+        "launcherInitialContent": [
+          1100,
+          740
+        ],
+        "minimumWindowFrame": [
+          720,
+          480
+        ],
+        "entry": {
+          "width": 490,
+          "gap": 20
+        },
+        "library": {
+          "sidebarWidth": 200,
+          "sidebarInset": 16,
+          "mainInsets": [
+            36,
+            32,
+            28,
+            32
+          ],
+          "gap": 18,
+          "rowHeight": 78,
+          "mainFillsRemainder": true,
+          "dateSingleLine": true
+        },
+        "conversation": {
+          "sidebarWidth": 220,
+          "sidebarInset": 14,
+          "rowHeight": 54,
+          "mainInsets": [
+            20,
+            22,
+            16,
+            22
+          ],
+          "gap": 10,
+          "transcriptRowGap": 20,
+          "transcriptNavigationFooterHeight": 28,
+          "transcriptNavigationSpacing": 0,
+          "deleteControlSize": [
+            28,
+            28
+          ]
+        },
+        "context": {
+          "wideWidth": "clamp(0.27 × window frame width, 330, 400)",
+          "compactWidth": 300,
+          "insets": [
+            20,
+            14,
+            16,
+            14
+          ],
+          "browserHeight": 236,
+          "rowHeight": 32
+        },
+        "composer": {
+          "editorHeight": 64,
+          "groupInset": 10,
+          "gap": 8,
+          "cornerRadius": 10,
+          "borderWidth": 1,
+          "editorTextInset": [
+            0,
+            3
+          ]
+        },
+        "disclosure": [
+          20,
+          20
+        ],
+        "approvalInitialContent": [
+          620,
+          380
+        ],
+        "responsive": {
+          "compactBelowFrameWidth": 1000,
+          "shortBelowFrameHeight": 640,
+          "compact": "Conversation hides context; revealing navigation selects Conversation. Selecting Task context or opening Walkthrough/Run hides the compact sidebar and reveals the chosen 300-point context panel alongside center. Transcript/composer persist; wide sidebar preference remains separate.",
+          "short": "Alternate Code/Changes browser and preview; release browser height. File selection requires activation so arrow navigation keeps the browser visible. Walkthrough hides secondary stage explanation and evidence summary, retaining stage, activity and actions."
+        },
+        "captureFrames": {
+          "wideWorkspace": [
+            1440,
+            731
+          ],
+          "compactDarkWorkspaceAndCode": [
+            720,
+            480
+          ],
+          "lightDraft": [
+            720,
+            500
+          ],
+          "lightApprovalParent": [
+            720,
+            504
+          ],
+          "wideLauncher": [
+            1100,
+            731
+          ],
+          "compactLauncher": [
+            720,
+            480
+          ],
+          "walkthroughWide": [
+            1440,
+            731
+          ],
+          "walkthroughCompact": [
+            720,
+            500
+          ],
+          "walkthroughApproval": [
+            720,
+            504
+          ],
+          "navigationWide": [
+            1312,
+            731
+          ],
+          "navigationCompact": [
+            720,
+            500
+          ]
+        },
         "captureQualification": "Prior journey frames remain historical evidence. Walkthrough requested 720x480 was constrained by native minimum window size; actual compact frames are 720x500/504. Exact 480-point acceptance is not established. Navigation follow-up frames are 1312x731 and 720x500; evidence dimensions are not layout breakpoints.",
         "reading": "Reflow rows, preserve earlier origin or follow within 35 points of bottom; physical selection/reading retention unverified",
-        "walkthrough": {"stackGap": 9, "horizontalGap": 8, "collapsedRowHeight": 58, "expandedRows": "Grow with selectable detail and file links; scrolling table yields to native controls"}
+        "walkthrough": {
+          "stackGap": 9,
+          "horizontalGap": 8,
+          "collapsedRowHeight": 58,
+          "expandedRows": "Grow with selectable detail and file links; scrolling table yields to native controls"
+        },
+        "messageAndProjectTools": "Trailing You and leading LUMI/activity with bounded wrapping; intrinsic checkpoint links. Whole Run region scrolls to retain Save Command at compact sizes, with independently scrolling console. History has flexible native table, detail, paging and review actions. No new global sizing tokens. Role/completion and check/review evidence use separate lines. Jump to Latest has a reserved 28-point footer below the transcript, with zero spacing and no message overlap; hiding the button retains the footer.",
+        "checkpointPanel": {
+          "initialContent": [
+            680,
+            620
+          ],
+          "minimumWindowSize": [
+            560,
+            560
+          ],
+          "tableRowHeight": 58,
+          "detailHeight": 100,
+          "inset": 18,
+          "stackGap": 10,
+          "qualification": "Local AppKit component measurements; minimum-size extreme not visually accepted."
+        },
+        "pods": {
+          "initialContent": [
+            1180,
+            780
+          ],
+          "minimumWindowFrame": [
+            640,
+            480
+          ],
+          "columns": "One to three equal columns from the current native content rectangle, board insets and legacy-scroller width; no window-frame breakpoint.",
+          "minimumCardWidth": 360,
+          "maximumColumns": 3,
+          "outerInset": 16,
+          "rootGap": 8,
+          "boardGap": 12,
+          "boardInset": 2,
+          "cardInset": 12,
+          "cardGap": 6,
+          "compactCardGap": 4,
+          "cardMinimumHeight": 300,
+          "cardMaximumHeight": 400,
+          "compactBelowCardHeight": 380,
+          "cardHeight": "Fixed for the current viewport, following available board height within 300–400 points. Bursts do not enlarge cards.",
+          "emptyInset": 24,
+          "activityMinimumViewportHeight": 32,
+          "activityViewport": "Fills remaining card height; Pause and Latest / Resume stay in the heading row.",
+          "approvalViewportHeight": 88,
+          "compactRoutineApprovalViewportHeight": 72,
+          "compactStatusApprovalViewportHeight": 52,
+          "approvalDensity": "Only routine Allow Once help hides in short cards. Pending, error, unavailable and replacement messages remain visible; decisions stay outside the scrolling arguments.",
+          "headerOrder": "Heading/actions, native All / Working / Attention segments and search, summary/Next Request, separator, scrolling board",
+          "cardOrder": "Project/status; stable slot/context; instruction, timing and optional note; inline request; feed with Pause and Latest / Resume; stable Conversation / available More / Stop Agent footer",
+          "compact": "Current user instruction replaces the separate thread label in the context row when present; its separate instruction line hides. A monitoring note compressed into timing retains full timing in the tooltip. Next Request scrolls the waiting card into view.",
+          "timingMaximumLines": 1,
+          "monitoringNoteMaximumLines": 1,
+          "textViewport": "Width-tracked selectable NSTextView with word wrapping, including long unbroken content; vertical growth inside clipped scroll panes with no horizontal scroller. Text insets are 8 horizontal and 6 vertical points. Exact approval payload remains unchanged.",
+          "constraintLifecycle": "Hidden approval views release their width constraint. Previous row equal-width constraints are released before cards are reused.",
+          "captureFrames": {
+            "wide": [
+              1180,
+              730
+            ],
+            "medium": [
+              820,
+              650
+            ],
+            "minimum": [
+              640,
+              480
+            ],
+            "emptySearch": [
+              640,
+              480
+            ]
+          },
+          "captureQualification": "Final containment captures exercise three, two and one columns and an exact 640 × 480-point minimum frame. These are scoped fixture dimensions, not new global breakpoints or release/accessibility acceptance."
+        }
       },
-      "shapesAndDepth": "Native buttons, source lists, search fields, segments, SF Symbols, sidebar material, sheets and popovers. One 10-point NSBox composer radius; 20-point square transcript disclosure and native Walkthrough table disclosures. No custom shadow/gradient/texture or general radius scale.",
+      "shapesAndDepth": "Native buttons, source lists, search fields, segments, SF Symbols, sidebar material, sheets and popovers. One 10-point NSBox composer radius; 20-point square transcript disclosure and native Walkthrough table disclosures. No custom shadow/gradient/texture or general radius scale. You messages add a local 12-point NSBox radius and semantic tint; LUMI surfaces remain clear. Pods use semantic control-background boxes with separator borders and a local 12-point radius.",
       "motion": {
         "indicator": "Native indeterminate Walkthrough spinner only for connected, visible running/cancelling work; hidden/minimized/offline/approval/terminal states stop it",
         "stageIcon": "CATransition fade, 0.18 seconds, for visible stage changes; no percentage or fixed linear checklist",
@@ -64,9 +297,19 @@
         "drafts": "Per-conversation drafts in bounded atomic workspace recovery; destination adoption restores its own text. Failed save prevents switching. Uncertain submission looked up by original ID, never replayed.",
         "account": "Private account process reuses existing OpenAI Codex OAuth/protected storage. Swift receives status/restricted browser URL/catalog availability, never credentials. Workspaces close before account change; disconnect removes local connection.",
         "providerMigration": "New dynamic-client/token-sharing contract remains separate; see JOURNEY-V3.md. No entitlement, billing or inference claim from connection/catalog status.",
-        "inspection": "Read-only; browsing adds no context and filename results grant no read access. Conversation changes discard stale replies and clear inspector history. Lexical outline at most 100 declarations in displayed page; Git comparisons include earlier/external edits. Background refresh retains the preview until Reload and preserves recorded-history pages.",
+        "inspection": "Read-only; browsing adds no context and filename results grant no read access. Conversation changes discard stale replies and clear inspector history. Lexical outline at most 100 declarations in displayed page; Git comparisons include earlier/external edits. Background refresh retains the preview until Reload and preserves recorded-history pages. Inspector close X/control/handler removed; compact visibility follows Conversation / Task context and context entry points.",
         "windows": "Independent workspaces; four-window product target is not an enforced source cap",
-        "walkthrough": "Negotiated walkthrough-v1; follow active/approval/cancelling work over queued work, or explicitly pin loaded history. Structured events, bounded retained activity/checkpoints and ordered merges preserve partial recorded work; restart marks unfinished work interrupted without replay. Coverage and load-retry UI expose limits; not a complete audit log."
+        "walkthrough": "Negotiated walkthrough-v1; follow active/approval/cancelling work over queued work, or explicitly pin loaded history. Structured events, bounded retained activity/checkpoints and ordered merges preserve partial recorded work; restart marks unfinished work interrupted without replay. Coverage and load-retry UI expose limits; not a complete audit log.",
+        "checkpoints": "Negotiated checkpoints-v1; isolated local Git object store separate from repository commits, branch, HEAD and staging. Before message / After reply / Before restore · Safety copy; full date, snapshot file count, local revision, Copy Revision and workspace title. Full saved-message and revision search uses NFKC/lowercase across records before All/Flagged/Safety filtering and 100-entry paging. Matching totals, Newest, stale-offset clamp and timestamp/ID ordering. Latest navigation intent wins; pending debounced search disables old-result actions. Message links clear search/filters and resolve exact IDs across pages/existing panels. Unflagging in Flagged clears the removed target. Missing IDs leave restore disabled; explicit Refresh recovers browsing. Reviewed restore unchanged: idle preconditions, changed-file review, default Cancel, safety copy and new conversation preserving original; runtime contract retains recovery/exclusion limits.",
+        "projectRun": "Negotiated project-run-v1; bounded command discovery or saved custom configuration. Opening Run or saving never executes. Literal command/folder shown; metadata revision rechecked. One process group per workspace; Stop App differs from Stop LUMI; closing stops both. Bounded console; browser-only loopback preview while running, no readiness or hosting claim. Detached descendants and user-readable files remain outside isolation guarantees. Unsaved command/folder/preview edits survive refresh, tab changes, reconnect and failed save within the window lifetime; explicit Save Command commits and Discard Edits resets to the selected target. Pending start/stop suppress duplicate requests. Unknown status disables launch/preview, preserves console and retries with Refresh recovery; failed actions reconcile actual status before another launch. Generation checks ignore obsolete replies. The actual active command/folder remains visible even if discovery omits it. No draft persistence after closing the window.",
+        "conversationDeletion": "Negotiated conversation-delete-v1. Per-row inline trash is hidden without capability and disabled under conversation-switch guards, including pending work and transitions. Tooltip Delete conversation…; title-specific accessibility label. Native sheet names target, defaults to Cancel, marks Delete Conversation destructive and explains discarded draft, retained project files/checkpoints, and active versus inactive outcome. Cancel preserves draft. Confirmed active deletion opens fresh context; inactive deletion keeps current context. Interaction resumes only after fresh destination snapshot confirmation; deleted draft is removed from workspace recovery. Navigation removal retains run/checkpoint evidence; not secure erasure.",
+        "projectNavigation": "Sidebar Pods first saves the current draft; failed save prevents transition. Load Projects uses a native multiple-folder chooser. Canonical paths reuse existing workspaces, each with one CLI worker. Stable opening order and loaded board are session-only. Other project work continues; no multiple concurrent workers for one canonical project. Conversation, inline decisions, guarded recovery and Stop Agent target the intended canonical path.",
+        "podActivity": "Up to 30 recent structured lifecycle activities within a 24,000-character preview budget; up to 1800 characters of each event’s content and 6000 completed response characters, with explicit shortening notices and older entries dropped as needed. Exact approval payload is never shortened. No token streaming. Disclose shown versus observed counts, including after reconnection; Conversation → Walkthrough exposes retained detail/history, not a complete log. Pause, selected text, or actual user scroll/keyboard navigation away from the end freezes displayed text and preserves selection/position. Keep only displayed and newest projections; no hidden update queue. Reading paused / Paused · Updates waiting; Resume applies newest text and returns to end, Latest returns to end while live. Resize/layout alone does not pause. Following survives unchanged-text viewport/column changes, reattachment and deferred text-document reflow through a coalesced update that rechecks current pause/selection state; both scroll and document observers are removed on teardown. Conversation/run identity change resets to live. Execution, timing and approval requests continue. Live/Recorded heading follows work/review state; filtering retains each loaded pod’s reader state.",
+        "podDecisions": "Complete selectable Arguments, Reason, Workspace wrap above activity without modifying the payload. Exact displayed-request Allow Once/Deny; duplicate, pending, stale, disconnected, stopping, closing and switching guards in view/workspace. A replacement freezes the displayed request and hides decisions, leaving one Review Next Request action until the replacement is explicitly loaded. Pending/errors remain visible inline, including in compact cards; only repeated routine Allow Once help hides at short height.",
+        "podMonitoring": "Elapsed uses recorded start; terminal Duration freezes at recorded terminal time. Last activity age, approval Waiting … for you from worker-created request timestamp, observed activity count and explicit missing-timing copy. Day/hour formatting and start-date tooltip. Connected running work with at least two minutes of quiet shows a neutral note, never a stall diagnosis, cancellation or automatic retry. Completed, Stopped, Failed, Interrupted and Timed out remain distinct labels.",
+        "podFilters": "All; Working includes running or queued work; Attention includes review, Disconnected, Check connection, Failed, Interrupted and Timed out. Case/diacritic-insensitive search over path, thread and displayed instruction. Filter only the view: preserve workers, original slot numbers/order and reader state. Hidden results retain total request count; No matching projects offers Show All Projects. Next Request clears filter and query before cycling waiting requests in stable order and scrolling the selected pod into view.",
+        "podRecovery": "Native More menu contains guarded Checkpoints… and Reconnect Agent; the menu hides when neither is available. Reconnect is enabled only for an unavailable runtime whose old worker has exited, outside closing; callback rechecks availability and recovers recorded state without resubmitting tasks. Checkpoints uses existing ready-runtime/capability/window guards and reviewed history; restore retains idle-agent, queue and project-process guards. Conversation and Stop Agent remain directly available outside the text panes. Recovery targets the canonical project and is separate from feed Resume.",
+        "podRefresh": "Half-second overview timer skips snapshot refresh when the window is occluded. Closing Pods invalidates its timer without stopping project workers. Scheduling is not decorative animation."
       },
       "navigation": {
         "filePicker": "Modeless NSPanel child of the workspace, inheriting its appearance; conversation and Stop remain available. Scope/search precede a flexible result table; status, keyboard hint, Refresh and Open Preview follow. Local picker measurements are not global tokens.",
@@ -76,34 +319,105 @@
         "activation": "Picker arrows select; Return, double-click or Open Preview opens read-only content. Code folder selection never opens: Return/double-click/Right enters; Left returns to parent. Code file selection previews when browser and preview coexist; short layouts require Return/double-click. Opening a path reveals its parent.",
         "focus": "Escape restores previous responder; clicking the conversation dismisses without reclaiming focus. Focus Composer (Cmd-L) dismisses the picker, selects compact Conversation, makes the workspace key and makes composer first responder. Background conversation completion does not activate an inactive workspace.",
         "availability": "File menu, Actions and context header expose Open File (Cmd-P) only with a ready runtime and file-search-v1; closing, conversation transition and attached sheets prevent opening.",
-        "input": "NSSearchField marked-text composition retains native handling. Debouncing and request generations schedule work and reject stale results; no decorative motion."
+        "input": "NSSearchField marked-text composition retains native handling. Debouncing and request generations schedule work and reject stale results; no decorative motion.",
+        "pods": "Native command station via sidebar Pods or File → Pods (Cmd-0). Load Projects…, Project Library…, All / Working / Attention and Find project or task. Stable project order/slot identity; filtered summary retains total requests. Next Request clears filters and query, cycles waiting requests and scrolls into view. One to three viewport-sized columns with bounded wrapping payload panes; inline decisions, selectable activity with Pause / Resume, direct Conversation and Stop Agent, native More with guarded Checkpoints / Reconnect."
       },
       "review": {
         "directory": ".impeccable/review/journey-v3",
-        "records": ["review.json", "verdict.json", "verification.json", "evidence.json"],
-        "capturesInspected": ["hero-repro.png", "workspace-ui-code.png", "workspace-ui-changes.png", "workspace-ui-new-conversation.png", "workspace-ui-draft-light.png", "workspace-ui-expanded-light.png", "launcher-launcher-projects.png", "launcher-launcher-narrow-projects.png", "launcher-launcher-welcome.png", "launcher-launcher-signin.png", "approval-ui-approval-light-overlay-0.png"],
+        "records": [
+          "review.json",
+          "verdict.json",
+          "verification.json",
+          "evidence.json"
+        ],
+        "capturesInspected": [
+          "hero-repro.png",
+          "workspace-ui-code.png",
+          "workspace-ui-changes.png",
+          "workspace-ui-new-conversation.png",
+          "workspace-ui-draft-light.png",
+          "workspace-ui-expanded-light.png",
+          "launcher-launcher-projects.png",
+          "launcher-launcher-narrow-projects.png",
+          "launcher-launcher-welcome.png",
+          "launcher-launcher-signin.png",
+          "approval-ui-approval-light-overlay-0.png"
+        ],
         "disposition": "ship",
         "dispositionScope": "J3-F01 through J3-F04 and regressions attributable to their fix batch only; not full surface or release certification",
-        "resolved": ["Unified composer/empty-only placeholder", "Full-width library/single-line date", "Readable approval and exact payload", "Compact activity disclosure"],
-        "automatedEvidence": {"nativeTests": 37, "desktopTests": 38, "oauthHelperTests": 4, "typescript": "passed", "lint": "finish-run reported passed", "accountStatusAndEOF": "passed in isolated storage", "workspaceBoundsReports": 20, "build": "local ad-hoc signature verified"},
+        "resolved": [
+          "Unified composer/empty-only placeholder",
+          "Full-width library/single-line date",
+          "Readable approval and exact payload",
+          "Compact activity disclosure"
+        ],
+        "automatedEvidence": {
+          "nativeTests": 37,
+          "desktopTests": 38,
+          "oauthHelperTests": 4,
+          "typescript": "passed",
+          "lint": "finish-run reported passed",
+          "accountStatusAndEOF": "passed in isolated storage",
+          "workspaceBoundsReports": 20,
+          "build": "local ad-hoc signature verified"
+        },
         "provenance": "verification.json and evidence.json carry build identity and capture origins; supplemental light disclosure states are separately recorded",
         "fixtureScope": "Synthetic conversation history/approval; packaged runtime file/diff reads and conversation switching. No OAuth or model task in UI fixtures.",
         "reviewerScope": "Static native captures and targeted source; reviewer did not rerun tests or interaction. No design detector ran.",
-        "unverified": ["Live OAuth/provider behavior", "Physical keyboard and IME", "VoiceOver and complete focus order", "Increased contrast", "Reduce Motion", "Performance", "Developer ID signing", "Notarization and public distribution"]
+        "unverified": [
+          "Live OAuth/provider behavior",
+          "Physical keyboard and IME",
+          "VoiceOver and complete focus order",
+          "Increased contrast",
+          "Reduce Motion",
+          "Performance",
+          "Developer ID signing",
+          "Notarization and public distribution"
+        ]
       },
       "walkthroughReview": {
         "directory": ".impeccable/review/walkthrough-v1",
-        "records": ["review.json", "verification.json", "provenance.json", "packaged-runtime.json"],
-        "capturesInspected": ["live-wide.png", "live-compact.png", "history-wide.png", "file-wide.png", "failure-wide.png", "failure-compact.png", "approval-compact.png", "recovered-wide.png"],
+        "records": [
+          "review.json",
+          "verification.json",
+          "provenance.json",
+          "packaged-runtime.json"
+        ],
+        "capturesInspected": [
+          "live-wide.png",
+          "live-compact.png",
+          "history-wide.png",
+          "file-wide.png",
+          "failure-wide.png",
+          "failure-compact.png",
+          "approval-compact.png",
+          "recovered-wide.png"
+        ],
         "diagnostics": "Matching JSON for all eight captured states; actual wide 1440x731, compact 720x500, approval 720x504; exact 720x480 not certified",
         "disposition": "ship",
         "materialFixes": [],
         "dispositionScope": "Eight captured native states and targeted WalkthroughView/WalkthroughState/WorkspaceWindow/RuntimeClient integration source; not backend, full accessibility or release certification",
-        "automatedEvidence": {"nativeTests": 42, "desktopTests": 44, "cliEngineTests": 9, "typescript": "passed", "changedFileLint": "passed", "build": "local ad-hoc signature verified"},
+        "automatedEvidence": {
+          "nativeTests": 42,
+          "desktopTests": 44,
+          "cliEngineTests": 9,
+          "typescript": "passed",
+          "changedFileLint": "passed",
+          "build": "local ad-hoc signature verified"
+        },
         "fixtureScope": "Scripted engine over production DesktopSession, database, protocol and native client; actual file reads. Real CLI scheduler callbacks tested separately. No provider, OAuth or approval command executed.",
         "packagedRuntime": "Actual bundled Node/CLI negotiated walkthrough-v1, preserved persisted activity metadata/paths and passed read-only file inspection; no provider request",
         "reviewerScope": "Native captures, JSON provenance and targeted native source; backend/engine not independently reviewed and tests not rerun. No native design detector ran.",
-        "unverified": ["Physical keyboard and IME", "Full VoiceOver and focus order", "Increased contrast", "Physical Reduce Motion and transition timing acceptance", "Production-provider performance", "Ambiguous owner-lock crash reconciliation", "Developer ID signing", "Notarization and public distribution"]
+        "unverified": [
+          "Physical keyboard and IME",
+          "Full VoiceOver and focus order",
+          "Increased contrast",
+          "Physical Reduce Motion and transition timing acceptance",
+          "Production-provider performance",
+          "Ambiguous owner-lock crash reconciliation",
+          "Developer ID signing",
+          "Notarization and public distribution"
+        ]
       },
       "navigationReview": {
         "directory": ".impeccable/review/navigation-v1",
@@ -148,27 +462,671 @@
           "Provider OAuth",
           "Release acceptance"
         ]
+      },
+      "checkpointsRunReview": {
+        "directory": ".impeccable/review/checkpoints-run-v1",
+        "records": [
+          "review.json",
+          "provenance.json",
+          "packaged-runtime.json"
+        ],
+        "capturesInspected": [
+          "messages-wide.png",
+          "checkpoints-wide.png",
+          "restore-review-wide.png",
+          "run-wide.png",
+          "run-compact.png",
+          "run-configuration-compact.png",
+          "run-save-visible-compact.png",
+          "run-saved-compact.png",
+          "restore-review-compact.png",
+          "restored-compact.png"
+        ],
+        "initialDisposition": "fix",
+        "disposition": "ship",
+        "resolved": [
+          "P1: exact message checkpoint selection across pages and existing panels; unavailable entries never select a substitute"
+        ],
+        "dispositionScope": "Final follow-up covers the resolved P1 and attributable regressions only; not full-surface or release certification. Ten valid native captures include compact Save visibility and saved configuration.",
+        "automatedEvidence": {
+          "nativeTests": 52,
+          "desktopTests": 68,
+          "typescript": "passed",
+          "changedFileLint": "passed at error severity",
+          "uiFlow": "passed",
+          "build": "Ad-hoc development signature verified; not a notarized release"
+        },
+        "fixtureScope": "Raw macOS native window-group captures; scripted engine through production DesktopSession and native client; real local project process; no provider invoked",
+        "packagedRuntime": "Checkpoint capability and empty history; project-run capability, custom configuration/discovery/execution and expected output passed.",
+        "reviewerScope": "Read native captures and targeted source; tests/signatures read from provenance rather than rerun. No web design detector.",
+        "unverified": [
+          "Manual VoiceOver",
+          "Physical keyboard/IME",
+          "Complete focus order",
+          "Large-content stress",
+          "Measured contrast",
+          "Production provider behavior",
+          "All runner frameworks",
+          "Long sessions",
+          "Release acceptance"
+        ],
+        "backendFollowup": "Newly ignored current-file restore safeguard separately regression-tested after visual review; native UI unchanged. Not independently design-reviewed; verdict scope unchanged."
+      },
+      "runResilienceReview": {
+        "directory": ".impeccable/review/run-resilience-v1",
+        "records": [
+          "review.json",
+          "provenance.json",
+          "verification.json",
+          "packaged-runtime.json"
+        ],
+        "capturesInspected": [
+          "run-wide.png",
+          "run-compact.png",
+          "draft-after-refresh-compact.png",
+          "save-visible-compact.png",
+          "saved-compact.png"
+        ],
+        "disposition": "ship",
+        "materialFindings": [],
+        "dispositionScope": "Bounded native macOS Run resilience refinement and attributable transcript layout changes; not a release or accessibility certification.",
+        "diagnostics": "Matching JSON for five required captures; wide 1312x731 and compact 720x500 points. Before capture comparison-only; no exact 720x480 acceptance. Native flow asserts footer/transcript separation.",
+        "automatedEvidence": {
+          "nativeTests": 58,
+          "desktopTests": 68,
+          "typescript": "passed",
+          "changedFileLint": "passed",
+          "uiFlow": "passed",
+          "packagedRuntime": "passed"
+        },
+        "fixtureScope": "Raw native window captures; explicitly scripted engine through production worker/client and real local process; no provider invocation.",
+        "reviewerScope": "Fresh review of five captures, diagnostics, targeted native source and supplied records. Source/build/runtime hashes independently matched. Tests and live interaction not rerun; pending/error assessed from source and supplied tests, reconnect draft retention from source without dedicated exercised test. No web detector.",
+        "unverified": [
+          "Tests and live interaction were not independently rerun by reviewer.",
+          "Pending/error/reconnect behavior assessed through source and supplied test evidence, not additional captures or a physical interaction pass.",
+          "Manual VoiceOver, complete keyboard/focus traversal, physical keyboard/IME, measured contrast, increased contrast, and long-content stress remain unverified.",
+          "No production provider or OAuth task; scripted fixture is explicitly disclosed in conversation.",
+          "No acceptance for every framework runner, long sessions, notarization or distribution.",
+          "Drafts survive only the window lifetime; closing-window persistence is deliberately outside contract.",
+          "No exact 720×480 acceptance inferred from 720×500 compact evidence.",
+          "Unrelated historical dirty changes were not reviewed as new scope."
+        ]
+      },
+      "checkpointNavigationReview": {
+        "directory": ".impeccable/review/checkpoint-navigation-v1",
+        "records": [
+          "review.json",
+          "provenance.json",
+          "verification.json",
+          "packaged-runtime.json"
+        ],
+        "capturesInspected": [
+          "history-wide.png",
+          "flagged-wide.png",
+          "empty-search-wide.png",
+          "restore-wide.png",
+          "history-compact.png",
+          "restore-compact.png",
+          "safety-compact.png"
+        ],
+        "disposition": "ship",
+        "materialFindings": [],
+        "dispositionScope": "Bounded checkpoint-navigation refinement and attributable regressions only. No release, provider, performance, or accessibility certification.",
+        "automatedEvidence": {
+          "nativeTests": 61,
+          "desktopTests": 69,
+          "typescript": "passed",
+          "changedFileLint": "passed",
+          "uiFlow": "passed",
+          "packagedRuntime": "passed"
+        },
+        "diagnostics": "All seven raw native window-group captures accepted; corresponding JSON agrees with displayed count, filter, selection, restore availability, and appearance. Wide workspace frames are 1312 x 731 points; compact frames are 720 x 500 points.",
+        "geometryLimitations": "Compact workspace frames are 720 x 500 points. The modeless checkpoint panel may extend beyond its parent and remains fully represented in native window-group captures. Exterior transparency and parent edges are not application clipping. Exact 720 x 480 acceptance and the panel minimum-size extreme are not established.",
+        "fixtureScope": "Raw native window-group captures; scripted engine through production worker/client; real local app and file restoration; no provider invoked.",
+        "packagedRuntime": "Bundled capability negotiation and empty checkpoint history; not populated-history navigation.",
+        "reviewerScope": "Fresh reviewer inspected seven captures, diagnostics, targeted source and supplied logs; independently matched all four source/build/runtime hashes. Did not launch app, rerun tests or rebuild. Pending debounce guard source-assessed. No web detector.",
+        "reviewedRestore": "Unchanged; flow records restore into a new conversation. Backend recovery guarantees were not re-certified.",
+        "unverified": [
+          "Manual VoiceOver and complete focus traversal",
+          "Physical keyboard and IME behavior",
+          "Measured contrast and increased-contrast appearance",
+          "Long-content, large-history performance and long sessions",
+          "Production providers and OAuth",
+          "Notarization, distribution, and release acceptance"
+        ]
+      },
+      "conversationDeletionReview": {
+        "directory": ".impeccable/review/conversation-delete-v1",
+        "records": [
+          "review.json",
+          "provenance.json",
+          "packaged-runtime.json"
+        ],
+        "capturesInspected": [
+          "sidebar-wide-dark.png",
+          "confirmation-wide.png",
+          "deleted-wide.png",
+          "sidebar-compact.png",
+          "confirmation-compact.png"
+        ],
+        "disposition": "ship",
+        "materialFindings": [],
+        "dispositionScope": "Conversation deletion refinement and attributable regressions only",
+        "diagnostics": "All five raw native captures accepted, with matching JSON diagnostics; source and build hashes matched.",
+        "automatedEvidence": {
+          "native": 62,
+          "desktop": 71,
+          "typescript": "passed",
+          "lint": "passed",
+          "uiFlow": "passed: cancellation preserves draft, confirmed deletion clears draft and opens fresh chat, compact confirmation visible",
+          "packagedRuntime": "passed"
+        },
+        "fixtureScope": "Raw native window captures; isolated scripted engine using production worker and native client; no provider invoked.",
+        "packagedRuntime": "Active deletion and safe retry verified in bundled runtime.",
+        "reviewerScope": "Independent reviewer inspected captures and source and matched source/build hashes; active deletion captured, inactive deletion source-assessed. Tests and packaged-runtime checks not independently rerun. No HTML/CSS detector.",
+        "unverified": [
+          "Inactive deletion source-assessed; active deletion captured",
+          "Tests and packaged-runtime verification reported, not independently rerun by reviewer",
+          "Physical keyboard/default-button behavior, full focus traversal, VoiceOver, measured contrast, long-title stress, provider behavior and release readiness not verified",
+          "Native AppKit: no HTML/CSS detector ran"
+        ]
+      },
+      "projectNavigationReview": {
+        "directory": ".impeccable/review/project-navigation-v1",
+        "records": [
+          "provenance.json",
+          "verification.json"
+        ],
+        "capturesInspected": [
+          "menu-wide-dark.png",
+          "menu-compact-light.png",
+          "code-wide-dark.png",
+          "code-compact-light.png",
+          "walkthrough-compact-light.png",
+          "run-compact-light.png"
+        ],
+        "disposition": "ship",
+        "dispositionSource": "Independent-review finish handoff",
+        "dispositionScope": "Resolved scored P2 compact-entry-point fix and attributable regressions only; not whole-surface certification.",
+        "resolvedFinding": "Opening Walkthrough or Run from a revealed compact sidebar now selects Task context, hides the sidebar and displays the requested panel.",
+        "automatedEvidence": {
+          "nativeTests": 63,
+          "typescript": "passed",
+          "lint": "passed",
+          "nativeNavigation": "passed including menu availability and compact sidebar/context transitions",
+          "signature": "passed"
+        },
+        "diagnostics": "Six raw native captures with matching JSON diagnostics; menu captures show actual tracked native menus.",
+        "fixtureScope": "Isolated project fixture; no provider invoked.",
+        "verification": [
+          "Scoped search",
+          "Compact preview",
+          "Draft restoration",
+          "Stale-history clearing",
+          "Composer focus handoff before capture activates window"
+        ],
+        "unverified": [
+          "Whole-surface certification",
+          "Physical keyboard and IME acceptance",
+          "Full VoiceOver and focus-order acceptance",
+          "Production provider behavior",
+          "Release readiness"
+        ],
+        "historical": "Switch Project menu superseded by Pods; original scoped review and compact-navigation evidence retained."
+      },
+      "podsReview": {
+        "directory": ".impeccable/review/pods-v1",
+        "records": [
+          "review.md",
+          "verification.json",
+          "provenance.json",
+          "native-tests.log"
+        ],
+        "capturesInspected": [
+          "pods-wide.png",
+          "pods-stopped.png",
+          "pods-compact.png"
+        ],
+        "disposition": "ship",
+        "dispositionScope": "Pods overview and attributable native-navigation changes only; no material findings",
+        "automatedEvidence": {
+          "nativeTests": 63,
+          "concurrentAgents": "passed",
+          "targetedStop": "passed",
+          "approvalVisibility": "passed",
+          "compact": "passed"
+        },
+        "fixtureScope": "Three independent real workspace workers with scripted agent events; no provider invoked.",
+        "reviewerScope": "Inspected captures and targeted native source; matched four source/build hashes; independently executed AppKit constraint lifecycle probe. Did not rerun app, build or tests. No HTML/CSS detector.",
+        "visualAuthority": "Code-led AppKit extension; no approved comp or generated raster product assets.",
+        "unverified": [
+          "Actual empty/loaded transitions",
+          "Below-fold compact interaction",
+          "Exact minimum-size acceptance",
+          "Physical keyboard and complete focus traversal",
+          "VoiceOver and contrast",
+          "Long-content stress and many-project performance",
+          "Long sessions",
+          "Production provider behavior",
+          "Multiple workers for same project",
+          "Release readiness"
+        ],
+        "historical": "Overview review predates command-station refinement; original scope, counts and evidence retained."
+      },
+      "podsCommandReview": {
+        "directory": ".impeccable/review/pods-command-v1",
+        "records": [
+          "review.md",
+          "verdict.md",
+          "verification.json",
+          "provenance.json"
+        ],
+        "capturesInspected": [
+          "pods-wide.png",
+          "pods-stopped.png",
+          "pods-compact.png",
+          "pods-decided.png"
+        ],
+        "disposition": "ship",
+        "dispositionScope": "Single finding resolved: Arguments now precede Reason and Workspace and appear before decisions in updated wide/compact captures. Original review scope limits retained.",
+        "automatedEvidence": {
+          "nativeTests": 66,
+          "postFixFocusedTests": 3,
+          "typescript": "passed",
+          "lint": "passed",
+          "signature": "passed",
+          "source": "Implementation handoff; not independently rerun by reviewer"
+        },
+        "fixtureScope": "Real independent workspace workers, scripted lifecycle and approval fixtures; no provider invoked.",
+        "reviewerScope": "Initial four captures and source inspected; updated wide/compact re-inspected; source and binary hashes matched.",
+        "visualAuthority": "Code-led native refinement; no raster product assets.",
+        "unverified": [
+          "Accessibility tree",
+          "Keyboard-only use",
+          "Increased contrast",
+          "Minimum height",
+          "Captured multi-request replacement and long-argument interaction",
+          "Live-provider execution",
+          "Assistant token streaming",
+          "Release readiness"
+        ]
+      },
+      "podsLongRunReview": {
+        "directory": ".impeccable/review/pods-longrun-v1",
+        "records": [
+          "review.md",
+          "verification.json",
+          "provenance.json"
+        ],
+        "capturesInspected": [
+          "pods-wide.png",
+          "pods-attention.png",
+          "pods-search-empty.png",
+          "pods-compact.png",
+          "pods-longrun-clock.png"
+        ],
+        "disposition": "ship",
+        "materialFindings": [],
+        "dispositionScope": "Supplied captures and sampled long-running-task refinement only; no runtime-endurance, provider, accessibility or release certification.",
+        "diagnostics": "All five raw native captures valid with matching JSON: wide/Attention/empty search 2360 × 1446 pixels; compact/simulated clock 1524 × 1462 pixels. Complete window frames and normal below-viewport scrolling; exact minimum-window acceptance unverified.",
+        "automatedEvidence": {
+          "nativeTests": 71,
+          "desktopTests": 77,
+          "finalFocusedNativeTests": 5,
+          "typescript": "passed",
+          "lint": "passed",
+          "build": "local development build passed",
+          "signature": "codesign --verify --deep --strict passed",
+          "threeProjectFixture": "passed",
+          "source": "Implementation handoff and provenance; focused log records five PodLongRunTests. Reviewer did not rerun suites or operate GUI."
+        },
+        "fixtureScope": "Three independent real workers with scripted lifecycle/approval activity; no provider invoked. Verification records concurrency, targeted stop, approval visibility, inline decision, activity, compact layout, filter isolation and timing.",
+        "clockSimulation": "Only displayed timestamps change to 27 hours elapsed and five minutes quiet. Real workers and stored timestamps are unchanged; not multi-day endurance or provider evidence.",
+        "reviewerScope": "Validated five captures and matching JSON, sampled implementation, reviewed supplied test records and matched all seven source/build hashes. No suite reruns or GUI operation; no HTML/CSS detector.",
+        "implementationOnly": [
+          "Reconnect and Checkpoints source-reviewed; unavailable in captured snapshots and not clicked from Pods.",
+          "Pause, selection, user scrolling versus resize and bounded retention supported by source/focused tests, including 10,000 updates; no dedicated paused-state captures.",
+          "Occlusion skipping source-reviewed."
+        ],
+        "visualAuthority": "Code-led refinement preserving macOS Swift/AppKit Operate, conversation-first workspace, native semantic colors/type/controls, stable project grouping and direct guarded approvals. No approved comp or raster product assets.",
+        "unverified": [
+          "Physical VoiceOver",
+          "End-to-end keyboard-only use",
+          "Increased contrast",
+          "Exact minimum-window acceptance",
+          "Long-session resource growth and multi-day endurance",
+          "Provider behavior",
+          "Public release readiness and unrelated implementation"
+        ],
+        "historicalReviews": "Every earlier review retains its original scope and counts."
+      },
+      "podsContainmentReview": {
+        "directory": ".impeccable/review/pods-containment-v1",
+        "records": [
+          "review.md",
+          "verdict.md",
+          "provenance.json",
+          "verification.json"
+        ],
+        "capturesInspected": [
+          "pods-burst-wide.png",
+          "pods-burst-medium.png",
+          "pods-burst-minimum.png",
+          "pods-burst-empty.png"
+        ],
+        "matchingDiagnostics": [
+          "pods-burst-wide.json",
+          "pods-burst-medium.json",
+          "pods-burst-minimum.json",
+          "pods-burst-empty.json"
+        ],
+        "initialDisposition": "fix",
+        "initialMaterialFindings": [
+          {
+            "id": "P2-1",
+            "priority": "P2",
+            "finding": "An unpaused feed could remain on older activity after a layout change."
+          }
+        ],
+        "disposition": "ship",
+        "scoredFixes": [
+          {
+            "id": "P2-1",
+            "status": "resolved",
+            "correction": "Coalesced following after viewport, column reattachment and deferred text-document reflow, guarded by current pause/selection state."
+          }
+        ],
+        "dispositionScope": "Final verdict covers the resolved P2-1 and attributable regressions only, not a new general audit or release certification. No attributable regression was found in supplied captures or sampled changed behavior.",
+        "captureFrames": {
+          "wide": [
+            1180,
+            730
+          ],
+          "medium": [
+            820,
+            650
+          ],
+          "minimum": [
+            640,
+            480
+          ],
+          "emptySearch": [
+            640,
+            480
+          ]
+        },
+        "diagnostics": "Four valid raw native captures with matching JSON at 2× image resolution. Exact 640 × 480-point minimum frame exercised. All nine card records across wide/medium/minimum report following: true and atLatest: true, with no card overlap, escaped controls, control overlap or horizontal overflow. Width-tracked text remains inside clip views; the minimum-frame waiting pod retains approval, activity, Conversation and Stop Agent.",
+        "automatedEvidence": {
+          "nativeTests": 75,
+          "finalFocusedNativeTests": 13,
+          "typescript": "passed",
+          "changedScriptLint": "passed without warnings",
+          "build": "passed",
+          "signature": "codesign --verify --deep --strict passed",
+          "threeWorkerBurstFixture": "passed",
+          "viewportContainment": "passed",
+          "columnTransitions": "passed",
+          "burstActivity": "passed",
+          "longApprovalArguments": "passed",
+          "followLatestAfterReflow": "GUI geometry assertions at all captured column counts; regression test covers same-text resizing in both directions, deferred document reflow, and retained text/selection for a selected paused reader.",
+          "source": "Final provenance and verification records; reviewer did not independently rerun suites or operate the GUI."
+        },
+        "fixtureScope": "Three independent real workspace workers with scripted burst activity and long approval arguments. No provider invoked. Capture harness isolates Pods mode from unrelated workspace outcome captures and retains errors.",
+        "reviewerScope": "Initial review and final scored-fix verdict inspect the four raw captures, matching diagnostics, targeted implementation and supplied records. Final verdict reopened every capture and matched all ten final source/build hashes. No independent suite reruns, GUI operation or HTML/CSS detector.",
+        "visualAuthority": "Code-led macOS Operate refinement preserving the conversation-first Swift/AppKit command station, semantic colors, system typography and native controls. No approved comp or raster product assets.",
+        "implementationOnly": [
+          "More, Reconnect and Checkpoints were not GUI-clicked.",
+          "Replacement-request behavior is source/unit reviewed."
+        ],
+        "unverified": [
+          "Physical VoiceOver",
+          "Keyboard-only acceptance",
+          "Increased contrast",
+          "Provider execution",
+          "Long-session resource growth and endurance",
+          "Release readiness"
+        ],
+        "historicalReviews": "All eleven prior review records retain their original entries, scope and counts."
       }
     }
   },
   "components": [
-    {"name": "Native Action Controls", "kind": "button", "description": "Native accent entry/open/send actions and neutral supporting actions; system state rendering.", "native": {"api": "NSButton / JourneyButton", "source": ["Sources/Heav3nsCode/JourneyStyle.swift", "Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
-    {"name": "Entry and Account Journey", "kind": "custom", "description": "Preparation, welcome, browser sign-in, saved connection, cancel/retry and existing-setup routes; private runtime account boundary.", "native": {"api": "NSWindow / NSProgressIndicator / NSWorkspace", "source": ["Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/AccountClient.swift"]}},
-    {"name": "Project Library", "kind": "nav", "description": "Full-width searchable project table, pinned/recency order, single-line date and yielding path; remove never deletes files.", "native": {"api": "NSTableView.fullWidth / NSSearchField / NSOpenPanel", "source": ["Sources/Heav3nsCode/LauncherWindow.swift", "Sources/Heav3nsCode/ProjectLibrary.swift", "Sources/Heav3nsCode/App.swift"]}},
-    {"name": "Conversation Navigation", "kind": "nav", "description": "Source list of durable isolated conversations; Find on this page filters loaded titles. Guarded selection confirms a fresh destination snapshot, restores its draft and clears stale inspection; background replies do not take focus.", "native": {"api": "NSVisualEffectView / NSTableView.sourceList / NSSearchField", "source": ["Sources/Heav3nsCode/ConversationSidebar.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/WorkspaceDraftStore.swift"]}},
-    {"name": "Unified Composer and Up Next", "kind": "input", "description": "Single semantic NSBox joins native text and actions; empty-only Message LUMI…; queue controls and per-conversation drafts. Noneditable during conversation transition; Cmd-L restores workspace key and composer focus. Return/IME behavior source-backed, not physically certified.", "native": {"api": "NSBox / ComposerView:NSTextView / NSScrollView / NSPopover", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
-    {"name": "Conversation and Activity", "kind": "custom", "description": "Selectable plain-text conversation, compact expandable activity, distinct completion/evidence/review labels and Jump to Latest.", "native": {"api": "NSTableView / NSTextField / NSButton", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
-    {"name": "Task Context and Inspection", "kind": "custom", "description": "Secondary Walkthrough/Changes/Code with scoped modeless filename/path search, native result states and deliberate keyboard activation. Folder selection never opens; short file browsing waits for activation. Read-only previews retain paths/history/find/paging and bounded outline; current or pinned Walkthrough preserves stable filtered activity and honest evidence.", "native": {"api": "NSSegmentedControl / NSPopUpButton / NSPanel / KeyboardListView:NSTableView / NSSearchField / NSProgressIndicator / NSTextView / NSPathControl", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift", "Sources/Heav3nsCode/NavigationSidebar.swift", "Sources/Heav3nsCode/CodeOutline.swift", "Sources/Heav3nsCode/WalkthroughView.swift", "Sources/Heav3nsCode/WalkthroughState.swift", "Sources/Heav3nsCode/RuntimeClient.swift", "Sources/Heav3nsCode/QuickOpenWindow.swift", "Sources/Heav3nsCode/KeyboardListView.swift"]}},
-    {"name": "Approval Review", "kind": "custom", "description": "Immutable operation, readable question/prose, exact selectable path/arguments, full payload scroll, non-default Close/Deny/Allow Once.", "native": {"api": "AppKit sheet / NSTextView / NSButton", "source": ["Sources/Heav3nsCode/ApprovalReview.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
-    {"name": "Notices and Recovery", "kind": "custom", "description": "Persistent notices, explicit reconnect, uncertain-acceptance lookup, guarded Stop/Force Stop, and native close decisions.", "native": {"api": "NSTextField / NSButton / NSAlert", "source": ["Sources/Heav3nsCode/WorkspaceWindow.swift"]}},
-    {"name": "Native Windows and Menus", "kind": "custom", "description": "Independent workspace windows, canonical refocusing, standard editing/window commands, toolbar Stop and searchable Actions. Open File Cmd-P and Focus Composer Cmd-L resolve the workspace through its native child panel.", "native": {"api": "NSWindow / NSToolbar / NSMenu / NSOpenPanel", "source": ["Sources/Heav3nsCode/App.swift", "Sources/Heav3nsCode/WorkspaceWindow.swift"]}}
+    {
+      "name": "Native Action Controls",
+      "kind": "button",
+      "description": "Native accent entry/open/send actions and neutral supporting actions; system state rendering.",
+      "native": {
+        "api": "NSButton / JourneyButton",
+        "source": [
+          "Sources/Heav3nsCode/JourneyStyle.swift",
+          "Sources/Heav3nsCode/LauncherWindow.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Entry and Account Journey",
+      "kind": "custom",
+      "description": "Preparation, welcome, browser sign-in, saved connection, cancel/retry and existing-setup routes; private runtime account boundary.",
+      "native": {
+        "api": "NSWindow / NSProgressIndicator / NSWorkspace",
+        "source": [
+          "Sources/Heav3nsCode/LauncherWindow.swift",
+          "Sources/Heav3nsCode/AccountClient.swift"
+        ]
+      }
+    },
+    {
+      "name": "Project Library",
+      "kind": "nav",
+      "description": "Full-width searchable project table, pinned/recency order, single-line date and yielding path; remove never deletes files.",
+      "native": {
+        "api": "NSTableView.fullWidth / NSSearchField / NSOpenPanel",
+        "source": [
+          "Sources/Heav3nsCode/LauncherWindow.swift",
+          "Sources/Heav3nsCode/ProjectLibrary.swift",
+          "Sources/Heav3nsCode/App.swift"
+        ]
+      }
+    },
+    {
+      "name": "Conversation Navigation",
+      "kind": "nav",
+      "description": "Source list of durable isolated conversations; Find on this page filters loaded titles. Guarded selection confirms a fresh destination snapshot, restores its draft and clears stale inspection; background replies do not take focus. Capability-gated 28-point labeled trash per row; idle guards, default-Cancel destructive confirmation and explicit draft/files/checkpoints disposition. Active deletion opens a fresh chat after confirmed snapshot; inactive deletion keeps the current chat. Navigation removal retains run/checkpoint evidence. Pods beneath the project name opens the concurrent-project overview; Project Library… footer.",
+      "native": {
+        "api": "NSVisualEffectView / NSTableView.sourceList / NSSearchField / JourneyButton",
+        "source": [
+          "Sources/Heav3nsCode/ConversationSidebar.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "Sources/Heav3nsCode/WorkspaceDraftStore.swift"
+        ]
+      }
+    },
+    {
+      "name": "Unified Composer and Up Next",
+      "kind": "input",
+      "description": "Single semantic NSBox joins native text and actions; empty-only Message LUMI…; queue controls and per-conversation drafts. Noneditable during conversation transition; Cmd-L restores workspace key and composer focus. Return/IME behavior source-backed, not physically certified.",
+      "native": {
+        "api": "NSBox / ComposerView:NSTextView / NSScrollView / NSPopover",
+        "source": [
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Conversation and Activity",
+      "kind": "custom",
+      "description": "Selectable plain-text conversation and compact expandable activity; separate LUMI role/completion and check/review evidence lines. Stable 28-point Jump to Latest footer below transcript prevents overlap. Trailing tinted You / leading clear LUMI with roles and SF Symbols; intrinsic checkpoint links.",
+      "native": {
+        "api": "NSTableView / NSTextField / NSButton",
+        "source": [
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Task Context and Inspection",
+      "kind": "custom",
+      "description": "Secondary Walkthrough/Changes/Code/Run with scoped modeless filename/path search, native result states and deliberate keyboard activation. Folder selection never opens; short file browsing waits for activation. Read-only previews retain paths/history/find/paging and bounded outline; current or pinned Walkthrough preserves stable filtered activity and honest evidence. Inspector close X/control/handler removed. Compact Task context, Walkthrough and Run entry points hide the sidebar and reveal the chosen panel; revealing the sidebar selects Conversation.",
+      "native": {
+        "api": "NSSegmentedControl / NSPopUpButton / NSPanel / KeyboardListView:NSTableView / NSSearchField / NSProgressIndicator / NSTextView / NSPathControl",
+        "source": [
+          "Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "Sources/Heav3nsCode/NavigationSidebar.swift",
+          "Sources/Heav3nsCode/CodeOutline.swift",
+          "Sources/Heav3nsCode/WalkthroughView.swift",
+          "Sources/Heav3nsCode/WalkthroughState.swift",
+          "Sources/Heav3nsCode/RuntimeClient.swift",
+          "Sources/Heav3nsCode/QuickOpenWindow.swift",
+          "Sources/Heav3nsCode/KeyboardListView.swift"
+        ]
+      }
+    },
+    {
+      "name": "Approval Review",
+      "kind": "custom",
+      "description": "Immutable operation, readable question/prose, exact selectable path/arguments, full payload scroll, non-default Close/Deny/Allow Once.",
+      "native": {
+        "api": "AppKit sheet / NSTextView / NSButton",
+        "source": [
+          "Sources/Heav3nsCode/ApprovalReview.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Notices and Recovery",
+      "kind": "custom",
+      "description": "Persistent notices, explicit reconnect, uncertain-acceptance lookup, guarded Stop/Force Stop, and native close decisions.",
+      "native": {
+        "api": "NSTextField / NSButton / NSAlert",
+        "source": [
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Native Windows and Menus",
+      "kind": "custom",
+      "description": "Independent workspace windows, canonical refocusing, standard editing/window commands, toolbar Stop and searchable Actions. Open File Cmd-P and Focus Composer Cmd-L resolve the workspace through its native child panel. Direct project selection/Open Folder saves the current draft first; canonical project reuse updates library recency while current work stays open.",
+      "native": {
+        "api": "NSWindow / NSToolbar / NSMenu / NSOpenPanel",
+        "source": [
+          "Sources/Heav3nsCode/App.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Message Checkpoints and Reviewed Restore",
+      "kind": "custom",
+      "description": "Workspace-wide native history with full saved-message/revision search, All/Flagged/Safety, matching totals and 100-entry paging, Newest and stable ordering. Latest navigation intent wins; message links clear filters and select exact IDs, unflag clears removed targets, unavailable IDs disable restore until explicit recovery. Full dates, snapshot counts, isolated local revision/Copy Revision and workspace title. Reviewed restore remains unchanged: selectable paths/scope, default Cancel, safety copy and new conversation preserving the original.",
+      "native": {
+        "api": "NSPanel / NSSearchField / NSSegmentedControl / KeyboardListView / NSAlert sheet / NSTextView / NSButton",
+        "source": [
+          "Sources/Heav3nsCode/CheckpointWindow.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
+    {
+      "name": "Project Run and Console",
+      "kind": "custom",
+      "description": "Supporting native Run with actual active command/folder, window-lifetime draft retention, explicit Save Command / Discard Edits, pending start/stop and duplicate suppression, unknown-status retry that preserves console and blocks launch/preview, obsolete reply rejection, bounded console and local browser preview.",
+      "native": {
+        "api": "NSStackView / NSPopUpButton / NSTextField / NSScrollView / NSTextView / NSWorkspace",
+        "source": [
+          "Sources/Heav3nsCode/ProjectRunView.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "Sources/Heav3nsCode/App.swift"
+        ]
+      }
+    },
+    {
+      "name": "Pods Command Station",
+      "kind": "custom",
+      "description": "Stable project board with one to three columns from usable content width, 360-point minimum card width, 12-point gaps and fixed viewport-following card heights of 300–400 points. Compressed metadata keeps the current user instruction visible in short cards; full path remains in the project tooltip. Wrapping, clipped request and activity panes preserve exact approval arguments and bound activity previews. Feed fills remaining height; following survives viewport and text-document reflow while current pause/selection wins. Arguments-first exact-request Allow Once/Deny guards; replacement exposes one Review Next Request action. Direct Conversation and targeted Stop Agent; native More contains guarded Checkpoints/Reconnect. Stable slots, isolated filters, honest timing and retention notices, session-only canonical workers and occlusion-aware refresh remain.",
+      "native": {
+        "api": "NSWindowController / NSScrollView / NSStackView / NSBox / NSSegmentedControl / NSSearchField / JourneyButton / NSTextView / NSPopUpButton / PodLayout / PodTextViewport",
+        "source": [
+          "Sources/Heav3nsCode/PodsWindow.swift",
+          "Sources/Heav3nsCode/App.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "Sources/Heav3nsCode/ConversationSidebar.swift",
+          "Sources/Heav3nsCode/PodLiveView.swift",
+          "Sources/Heav3nsCode/PodMonitoring.swift",
+          "Sources/Heav3nsCode/PodLayout.swift"
+        ]
+      }
+    }
   ],
   "narrative": {
     "northStar": "A native workspace for LUMI",
-    "overview": "Human–agent conversation leads this macOS workspace. A quiet native shell gives the conversation room to breathe, keeps its composer available, and places project navigation and read-only evidence within reach. System typography, semantic appearance, SF Symbols, and familiar AppKit controls provide the visual character.\n\nThis records the built translation of [journey-v3](../ui-prototypes/journey-v3/), approved for implementation on September 30, 2026: projects and conversations on the left, a dominant central conversation with a unified composer, and secondary Walkthrough / Changes / Code on the right. The live Walkthrough extends that system with inspectable activity and explicit follow-current or pinned-history selection. Native filename/path search and deliberate file activation connect intent to read-only evidence; conversation changes preserve separate drafts and clear stale inspection. The same native system carries preparation, welcome, browser sign-in, and the project library. Generated concepts remain references; no raster concept ships inside the app UI.\n\nSwift/AppKit remains the implementation. [PRODUCT.md](PRODUCT.md), [JOURNEY-V3.md](../docs/desktop/JOURNEY-V3.md), and the [Walkthrough contract](../docs/desktop/WALKTHROUGH.md) define product and runtime boundaries. This record applies only to native/. Identity-only portable frontmatter is extended by [.impeccable/design.json](.impeccable/design.json), which preserves native semantic bindings and point measurements without inventing CSS colors, web previews, or tonal ramps.",
-    "keyCharacteristics": ["A dominant human–agent conversation and persistent, unified native composer.", "Projects and durable conversations on the left; secondary task context on the right.", "Semantic light and dark appearance, system fonts, SF Symbols, and native chrome.", "Readable activity and approval language with selectable technical evidence.", "Explicit search scope, deliberate navigation, and a reliable return to the composer.", "Runtime-owned execution, context, permissions, credentials, and task history."],
-    "rules": [{"name": "The Semantic Appearance Rule", "body": "Preserve semantic colors and native materials in both appearances. Do not convert screenshots or system accents into fixed brand colors or synthetic tonal ramps.", "section": "colors"}, {"name": "The Evidence Type Rule", "body": "Use system prose for intent, explanation, and decisions. Reserve monospaced text for code, exact paths, arguments, and identifiers.", "section": "typography"}, {"name": "The Native Depth Rule", "body": "Let AppKit render material, focus, control state, and modality. Native screenshot shadows and bezels do not establish application shadow or blur tokens.", "section": "elevation"}],
-    "dos": ["Do keep conversation dominant and its unified composer available beside secondary context.", "Do preserve native semantic colors, fonts, controls, symbols, and window behavior.", "Do fill the library's main pane, protect single-line dates, and let paths truncate.", "Do use readable approval prose with exact selectable technical payloads and explicit decisions.", "Do align conversation context, drafts, history, and admission with confirmed runtime state.", "Do distinguish read-only evidence, Git baselines, review status, and verification limits.", "Do preserve explicit follow-current versus pinned history and honest stage, coverage, and issue labels.", "Do state each search scope and keep folder selection separate from opening; require file activation when preview replaces the browser.", "Do restore the intended native key window and responder when returning to the composer."],
-    "donts": ["Don't replace Swift/AppKit with illustrative SwiftUI snippets, a web shell, or raster concepts.", "Don't infer fixed palettes, tonal ramps, or a radius scale from native screenshots.", "Don't promote the page outline to a language-server index or Git changes to exclusive run attribution.", "Don't grant permission on default Return, replay uncertain submissions, or resume execution from history.", "Don't equate connection/catalog status with subscription, billing, or inference entitlement.", "Don't promote scoped reviews, synthetic fixtures, or local signing into release or accessibility certification."]
+    "overview": "Human–agent conversation leads this macOS workspace. A quiet native shell gives the conversation room to breathe, keeps its composer available, and places project navigation and read-only evidence within reach. System typography, semantic appearance, SF Symbols, and familiar AppKit controls provide the visual character.\n\nThis records the built translation of [journey-v3](../ui-prototypes/journey-v3/), approved for implementation on September 30, 2026: projects and conversations on the left, a dominant central conversation with a unified composer, and secondary Walkthrough / Changes / Code / Run on the right. The live Walkthrough extends that system with inspectable activity and explicit follow-current or pinned-history selection. Native filename/path search and deliberate file activation connect intent to read-only evidence; conversation changes preserve separate drafts and clear stale inspection. Distinct You and LUMI messages link to reviewed local checkpoints; Run offers supporting local process control and browser preview. The same native system carries preparation, welcome, browser sign-in, the project library, and a Pods command station with run timing, project filters, contained reader-controlled activity and inline decisions across separate loaded projects. Generated concepts remain references; no raster concept ships inside the app UI.\n\nSwift/AppKit remains the implementation. [PRODUCT.md](PRODUCT.md), [JOURNEY-V3.md](../docs/desktop/JOURNEY-V3.md), the [Walkthrough contract](../docs/desktop/WALKTHROUGH.md), and [checkpoint and Run behavior](../docs/desktop/CHECKPOINTS-AND-RUN.md) define product and runtime boundaries. This record applies only to native/. Identity-only portable frontmatter is extended by [.impeccable/design.json](.impeccable/design.json), which preserves native semantic bindings and point measurements without inventing CSS colors, web previews, or tonal ramps.",
+    "keyCharacteristics": [
+      "A dominant human–agent conversation and persistent, unified native composer.",
+      "Projects and durable conversations on the left; secondary task context on the right.",
+      "A native Pods command station with stable project order, cards sized to the viewport, honest run timing, reader-controlled activity, inline approval decisions, and targeted recovery and stop actions.",
+      "Semantic light and dark appearance, system fonts, SF Symbols, and native chrome.",
+      "Readable activity and approval language with selectable technical evidence.",
+      "Explicit search scope, deliberate navigation, and a reliable return to the composer.",
+      "Message-linked project history with reviewed restore and a preserved original conversation.",
+      "Supporting local Run controls with a separate Stop App and explicit browser preview.",
+      "Runtime-owned execution, context, permissions, credentials, and task history."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Appearance Rule",
+        "body": "Preserve semantic colors and native materials in both appearances. Do not convert screenshots or system accents into fixed brand colors or synthetic tonal ramps.",
+        "section": "colors"
+      },
+      {
+        "name": "The Evidence Type Rule",
+        "body": "Use system prose for intent, explanation, and decisions. Reserve monospaced text for code, exact paths, arguments, and identifiers.",
+        "section": "typography"
+      },
+      {
+        "name": "The Native Depth Rule",
+        "body": "Let AppKit render material, focus, control state, and modality. Native screenshot shadows and bezels do not establish application shadow or blur tokens.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep conversation dominant and its unified composer available beside secondary context.",
+      "Do preserve native semantic colors, fonts, controls, symbols, and window behavior.",
+      "Do preserve stable Pods opening order, keep project state and decisions attributable to the exact canonical project/request, and retain the current workspace while opening another.",
+      "Do show approval arguments before decisions, preserve a reader's activity position, and distinguish structured live activity from completed responses.",
+      "Do distinguish elapsed time, terminal duration, activity age and approval wait; retain request totals and stable pod slots when filtering.",
+      "Do keep Pause / Resume local to feed reading, disclose shown versus observed history, and recover recorded state without resubmitting work.",
+      "Do size Pods from the usable viewport, contain wrapping payloads within their scroll panes, and keep approval decisions, Conversation and Stop Agent outside them.",
+      "Do follow the latest activity after viewport and text-document reflow while letting current pause and selection state take precedence.",
+      "Do keep compact workspace navigation and the selected context panel mutually exclusive.",
+      "Do fill the library's main pane, protect single-line dates, and let paths truncate.",
+      "Do use readable approval prose with exact selectable technical payloads and explicit decisions.",
+      "Do align conversation context, drafts, history, and admission with confirmed runtime state.",
+      "Do make conversation deletion explicit, default its confirmation to Cancel, discard only the deleted draft, and preserve project files and saved checkpoints.",
+      "Do distinguish read-only evidence, Git baselines, review status, and verification limits.",
+      "Do preserve explicit follow-current versus pinned history and honest stage, coverage, and issue labels.",
+      "Do state each search scope and keep folder selection separate from opening; require file activation when preview replaces the browser.",
+      "Do restore the intended native key window and responder when returning to the composer.",
+      "Do distinguish You and LUMI with alignment, role labels and symbols as well as tint.",
+      "Do resolve the exact message checkpoint, review restore scope, and preserve the original conversation and safety copy.",
+      "Do state full-history search scope, keep the latest navigation intent authoritative, distinguish snapshot counts from changed files, and name the isolated local checkpoint revision.",
+      "Do keep Save Command and Discard Edits reachable, preserve unsaved edits within the window lifetime, show the active command, and keep Stop App distinct from Stop LUMI.",
+      "Do separate role/completion from check/review evidence and reserve the 28-point Jump to Latest footer.",
+      "Do make pending actions and unknown status explicit, preserve console evidence, and reconcile status before another launch."
+    ],
+    "donts": [
+      "Don't silently replace a displayed request or describe lifecycle updates as assistant token streaming.",
+      "Don't infer a stalled run from quiet activity or automatically retry it.",
+      "Don't silently substitute a checkpoint or imply complete environment recovery, server readiness, or deployment.",
+      "Don't replace Swift/AppKit with illustrative SwiftUI snippets, a web shell, or raster concepts.",
+      "Don't infer fixed palettes, tonal ramps, or a radius scale from native screenshots.",
+      "Don't promote the page outline to a language-server index or Git changes to exclusive run attribution.",
+      "Don't grant permission on default Return, replay uncertain submissions, or resume execution from history.",
+      "Don't equate connection/catalog status with subscription, billing, or inference entitlement.",
+      "Don't promote scoped reviews, synthetic fixtures, or local signing into release or accessibility certification.",
+      "Don't describe removal from conversation navigation as secure erasure of retained run or checkpoint evidence."
+    ]
   }
 }

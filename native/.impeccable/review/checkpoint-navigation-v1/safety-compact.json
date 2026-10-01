@@ -1,0 +1,110 @@
+{
+  "appPID" : 41868,
+  "capturedAt" : "2026-09-30T21:50:00Z",
+  "focusBeforeCapture" : {
+    "composerFocused" : true,
+    "workspaceKey" : false
+  },
+  "harness" : "native composer and configured stdio worker",
+  "layout" : {
+    "appearance" : "NSAppearanceNameAqua",
+    "canInspectBack" : false,
+    "canInspectForward" : false,
+    "checkpoints" : {
+      "count" : 1,
+      "filter" : "safety",
+      "newestEnabled" : false,
+      "offset" : 0,
+      "query" : "",
+      "restoreEnabled" : true,
+      "selected" : "bafc9584-f2f0-4461-9470-9f77f169cd44",
+      "status" : "1–1 of 1 · Newest first",
+      "visible" : true
+    },
+    "composerFocused" : true,
+    "composerUTF16Count" : 0,
+    "controls" : {
+      "composer" : {
+        "height" : 64,
+        "visibleWithinWindow" : true,
+        "width" : 654,
+        "x" : 33,
+        "y" : 83
+      },
+      "queue" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 73.5,
+        "x" : 33,
+        "y" : 51
+      },
+      "send" : {
+        "height" : 24,
+        "visibleWithinWindow" : true,
+        "width" : 55,
+        "x" : 632,
+        "y" : 51
+      },
+      "stop" : {
+        "height" : 36,
+        "visibleWithinWindow" : true,
+        "width" : 64,
+        "x" : 604,
+        "y" : 456
+      },
+      "transcript" : {
+        "height" : 98,
+        "visibleWithinWindow" : true,
+        "width" : 676,
+        "x" : 22,
+        "y" : 230
+      }
+    },
+    "conversation" : "0a46956c-51ee-4192-b8b0-3b90dad70e3f",
+    "destination" : "Files",
+    "draftSaveFailed" : false,
+    "findBarVisible" : false,
+    "forceStopAvailable" : false,
+    "inspectionPage" : "Read only",
+    "inspectionPreview" : "Choose a file, change, or recorded instruction to inspect.",
+    "inspectionTitle" : "Inspect",
+    "messageRoles" : [
+      "agent"
+    ],
+    "navigationVisible" : false,
+    "projectRun" : {
+      "command" : "npm run dev -- --host 127.0.0.1\nIn .",
+      "draftChanged" : false,
+      "output" : "\n> dev\n> node fixture-app.cjs\n\nPreview: http:\/\/127.0.0.1:57162\n",
+      "previewEnabled" : false,
+      "runEnabled" : true,
+      "state" : "stopped",
+      "status" : "Stopped · Exit 0",
+      "statusKnown" : true,
+      "stopEnabled" : false,
+      "targets" : 2
+    },
+    "quickOpen" : {
+
+    },
+    "recordedOutputAvailable" : false,
+    "submissionNeedsReconciliation" : false,
+    "switchingConversation" : false,
+    "walkthrough" : {
+      "animating" : false,
+      "expandedActivities" : 0,
+      "pinnedRun" : "",
+      "reduceMotion" : false,
+      "selectedRun" : "",
+      "stage" : "Ready when you are",
+      "visibleActivities" : 0
+    },
+    "windowFrameHeight" : 500,
+    "windowFrameWidth" : 720,
+    "workspaceKey" : false
+  },
+  "windowHeight" : 448,
+  "windowWidth" : 720,
+  "workerPID" : 41871,
+  "workspace" : "\/Users\/bozoegg\/Desktop\/LUMI-NEW\/build\/desktop-walkthrough-1790804958425\/project\/Workspace"
+}

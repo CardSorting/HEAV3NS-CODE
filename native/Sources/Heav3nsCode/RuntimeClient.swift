@@ -67,8 +67,8 @@ final class RuntimeClient {
     private var snapshotPending = false
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
-    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown"]
-    private static let inspections: Set<String> = ["files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list"]
+    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop"]
+    private static let inspections: Set<String> = ["files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -184,7 +184,8 @@ final class RuntimeClient {
                 self.fail("LUMI did not confirm \(method == "task.submit" ? "the instruction" : "the request") in time. It is stopping; reconnect to reconcile recorded state.")
             }
             callbacks[id] = Pending(method: method, completion: completion, deadline: timeout)
-            DispatchQueue.main.asyncAfter(deadline: .now() + requestTimeout, execute: timeout)
+            let checkpointOperation = ["checkpoint.preview", "checkpoint.restore"].contains(method)
+            DispatchQueue.main.asyncAfter(deadline: .now() + (checkpointOperation ? max(120, requestTimeout) : requestTimeout), execute: timeout)
             pendingWrites += data.count
             let count = data.count
             let bytes = data.withUnsafeBytes { DispatchData(bytes: $0) }
@@ -266,7 +267,11 @@ final class RuntimeClient {
         case "task.edit": return result["updated"] as? Bool == true && (result["run"] as? [String: Any]).map(validRun) == true
         case "history.read": return (result["run"] as? [String: Any]).map(validRun) == true && result["outputAvailable"] is Bool
         case "activity.list": return result["run"] is String && result["activities"] is [[String: Any]] && result["activitySequence"] is NSNumber && result["activityCount"] is NSNumber
-        case "conversation.create", "conversation.select": return (result["conversation"] as? String).map { !$0.isEmpty && $0.utf8.count <= 128 } == true
+        case "conversation.create", "conversation.select", "conversation.delete", "checkpoint.restore": return (result["conversation"] as? String).map { !$0.isEmpty && $0.utf8.count <= 128 } == true
+        case "checkpoint.list": return result["checkpoints"] is [[String: Any]] && result["more"] is Bool
+        case "checkpoint.preview": return result["token"] is String && result["changes"] is [[String: Any]] && result["total"] is NSNumber
+        case "project.discover": return result["targets"] is [[String: Any]]
+        case "project.status", "project.start", "project.stop": return ["idle", "running", "stopping", "stopped", "completed", "failed"].contains(result["state"] as? String ?? "") && result["output"] is String
         case "files.search": return result["entries"] is [[String: Any]] && result["matched"] is NSNumber && result["more"] is Bool && result["scanLimited"] is Bool && ["git", "workspace"].contains(result["scope"] as? String ?? "")
         case "approval.resolve": return result["resolved"] as? Bool == true
         case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber

@@ -10,6 +10,8 @@ final class IntegrationProbe {
     let navigationPass: Bool
     let steps: [String]
     let draftRoot: URL?
+    let podsPass: Bool
+    let podsContainmentPass: Bool
     let launcherPass: Bool
     let projectPaths: [String]
     private let captureWalkthroughStages: Bool
@@ -28,9 +30,23 @@ final class IntegrationProbe {
         navigationPass = config["navigationPass"] as? Bool ?? false
         steps = config["steps"] as? [String] ?? ["files", "changes", "narrow", "dark", "palette"]
         draftRoot = (config["draftRoot"] as? String).map { URL(fileURLWithPath: $0, isDirectory: true) }
+        podsPass = config["podsPass"] as? Bool ?? false
+        podsContainmentPass = config["podsContainmentPass"] as? Bool ?? false
         launcherPass = config["launcherPass"] as? Bool ?? false
         projectPaths = config["projectPaths"] as? [String] ?? []
         captureWalkthroughStages = config["captureWalkthroughStages"] as? Bool ?? false
+    }
+    func capturePods(_ pods: PodsWindow, suffix: String) {
+        guard let window = pods.window else { return }
+        pods.refresh(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        window.contentView?.layoutSubtreeIfNeeded()
+        // Let native post-layout reading anchors settle before recording the presented window.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05)); window.displayIfNeeded()
+        try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), destination.appendingPathComponent("\(suffix).png").path]
+        try? capture.run(); capture.waitUntilExit()
+        if let data = try? JSONSerialization.data(withJSONObject: pods.diagnostics) { try? data.write(to: destination.appendingPathComponent("\(suffix).json")) }
     }
     func connected(_ launcher: LauncherWindow) {
         func step(_ index: Int) {
@@ -51,6 +67,7 @@ final class IntegrationProbe {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { step(0) }
     }
     func connected(_ workspace: WorkspaceWindow) {
+        if podsPass { return }
         guard !submitted else { return }; submitted = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
@@ -70,7 +87,7 @@ final class IntegrationProbe {
         }
     }
     func outcome(_ workspace: WorkspaceWindow, state: String) {
-        guard !finished, !navigationPass else { return }; finished = true
+        guard !finished, !navigationPass, !podsPass else { return }; finished = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
             self.capture(workspace, suffix: "result", state: state)
@@ -83,7 +100,8 @@ final class IntegrationProbe {
     private func navigationStep(_ workspace: WorkspaceWindow, index: Int) {
         guard steps.indices.contains(index) else { return }
         workspace.navigateProbe(steps[index])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak workspace] in
+        let delay = ["project-stop", "checkpoint-restore"].contains(steps[index]) ? 2.2 : 0.7
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
             self.capture(workspace, suffix: "ui-\(steps[index])")
             self.navigationStep(workspace, index: index + 1)
@@ -96,7 +114,11 @@ final class IntegrationProbe {
         view.layoutSubtreeIfNeeded()
         // Capture must not manufacture the focus state a keyboard check asserts.
         let beforeCapture = workspace.probeLayout
-        if NSApp.keyWindow?.parent !== workspace.window { workspace.window?.makeKeyAndOrderFront(nil) }
+        var ownedWindow = NSApp.keyWindow
+        while let window = ownedWindow, window !== workspace.window {
+            ownedWindow = window.sheetParent ?? window.parent
+        }
+        if ownedWindow !== workspace.window { workspace.window?.makeKeyAndOrderFront(nil) }
         NSApp.activate(ignoringOtherApps: true)
         // View caching omits layer-backed AppKit controls. Capture the owned
         // window, including native chrome, rather than treating that as evidence.
