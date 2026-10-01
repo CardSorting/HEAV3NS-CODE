@@ -122,6 +122,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let viewItem = NSMenuItem(); viewItem.title = "Workspace"; let view = NSMenu(title: "Workspace")
         let palette = view.addItem(withTitle: "Actions…", action: #selector(actions), keyEquivalent: "p"); palette.keyEquivalentModifierMask = [.command, .shift]; palette.target = self
         view.addItem(withTitle: "Toggle Navigation", action: #selector(toggleNavigation), keyEquivalent: "b").target = self
+        let models = view.addItem(withTitle: "Model & Provider…", action: #selector(showModels), keyEquivalent: "m")
+        models.keyEquivalentModifierMask = [.command, .shift]; models.target = self
         view.addItem(withTitle: "Focus Composer", action: #selector(focusComposer), keyEquivalent: "l").target = self
         view.addItem(.separator())
         view.addItem(withTitle: "Code", action: #selector(showFiles), keyEquivalent: "1").target = self
@@ -225,6 +227,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
     @objc private func showProjectLibrary() { showLauncher() }
     @objc private func newConversation() { current?.newConversation() }
+    @objc private func showModels() { current?.showModels() }
     @objc private func openFile() { current?.showQuickOpen() }
     @objc private func showWalkthrough() { current?.showWalkthrough() }
     @objc private func showProjectRun() { current?.showProjectRun() }
@@ -244,6 +247,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if let current { current.showActions() } else { openFolder() }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(showModels) { return current?.canChooseModels == true }
         if menuItem.action == #selector(showProjectRun) { return current?.client.capabilities.contains("project-run-v1") == true }
         if menuItem.action == #selector(showCheckpoints) { return current?.client.capabilities.contains("checkpoints-v1") == true }
         if menuItem.action == #selector(openFile) { return current?.canOpenFile == true }

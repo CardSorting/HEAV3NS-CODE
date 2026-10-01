@@ -68,7 +68,7 @@ final class RuntimeClient {
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
     private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
-    private static let inspections: Set<String> = ["files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status"]
+    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -241,6 +241,9 @@ final class RuntimeClient {
                         if let type = message["type"] as? String, ["run.state", "run.progress", "run.accepted", "approval.requested", "approval.resolved"].contains(type) {
                             guard let payload = message["payload"] as? [String: Any], self.validRun(payload), message["seq"] is NSNumber else { self.fail("LUMI sent an invalid state event. Reconnect to recover recorded state."); return }
                         }
+                        if message["type"] as? String == "models.changed" {
+                            guard let payload = message["payload"] as? [String: Any], WorkspaceModelCatalog(payload) != nil else { self.fail("LUMI sent invalid model settings. Reconnect to recover the current selection."); return }
+                        }
                         if message["type"] as? String == "project.state" {
                             guard let payload = message["payload"] as? [String: Any], self.validResult(payload, for: "project.status"), payload["revision"] is NSNumber else { self.fail("LUMI sent an invalid app state. Reconnect to check its status."); return }
                         }
@@ -261,6 +264,8 @@ final class RuntimeClient {
     }
     private func validResult(_ result: [String: Any], for method: String) -> Bool {
         switch method {
+        case "models.list", "models.select": return WorkspaceModelCatalog(result) != nil
+        case "models.discover": return WorkspaceModelDiscovery(result) != nil
         case "task.submit": return result["accepted"] as? Bool == true && (result["run"] as? [String: Any]).map(validRun) == true
         case "task.lookup":
             guard let found = result["found"] as? Bool else { return false }
@@ -287,7 +292,7 @@ final class RuntimeClient {
         isReady = false
         snapshotCompletions.removeAll(); snapshotPending = false
         if failure == nil { failure = message }
-        closeInput()
+        closeTransport()
         if wasOpen { onConnection?(failure ?? message) }
         let waiting = callbacks; callbacks.removeAll()
         for pending in waiting.values {
@@ -296,6 +301,12 @@ final class RuntimeClient {
         }
     }
     func closeInput() {
+        guard !closed else { return }
+        // An intentional pipe close has the same readiness and callback boundary
+        // as a transport failure; waiting for process exit leaves stale controls.
+        fail("Disconnected · Connection closed.")
+    }
+    private func closeTransport() {
         guard !closed else { return }; closed = true
         writer?.close(flags: .stop); writer = nil
         try? input.fileHandleForWriting.close()

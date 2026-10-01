@@ -25,6 +25,7 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
     private var all = [ConversationSummary]()
     private var visible = [ConversationSummary]()
     private var selected: String?
+    private var navigationMessage = ""
     private var suppress = false
     private lazy var create = JourneyButton("New conversation", symbol: "plus.bubble") { [weak self] in self?.onNew?() }
     private lazy var more = JourneyButton("Earlier conversations") { [weak self] in self?.onMore?() }
@@ -63,7 +64,7 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         create.toolTip = canSwitch ? "Start with a fresh conversation" : "Finish or stop current work before switching conversations"
         self.more.isHidden = !more; self.more.isEnabled = canSwitch
         recent.isHidden = !earlierPage; recent.isEnabled = canSwitch
-        self.message.stringValue = message; self.message.isHidden = message.isEmpty
+        navigationMessage = message
         render()
     }
     func setCanSwitch(_ allowed: Bool) {
@@ -72,18 +73,19 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         create.toolTip = allowed ? "Start with a fresh conversation" : "Finish or stop current work before switching conversations"
     }
     private func render() {
-        visible = all.filter { search.stringValue.isEmpty || $0.title.localizedCaseInsensitiveContains(search.stringValue) }
+        let query = search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        visible = all.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }
         deleteButtons.removeAll()
         suppress = true; table.deselectAll(nil); table.reloadData()
         if let index = visible.firstIndex(where: { $0.id == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
         suppress = false
-        if visible.isEmpty && !search.stringValue.isEmpty { message.stringValue = "No matching conversations."; message.isHidden = false }
-        else if message.stringValue == "No matching conversations." { message.isHidden = true }
+        message.stringValue = visible.isEmpty && !query.isEmpty ? "No matching conversations on this page." : navigationMessage
+        message.isHidden = message.stringValue.isEmpty
     }
     func controlTextDidChange(_ obj: Notification) { render() }
     func numberOfRows(in tableView: NSTableView) -> Int { visible.count }
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard !suppress, visible.indices.contains(table.selectedRow) else { return }
+        guard table.isEnabled, !suppress, visible.indices.contains(table.selectedRow) else { return }
         let id = visible[table.selectedRow].id
         if id != selected { onSelect?(id) }
     }

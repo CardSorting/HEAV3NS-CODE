@@ -16,6 +16,9 @@ export const requestSchema = z
 		method: z.enum([
 			"hello",
 			"workspace.attach",
+			"models.list",
+			"models.discover",
+			"models.select",
 			"snapshot",
 			"task.submit",
 			"task.edit",

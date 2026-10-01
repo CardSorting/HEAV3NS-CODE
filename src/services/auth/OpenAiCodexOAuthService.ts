@@ -1,12 +1,12 @@
 import { createHash, randomBytes } from "node:crypto"
 import http, { type Server } from "node:http"
+import { StateManager } from "@core/storage/StateManager"
 import type { ModelInfo } from "@shared/api"
 import { ApiFormat } from "@shared/proto/dietcode/models"
-import { StateManager } from "@core/storage/StateManager"
 import { ExtensionRegistryInfo } from "@/registry"
 import { fetch as configuredFetch } from "@/shared/net"
 import { openExternal } from "@/utils/env"
-import { writeOpenAiCodexOAuthCallbackResponse, type OpenAiCodexOAuthCallbackPageState } from "./openAiCodexOAuthCallbackPage"
+import { type OpenAiCodexOAuthCallbackPageState, writeOpenAiCodexOAuthCallbackResponse } from "./openAiCodexOAuthCallbackPage"
 
 export const OPENAI_CODEX_OAUTH_CREDENTIALS_KEY = "openaiCodexOauthCredentials" as const
 
@@ -685,9 +685,10 @@ export class OpenAiCodexOAuthService {
 		return refreshAndPersistCredentials(credentials)
 	}
 
-	static async listModels(rawFallback?: string): Promise<Record<string, ModelInfo>> {
+	static async listModels(rawFallback?: string, signal?: AbortSignal): Promise<Record<string, ModelInfo>> {
 		const credentialsBeforeRefresh = getStoredCredentials(rawFallback)
 		const credentials = await this.getValidCredentials(rawFallback)
+		signal?.throwIfAborted()
 		const wasRefreshedBeforeRequest =
 			credentialsBeforeRefresh !== undefined && credentialsBeforeRefresh.accessToken !== credentials.accessToken
 		const modelsUrl = new URL(`${OPENAI_CODEX_BASE_URL}/models`)
@@ -704,7 +705,7 @@ export class OpenAiCodexOAuthService {
 						...OPENAI_CODEX_CLIENT_HEADERS,
 						...(requestCredentials.accountId ? { "ChatGPT-Account-ID": requestCredentials.accountId } : {}),
 					},
-					signal: controller.signal,
+					signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
 				})
 			} catch (error) {
 				if (controller.signal.aborted) {

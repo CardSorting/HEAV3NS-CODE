@@ -117,6 +117,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let stopSendButton = NSButton(title: "Stop & Send", target: nil, action: nil)
     private let notice = NSTextField(wrappingLabelWithString: "")
     private let noticeBar = NSStackView()
+    private let modelButton = NSButton(title: "Model & Provider…", target: nil, action: nil)
+    private var modelPicker: ModelPicker?
     private let hint = NSTextField(labelWithString: "Enter to send · Shift–Enter for a new line")
     private var sidebarPreferred = true
     private var compactSidebarRevealed = false
@@ -159,6 +161,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var canFindInInspection: Bool { showingInspector && !inspector.isHidden && window?.attachedSheet == nil }
     var canReviewApproval: Bool { currentApproval != nil && window?.attachedSheet == nil && !closing }
     var canOpenFile: Bool { client.isReady && client.capabilities.contains("file-search-v1") && !switchingConversation && !closing && window?.attachedSheet == nil }
+    var canChooseModels: Bool { client.isReady && client.capabilities.contains("model-selection-v1") && !closing && window?.attachedSheet == nil }
     var canCreateConversation: Bool { canSwitchConversation && window?.attachedSheet == nil }
 
     init(folder: URL, runtimeClient: RuntimeClient? = nil, draftStore: WorkspaceDraftStore? = nil) {
@@ -181,6 +184,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private func configureClient() {
         client.onConnection = { [weak self] value in
             guard let self else { return }; self.connection = value; self.updateStatus(); self.walkthroughLoaded = nil; self.updateWalkthrough()
+            self.modelPicker?.connectionChanged()
             self.projectRun.connect(self.client)
             if self.client.isReady {
                 self.reconnectButton.isHidden = true
@@ -189,6 +193,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.reconcileSubmission()
                 self.refreshNavigation()
                 self.loadConversations()
+                if self.client.capabilities.contains("model-selection-v1") {
+                    self.client.request("models.list", params: [:]) { [weak self] result in
+                        if case .success(let data) = result, let selection = WorkspaceModelSelection(data) { self?.updateModel(selection) }
+                    }
+                }
                 self.probe?.connected(self)
             } else if value != "Connecting to LUMI…" {
                 self.switchingConversation = false; self.expectedConversation = nil
@@ -407,6 +416,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         noticeBar.orientation = .horizontal; noticeBar.alignment = .centerY; noticeBar.spacing = 6; noticeBar.isHidden = true
         [notice, reconnectButton, dismiss].forEach(noticeBar.addArrangedSubview)
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
+        modelButton.target = self; modelButton.action = #selector(showModels); modelButton.bezelStyle = .rounded
+        modelButton.setAccessibilityLabel("Choose model and provider")
+        modelButton.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil); modelButton.imagePosition = .imageTrailing
+        modelButton.setContentHuggingPriority(.required, for: .horizontal)
+        modelButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        modelButton.cell?.lineBreakMode = .byTruncatingMiddle
         let composerBar = stack([queueButton, NSView(), stopSendButton, sendButton]); composerBar.distribution = .fill
         let composerSurface = NSBox(); composerSurface.boxType = .custom; composerSurface.titlePosition = .noTitle
         composerSurface.borderWidth = 1; composerSurface.cornerRadius = 10
@@ -424,11 +439,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         chatTitle.setContentHuggingPriority(.init(1), for: .horizontal); checkpointsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         let header = stack([titleLine, chatState], vertical: true, spacing: 5)
         let rule = JourneyStyle.rule()
-        let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, hint], vertical: true, spacing: 10)
+        let modelBar = stack([modelButton, hint])
+        hint.toolTip = "Enter to send · Shift–Enter for a new line"
+        modelButton.widthAnchor.constraint(lessThanOrEqualTo: modelBar.widthAnchor, multiplier: 0.65).isActive = true
+        modelButton.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
+        let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, modelBar], vertical: true, spacing: 10)
         center.setContentHuggingPriority(.init(1), for: .horizontal)
         work.setContentHuggingPriority(.init(1), for: .vertical)
         center.edgeInsets = NSEdgeInsets(top: 20, left: 22, bottom: 16, right: 22)
-        for view in [header, rule, work, approval, noticeBar, composerSurface, hint] { view.widthAnchor.constraint(equalTo: center.widthAnchor, constant: -44).isActive = true }
+        for view in [header, rule, work, approval, noticeBar, composerSurface, modelBar] { view.widthAnchor.constraint(equalTo: center.widthAnchor, constant: -44).isActive = true }
         titleLine.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
         chatState.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
         work.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
@@ -695,6 +714,29 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
         return item
     }
+    private func updateModel(_ selection: WorkspaceModelSelection) {
+        modelButton.title = selection.model
+        modelButton.toolTip = "\(selection.providerLabel) · \(selection.model) · Choose model and provider for this workspace"
+        modelButton.setAccessibilityLabel("\(selection.providerLabel), model \(selection.model). Choose model and provider")
+    }
+    @objc func showModels() {
+        guard canChooseModels, let window else { return }
+        if let picker = modelPicker {
+            if picker.window?.isVisible == true { picker.window?.makeKeyAndOrderFront(nil) }
+            else { picker.present(for: window) }
+            return
+        }
+        modelPicker = ModelPicker(request: { [weak self] method, params, completion in
+            guard let self else { completion(.failure(BridgeError.message("Workspace closed."))); return }
+            self.client.request(method, params: params, completion: completion)
+        }, connected: { [weak self] in
+            self?.client.isReady == true && self?.client.capabilities.contains("model-selection-v1") == true
+        }, supportsDiscovery: { [weak self] in self?.client.capabilities.contains("model-discovery-v1") == true }, canApply: { [weak self] in
+            guard let self else { return false }
+            return self.canRequestRecovery && self.stopThenSend == nil
+        }, onSelection: { [weak self] in self?.updateModel($0) })
+        modelPicker?.present(for: window)
+    }
     @objc func showActions() {
         guard let window, window.attachedSheet == nil else { return }
         var actions = [
@@ -702,12 +744,16 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             WorkspaceAction(title: "Focus Composer", shortcut: "⌘L") { [weak self] in self?.focusComposer() },
             WorkspaceAction(title: "Show Files", shortcut: "⌘1") { [weak self] in self?.showFiles() },
             WorkspaceAction(title: "Show Changes", shortcut: "⌘2") { [weak self] in self?.showChanges() },
-            WorkspaceAction(title: "Show Recorded Runs", shortcut: "⌘3") { [weak self] in self?.showSessions() },
+            WorkspaceAction(title: "Show Recorded Runs", shortcut: "⌘3", keywords: ["history", "sessions"]) { [weak self] in self?.showSessions() },
             WorkspaceAction(title: "Show Walkthrough", shortcut: "⌘6") { [weak self] in self?.showWalkthrough() },
-            WorkspaceAction(title: "Show Up Next", shortcut: "⌘4") { [weak self] in self?.showQueue() },
-            WorkspaceAction(title: "Toggle Navigation", shortcut: "⌘B") { [weak self] in self?.toggleNavigation() },
+            WorkspaceAction(title: "Show Up Next", shortcut: "⌘4", keywords: ["queue", "pending instructions"]) { [weak self] in self?.showQueue() },
+            WorkspaceAction(title: "Toggle Navigation", shortcut: "⌘B", keywords: ["sidebar"]) { [weak self] in self?.toggleNavigation() },
             WorkspaceAction(title: "Refresh Current Destination", shortcut: "") { [weak self] in self?.refreshNavigation() }
         ]
+        if client.capabilities.contains("model-selection-v1") { actions.insert(WorkspaceAction(title: "Choose Model & Provider…", shortcut: "⇧⌘M", keywords: ["switch", "change", "AI"]) { [weak self] in self?.showModels() }, at: 1) }
+        if !client.isReady, client.process?.isRunning != true, !closing { actions.insert(WorkspaceAction(title: "Reconnect Workspace", shortcut: "", keywords: ["connection", "retry", "recover"]) { [weak self] in self?.reconnect() }, at: 0) }
+        actions.append(WorkspaceAction(title: "Project Library…", shortcut: "", keywords: ["projects", "open recent"]) { [weak self] in self?.onProjects?() })
+        actions.append(WorkspaceAction(title: "ChatGPT Connection…", shortcut: "", keywords: ["account", "sign in", "authentication"]) { [weak self] in self?.onAccount?() })
         if canOpenFile { actions.insert(WorkspaceAction(title: "Open File…", shortcut: "⌘P") { [weak self] in self?.showQuickOpen() }, at: 1) }
         if client.capabilities.contains("project-run-v1") { actions.insert(WorkspaceAction(title: "Run Project", shortcut: "⌘R") { [weak self] in self?.showProjectRun() }, at: 1) }
         if client.capabilities.contains("checkpoints-v1") { actions.insert(WorkspaceAction(title: "Checkpoints", shortcut: "⌘7") { [weak self] in self?.showCheckpoints() }, at: 1) }
@@ -734,6 +780,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc func focusComposer() {
         quickOpen?.dismiss(restoreFocus: false)
+        modelPicker?.dismiss(restoreFocus: false)
         checkpointWindow?.close()
         surfaces.selectedSegment = 0; adapt()
         window?.makeKeyAndOrderFront(nil); window?.makeFirstResponder(composer)
@@ -867,6 +914,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     /// Development-only entry points selected by the opt-in integration harness.
     /// They drive the same controls and real read-only bridge as the application.
     func navigateProbe(_ step: String) {
+        if step.hasPrefix("model-draft:") { modelPicker?.editProbe(String(step.dropFirst("model-draft:".count))); return }
+        if step.hasPrefix("palette-search:") { palette?.searchProbe(String(step.dropFirst("palette-search:".count))); return }
         if step.hasPrefix("quick-open:") { showQuickOpen(); quickOpen?.searchProbe(String(step.dropFirst("quick-open:".count))); return }
         if step.hasPrefix("walkthrough-") {
             let action = String(step.dropFirst("walkthrough-".count))
@@ -917,6 +966,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "conversation-delete-confirm": if let sheet = window?.attachedSheet { window?.endSheet(sheet, returnCode: NSApplication.ModalResponse.alertSecondButtonReturn) }
         case "new-conversation": newConversation()
         case "previous-conversation": if let id = conversationList.last?.id { selectConversation(id) }
+        case "models": showModels()
+        case "models-close": modelPicker?.dismiss()
+        case "models-reopen": showModels()
+        case "models-refresh", "models-refresh-retry": modelPicker?.refreshProbe()
+        case "models-claude": modelPicker?.providerProbe("claude-subscription-directsdk-experimental")
+        case "models-openai": modelPicker?.providerProbe("openai-codex")
+        case "models-disconnect": client.closeInput()
+        case "models-reconnect": reconnect()
+        case "palette-close": palette?.cancelOperation(nil)
         case "draft", "draft-light": composer.string = "Keep the conversation in focus as you refine the sidebar."; updateStatus()
         case "clear-draft", "clear-draft-light": composer.string = ""; updateStatus()
         case "expanded", "expanded-light":
@@ -955,17 +1013,18 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             }
         default: break
         }
+        modelPicker?.syncPresentation()
     }
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
+        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
+        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "modelPicker": modelPicker?.diagnostics ?? [:], "actionPalette": palette?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
@@ -982,6 +1041,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if switchingConversation && (expectedConversation == nil || payload["conversation"] as? String != expectedConversation) { return }
             guard (payload["seq"] as? Int ?? 0) >= sequence else { return }
             if let conversation = payload["conversation"] as? String { adoptConversation(conversation) }
+            if let data = payload["modelSelection"] as? [String: Any], let selection = WorkspaceModelSelection(data) { updateModel(selection); modelPicker?.receive(data) }
             sequence = payload["seq"] as? Int ?? 0
             let incoming = payload["runs"] as? [[String: Any]] ?? []
             let previous = Dictionary(runs.compactMap { run in (run["id"] as? String).map { ($0, run) } }, uniquingKeysWith: { _, newest in newest })
@@ -997,6 +1057,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if seq != sequence + 1 { client.requestSnapshot(); return }
             sequence = seq
         }
+        if event["type"] as? String == "models.changed", let selection = WorkspaceModelSelection(payload) { updateModel(selection); modelPicker?.receive(payload); return }
         if event["type"] as? String == "project.state" { projectRun.receiveProjectState(payload); return }
         if ["activity", "activity.batch"].contains(event["type"] as? String ?? ""), let runID = event["run"] as? String, let index = runs.firstIndex(where: { $0["id"] as? String == runID }) {
             let values = event["type"] as? String == "activity.batch" ? payload["activities"] as? [[String: Any]] ?? [] : [payload]
@@ -1044,7 +1105,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 next.append(TranscriptRow(id: aid, title: "\(activity["message"] as? String ?? "Activity") · \(phase.replacingOccurrences(of: "_", with: " "))\(elapsed)", text: expandedActions.contains(aid) ? activity["detail"] as? String ?? "No additional display detail. Recorded output is available in Sessions after the run." : "", activity: true))
             }
             if let response = run["response"] as? String {
-                let evidence = WorkspaceVerificationPresentation.label(run)
+                let route = run["modelSelection"] as? [String: Any]
+                let model = route?["model"] as? String
+                let evidence = WorkspaceVerificationPresentation.label(run) + (model.map { " · Model: " + $0 } ?? "")
                 next.append(TranscriptRow(id: "\(id)-result", title: "LUMI · \(state.capitalized)", text: response, activity: false, checkpoint: run["checkpointAfter"] as? String, evidence: "\(evidence) · Not reviewed"))
             }
             if let error = run["checkpointError"] as? String { next.append(TranscriptRow(id: "\(id)-checkpoint-error", title: "Checkpoint unavailable", text: error, activity: false)) }
@@ -1067,7 +1130,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 transcript.insertRows(at: IndexSet(integersIn: old.count..<next.count), withAnimation: [])
             } else { transcript.reloadData() }
             if following { jumpLatest() }
-            else { transcriptScroll.contentView.scroll(to: origin); transcriptScroll.reflectScrolledClipView(transcriptScroll.contentView); jumpButton.isHidden = false }
+            else { transcriptScroll.contentView.scroll(to: origin); transcriptScroll.reflectScrolledClipView(transcriptScroll.contentView); jumpButton.isHidden = runs.isEmpty }
         }
         updateWalkthrough(); updateStatus()
     }
@@ -1083,6 +1146,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func updateStatus() {
+        modelButton.isEnabled = canChooseModels
+        modelButton.toolTip = client.capabilities.contains("model-selection-v1") ? modelButton.toolTip : "This runtime does not support model switching. Rebuild the app and runtime together."
+        modelPicker?.refreshAvailability()
         checkpointsButton.isEnabled = client.isReady && client.capabilities.contains("checkpoints-v1") && !switchingConversation
         checkpointWindow?.refreshAvailability()
         composer.needsDisplay = true
@@ -1530,7 +1596,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         projectRun.setVisible(!contextPanel.isHidden && !projectRunScroll.isHidden)
         transcriptScroll.isHidden = false
         updateWalkthroughVisibility()
-        if transcriptScroll.isHidden { jumpButton.isHidden = true }
+        if transcriptScroll.isHidden || runs.isEmpty { jumpButton.isHidden = true }
         transcript.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<rows.count))
     }
     private func restoreTranscriptAfterResize() {
@@ -1542,11 +1608,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         else {
             transcriptScroll.contentView.scroll(to: anchor.origin)
             transcriptScroll.reflectScrolledClipView(transcriptScroll.contentView)
-            jumpButton.isHidden = transcriptScroll.documentVisibleRect.maxY >= transcript.bounds.height - 35
+            jumpButton.isHidden = runs.isEmpty || transcriptScroll.documentVisibleRect.maxY >= transcript.bounds.height - 35
         }
         resizeAnchor = nil
     }
-    func windowDidResize(_ notification: Notification) { adapt() }
+    func windowDidResize(_ notification: Notification) { adapt(); modelPicker?.syncPresentation(recenter: true) }
     func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady { client.requestSnapshot() } }
     func windowDidChangeOcclusionState(_ notification: Notification) { if needsRebuild && window?.occlusionState.contains(.visible) == true { rebuildRows() }; updateElapsedTimer(); updateWalkthroughVisibility() }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -1567,7 +1633,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if stopped || client.process == nil { window?.close(); return }
         closing = true; composer.isEditable = false; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
     }
-    func windowWillClose(_ notification: Notification) { saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
+    func windowWillClose(_ notification: Notification) {
+        modelPicker?.dismiss(restoreFocus: false); modelPicker = nil; saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         guard rows.indices.contains(row) else { return 40 }

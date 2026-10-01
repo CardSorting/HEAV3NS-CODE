@@ -100,7 +100,7 @@ final class IntegrationProbe {
     private func navigationStep(_ workspace: WorkspaceWindow, index: Int) {
         guard steps.indices.contains(index) else { return }
         workspace.navigateProbe(steps[index])
-        let delay = ["project-stop", "checkpoint-restore"].contains(steps[index]) ? 2.2 : 0.7
+        let delay = ["project-stop", "checkpoint-restore", "models-disconnect", "models-reconnect"].contains(steps[index]) ? 2.2 : 0.7
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak workspace] in
             guard let self, let workspace else { return }
             self.capture(workspace, suffix: "ui-\(steps[index])")

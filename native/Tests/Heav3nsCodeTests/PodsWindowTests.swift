@@ -106,7 +106,7 @@ final class PodContainmentTests: XCTestCase {
         let content = (1...60).map { "Event \($0) " + String(repeating: "wrapped output 🌙 ", count: 25) }.joined(separator: "\n")
         feed.update(content, identity: "run", live: true)
         func settle() { window.contentView?.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.04)) }
-        settle(); XCTAssertTrue(feed.isAtLatest)
+        settle(); XCTAssertTrue(feed.isAtLatest, "Initial viewport \(feed.scroll.documentVisibleRect), document \(feed.text.bounds), viewport frame \(feed.scroll.frame)")
         for width: CGFloat in [360, 640, 380] {
             window.setContentSize(NSSize(width: width, height: 220)); settle()
             XCTAssertEqual(feed.text.string, content)

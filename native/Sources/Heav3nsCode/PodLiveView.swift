@@ -13,6 +13,7 @@ final class PodFeed: NSStackView {
     private var minimumHeight: NSLayoutConstraint!
     private var lastViewportSize = NSSize.zero
     private var tailUpdatePending = false
+    private var anchoringTail = false
     private lazy var latest = JourneyButton("Latest", symbol: "arrow.down") { [weak self] in self?.follow() }
     private lazy var pause = JourneyButton("Pause", symbol: "pause") { [weak self] in self?.state.pause(); self?.updateHeading() }
     init() {
@@ -47,7 +48,8 @@ final class PodFeed: NSStackView {
         super.layout()
         let size = scroll.contentView.bounds.size
         guard size != lastViewportSize else { return }
-        lastViewportSize = size; scheduleTailUpdate()
+        lastViewportSize = size
+        anchorTail()
     }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -56,15 +58,27 @@ final class PodFeed: NSStackView {
     /// Row reflow and text wrapping settle after the snapshot update. Anchor once afterward,
     /// using the current reader state so a selection or scroll made meanwhile always wins.
     private func scheduleTailUpdate() {
-        guard !tailUpdatePending else { return }
+        guard !tailUpdatePending, !anchoringTail else { return }
         tailUpdatePending = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.tailUpdatePending = false
-            guard !self.state.paused, self.text.selectedRange().length == 0, self.scroll.contentSize.width > 0 else { return }
-            self.scroll.layoutSubtreeIfNeeded()
-            self.text.scrollRangeToVisible(NSRange(location: self.text.string.utf16.count, length: 0))
+            defer { self.tailUpdatePending = false }
+            self.anchorTail()
         }
+    }
+    private func anchorTail() {
+        guard !anchoringTail, !state.paused, text.selectedRange().length == 0, scroll.contentSize.width > 0 else { return }
+        anchoringTail = true
+        defer { anchoringTail = false }
+        scroll.layoutSubtreeIfNeeded()
+        // Resolve wrapping at the viewport's layout boundary, including the
+        // bottom inset. First layout must not depend on a later main-queue turn.
+        if let container = text.textContainer { text.layoutManager?.ensureLayout(for: container) }
+        text.sizeToFit()
+        let clip = scroll.contentView
+        let bottom = max(0, text.bounds.maxY - clip.bounds.height)
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: bottom))
+        scroll.reflectScrolledClipView(clip)
     }
     var isAtLatest: Bool { scroll.documentVisibleRect.maxY >= text.bounds.height - 2 }
     var isFollowing: Bool { !state.paused }

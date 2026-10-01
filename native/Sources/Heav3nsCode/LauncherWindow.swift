@@ -5,22 +5,26 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
     var onOpenProject: ((URL) -> Void)?
     var canChangeAccount: () -> Bool = { true }
     private let library: ProjectLibrary
+    private let defaults: UserDefaults
     private let account = AccountClient()
     private var connected = false
     private var waiting = false
     private var browserURL: URL?
     private var accountMessage = ""
     private var accountPage = false
+    private var accountStatusLoaded = false
+    private var disconnecting = false
     private var pinnedOnly = false
     private var entries = [WorkspaceProject]()
     private let search = NSSearchField()
-    private let table = NSTableView()
+    private let table = KeyboardListView()
+    private var projectActions = [NSButton]()
     private let empty = JourneyStyle.label("", size: 14, secondary: true)
     private var content = NSView()
     private let probe = IntegrationProbe()
 
-    init(library: ProjectLibrary) {
-        self.library = library
+    init(library: ProjectLibrary, defaults: UserDefaults = .standard) {
+        self.library = library; self.defaults = defaults
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 740), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "HEAV3NS-CODE"; window.minSize = NSSize(width: 720, height: 480); window.isReleasedWhenClosed = false
         super.init(window: window); window.delegate = self; window.center()
@@ -29,33 +33,28 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         table.dataSource = self; table.delegate = self; table.rowHeight = 78; table.style = .fullWidth
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.target = self; table.doubleAction = #selector(openSelected)
+        table.onActivate = { [weak self] in self?.openSelected() }
         table.setAccessibilityLabel("Saved projects. Select a project, then choose Open.")
         account.onBrowser = { [weak self] url in
             guard let self else { return }; self.browserURL = url
             if !NSWorkspace.shared.open(url) { self.accountMessage = "The browser could not open. Use Open Browser to try again." }
             self.showSignIn()
         }
-        showWelcome(checking: true)
-        if probe?.launcherPass == true { probe?.connected(self); return }
-        account.request("status") { [weak self] result in
-            guard let self else { return }
-            if case .success(let data) = result { self.connected = data["saved"] as? Bool == true }
-            else if case .failure(let error) = result { self.accountMessage = error.localizedDescription }
-            if self.accountPage { self.showSignIn() }
-            else if UserDefaults.standard.bool(forKey: "journeyWelcomeCompleted") || !self.library.projects.isEmpty { self.showProjects() }
-            else { self.showWelcome() }
-        }
+        if defaults.bool(forKey: "journeyWelcomeCompleted") || !library.projects.isEmpty { showProjects() }
+        else { showWelcome() }
+        if probe?.launcherPass == true { probe?.connected(self) }
+
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func present(account: Bool = false) {
         accountPage = account
-        if account { showSignIn() } else if probe?.launcherPass != true && (UserDefaults.standard.bool(forKey: "journeyWelcomeCompleted") || !library.projects.isEmpty) { showProjects() }
+        if account { showSignIn() } else if probe?.launcherPass != true && (defaults.bool(forKey: "journeyWelcomeCompleted") || !library.projects.isEmpty) { showProjects() }
         window?.makeKeyAndOrderFront(nil)
     }
     func suspend() {
         account.stop()
         if waiting { accountMessage = "Sign-in was cancelled when the workspace opened. You can connect again after closing your workspaces." }
-        waiting = false; browserURL = nil; window?.orderOut(nil)
+        waiting = false; disconnecting = false; accountStatusLoaded = false; browserURL = nil; window?.orderOut(nil)
     }
     func refresh() { if !accountPage { showProjects() } }
     private func install(_ view: NSView) { content = view; window?.contentView = view }
@@ -73,14 +72,26 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
             let progress = NSProgressIndicator(); progress.style = .spinning; progress.startAnimation(nil)
             centered([mark, JourneyStyle.label("HEAV3NS-CODE", size: 30, weight: .semibold), JourneyStyle.label("Preparing your workspace…", size: 15, secondary: true), progress]); return
         }
-        let start = JourneyButton("Get started", symbol: "arrow.right") { [weak self] in self?.showSignIn() }
+        let start = JourneyButton("Get started", symbol: "arrow.right") { [weak self] in self?.finishWelcome() }
         start.keyEquivalent = "\r"; start.bezelColor = .controlAccentColor
-        centered([mark, JourneyStyle.label("Build through conversation.", size: 32, weight: .semibold), JourneyStyle.label("Tell LUMI what you want to make. Stay close to the work, from the first idea to the final review.", size: 16, secondary: true), JourneyStyle.rule(), JourneyStyle.label("Talk through the task\nFollow the agent’s work\nReview the changes", size: 15), start])
+        centered([mark, JourneyStyle.label("Build through conversation.", size: 32, weight: .semibold), JourneyStyle.label("Tell LUMI what you want to make. Stay close to the work, from the first idea to the final review.", size: 16, secondary: true), JourneyStyle.rule(), JourneyStyle.label("Open a project without signing in. Choose your model and provider in the workspace whenever you’re ready.", size: 15), start])
     }
     func showSignIn() {
         accountPage = true
-        var views: [NSView] = [JourneyStyle.label(waiting ? "Continue in your browser." : connected ? "Your ChatGPT connection" : "Sign in with ChatGPT", size: 30, weight: .semibold)]
-        let detail = waiting ? "Complete the sign-in in your browser, then return here. You can cancel and try again at any time." : connected ? "A ChatGPT connection is saved in LUMI. Model access is checked when you connect and when you start work." : "Connect securely in your browser. LUMI keeps credentials on this Mac and uses the OpenAI Codex provider for your work."
+        if !accountStatusLoaded && probe?.launcherPass != true {
+            accountStatusLoaded = true
+            account.request("status") { [weak self] result in
+                guard let self else { return }
+                if case .success(let data) = result { self.connected = data["saved"] as? Bool == true }
+                if case .failure(let error) = result { self.accountMessage = error.localizedDescription; self.accountStatusLoaded = false }
+                if self.accountPage { self.renderSignIn() }
+            }
+        }
+        renderSignIn()
+    }
+    private func renderSignIn() {
+        var views: [NSView] = [JourneyStyle.label(waiting ? "Continue in your browser." : connected ? "Your ChatGPT connection" : "Connect ChatGPT (optional)", size: 30, weight: .semibold)]
+        let detail = waiting ? "Complete the sign-in in your browser, then return here. You can cancel and try again at any time." : connected ? "A ChatGPT connection is saved in LUMI. Model access is checked when you connect and when you start work." : "ChatGPT is one way to connect. You can also use your existing LUMI API key, compatible endpoint, or Claude Code setup. Choose your provider inside a workspace."
         views.append(JourneyStyle.label(detail, size: 15, secondary: true))
         if !accountMessage.isEmpty { let notice = JourneyStyle.label(accountMessage, size: 13); notice.isSelectable = true; views.append(notice) }
         if waiting {
@@ -89,17 +100,17 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
             views.append(JourneyButton("Cancel sign-in") { [weak self] in self?.cancelSignIn() })
         } else {
             let signIn = JourneyButton(connected ? "Reconnect with ChatGPT" : "Sign in with ChatGPT", symbol: "person.crop.circle") { [weak self] in self?.signIn() }
-            signIn.isEnabled = canChangeAccount(); signIn.bezelColor = .controlAccentColor; views.append(signIn)
+            signIn.isEnabled = canChangeAccount() && !disconnecting; signIn.bezelColor = .controlAccentColor; views.append(signIn)
             if connected {
-                let disconnect = JourneyButton("Disconnect this Mac") { [weak self] in self?.disconnect() }; disconnect.isEnabled = canChangeAccount(); views.append(disconnect)
+                let disconnect = JourneyButton("Disconnect this Mac") { [weak self] in self?.disconnect() }; disconnect.isEnabled = canChangeAccount() && !disconnecting; views.append(disconnect)
             }
             if !canChangeAccount() { views.append(JourneyStyle.label("Close your workspace windows before changing the account connection.", size: 12, secondary: true)) }
-            views.append(JourneyButton(connected ? "Continue to projects" : "Use existing LUMI setup", symbol: "folder") { [weak self] in self?.finishWelcome() })
         }
+        views.append(JourneyButton("Continue to projects", symbol: "folder") { [weak self] in self?.finishWelcome() })
         centered(views)
     }
     private func signIn() {
-        guard !waiting, canChangeAccount() else { return }
+        guard !waiting, !disconnecting, canChangeAccount() else { return }
         waiting = true; browserURL = nil; accountMessage = ""; showSignIn()
         account.request("signIn") { [weak self] result in
             guard let self else { return }; self.waiting = false; self.browserURL = nil
@@ -109,28 +120,33 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
                 self.accountMessage = data["accessChecked"] as? Bool == true && (data["modelCount"] as? Int ?? 0) > 0 ? "Connected. Available models were retrieved." : "Sign-in saved. Model access could not be confirmed; check your account or try connecting again."
             case .failure(let error): self.accountMessage = error.localizedDescription
             }
-            self.showSignIn()
+            if self.accountPage { self.renderSignIn() }
         }
     }
     private func cancelSignIn() { account.request("cancel") { _ in }; accountMessage = "Cancelling sign-in…"; showSignIn() }
     private func disconnect() {
-        guard canChangeAccount(), !waiting else { return }
+        guard canChangeAccount(), !waiting, !disconnecting else { return }
+        disconnecting = true; accountMessage = "Disconnecting…"; renderSignIn()
         account.request("signOut") { [weak self] result in
             guard let self else { return }
+            self.disconnecting = false
             switch result {
             case .success: self.connected = false; self.accountMessage = "The saved connection was removed from this Mac."
             case .failure(let error): self.accountMessage = error.localizedDescription
             }
-            self.showSignIn()
+            if self.accountPage { self.renderSignIn() }
         }
     }
-    private func finishWelcome() { UserDefaults.standard.set(true, forKey: "journeyWelcomeCompleted"); showProjects() }
+    private func finishWelcome() {
+        if waiting { account.stop(); waiting = false; browserURL = nil; accountStatusLoaded = false }
+        defaults.set(true, forKey: "journeyWelcomeCompleted"); showProjects()
+    }
     private func showProjects() {
         accountPage = false
         let root = NSView(), sidebar = NSVisualEffectView(); sidebar.material = .sidebar; sidebar.blendingMode = .withinWindow
         let all = JourneyButton("Projects", symbol: "folder") { [weak self] in self?.pinnedOnly = false; self?.showProjects() }
         let pinned = JourneyButton("Pinned", symbol: "pin") { [weak self] in self?.pinnedOnly = true; self?.showProjects() }
-        let accountButton = JourneyButton(connected ? "ChatGPT connected" : "Account", symbol: "person.crop.circle") { [weak self] in self?.showSignIn() }
+        let accountButton = JourneyButton(connected ? "ChatGPT connected" : "Connect ChatGPT…", symbol: "person.crop.circle") { [weak self] in self?.showSignIn() }
         for button in [all, pinned, accountButton] { button.alignment = .left; button.bezelStyle = .inline; button.heightAnchor.constraint(equalToConstant: 36).isActive = true }
         let rail = JourneyStyle.stack([JourneyStyle.label("HEAV3NS-CODE", size: 13, weight: .semibold), JourneyStyle.rule(), all, pinned, NSView(), JourneyStyle.rule(), accountButton])
         sidebar.addSubview(rail); JourneyStyle.pin(rail, to: sidebar, inset: 16)
@@ -146,7 +162,8 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         let openSelected = JourneyButton("Open selected", symbol: "arrow.right") { [weak self] in self?.openSelected() }
         let pin = JourneyButton("Pin / Unpin", symbol: "pin") { [weak self] in self?.pinSelected() }
         let forget = JourneyButton("Remove from list") { [weak self] in self?.forgetSelected() }
-        let footer = JourneyStyle.stack([openSelected, pin, forget], vertical: false)
+        projectActions = [openSelected, pin, forget]
+        let footer = JourneyStyle.stack(projectActions, vertical: false)
         let main = JourneyStyle.stack([title, JourneyStyle.label("Pick up where you left off, or open a folder.", size: 15, secondary: true), toolbar, JourneyStyle.rule(), empty, scroll, footer], spacing: 18)
         main.edgeInsets = NSEdgeInsets(top: 36, left: 32, bottom: 28, right: 32)
         for view in main.arrangedSubviews { view.widthAnchor.constraint(equalTo: main.widthAnchor, constant: -64).isActive = true }
@@ -158,11 +175,25 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         install(root); refreshProjects()
     }
     private func refreshProjects() {
+        let selected = selectedProject?.path
         entries = library.matching(search.stringValue, pinnedOnly: pinnedOnly); table.reloadData()
+        if let selected, let index = entries.firstIndex(where: { $0.path == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
+        else { table.deselectAll(nil) }
+        updateProjectActions()
         empty.stringValue = !search.stringValue.isEmpty ? "No matching projects." : pinnedOnly ? "Pin a project to keep it close." : "Your next project starts here. Open an existing folder to begin."
         empty.isHidden = !entries.isEmpty
     }
+    private func updateProjectActions() { for button in projectActions { button.isEnabled = selectedProject != nil } }
+    func tableViewSelectionDidChange(_ notification: Notification) { updateProjectActions() }
     func controlTextDidChange(_ obj: Notification) { refreshProjects() }
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if commandSelector == #selector(NSResponder.moveDown(_:)), !entries.isEmpty {
+            table.selectRowIndexes(IndexSet(integer: max(0, table.selectedRow)), byExtendingSelection: false)
+            window?.makeFirstResponder(table); return true
+        }
+        if commandSelector == #selector(NSResponder.insertNewline(_:)), !textView.hasMarkedText(), selectedProject != nil { openSelected(); return true }
+        return false
+    }
     private var selectedProject: WorkspaceProject? { entries.indices.contains(table.selectedRow) ? entries[table.selectedRow] : nil }
     @objc private func openSelected() { if let project = selectedProject { onOpenProject?(URL(fileURLWithPath: project.path)) } }
     private func pinSelected() { if let project = selectedProject { library.togglePin(project.path); refreshProjects() } }
@@ -187,7 +218,7 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         cell.textField = name; cell.imageView = icon; cell.toolTip = project.path
         return cell
     }
-    func windowWillClose(_ notification: Notification) { account.stop(); waiting = false; browserURL = nil }
+    func windowWillClose(_ notification: Notification) { account.stop(); waiting = false; disconnecting = false; accountStatusLoaded = false; browserURL = nil }
     func navigateProbe(_ step: String) {
         guard probe?.launcherPass == true else { return }
         switch step {

@@ -4947,26 +4947,26 @@ export class LumiMonolith implements IAgentEngine {
 	}
 
 	/** Dynamically changes the active LLM model with alias normalization */
-	setModel(modelName: string): string {
-		const normalized = this.modelResolver.setActiveModel(modelName)
+	setModel(modelName: string, persist = true, exact = false): string {
+		const normalized = this.modelResolver.setActiveModel(modelName, exact)
 		;(this.config as { modelName: string }).modelName = normalized
-		this.setupWizard.setSavedModel(normalized)
+		if (persist) this.setupWizard.setSavedModel(normalized)
 		return normalized
 	}
 
 	/** Selects the active transport and keeps the model on that provider's catalog. */
-	setProvider(provider: AgentProviderId): AgentProviderId {
+	setProvider(provider: AgentProviderId, persist = true): AgentProviderId {
 		const normalizedProvider = normalizeAgentProvider(provider)
 		this.modelResolver.setProvider(normalizedProvider)
 		;(this.config as { provider: AgentProviderId }).provider = normalizedProvider
-		this.setModel(this.modelResolver.getActiveModel())
+		this.setModel(this.modelResolver.getActiveModel(), persist)
 		const persistableProvider =
 			normalizedProvider === OPENAI_CODEX_PROVIDER
 				? OPENAI_CODEX_PROVIDER
 				: normalizedProvider === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
 					? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
 					: undefined
-		if (persistableProvider) {
+		if (persist && persistableProvider) {
 			this.setupWizard.setSavedProvider(persistableProvider)
 		}
 		return normalizedProvider

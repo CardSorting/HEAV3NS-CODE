@@ -11,6 +11,11 @@ import type {
 	IAgentEngine,
 	WorkspaceRuntimeObservation,
 } from "../core/contracts/agent.contracts.js"
+import {
+	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+	getAgentProviderLabel,
+	OPENAI_CODEX_PROVIDER,
+} from "../core/providers/provider-ids.js"
 import { StateManager } from "../core/storage/StateManager.js"
 import { HostProvider } from "../hosts/host-provider.js"
 import { LumiMonolith } from "../index.js"
@@ -23,6 +28,8 @@ import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/det
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
 import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
 import { WorkspaceInspection } from "./inspection.js"
+import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
+import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
 import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
@@ -75,6 +82,7 @@ const shortText = (text: string, limit = 24_000) => {
 }
 const projectRun = (run: Run) => ({
 	id: run.id,
+	modelSelection: run.modelSelection,
 	request: run.request,
 	session: run.session,
 	conversation: run.conversation ?? run.session,
@@ -125,6 +133,7 @@ const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<
 
 type ConversationContext = { jsonl: string; turnCount: number; memories?: MemoryEntry[] }
 type DesktopLifecycle = {
+	models?: DesktopModels
 	sessionId: string
 	saveContext: (conversation?: string) => void
 	readContext?: () => ConversationContext
@@ -154,6 +163,7 @@ export class DesktopSession {
 	private controller?: AbortController
 	private queue: Run[] = []
 	private closing = false
+	private modelStateError?: string
 	private pumping?: Promise<void>
 	private approvalResolvers = new Map<string, (value: ConfirmationResponse) => void>()
 	private approvalTurns: Promise<unknown> = Promise.resolve()
@@ -541,10 +551,23 @@ export class DesktopSession {
 			})
 		return result
 	}
+	private modelStatus() {
+		const models = this.lifecycle?.models
+		if (!models) throw new Error("UNSUPPORTED: this runtime cannot switch models")
+		return {
+			...models.current(),
+			revision: this.metadata.get("model-selection")?.revision ?? 0,
+			providers: models.catalog(),
+			recent: recentModelSelections(models.current(), this.metadata.get("model-selection")?.recent),
+			busy: Boolean(this.active || this.queue.length || this.cancellingAll),
+			blocked: this.modelStateError,
+		}
+	}
 	async request(request: DesktopRequest): Promise<unknown> {
 		if (
 			[
 				"task.submit",
+				"models.select",
 				"task.edit",
 				"conversation.create",
 				"conversation.select",
@@ -572,6 +595,8 @@ export class DesktopSession {
 				limits: { queuedInstructions: DESKTOP_QUEUE_LIMIT, instructionLength: MAX_INSTRUCTION_LENGTH },
 				capabilities: [
 					"native",
+					...(this.lifecycle?.models ? ["model-selection-v1"] : []),
+					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
 					"snapshot",
 					"workspace-verification-v1",
 					"task-continuation-v1",
@@ -602,6 +627,55 @@ export class DesktopSession {
 			throw new Error("IDENTITY_MISMATCH: attach to this workspace and session before execution")
 		if (this.closing && request.method !== "snapshot") throw new Error("SHUTTING_DOWN: no more work is admitted")
 		switch (request.method) {
+			case "models.discover": {
+				const { provider, refresh } = z
+					.object({ provider: modelSelectionSchema.shape.provider, refresh: z.boolean().default(false) })
+					.strict()
+					.parse(request.params)
+				if (!this.lifecycle?.models?.discover) throw new Error("UNSUPPORTED: model discovery is unavailable")
+				return this.lifecycle.models.discover(provider, refresh)
+			}
+			case "models.list":
+				await this.submissions
+				return this.modelStatus()
+			case "models.select": {
+				if (this.modelStateError) throw new Error(this.modelStateError)
+				const models = this.lifecycle?.models
+				if (!models) throw new Error("UNSUPPORTED: this runtime cannot switch models")
+				const { revision, ...raw } = modelSelectionSchema
+					.extend({ revision: z.number().int().nonnegative() })
+					.parse(request.params)
+				const selection = validateModelSelection(raw)
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop active and queued instructions before switching models")
+				const previous = this.metadata.get("model-selection")
+				if (revision !== (previous?.revision ?? 0))
+					throw new Error("STALE_MODEL: reload the current selection before applying")
+				const before = models.current()
+				if (before.provider === selection.provider && before.model === selection.model) return this.modelStatus()
+				try {
+					models.apply(selection)
+					this.metadata.put("model-selection", {
+						...selection,
+						revision: revision + 1,
+						recent: recentModelSelections(selection, recentModelSelections(before, previous?.recent)),
+					})
+					await this.database.flush()
+				} catch (error) {
+					try {
+						models.apply(before)
+						this.metadata.put("model-selection", previous ?? { ...before, revision })
+						await this.database.flush()
+					} catch {
+						this.modelStateError =
+							"MODEL_STATE_UNCERTAIN: the model change could not be saved or rolled back. Close and reopen this workspace to recover the saved selection before sending more work."
+						throw new Error(this.modelStateError)
+					}
+					throw error
+				}
+				this.event("models.changed", this.modelStatus())
+				return this.modelStatus()
+			}
 			case "workspace.attach":
 			case "snapshot":
 				await this.submissions
@@ -613,6 +687,7 @@ export class DesktopSession {
 					conversation: this.conversation,
 					seq: this.seq,
 					runs: this.snapshotRuns(),
+					modelSelection: this.lifecycle?.models ? this.modelStatus() : undefined,
 					active: this.active?.id,
 					queued: this.queue.map((r) => r.id),
 				}
@@ -892,6 +967,7 @@ export class DesktopSession {
 				return { conversation: id }
 			}
 			case "task.submit": {
+				if (this.modelStateError) throw new Error(this.modelStateError)
 				const params = z
 					.object({
 						text: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH),
@@ -984,6 +1060,7 @@ export class DesktopSession {
 					continuation,
 					projectRepair,
 					state: "queued",
+					modelSelection: this.lifecycle?.models?.current(),
 					queueOrder: this.seq + 1,
 					createdAt: Date.now(),
 					updatedAt: Date.now(),
@@ -1653,6 +1730,7 @@ export class DesktopSession {
 	}
 	async stop() {
 		this.closing = true
+		this.lifecycle?.models?.close?.()
 		this.projectEpoch++
 		clearTimeout(this.activityCheckpoint)
 		clearTimeout(this.activityDelivery)
@@ -1760,6 +1838,12 @@ export async function runDesktopWorker(): Promise<void> {
 		const saved = metadata.get("session")
 		const sessionId = typeof saved?.session === "string" ? saved.session : randomUUID()
 		engine = new LumiMonolith({ cwd: owner.path, sessionId, databaseKernel: database })
+		const savedSelection = metadata.get("model-selection")
+		if (savedSelection) {
+			const selection = validateModelSelection({ provider: savedSelection.provider, model: savedSelection.model })
+			engine.setProvider(selection.provider, false)
+			engine.setModel(selection.model, false, true)
+		}
 		const context = metadata.get("context")
 		if (typeof context?.jsonl === "string") {
 			engine.sessionStore.importJsonl(context.jsonl)
@@ -1786,8 +1870,55 @@ export async function runDesktopWorker(): Promise<void> {
 			for (const memory of context.memories as MemoryEntry[])
 				engine.sessionMemoryStore.saveMemory(memory.key, memory.value, memory.category)
 		}
+		const discovery = new DesktopModelDiscovery(
+			providerModelLoader({
+				gateway: engine.proxyGateway,
+				authMethod: () => engine!.setupWizard.getOpenAiAuthMethod(),
+				apiKey: () =>
+					engine!.authStorageVault.getToken(OPENAI_CODEX_PROVIDER) ||
+					engine!.envKeyResolver.resolveKey(OPENAI_CODEX_PROVIDER) ||
+					undefined,
+				claude: {
+					cwd: owner.path,
+					pluginDir: engine.config.claudePluginDir,
+					pythonPath: engine.config.claudePythonPath,
+					command: engine.config.claudeCommand,
+				},
+			}),
+		)
 		bridge = new DesktopSession(owner, engine, database, send, {
 			sessionId,
+			models: {
+				current: () => ({
+					provider: engine!.modelResolver.getProvider() as
+						| "openai-codex"
+						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+					model: engine!.modelResolver.getActiveModel(),
+				}),
+				apply: (selection) => {
+					engine!.setProvider(selection.provider, false)
+					engine!.setModel(selection.model, false, true)
+				},
+				discover: (provider, refresh) => discovery.discover(provider, refresh),
+				close: () => discovery.close(),
+				catalog: () =>
+					[OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER].map((id) => ({
+						id,
+						label: getAgentProviderLabel(id),
+						detail:
+							id === OPENAI_CODEX_PROVIDER
+								? engine!.proxyGateway.getProxyConfig() ||
+									engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
+									? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
+									: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
+										? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
+										: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
+											? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
+											: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."
+								: "Uses your existing Claude Code connection. If needed, run claude auth login, then reconnect this workspace.",
+						models: discovery.models(id),
+					})),
+			},
 			readContext,
 			restoreContext,
 			saveContext: (conversation) => {

@@ -181,9 +181,10 @@ export class ModelResolver {
 		return this.provider
 	}
 
-	setActiveModel(modelName: string): string {
-		const normalized = ModelResolver.normalizeModelNameForProvider(modelName, this.provider)
+	setActiveModel(modelName: string, exact = false): string {
+		const normalized = exact ? modelName.trim() : ModelResolver.normalizeModelNameForProvider(modelName, this.provider)
 		if (!isModelSupportedByProvider(normalized, this.provider)) {
+			if (exact) throw new Error("Model ID is not compatible with this provider")
 			this.currentActiveModel = providerDefaultModel(this.provider)
 			return this.currentActiveModel
 		}

@@ -1,6 +1,8 @@
 import { type DesktopRequest, MAX_PENDING_BYTES } from "./protocol.js"
 
 const inspectionMethods = new Set([
+	"models.list",
+	"models.discover",
 	"files.list",
 	"files.search",
 	"files.read",

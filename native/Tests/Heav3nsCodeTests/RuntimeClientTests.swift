@@ -41,6 +41,26 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testClosingInputImmediatelyRevokesReadinessAndCompletesPendingRequestsOnce() throws {
+        let client = try peer(hello + snapshot, timeout: 2)
+        let finished = expectation(description: "connection close completes its observer and pending request")
+        var started = false, disconnects = 0, completions = 0
+        client.onConnection = { message in
+            if message.hasPrefix("Disconnected") { disconnects += 1; XCTAssertFalse(client.isReady) }
+            guard client.isReady, !started else { return }; started = true
+            client.request("models.list") { result in
+                completions += 1
+                if case .success = result { XCTFail("Closed requests must fail") }
+            }
+            client.closeInput(); client.closeInput()
+            XCTAssertFalse(client.isReady)
+            XCTAssertEqual(disconnects, 1); XCTAssertEqual(completions, 1)
+            finished.fulfill()
+        }
+        client.start(folder: directory); wait(for: [finished], timeout: 3)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        XCTAssertEqual(disconnects, 1); XCTAssertEqual(completions, 1)
+    }
     func testFreshSnapshotCannotJoinAReadFromBeforeAConversationMutation() throws {
         let client = try peer(hello + """
         if (request.method === 'snapshot') {

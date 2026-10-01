@@ -11,7 +11,7 @@ final class AccountClient {
     private let io = DispatchQueue(label: "io.heav3ns.account")
     private var callbacks = [String: (Result<[String: Any], Error>) -> Void]()
     private var generation = UUID()
-    private var deadline: DispatchWorkItem?
+    private var deadlines = [String: DispatchWorkItem]()
     private let nodeOverride: URL?
     private let cliOverride: URL?
     init(node: URL? = nil, cli: URL? = nil) { nodeOverride = node; cliOverride = cli }
@@ -28,11 +28,11 @@ final class AccountClient {
             callbacks[id] = completion
             var data = try JSONSerialization.data(withJSONObject: ["v": 1, "id": id, "method": method]); data.append(10)
             try input?.fileHandleForWriting.write(contentsOf: data)
-            if method == "signIn" || (deadline == nil && method == "status") {
-                deadline?.cancel()
-                let timeout = DispatchWorkItem { [weak self] in self?.fail("The account service timed out. Check your browser and try again."); self?.stop() }
-                deadline = timeout; DispatchQueue.main.asyncAfter(deadline: .now() + (method == "signIn" ? 180 : 15), execute: timeout)
+            let timeout = DispatchWorkItem { [weak self] in
+                self?.fail("The account service timed out. Try connecting again."); self?.stop()
             }
+            deadlines[id] = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + (method == "signIn" ? 180 : 15), execute: timeout)
         } catch { callbacks.removeValue(forKey: id); completion(.failure(error)) }
     }
     private func start() throws {
@@ -79,15 +79,17 @@ final class AccountClient {
             onBrowser?(url); return
         }
         guard let id = frame["id"] as? String, let callback = callbacks.removeValue(forKey: id) else { return }
-        if let error = frame["error"] as? String { deadline?.cancel(); callback(.failure(BridgeError.message(error))) }
-        else { if frame["result"] as? [String: Any] != nil && callbacks.isEmpty { deadline?.cancel() }; callback(.success(frame["result"] as? [String: Any] ?? [:])) }
+        deadlines.removeValue(forKey: id)?.cancel()
+        if let error = frame["error"] as? String { callback(.failure(BridgeError.message(error))) }
+        else if let result = frame["result"] as? [String: Any] { callback(.success(result)) }
+        else { callback(.failure(BridgeError.message("The account service returned an invalid response."))) }
     }
     private func fail(_ message: String) {
-        let pending = callbacks; callbacks.removeAll(); deadline?.cancel()
+        let pending = callbacks; callbacks.removeAll(); deadlines.values.forEach { $0.cancel() }; deadlines.removeAll()
         for callback in pending.values { callback(.failure(BridgeError.message(message))) }
     }
     func stop() {
-        deadline?.cancel(); deadline = nil; generation = UUID()
+        deadlines.values.forEach { $0.cancel() }; deadlines.removeAll(); generation = UUID()
         callbacks.removeAll(); output?.fileHandleForReading.readabilityHandler = nil
         try? input?.fileHandleForWriting.close()
         let child = process; process = nil

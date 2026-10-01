@@ -3,6 +3,19 @@ import XCTest
 @testable import Heav3nsCode
 
 final class ConversationSidebarTests: XCTestCase {
+    func testSearchDoesNotEraseNavigationErrorsAndWhitespaceDoesNotHideThreads() throws {
+        _ = NSApplication.shared
+        let sidebar = ConversationSidebar(folder: URL(fileURLWithPath: "/tmp/fixture"))
+        sidebar.show([.init(id: "one", title: "First conversation", detail: "Today")], selected: "one", canSwitch: false, more: false, message: "Earlier conversations could not load. Try again.")
+        func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+        let search = try XCTUnwrap(views(sidebar).compactMap { $0 as? NSSearchField }.first)
+        search.stringValue = "unmatched"; sidebar.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        XCTAssertEqual(sidebar.numberOfRows(in: NSTableView()), 0)
+        search.stringValue = "   "; sidebar.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        XCTAssertEqual(sidebar.numberOfRows(in: NSTableView()), 1)
+        XCTAssertTrue(views(sidebar).compactMap { $0 as? NSTextField }.contains { !$0.isHidden && $0.stringValue == "Earlier conversations could not load. Try again." })
+    }
+
     func testDeleteTargetsItsOwnRowWithoutSelectingAndTracksWorkAvailability() {
         _ = NSApplication.shared
         let sidebar = ConversationSidebar(folder: URL(fileURLWithPath: "/tmp/fixture"))

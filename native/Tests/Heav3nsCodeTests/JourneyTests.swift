@@ -3,6 +3,23 @@ import AppKit
 @testable import Heav3nsCode
 
 final class JourneyTests: XCTestCase {
+    func testFirstInteractionEntersProjectsWithoutAnAccount() throws {
+        _ = NSApplication.shared
+        let suite = "LauncherTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let launcher = LauncherWindow(library: ProjectLibrary(defaults: defaults), defaults: defaults)
+        defer { launcher.window?.close() }
+        func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+        let start = try XCTUnwrap(views(try XCTUnwrap(launcher.window?.contentView)).compactMap { $0 as? NSButton }.first { $0.title == "Get started" })
+        start.performClick(nil)
+        let buttons = views(try XCTUnwrap(launcher.window?.contentView)).compactMap { $0 as? NSButton }
+        XCTAssertTrue(defaults.bool(forKey: "journeyWelcomeCompleted"))
+        XCTAssertNotNil(buttons.first { $0.title == "Open existing workspace…" })
+        XCTAssertNil(buttons.first { $0.title == "Sign in with ChatGPT" })
+        XCTAssertFalse(try XCTUnwrap(buttons.first { $0.title == "Open selected" }).isEnabled)
+    }
+
     func testAccountPipeCancelsBrowserFlowAndCanRestartWithoutOpeningABrowser() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
