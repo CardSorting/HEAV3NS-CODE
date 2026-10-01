@@ -4,6 +4,24 @@ import XCTest
 
 final class ActionPaletteTests: XCTestCase {
     private func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+    func testPaletteLeavesWorkspaceUnblockedAndDismissalDetachesItsWindow() throws {
+        _ = NSApplication.shared
+        let parent = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 480), styleMask: [.titled], backing: .buffered, defer: false)
+        parent.isReleasedWhenClosed = false
+        var performed = false
+        let palette = ActionPalette(actions: [WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { performed = true }])
+        defer { palette.cancelOperation(nil); parent.close() }
+        palette.present(for: parent)
+        XCTAssertNil(parent.attachedSheet, "Action search must leave the parent workspace interactive")
+        XCTAssertTrue(palette.window?.parent === parent)
+        XCTAssertTrue(palette.window?.isVisible == true)
+        palette.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification))
+        XCTAssertNil(palette.window?.parent)
+        XCTAssertFalse(palette.window?.isVisible == true)
+        let table = try XCTUnwrap(descendants(try XCTUnwrap(palette.window?.contentView)).compactMap { $0 as? KeyboardListView }.first)
+        table.onActivate?()
+        XCTAssertFalse(performed, "A dismissed palette must not dispatch a stale action")
+    }
     func testSearchSupportsUnorderedTermsAliasesAndDiacriticsWithoutInventingMatches() {
         let action = WorkspaceAction(title: "Choose Model & Provider…", shortcut: "", keywords: ["switch", "change", "résumé"]) {}
         for query in ["provider model", "SWITCH provider", "resume", "  \n "] { XCTAssertTrue(action.matches(query), query) }

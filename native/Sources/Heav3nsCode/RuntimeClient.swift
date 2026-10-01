@@ -68,7 +68,8 @@ final class RuntimeClient {
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
     private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
-    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status"]
+    private static let discoveries: Set<String> = ["models.discover", "files.search", "project.discover", "changes.list"]
+    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "task.lookup"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -168,11 +169,16 @@ final class RuntimeClient {
     }
     func request(_ method: String, params: [String: Any] = [:], id: String = UUID().uuidString, completion: @escaping (Result<[String: Any], Error>) -> Void = { _ in }) {
         let control = Self.controls.contains(method)
+        let discovery = Self.discoveries.contains(method)
+        if discovery && callbacks.values.filter({ Self.discoveries.contains($0.method) }).count >= 40 {
+            completion(.failure(RuntimeFailure(message: "Discovery is busy. Try again shortly; task controls and navigation remain available.", acceptanceUnknown: false))); return
+        }
         guard process?.isRunning == true, !closed, callbacks.count < (control ? 64 : 56), callbacks[id] == nil, let writer else {
             completion(.failure(RuntimeFailure(message: "LUMI is unavailable or has too many pending requests. Your draft is preserved.", acceptanceUnknown: false))); return
         }
         do {
             var data = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "request", "id": id, "workspace": workspace, "session": session, "method": method, "params": params])
+            guard !discovery || pendingWrites + data.count <= 2 * 1024 * 1024 else { throw BridgeError.message("Discovery is busy. Try again shortly; task controls and navigation remain available.") }
             guard data.count <= FrameParser.limit, pendingWrites + data.count < 4 * 1024 * 1024 - (control ? 0 : 64 * 1024) else { throw BridgeError.message("The input queue is full. Your draft is preserved; try again after LUMI catches up.") }
             data.append(10)
             let timeout = DispatchWorkItem { [weak self] in

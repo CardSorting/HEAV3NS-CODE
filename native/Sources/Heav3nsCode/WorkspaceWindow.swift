@@ -133,6 +133,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var inspectedDiff: String?
     private var expandedActions = Set<String>()
     private var uncertainSubmission: WorkspaceDraft.Submission?
+    private var checkingSubmission = false
     private let draftStore: WorkspaceDraftStore
     private var recoverySubmission: WorkspaceDraft.Submission?
     private var draftTimer: Timer?
@@ -740,6 +741,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc func showActions() {
         guard let window, window.attachedSheet == nil else { return }
+        palette?.cancelOperation(nil)
         var actions = [
             WorkspaceAction(title: "Open Workspace…", shortcut: "⌘O") { NSApp.sendAction(#selector(ApplicationDelegate.openFolder), to: NSApp.delegate, from: nil) },
             WorkspaceAction(title: "Focus Composer", shortcut: "⌘L") { [weak self] in self?.focusComposer() },
@@ -753,6 +755,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         ]
         if client.capabilities.contains("model-selection-v1") { actions.insert(WorkspaceAction(title: "Choose Model & Provider…", shortcut: "⇧⌘M", keywords: ["switch", "change", "AI"]) { [weak self] in self?.showModels() }, at: 1) }
         if !client.isReady, client.process?.isRunning != true, !closing { actions.insert(WorkspaceAction(title: "Reconnect Workspace", shortcut: "", keywords: ["connection", "retry", "recover"]) { [weak self] in self?.reconnect() }, at: 0) }
+        if client.isReady, uncertainSubmission != nil, !checkingSubmission { actions.insert(WorkspaceAction(title: "Check Instruction Status", shortcut: "", keywords: ["retry", "submission", "recover"]) { [weak self] in self?.reconcileSubmission() }, at: 0) }
         actions.append(WorkspaceAction(title: "Project Library…", shortcut: "", keywords: ["projects", "open recent"]) { [weak self] in self?.onProjects?() })
         actions.append(WorkspaceAction(title: "ChatGPT Connection…", shortcut: "", keywords: ["account", "sign in", "authentication"]) { [weak self] in self?.onAccount?() })
         if canOpenFile { actions.insert(WorkspaceAction(title: "Open File…", shortcut: "⌘P") { [weak self] in self?.showQuickOpen() }, at: 1) }
@@ -780,6 +783,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         quickOpen?.present(for: window)
     }
     @objc func focusComposer() {
+        palette?.cancelOperation(nil)
         quickOpen?.dismiss(restoreFocus: false)
         modelPicker?.dismiss(restoreFocus: false)
         checkpointWindow?.close()
@@ -888,9 +892,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func reconcileSubmission() {
-        guard let uncertain = uncertainSubmission else { return }
+        guard client.isReady, !closing, !checkingSubmission, let uncertain = uncertainSubmission else { return }
+        checkingSubmission = true; updateStatus()
         client.request("task.lookup", params: ["request": uncertain.id]) { [weak self] result in
             guard let self, self.uncertainSubmission?.id == uncertain.id else { return }
+            self.checkingSubmission = false
             switch result {
             case .success(let data):
                 self.uncertainSubmission = nil
@@ -903,12 +909,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                     self.walkthrough.followCurrentInstruction()
                 } else { self.showNotice("LUMI has no acceptance record for that instruction. Review your draft and send it when ready.") }
                 self.saveDraft()
-            case .failure(let error): self.showNotice(error.localizedDescription)
+            case .failure(let error): self.showNotice(self.client.isReady ? "Could not confirm the instruction yet. Choose Check Status to retry. Your draft is preserved and nothing will be resubmitted." : error.localizedDescription)
             }
             self.updateStatus()
         }
     }
     @objc func reconnect() {
+        if client.isReady, uncertainSubmission != nil { reconcileSubmission(); return }
         guard client.process?.isRunning != true, !closing else { return }
         client = RuntimeClient(); stopped = false; sequence = 0; cancelRequested = false; stopAcknowledged = true; cancellationToken = nil; forceAvailable = false; recovering = true
         configureClient(); reconnectButton.isHidden = true; client.start(folder: folder)
@@ -1163,6 +1170,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         updateApproval()
         if !hasWork && !closing && stopAcknowledged { forceAvailable = false; cancelRequested = false; cancellationToken = nil; stopButton.title = "Stop" }
         let queued = runs.filter { $0["state"] as? String == "queued" }.count
+        let needsLookup = client.isReady && uncertainSubmission != nil
+        reconnectButton.title = needsLookup ? (checkingSubmission ? "Checking…" : "Check Status") : "Reconnect"
+        reconnectButton.isEnabled = !checkingSubmission && !closing
+        reconnectButton.isHidden = closing || (!needsLookup && (client.isReady || client.process?.isRunning == true))
         let draft = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
         sendButton.isEnabled = client.isReady && !switchingConversation && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit
         stopButton.isEnabled = forceAvailable || (!cancelRequested && hasWork) || (closing && !stopped)
@@ -1178,7 +1189,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         sendButton.title = hasWork ? "Queue" : "Send"
         stopSendButton.isHidden = !hasWork || draft.isEmpty
         stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
-        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? "Acceptance unknown · reconnect to reconcile" : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
+        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? (client.isReady ? "Acceptance unknown · Check Status before sending" : "Acceptance unknown · reconnect to reconcile") : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
         queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
         queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
         updateQueue()
@@ -1640,7 +1651,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         closing = true; composer.isEditable = false; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
     }
     func windowWillClose(_ notification: Notification) {
-        modelPicker?.dismiss(restoreFocus: false); modelPicker = nil; saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
+        palette?.cancelOperation(nil); palette = nil; modelPicker?.dismiss(restoreFocus: false); modelPicker = nil; saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         guard rows.indices.contains(row) else { return 40 }

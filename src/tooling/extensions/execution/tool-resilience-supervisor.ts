@@ -13,8 +13,16 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import type { IToolRegistry, ToolDefinition, ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js";
 import { ToolErrorAutoHealer } from "./tool-error-auto-healer.js";
+import { ToolApprovalDeniedError } from "./tool-confirmation-gatekeeper.js";
+
+const REPEATABLE_TOOLS = new Set(["view_file", "batch_view_files", "list_dir", "file_info", "path_exists", "file_hash", "write_file", "create_directory"]);
+const isTransientLock = (error: unknown): boolean => {
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  return ["EBUSY", "EAGAIN"].includes(code) || /\b(?:EBUSY|EAGAIN)\b/.test(error instanceof Error ? error.message : String(error));
+};
 
 export interface ResilienceRecord {
   readonly toolName: string;
@@ -59,6 +67,8 @@ export class ToolResilienceSupervisor {
     toolDef?: ToolDefinition,
     options?: ToolExecutionOptions
   ): Promise<{ recovered: boolean; result?: unknown; record?: ResilienceRecord }> {
+    options?.signal?.throwIfAborted();
+    if (error instanceof ToolApprovalDeniedError || (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name))) return { recovered: false };
     this.totalAttempts++;
     const errMsg = error instanceof Error ? error.message : String(error);
     const lowerError = errMsg.toLowerCase();
@@ -73,20 +83,23 @@ export class ToolResilienceSupervisor {
       lowerError.includes("could not find target") ||
       lowerError.includes("mismatch");
 
-    if ((toolName === "replace_file_content" || toolName === "search_and_replace") && isTargetNotFound) {
+    if (toolName === "replace_file_content" && isTargetNotFound) {
       const filePath = typeof rawArgs.path === "string" ? rawArgs.path : (typeof rawArgs.targetFile === "string" ? rawArgs.targetFile : undefined);
-      const targetContent = typeof rawArgs.targetContent === "string" ? rawArgs.targetContent : (typeof rawArgs.target === "string" ? rawArgs.target : undefined);
-      const replacementContent = typeof rawArgs.replacementContent === "string" ? rawArgs.replacementContent : (typeof rawArgs.replacement === "string" ? rawArgs.replacement : undefined);
+      const targetContent = typeof rawArgs.target === "string" ? rawArgs.target : (typeof rawArgs.targetContent === "string" ? rawArgs.targetContent : undefined);
+      const replacementContent = typeof rawArgs.replacement === "string" ? rawArgs.replacement : (typeof rawArgs.replacementContent === "string" ? rawArgs.replacementContent : undefined);
 
       if (filePath && targetContent !== undefined && replacementContent !== undefined) {
         const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
         try {
-          const fileText = await fs.readFile(fullPath, "utf8");
+          const fileText = await fs.readFile(fullPath, { encoding: "utf8", signal: options?.signal });
+          options?.signal?.throwIfAborted();
           const fuzzyMatch = this.autoHealer.healFuzzyPatch(fileText, targetContent);
 
           if (fuzzyMatch.found && fuzzyMatch.adjustedTarget) {
-            const updatedText = fileText.replace(fuzzyMatch.adjustedTarget, replacementContent);
-            await fs.writeFile(fullPath, updatedText, "utf8");
+            // Re-enter the exact replacement tool, preserving journaling,
+            // validation, cancellation and the caller's execution authority.
+            const healedArgs = { ...rawArgs, target: fuzzyMatch.adjustedTarget, targetContent: fuzzyMatch.adjustedTarget };
+            const result = await this.executeRecovery(registry, toolName, healedArgs, cwd, options);
 
             this.totalRecovered++;
             this.strategyCounts.fuzzy_patch = (this.strategyCounts.fuzzy_patch || 0) + 1;
@@ -95,7 +108,7 @@ export class ToolResilienceSupervisor {
               toolName,
               originalArgs: rawArgs,
               strategy: "fuzzy_patch",
-              healedArgs: { ...rawArgs, targetContent: fuzzyMatch.adjustedTarget },
+              healedArgs,
               timestamp: Date.now(),
               success: true,
               details: `Fuzzy patch auto-healed matching line block with ${(fuzzyMatch.confidence * 100).toFixed(0)}% confidence.`,
@@ -104,17 +117,12 @@ export class ToolResilienceSupervisor {
 
             return {
               recovered: true,
-              result: {
-                success: true,
-                autoHealed: true,
-                strategy: "fuzzy_patch",
-                message: `Successfully replaced content via whitespace-tolerant fuzzy patch auto-recovery.`,
-                path: filePath,
-              },
+              result,
               record: rec,
             };
           }
-        } catch {
+        } catch (retryError) {
+          this.throwIfStopped(retryError, options);
           // Fall through if file cannot be read
         }
       }
@@ -133,12 +141,8 @@ export class ToolResilienceSupervisor {
         const parentDir = path.dirname(fullPath);
 
         try {
-          await fs.mkdir(parentDir, { recursive: true });
-          const retryRes = await registry.executeTool(toolName, rawArgs, cwd, {
-            ...options,
-            autoHeal: false,
-            bypassConfirmation: true,
-          });
+          await this.executeRecovery(registry, "create_directory", { path: parentDir }, cwd, options);
+          const retryRes = await this.executeRecovery(registry, toolName, rawArgs, cwd, options);
 
           this.totalRecovered++;
           this.strategyCounts.mkdir_parent = (this.strategyCounts.mkdir_parent || 0) + 1;
@@ -159,7 +163,8 @@ export class ToolResilienceSupervisor {
             result: retryRes,
             record: rec,
           };
-        } catch {
+        } catch (retryError) {
+          this.throwIfStopped(retryError, options);
           // Fall through
         }
       }
@@ -186,11 +191,7 @@ export class ToolResilienceSupervisor {
 
       if (repaired) {
         try {
-          const retryRes = await registry.executeTool(toolName, healedArgs, cwd, {
-            ...options,
-            autoHeal: false,
-            bypassConfirmation: true,
-          });
+          const retryRes = await this.executeRecovery(registry, toolName, healedArgs, cwd, options);
 
           this.totalRecovered++;
           this.strategyCounts.param_alias = (this.strategyCounts.param_alias || 0) + 1;
@@ -211,7 +212,8 @@ export class ToolResilienceSupervisor {
             result: retryRes,
             record: rec,
           };
-        } catch {
+        } catch (retryError) {
+          this.throwIfStopped(retryError, options);
           // Fall through
         }
       }
@@ -220,16 +222,11 @@ export class ToolResilienceSupervisor {
     // ------------------------------------------------------------------------
     // Strategy 4: Transient Filesystem Lock Contention Micro-Retry
     // ------------------------------------------------------------------------
-    const isLockError = /\b(ebusy|eexist|lock|locked|contention|resource temporarily unavailable)\b/i.test(errMsg);
-    if (isLockError) {
+    if (REPEATABLE_TOOLS.has(toolName) && isTransientLock(error)) {
       for (let attempt = 1; attempt <= 2; attempt++) {
-        await new Promise((r) => setTimeout(r, attempt * 40));
+        await delay(attempt * 40, undefined, { signal: options?.signal });
         try {
-          const retryRes = await registry.executeTool(toolName, rawArgs, cwd, {
-            ...options,
-            autoHeal: false,
-            bypassConfirmation: true,
-          });
+          const retryRes = await this.executeRecovery(registry, toolName, rawArgs, cwd, options);
 
           this.totalRecovered++;
           this.strategyCounts.transient_retry = (this.strategyCounts.transient_retry || 0) + 1;
@@ -250,13 +247,31 @@ export class ToolResilienceSupervisor {
             result: retryRes,
             record: rec,
           };
-        } catch {
-          // continue loop
+        } catch (retryError) {
+          this.throwIfStopped(retryError, options);
+          if (!isTransientLock(retryError)) break;
         }
       }
     }
 
     return { recovered: false };
+  }
+
+  private throwIfStopped(error: unknown, options?: ToolExecutionOptions): void {
+    options?.signal?.throwIfAborted();
+    if (error instanceof ToolApprovalDeniedError || (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name))) throw error;
+  }
+
+  private async executeRecovery(registry: IToolRegistry, name: string, args: Record<string, unknown>, cwd: string, options?: ToolExecutionOptions): Promise<unknown> {
+    options?.signal?.throwIfAborted();
+    const result = await registry.executeTool(name, args, cwd, { ...options, autoHeal: false });
+    options?.signal?.throwIfAborted();
+    if (result && typeof result === "object") {
+      const record = result as Record<string, unknown>;
+      if (record.denied === true) throw new ToolApprovalDeniedError("Automatic recovery was denied.");
+      if (record.success === false || (typeof record.exitCode === "number" && record.exitCode !== 0)) throw new Error("Automatic recovery did not succeed.");
+    }
+    return result;
   }
 
   private recordHistory(rec: ResilienceRecord): void {

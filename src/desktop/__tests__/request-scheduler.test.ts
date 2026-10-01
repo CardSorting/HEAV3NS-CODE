@@ -20,6 +20,88 @@ const gate = () => {
 }
 
 describe("desktop request scheduling", () => {
+	it("reserves queue admission for instructions and navigation under discovery saturation", async () => {
+		const scheduler = new DesktopRequestScheduler(),
+			blocked = gate()
+		const scans = Array.from({ length: 48 }, () => scheduler.dispatch(request("files.search"), () => blocked.promise))
+		try {
+			await assert.rejects(
+				scheduler.dispatch(request("models.discover"), async () => {}),
+				/discovery is busy/,
+			)
+			await scheduler.dispatch(request("task.submit"), async () => {})
+			await scheduler.dispatch(request("task.lookup"), async () => {})
+			await scheduler.dispatch(request("files.read"), async () => {})
+			await scheduler.dispatch(request("task.cancelAll"), async () => {})
+		} finally {
+			blocked.release()
+			await Promise.all(scans)
+		}
+		await scheduler.dispatch(request("models.discover"), async () => {})
+	})
+	it("reserves bytes for interactive work and reclaims discovery admission after shutdown", async () => {
+		const scheduler = new DesktopRequestScheduler(),
+			blocked = gate()
+		const scans = Array.from({ length: 8 }, () =>
+			scheduler.dispatch(request("files.search", { query: "x".repeat(240_000) }), () => blocked.promise),
+		)
+		const settled = Promise.allSettled(scans)
+		await assert.rejects(
+			scheduler.dispatch(request("files.search", { query: "x".repeat(240_000) }), async () => {}),
+			/discovery is busy/,
+		)
+		await scheduler.dispatch(request("task.submit", { text: "x".repeat(16_000) }), async () => {})
+		scheduler.close()
+		blocked.release()
+		const results = await settled
+		assert.equal(results.filter((result) => result.status === "fulfilled").length, 2)
+		assert.equal(results.filter((result) => result.status === "rejected").length, 6)
+	})
+	it("keeps navigation and lookup responsive behind mixed slow discovery requests", async () => {
+		const scheduler = new DesktopRequestScheduler()
+		const blocked = gate()
+		let active = 0,
+			peak = 0
+		const methods = ["models.discover", "files.search", "project.discover", "changes.list"] as const
+		const scans = methods.map((method) =>
+			scheduler.dispatch(request(method), async () => {
+				active++
+				peak = Math.max(peak, active)
+				await blocked.promise
+				active--
+			}),
+		)
+		try {
+			await scheduler.dispatch(request("files.read"), async () => assert.equal(active, 2))
+			await scheduler.dispatch(request("task.lookup"), async () => assert.equal(active, 2))
+			await scheduler.dispatch(request("task.cancelAll"), async () => {})
+		} finally {
+			blocked.release()
+			await Promise.all(scans)
+		}
+		assert.equal(peak, 2)
+	})
+
+	it("releases the discovery lane after errors and drains waiting requests", async () => {
+		const scheduler = new DesktopRequestScheduler()
+		const blocked = gate()
+		const failed = scheduler.dispatch(request("models.discover"), async () => {
+			await blocked.promise
+			throw new Error("provider offline")
+		})
+		const checked = assert.rejects(failed, /provider offline/)
+		const other = scheduler.dispatch(request("files.search"), () => blocked.promise)
+		let ran = false
+		const waiting = scheduler.dispatch(request("project.discover"), async () => {
+			ran = true
+		})
+		await Promise.resolve()
+		assert.equal(ran, false)
+		blocked.release()
+		await Promise.all([checked, other, waiting])
+		assert.equal(ran, true)
+	})
+
 	it("bounds concurrent inspections and lets approval and stop bypass blocked reads", async () => {
 		const scheduler = new DesktopRequestScheduler()
 		const blocked = gate()

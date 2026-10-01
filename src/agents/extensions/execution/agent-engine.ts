@@ -464,7 +464,17 @@ export class AgentEngine extends AbstractAgentEngine {
 				for (let attempt = 0; attempt < maxAttempts; attempt++) {
 					try {
 						await workspaceVerification?.start()
-						const preparedContext = await this.prepareProviderContext(activeModel, promptText)
+						this.reportProgress(input.onProgress, {
+							activityId: liveProgressActivityId,
+							phase: "planning",
+							status: "in_progress",
+							message: "Preparing workspace context",
+							detail: "Loading task history and available skills. You can stop while preparation is in progress.",
+							timestamp: Date.now(),
+							sequence: nextProgressSequence(),
+							metadata: { source: "lumi", scope: "turn", attempt: attempt + 1 },
+						})
+						const preparedContext = await this.prepareProviderContext(activeModel, promptText, input.signal)
 						const defaultUrl = "https://api.openai.com/v1/chat/completions"
 						const requestStartedAt = Date.now()
 						const endpoint = this.proxyGateway?.getEffectiveEndpoint("openai-codex", defaultUrl) ?? {
@@ -1177,7 +1187,12 @@ export class AgentEngine extends AbstractAgentEngine {
 		}
 	}
 
-	private async prepareProviderContext(activeModel: string, requestedPrompt = ""): Promise<PreparedProviderContext> {
+	private async prepareProviderContext(
+		activeModel: string,
+		requestedPrompt = "",
+		signal?: AbortSignal,
+	): Promise<PreparedProviderContext> {
+		signal?.throwIfAborted()
 		const sessionStore = this.sessionStore as PersistentSessionStore
 		const model = this.runtimeModelCatalog.getModelInfo(activeModel, this.config.provider ?? "openai-codex")
 		const requestedOutputTokens = Math.max(
@@ -1193,12 +1208,14 @@ export class AgentEngine extends AbstractAgentEngine {
 		const skillsIngestor = (this.toolRegistry as ValidatingToolRegistry | undefined)?.skillsIngestor
 		if (skillsIngestor) {
 			try {
-				skillManifests = await skillsIngestor.discoverSkills(this.sessionContext.cwd)
+				skillManifests = await skillsIngestor.discoverSkills(this.sessionContext.cwd, false, signal)
 			} catch {
+				signal?.throwIfAborted()
 				// Preserve the task flow and expose a targeted retry instead of hiding the failure.
 				skillDiscoveryFailed = true
 			}
 		}
+		signal?.throwIfAborted()
 		const skillsContext = [
 			skillsIngestor?.formatSkillsContext(skillManifests) ?? "",
 			skillDiscoveryFailed

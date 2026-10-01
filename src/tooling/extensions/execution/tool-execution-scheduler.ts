@@ -478,7 +478,7 @@ export class ToolExecutionScheduler {
 				isSuccess = !denied && obj.success !== false && (exitCode === undefined || exitCode === 0)
 			}
 
-			if (!isMutating && enableCache && isSuccess) {
+			if (!isMutating && enableCache && isSuccess && !schedulerOptions.signal?.aborted) {
 				// Cache read-only result
 				this.cache.set(call.name, parsedArgs, cwd, rawResult)
 			}

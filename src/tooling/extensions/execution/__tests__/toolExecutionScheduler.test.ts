@@ -325,6 +325,11 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			signal: controller.signal,
 		})
 		assert.equal(executions, 1)
+		assert.equal(
+			scheduler.cache.get("view_file", { path: "first.ts" }, process.cwd()),
+			null,
+			"A read completed after Stop must not enter the cache",
+		)
 		assert.deepEqual(
 			batch.results.map((record) => record.success),
 			[true, false, false],

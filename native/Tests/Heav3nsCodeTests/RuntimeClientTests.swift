@@ -453,6 +453,94 @@ final class RuntimeClientTests: XCTestCase {
         }
         client.start(folder: directory); wait(for: [stopped], timeout: 3)
     }
+    func testDiscoverySaturationLeavesRoomToSendInspectAndStop() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'task.lookup') reply(request, { found: false });
+        if (request.method === 'files.read') reply(request, { text: 'Still responsive', revision: 'r', nextOffset: 16, size: 16 });
+        if (request.method === 'task.cancelAll') reply(request, { requested: true });
+        if (request.method === 'task.submit') reply(request, { accepted: true, run: { id: 'accepted', text: request.params.text, state: 'queued', session: 'session', createdAt: 1 } });
+        """, timeout: 2)
+        let responsive = expectation(description: "interactive requests keep admission")
+        responsive.expectedFulfillmentCount = 4
+        var started = false
+        client.onConnection = { _ in
+            guard client.isReady, !started else { return }; started = true
+            for _ in 0..<40 { client.request("models.discover") }
+            XCTAssertEqual(client.pendingRequestCount, 40)
+            client.request("files.search") { result in
+                guard case .failure(let error) = result else { return XCTFail("Discovery should be bounded") }
+                XCTAssertTrue(error.localizedDescription.contains("Discovery is busy"))
+                XCTAssertEqual((error as? RuntimeFailure)?.acceptanceUnknown, false)
+            }
+            for method in ["task.lookup", "files.read", "task.submit", "task.cancelAll"] {
+                client.request(method, params: ["text": "Continue independently"]) { result in
+                    if case .failure(let error) = result { XCTFail(error.localizedDescription) }
+                    XCTAssertTrue(client.isReady); responsive.fulfill()
+                }
+            }
+        }
+        client.start(folder: directory); wait(for: [responsive], timeout: 3)
+    }
+    func testSubmissionLookupTimeoutDoesNotInterruptWorkOrReplaySubmission() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'task.lookup') setTimeout(() => reply(request, { found: false }), 450);
+        if (request.method === 'task.cancelAll') reply(request, { requested: true });
+        if (request.method === 'task.submit') process.exit(99);
+        """)
+        let checked = expectation(description: "lookup can be retried without disconnecting active work")
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            client.request("task.lookup", params: ["request": "unconfirmed"]) { result in
+                guard case .failure(let error) = result else { return XCTFail("Lookup must time out") }
+                XCTAssertEqual((error as? RuntimeFailure)?.acceptanceUnknown, false)
+                XCTAssertTrue(client.isReady)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    client.request("task.cancelAll") { result in
+                        if case .failure(let error) = result { XCTFail(error.localizedDescription) }
+                        XCTAssertTrue(client.isReady); checked.fulfill()
+                    }
+                }
+            }
+        }
+        client.start(folder: directory); wait(for: [checked], timeout: 3)
+    }
+    func testWorkspaceOffersStatusRetryAfterLookupTimeoutWithoutLosingDraft() throws {
+        _ = NSApplication.shared
+        let drafts = WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("retry-drafts"))
+        try drafts.save(text: "My newer draft", submission: .init(id: "unconfirmed", text: "Original instruction"))
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'files.list') reply(request, { entries: [] });
+        if (request.method === 'task.lookup') {
+          globalThis.lookups = (globalThis.lookups || 0) + 1;
+          if (globalThis.lookups > 1) setTimeout(() => reply(request, { found: false }), 40);
+        }
+        if (request.method === 'task.submit') process.exit(99);
+        """, timeout: 0.2)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: drafts)
+        defer { client.onConnection = nil; client.forceStop(); workspace.window?.close() }
+        let checked = expectation(description: "status retry recovers without replay")
+        let connection = client.onConnection
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+                let views = descendants(workspace.window!.contentView!)
+                let retry = views.compactMap { $0 as? NSButton }.first { $0.title == "Check Status" }
+                XCTAssertNotNil(retry); XCTAssertTrue(retry?.isEnabled == true); XCTAssertFalse(retry?.isHidden == true)
+                XCTAssertTrue(client.isReady)
+                retry?.performClick(nil); retry?.performClick(nil)
+                XCTAssertFalse(retry?.isEnabled == true, "Only one status lookup may be pending")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    XCTAssertNil(try? drafts.load()?.submission)
+                    XCTAssertEqual(try? drafts.load()?.text, "My newer draft")
+                    XCTAssertEqual(workspace.probeLayout["submissionNeedsReconciliation"] as? Bool, false)
+                    XCTAssertTrue(client.isReady); checked.fulfill()
+                }
+            }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 3)
+    }
     func testCoalescedSnapshotsCompleteEveryWaitingCaller() throws {
         let client = try peer(hello + "if (request.method === 'snapshot') setTimeout(() => reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }), 50);", timeout: 1)
         let completed = expectation(description: "both snapshot callers finish"); completed.expectedFulfillmentCount = 2

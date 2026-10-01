@@ -160,6 +160,29 @@ describe("IoRequestCoalescer", () => {
 })
 
 describe("ParentIoBulkhead", () => {
+	it("reserves a slot for parent reads under combined search and traversal pressure", async () => {
+		const pool = new ParentIoBudgetPool()
+		const releases = await Promise.all([
+			pool.acquire(0, true, { workClass: "search" }),
+			pool.acquire(0, true, { workClass: "search" }),
+			pool.acquire(0, true, { workClass: "traversal" }),
+		])
+		let scanStarted = false
+		const queued = pool.acquire(0, true, { workClass: "traversal" }).then((release) => {
+			scanStarted = true
+			return release
+		})
+		const read = await pool.acquire(0, true, { workClass: "small-read" })
+		assert.equal(scanStarted, false)
+		assert.equal(pool.getActiveCount(), 4)
+		read()
+		assert.equal(pool.getPendingCount(), 1)
+		releases.forEach((release) => release())
+		;(await queued)()
+		assert.equal(pool.getActiveCount(), 0)
+		assert.equal(pool.getPendingCount(), 0)
+	})
+
 	it("isolates validated capacities from caller mutation", async () => {
 		const caps = { metadata: 4, "small-read": 4, search: 1, traversal: 2 }
 		const pool = new ParentIoBudgetPool(4, caps)

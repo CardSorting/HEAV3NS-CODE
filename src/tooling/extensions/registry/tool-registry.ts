@@ -730,7 +730,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       try {
         const fastResult = await super.executeTool(canonicalName, preparedArgs, cwd, options);
         const fastElapsed = Date.now() - fastStart;
-        this.cache.set(canonicalName, preparedArgs, cwd, fastResult);
+        if (!options?.signal?.aborted) this.cache.set(canonicalName, preparedArgs, cwd, fastResult);
         this.telemetryLedger.recordSample(
           canonicalName,
           fastElapsed,
@@ -819,10 +819,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         durationMs: elapsed,
       });
 
-      if (tool.isMutating) {
-        const paths = this.cache.extractPaths(preparedArgs, cwd);
-        this.cache.invalidatePaths(paths, cwd);
-      } else {
+      if (!tool.isMutating && !options?.signal?.aborted) {
         this.cache.set(canonicalName, preparedArgs, cwd, result);
       }
 
@@ -843,10 +840,6 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           const elapsed = Date.now() - startTime;
           this.circuitBreaker.recordSuccess(canonicalName);
           this.telemetryLedger.recordSample(canonicalName, elapsed, true);
-          if (tool.isMutating) {
-            const paths = this.cache.extractPaths(preparedArgs, cwd);
-            this.cache.invalidatePaths(paths, cwd);
-          }
           return recovery.result;
         }
       }
@@ -857,6 +850,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       throw err;
     } finally {
       if (["run_command", "env_execute_command", "env_switch_backend"].includes(canonicalName)) this.cache.invalidatePaths();
+      else if (tool.isMutating) this.cache.invalidatePaths(this.cache.extractPaths(preparedArgs, cwd), cwd);
     }
   }
 
@@ -4004,8 +3998,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         query: { type: "string", description: "Optional search terms matched against skill names and descriptions." },
         refresh: { type: "boolean", description: "Refresh skill discovery instead of using the short-lived cache." },
       },
-      execute: async (args, cwd) => {
-        const skills = await this.skillsIngestor.discoverSkills(cwd || process.cwd(), args.refresh === true);
+      execute: async (args, cwd, options) => {
+        const skills = await this.skillsIngestor.discoverSkills(cwd || process.cwd(), args.refresh === true, options?.signal);
         const query = String(args.query ?? "").trim().toLocaleLowerCase();
         if (!query) return skills;
         const terms = query.split(/\s+/).filter(Boolean);
@@ -4022,8 +4016,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       parameters: {
         skill_name: { type: "string", required: true, description: "Exact name shown in the available skills catalog." },
       },
-      execute: async (args, cwd) => {
-        return this.skillsIngestor.activateSkill(String(args.skill_name ?? ""), cwd || process.cwd());
+      execute: async (args, cwd, options) => {
+        return this.skillsIngestor.activateSkill(String(args.skill_name ?? ""), cwd || process.cwd(), options?.signal);
       },
     });
 

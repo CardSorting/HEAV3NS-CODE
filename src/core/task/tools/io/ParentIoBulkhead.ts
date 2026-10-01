@@ -186,7 +186,13 @@ export class ParentIoBudgetPool {
 	}
 
 	private canDispatch(waiter: ParentIoWaiter): boolean {
-		return this.active < this.capacity && this.classStats[waiter.workClass].active < this.classCapacities[waiter.workClass]
+		const expensive = waiter.workClass === "search" || waiter.workClass === "traversal"
+		const expensiveActive = this.classStats.search.active + this.classStats.traversal.active
+		return (
+			this.active < this.capacity &&
+			this.classStats[waiter.workClass].active < this.classCapacities[waiter.workClass] &&
+			(!expensive || expensiveActive < Math.max(1, this.capacity - 1))
+		)
 	}
 
 	private findBestEligibleWaiterIndex(): number {

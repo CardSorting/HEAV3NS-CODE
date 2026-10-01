@@ -15,12 +15,13 @@ import {
 import { Logger } from "@/shared/services/Logger"
 import { parseYamlFrontmatter } from "./frontmatter"
 import { ROADMAP_SKILL_EXECUTION_DIGEST } from "./roadmapSkillDigest"
+import { runSkillOperation } from "./skillOperation"
 
 /** Runtime filesystem seam for deterministic CLI tests and alternate hosts. */
 export const skillsRuntime = {
 	readdir: (dirPath: string) => fs.readdir(dirPath),
 	stat: (filePath: string) => fs.stat(filePath),
-	readFile: (filePath: string, encoding: BufferEncoding) => fs.readFile(filePath, encoding),
+	readFile: (filePath: string, encoding: BufferEncoding, signal?: AbortSignal) => fs.readFile(filePath, { encoding, signal }),
 }
 
 const GOLDEN_CARTRIDGE_SKILL_DESCRIPTION =
@@ -36,15 +37,6 @@ export {
 	resetSkillsCacheMetrics,
 	wasLastSkillsCacheHit,
 } from "./skillRuntime"
-
-/** Parse YAML frontmatter from markdown content (shared helper). */
-function parseFrontmatter(fileContent: string): { data: Record<string, unknown>; content: string } {
-	const result = parseYamlFrontmatter(fileContent)
-	if (result.parseError) {
-		Logger.warn("Failed to parse YAML frontmatter:", result.parseError)
-	}
-	return { data: result.data, content: result.body }
-}
 
 const MAX_SKILL_FILE_SIZE_BYTES = 512 * 1024 // 512 KB safeguard against memory corruption/DoS
 
@@ -91,6 +83,7 @@ function isValidSkillDirName(name: string): boolean {
 async function scanSkillsDirectoryWithDiagnostics(
 	dirPath: string,
 	source: "global" | "project",
+	signal?: AbortSignal,
 ): Promise<{ skills: SkillMetadata[]; diagnostics: SkillDiagnostic[] }> {
 	const skills: SkillMetadata[] = []
 	const diagnostics: SkillDiagnostic[] = []
@@ -108,11 +101,13 @@ async function scanSkillsDirectoryWithDiagnostics(
 		await Promise.all(
 			Array.from({ length: Math.min(4, entries.length) }, async () => {
 				while (next < entries.length) {
+					signal?.throwIfAborted()
 					const index = next++
 					const entryName = entries[index]
 					const entryPath = path.join(dirPath, entryName)
 					const stats = await skillsRuntime.stat(entryPath).catch(() => null)
-					if (stats?.isDirectory()) results[index] = await loadSkillMetadataWithDiagnostic(entryPath, source, entryName)
+					if (stats?.isDirectory())
+						results[index] = await loadSkillMetadataWithDiagnostic(entryPath, source, entryName, signal)
 				}
 			}),
 		)
@@ -126,6 +121,7 @@ async function scanSkillsDirectoryWithDiagnostics(
 			}
 		}
 	} catch (error: unknown) {
+		signal?.throwIfAborted()
 		if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "EACCES") {
 			Logger.warn(`Permission denied reading skills directory: ${dirPath}`)
 			diagnostics.push({
@@ -148,6 +144,7 @@ async function loadSkillMetadataWithDiagnostic(
 	skillDir: string,
 	source: "global" | "project",
 	skillName: string,
+	signal?: AbortSignal,
 ): Promise<{ skill: SkillMetadata | null; diagnostic: SkillDiagnostic | null }> {
 	const skillMdPath = path.join(skillDir, "SKILL.md")
 	if (!(await fsRuntime.fileExistsAtPath(skillMdPath))) {
@@ -184,7 +181,8 @@ async function loadSkillMetadataWithDiagnostic(
 			}
 		}
 
-		const fileContent = await skillsRuntime.readFile(skillMdPath, "utf-8")
+		signal?.throwIfAborted()
+		const fileContent = await skillsRuntime.readFile(skillMdPath, "utf-8", signal)
 		const parseResult = parseYamlFrontmatter(fileContent)
 
 		if (parseResult.parseError) {
@@ -259,6 +257,7 @@ async function loadSkillMetadataWithDiagnostic(
 			diagnostic: null,
 		}
 	} catch (error) {
+		signal?.throwIfAborted()
 		Logger.warn(`Failed to load skill at ${skillDir}:`, error)
 		return {
 			skill: null,
@@ -276,18 +275,24 @@ async function loadSkillMetadataWithDiagnostic(
 /**
  * Discover skills along with diagnostic information for invalid/skipped skill folders.
  */
-export async function discoverSkillsWithDiagnostics(cwd: string, includeOptionalBundled = false): Promise<SkillDiscoveryResult> {
+export async function discoverSkillsWithDiagnostics(
+	cwd: string,
+	includeOptionalBundled = false,
+	signal?: AbortSignal,
+): Promise<SkillDiscoveryResult> {
 	const skills: SkillMetadata[] = []
 	const diagnostics: SkillDiagnostic[] = []
 
 	const scanDirs = diskRuntime.getSkillsDirectoriesForScan(cwd)
 
 	for (const dir of scanDirs) {
-		const result = await scanSkillsDirectoryWithDiagnostics(dir.path, dir.source)
+		signal?.throwIfAborted()
+		const result = await scanSkillsDirectoryWithDiagnostics(dir.path, dir.source, signal)
 		skills.push(...result.skills)
 		diagnostics.push(...result.diagnostics)
 	}
 
+	signal?.throwIfAborted()
 	const bundledSkill = await roadmapSkillRuntime.getBundledRoadmapSkillMetadata()
 	if (bundledSkill) {
 		skills.push(bundledSkill)
@@ -318,8 +323,12 @@ export async function discoverSkillsWithDiagnostics(cwd: string, includeOptional
  * Returns skills in order: project skills first, then global skills.
  * Global skills take precedence over project skills with the same name.
  */
-export async function discoverSkills(cwd: string, includeOptionalBundled = false): Promise<SkillMetadata[]> {
-	const result = await discoverSkillsWithDiagnostics(cwd, includeOptionalBundled)
+export async function discoverSkills(
+	cwd: string,
+	includeOptionalBundled = false,
+	signal?: AbortSignal,
+): Promise<SkillMetadata[]> {
+	const result = await discoverSkillsWithDiagnostics(cwd, includeOptionalBundled, signal)
 	return result.skills
 }
 
@@ -346,6 +355,7 @@ export type SkillLoadMode = "digest" | "full"
 
 export interface SkillLoadOptions {
 	mode?: SkillLoadMode
+	signal?: AbortSignal
 }
 
 /**
@@ -356,6 +366,7 @@ export async function getSkillContent(
 	availableSkills: SkillMetadata[],
 	options: SkillLoadOptions = {},
 ): Promise<SkillContent | null> {
+	options.signal?.throwIfAborted()
 	const trimmedName = skillName.trim()
 	const skill = availableSkills.find((s) => s.name === trimmedName || s.name.toLowerCase() === trimmedName.toLowerCase())
 	if (!skill) return null
@@ -371,19 +382,37 @@ export async function getSkillContent(
 	}
 
 	try {
-		const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
-		const fileContent = await skillsRuntime.readFile(readPath, "utf-8")
+		const fileContent = await runSkillOperation(
+			"Skill loading",
+			async (signal) => {
+				const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
+				signal.throwIfAborted()
+				return skillsRuntime.readFile(readPath, "utf-8", signal)
+			},
+			options.signal,
+		)
 		if (fileContent.includes("\0")) {
 			Logger.warn(`Corrupt binary content detected when loading skill instructions for ${skill.name}`)
 			return null
 		}
-		const { content: body } = parseFrontmatter(fileContent)
+		// Catalog metadata can outlive the file it describes. Revalidate at the
+		// instruction boundary instead of injecting a corrupt or oversized edit.
+		if (Buffer.byteLength(fileContent, "utf-8") > MAX_SKILL_FILE_SIZE_BYTES) {
+			Logger.warn(`Skill instructions exceed the 512KB limit for ${skill.name}`)
+			return null
+		}
+		const parsed = parseYamlFrontmatter(fileContent)
+		if (parsed.parseError || !parsed.body.trim()) {
+			Logger.warn(`Invalid skill instructions for ${skill.name}: ${parsed.parseError ?? "empty body"}`)
+			return null
+		}
 
 		return {
 			...skill,
-			instructions: body.trim(),
+			instructions: parsed.body.trim(),
 		}
 	} catch (error) {
+		options.signal?.throwIfAborted()
 		Logger.warn(`Failed to read skill content at ${skill.path}:`, error)
 		return null
 	}

@@ -13,6 +13,11 @@ import { BroccoliDatabaseKernel } from "../../../../sessions/extensions/substrat
 import { SessionVfs } from "../../../../sessions/extensions/vfs/session-vfs.js"
 import { AnchoredHands } from "../../../../tooling/extensions/hashline/hands.js"
 import type { ValidatingToolRegistry } from "../../../../tooling/extensions/registry/tool-registry.js"
+import { SkillsIngestor } from "../../../../tooling/extensions/registry/skills-ingestor.js"
+import {
+	invalidateSkillsCache,
+	skillDiscoveryRuntime,
+} from "../../../../core/context/instructions/user-instructions/skillRuntime.js"
 import { AgentActivityTimeline } from "../../../../tui/components/agent-activity-timeline.js"
 import { AgentConfig } from "../../../base/agent-config.js"
 import { PromptComposer } from "../../compaction/prompt-composer.js"
@@ -30,6 +35,7 @@ function createEngine(
 		timeoutMs?: number
 		maxToolRounds?: number
 		requestQueue?: BroccoliRuntimeQueue
+		skillsIngestor?: SkillsIngestor
 	} = {},
 ) {
 	const config = AgentConfig.createDefault()
@@ -45,6 +51,7 @@ function createEngine(
 		listTools: () => options.tools ?? [tool],
 		getTool: (name: string) => (options.tools ? options.tools.find((tool) => tool.name === name) : tool),
 		executeTool,
+		skillsIngestor: options.skillsIngestor,
 	} as unknown as ValidatingToolRegistry
 	const gateway = new LlmProxyGateway()
 	gateway.configureProxy({ baseUrl: "http://provider.invalid/v1", timeoutMs: options.timeoutMs ?? 30_000 })
@@ -389,6 +396,27 @@ describe("native agent compiler feedback loop", () => {
 
 describe("CLI AgentEngine autonomous execution", () => {
 	afterEach(() => sinon.restore())
+	it("stops during stalled skill preparation without contacting the provider", async () => {
+		invalidateSkillsCache()
+		const controller = new AbortController()
+		let release!: (value: []) => void
+		sinon.stub(skillDiscoveryRuntime, "discover").callsFake(() => {
+			setImmediate(() => controller.abort(new Error("Stopped during preparation")))
+			return new Promise((resolve) => {
+				release = resolve
+			})
+		})
+		const fetch = sinon.stub(globalThis, "fetch")
+		const { engine } = createEngine({ skillsIngestor: new SkillsIngestor() })
+		try {
+			const result = await engine.tick({ prompt: "Inspect the workspace", signal: controller.signal })
+			assert.equal(result.outcome, "cancelled")
+			assert.equal(fetch.callCount, 0)
+		} finally {
+			release?.([])
+			invalidateSkillsCache()
+		}
+	})
 	it("starts turn telemetry only after dequeue and never starts it for a cancelled waiter", async () => {
 		const folder = await mkdtemp(path.join(tmpdir(), "lumi-queue-telemetry-"))
 		const database = new BroccoliDatabaseKernel({ workspaceRoot: folder })

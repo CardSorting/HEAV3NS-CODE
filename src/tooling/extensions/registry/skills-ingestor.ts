@@ -24,20 +24,21 @@ export class SkillsIngestor {
 		// Kept optional for source compatibility with existing tool registry setup.
 	}
 
-	async discoverSkills(workspaceRoot: string, forceRefresh = false): Promise<SkillManifest[]> {
-		const skills = await getResolvedSkillsForCwd(workspaceRoot, forceRefresh)
+	async discoverSkills(workspaceRoot: string, forceRefresh = false, signal?: AbortSignal): Promise<SkillManifest[]> {
+		const skills = await getResolvedSkillsForCwd(workspaceRoot, forceRefresh, signal)
 		return skills.map((skill) => this.toManifest(skill))
 	}
 
 	async activateSkill(
 		skillName: string,
 		workspaceRoot: string,
+		signal?: AbortSignal,
 	): Promise<
 		| { success: true; name: string; source: SkillMetadata["source"]; location: string; instructions: string }
 		| { success: false; error: string; availableSkills: string[] }
 	> {
 		const requestedName = skillName.trim()
-		let skills = await getResolvedSkillsForCwd(workspaceRoot)
+		let skills = await getResolvedSkillsForCwd(workspaceRoot, false, signal)
 		if (!requestedName) {
 			return {
 				success: false,
@@ -48,14 +49,24 @@ export class SkillsIngestor {
 		// A skill can be installed or created after this turn's catalog was cached.
 		// Refresh once on a miss, sharing that refresh with concurrent activations.
 		const hasSkill = () => skills.some((skill) => skill.name.toLowerCase() === requestedName.toLowerCase())
-		if (!hasSkill()) skills = await getResolvedSkillsForCwd(workspaceRoot, true)
+		let refreshed = false
+		if (!hasSkill()) {
+			skills = await getResolvedSkillsForCwd(workspaceRoot, true, signal)
+			refreshed = true
+		}
 
-		const content: SkillContent | null = await getSkillContent(requestedName, skills, { mode: "full" })
+		let content: SkillContent | null = await getSkillContent(requestedName, skills, { mode: "full", signal })
+		// Installed skills may move while a cached catalog still names the old
+		// path. Recover once through discovery, without replaying any tool action.
+		if (!content && !refreshed) {
+			skills = await getResolvedSkillsForCwd(workspaceRoot, true, signal)
+			content = await getSkillContent(requestedName, skills, { mode: "full", signal })
+		}
 		if (!content) {
 			return {
 				success: false,
 				error: hasSkill()
-					? `Skill \"${requestedName}\" could not be read. Inspect its SKILL.md and retry after repairing the file.`
+					? `Skill \"${requestedName}\" could not be loaded after refreshing. Inspect its SKILL.md for unreadable, malformed, empty, or oversized instructions and retry after repairing the file.`
 					: `Skill \"${requestedName}\" was not found after refreshing. Use list_skills to find an available skill by exact name.`,
 				availableSkills: skills.map((skill) => skill.name),
 			}

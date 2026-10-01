@@ -4,6 +4,7 @@ import * as path from "path"
 import { getRoadmapConfig } from "@/services/roadmap/RoadmapConfig"
 import { BUNDLED_SKILL_NAME } from "@/services/roadmap/RoadmapSkillInstall"
 import { discoverSkills, getAvailableSkills } from "./skills"
+import { runSkillOperation, waitForSkillOperation } from "./skillOperation"
 
 const SKILLS_CACHE_TTL_MS = 15_000
 
@@ -52,13 +53,14 @@ export function wasLastSkillsCacheHit(): boolean {
 	return cacheMetrics.lastHit
 }
 
-export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false): Promise<SkillMetadata[]> {
+export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false, signal?: AbortSignal): Promise<SkillMetadata[]> {
+	signal?.throwIfAborted()
 	const key = cacheKey(cwd)
 	const pending = pendingDiscovery.get(key)
 	if (pending && (!forceRefresh || pending.refresh)) {
 		cacheMetrics.hits++
 		cacheMetrics.lastHit = true
-		return copySkills(await pending.promise)
+		return copySkills(await waitForSkillOperation(pending.promise, signal))
 	}
 	if (!forceRefresh) {
 		const cached = skillsCache.get(key)
@@ -75,9 +77,9 @@ export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false)
 	const entry = { promise: Promise.resolve([] as SkillMetadata[]), refresh: forceRefresh }
 	// Identity, rather than completion order, owns publication. Invalidated scans
 	// may finish for their original caller but cannot overwrite a newer catalog.
-	entry.promise = Promise.resolve()
-		.then(async () => {
-			const resolved = getAvailableSkills(await skillDiscoveryRuntime.discover(cwd, true))
+	entry.promise = runSkillOperation("Skill discovery", (scanSignal) => skillDiscoveryRuntime.discover(cwd, true, scanSignal))
+		.then((skills) => {
+			const resolved = getAvailableSkills(skills)
 			if (pendingDiscovery.get(key) === entry) {
 				skillsCache.delete(key)
 				skillsCache.set(key, { skills: resolved, cachedAt: Date.now() })
@@ -89,7 +91,7 @@ export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false)
 			if (pendingDiscovery.get(key) === entry) pendingDiscovery.delete(key)
 		})
 	pendingDiscovery.set(key, entry)
-	return copySkills(await entry.promise)
+	return copySkills(await waitForSkillOperation(entry.promise, signal))
 }
 
 export function filterEnabledSkills(

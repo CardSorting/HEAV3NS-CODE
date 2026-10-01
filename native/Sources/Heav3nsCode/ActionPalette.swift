@@ -27,6 +27,7 @@ final class ActionPalette: NSWindowController, NSWindowDelegate, NSTableViewData
         self.actions = actions; matches = actions
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 500, height: 340), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "Workspace Actions"; panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
         super.init(window: panel)
         panel.delegate = self
         search.placeholderString = "Search actions"; search.delegate = self; search.setAccessibilityLabel("Search workspace actions")
@@ -45,9 +46,12 @@ final class ActionPalette: NSWindowController, NSWindowDelegate, NSTableViewData
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func present(for parent: NSWindow) {
+        guard let window else { return }
         dismissed = false; previousResponder = parent.firstResponder
-        window?.appearance = parent.appearance
-        parent.beginSheet(window!); window?.makeFirstResponder(search)
+        window.appearance = parent.appearance
+        window.setFrameOrigin(NSPoint(x: parent.frame.midX - window.frame.width / 2, y: parent.frame.maxY - window.frame.height - 72))
+        parent.addChildWindow(window, ordered: .above)
+        window.makeKeyAndOrderFront(nil); window.makeFirstResponder(search)
     }
     func controlTextDidChange(_ obj: Notification) {
         let selected = matches.indices.contains(table.selectedRow) ? matches[table.selectedRow].title : nil
@@ -70,13 +74,16 @@ final class ActionPalette: NSWindowController, NSWindowDelegate, NSTableViewData
         }
         return false
     }
-    private func dismiss() {
+    private func dismiss(restoreFocus: Bool = true) {
         guard !dismissed else { return }; dismissed = true
-        if let window, let parent = window.sheetParent {
-            parent.endSheet(window); window.orderOut(nil)
+        let parent = window?.parent
+        if let window { parent?.removeChildWindow(window); window.orderOut(nil) }
+        if restoreFocus, let parent, parent.isVisible, NSApp.isActive {
+            parent.makeKeyAndOrderFront(nil)
             if let previousResponder { parent.makeFirstResponder(previousResponder) }
         }
     }
+    func windowDidResignKey(_ notification: Notification) { dismiss(restoreFocus: false) }
     override func cancelOperation(_ sender: Any?) { dismiss() }
     func windowShouldClose(_ sender: NSWindow) -> Bool { dismiss(); return false }
     @objc private func choose() { guard !dismissed, matches.indices.contains(table.selectedRow) else { return }; let action = matches[table.selectedRow]; dismiss(); action.perform() }
