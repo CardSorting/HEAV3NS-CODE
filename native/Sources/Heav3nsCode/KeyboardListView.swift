@@ -6,6 +6,14 @@ final class KeyboardListView: NSTableView {
     var onEnterFolder: (() -> Void)?
     var onParent: (() -> Void)?
     var onCancel: (() -> Void)?
+    var contextMenuForRow: ((Int) -> NSMenu?)?
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let contextMenuForRow else { return super.menu(for: event) }
+        let index = row(at: convert(event.locationInWindow, from: nil))
+        guard index >= 0 else { return nil }
+        selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        return contextMenuForRow(index)
+    }
     override func keyDown(with event: NSEvent) {
         guard isEnabled, event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { super.keyDown(with: event); return }
         switch event.keyCode {

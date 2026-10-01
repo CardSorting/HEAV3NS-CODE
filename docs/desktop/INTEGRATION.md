@@ -27,6 +27,54 @@ Do not rebuild the bundle while it or the native transport tests are running: re
 
 ## Actual integration boundary
 
+### Project creation and library dates
+
+Your projects offers New Project… (also File → New Project…, ⇧⌘N) and the
+existing-folder action. The native name/location sheet uses exclusive `mkdir`
+before opening the ordinary workspace. Collisions, symlinks at the target name,
+invalid names, and filesystem failures leave existing content intact. Cancel
+performs no project creation. No scaffold, Git initialization, or agent task is
+started by creating the directory itself.
+
+The sheet suggests an unused Untitled Project name and remembers the parent
+location only after successful creation. Invalid or unavailable remembered folders
+fall back to Documents, or the home folder if no Documents URL is available.
+Filesystem errors offer specific recovery and retain input.
+Search accepts unordered, case/diacritic-insensitive path terms. ⌘F focuses project
+search, Return opens the selected or first matching project, and Escape clears
+search (or returns focus to it from the list); input-method composition is respected.
+
+Selection actions show Pin or Unpin explicitly. More… and right-click offer the
+same project commands: Open/Locate, Pin/Unpin, Show in Finder, Copy Folder Path,
+and Remove from List. Menus capture a canonical path rather than a row index, so
+background sorting cannot redirect an action. Removal affects only the library.
+Unavailable projects offer Locate Folder…; choosing the replacement folder updates
+the entry without opening it, preserves its pin and last-opened time, and merges
+an already-listed destination using either pin and the more recent opened time.
+Cancellation or a failed location update leaves the original entry intact.
+
+The library remembers Last opened, Last modified, Newest created, Oldest created,
+or Name (A–Z). Dates include time, rows retain their canonical paths, and tooltips
+provide all three timestamps. Pins remain filterable; they do not override the
+selected global sort. Unknown dates sort last and equal keys use paths to break
+ties. Last modified is a background metadata scan of project files/directories,
+not the folder's top-level timestamp alone. It skips descendant symlinks and
+`.git`, `node_modules`, `.build`, `build`, `dist`, `.next`, `.lumi`, `.heav3ns`,
+`.broccolidb`, `.cache`, and `__pycache__` directories. Two scans run concurrently,
+with a cooperative one-second/20,000-entry budget per project. A host filesystem
+call can finish after that budget; incomplete scans are explicitly labelled.
+Refreshes are cancellable and stale completions cannot update a closed or changed
+library. No file contents are read. Creation dates describe the folder on this
+filesystem, not repository history.
+
+`ProjectLibraryTests` covers creation/collision/cancel behavior, duplicate-name
+sorting, nested edits versus dependency/runtime noise, symbolic-link traversal,
+unknown dates, sort persistence, suppressed cancelled results, path-term search,
+keyboard activation, menu target stability, relocation/merge recovery, and
+successful-creation-only location persistence.
+
+### Runtime ownership
+
 | Responsibility | Existing implementation / adapter |
 |---|---|
 | Composition | `src/index.ts:LumiMonolith`, `src/factories/monolith-factory.ts:MonolithFactory.createEngine` |

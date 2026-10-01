@@ -57,9 +57,10 @@ final class IntegrationProbe {
                 window.contentView?.layoutSubtreeIfNeeded()
                 try? FileManager.default.createDirectory(at: self.destination, withIntermediateDirectories: true)
                 let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-                capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), self.destination.appendingPathComponent("launcher-\(self.steps[index]).png").path]
+                let capturedWindow = window.attachedSheet ?? window
+                capture.arguments = ["-x", "-o", "-l", String(capturedWindow.windowNumber), self.destination.appendingPathComponent("launcher-\(self.steps[index]).png").path]
                 try? capture.run(); capture.waitUntilExit()
-                let report: [String: Any] = ["appPID": ProcessInfo.processInfo.processIdentifier, "harness": "Native launcher with isolated project fixture; no authentication performed", "width": window.frame.width, "height": window.frame.height]
+                let report: [String: Any] = ["appPID": ProcessInfo.processInfo.processIdentifier, "windowNumber": window.windowNumber, "harness": "Native launcher with isolated project fixture; no authentication performed", "width": capturedWindow.frame.width, "height": capturedWindow.frame.height]
                 if let data = try? JSONSerialization.data(withJSONObject: report) { try? data.write(to: self.destination.appendingPathComponent("launcher-\(self.steps[index]).json")) }
                 step(index + 1)
             }

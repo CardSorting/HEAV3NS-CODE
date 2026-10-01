@@ -2,6 +2,7 @@ import AppKit
 
 final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var launcher: LauncherWindow?
+    private var newProjectWindow: NewProjectWindow?
     private let projects = ProjectLibrary(persist: IntegrationProbe() == nil)
     private var workspaces = [String: WorkspaceWindow]()
     private var quitting = false
@@ -107,6 +108,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         applicationMenu.addItem(withTitle: "Quit HEAV3NS-CODE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         applicationItem.submenu = applicationMenu; main.addItem(applicationItem)
         let fileItem = NSMenuItem(); fileItem.title = "File"; let file = NSMenu(title: "File")
+        let newProject = file.addItem(withTitle: "New Project…", action: #selector(createProject), keyEquivalent: "n")
+        newProject.keyEquivalentModifierMask = [.command, .shift]; newProject.target = self
         file.addItem(withTitle: "Open Workspace…", action: #selector(openFolder), keyEquivalent: "o").target = self
         file.addItem(withTitle: "Open File…", action: #selector(openFile), keyEquivalent: "p").target = self
         file.addItem(withTitle: "Pods", action: #selector(showPods), keyEquivalent: "0").target = self
@@ -153,6 +156,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc func openFolder() {
         let panel = NSOpenPanel(); panel.title = "Open a Workspace"; panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false; panel.prompt = "Open Workspace"
         if panel.runModal() == .OK, let url = panel.url { open(url) }
+    }
+    @objc private func createProject() {
+        if let sheet = newProjectWindow?.window { sheet.makeKeyAndOrderFront(nil); return }
+        if NSApp.keyWindow == nil { showLauncher() }
+        guard let parent = NSApp.keyWindow?.sheetParent ?? NSApp.keyWindow, parent.attachedSheet == nil else { return }
+        let controller = NewProjectWindow(defaults: ProcessInfo.processInfo.arguments.contains("--integration-probe") ? nil : .standard) { [weak self] url in self?.open(url) }
+        controller.onClose = { [weak self] in self?.newProjectWindow = nil }
+        newProjectWindow = controller; controller.present(on: parent)
     }
     private func open(_ url: URL) {
         let canonical = url.resolvingSymlinksInPath().standardizedFileURL
@@ -220,6 +231,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             if let probe = IntegrationProbe(), probe.launcherPass { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) }; if let first = projects.projects.first { projects.togglePin(first.path) } }
             let controller = LauncherWindow(library: projects)
             controller.onOpenFolder = { [weak self] in self?.openFolder() }
+            controller.onCreateProject = { [weak self] in self?.createProject() }
             controller.onOpenProject = { [weak self] url in self?.open(url) }
             controller.canChangeAccount = { [weak self] in self?.workspaces.isEmpty == true }
             launcher = controller
@@ -242,7 +254,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showApprovalReview() { current?.showApprovalReview() }
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
-    @objc private func findInInspection() { current?.findInInspection() }
+    @objc private func findInInspection() {
+        if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() } else { current?.findInInspection() }
+    }
     @objc private func stop() { current?.stop() }
     @objc private func actions() {
         if let current { current.showActions() } else { openFolder() }
@@ -255,7 +269,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if menuItem.action == #selector(newConversation) { return current?.canCreateConversation == true }
         if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
-        if menuItem.action == #selector(findInInspection) { return current?.canFindInInspection == true }
+        if menuItem.action == #selector(findInInspection) {
+            let inLibrary = launcher != nil && NSApp.keyWindow === launcher?.window
+            menuItem.title = inLibrary ? "Find Projects…" : "Find in Current Page…"
+            return inLibrary ? launcher?.canFindProjects == true : current?.canFindInInspection == true
+        }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
         if menuItem.action == #selector(showApprovalReview) { return current?.canReviewApproval == true }
         if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue), #selector(showWalkthrough)].contains(menuItem.action) { return current != nil }
