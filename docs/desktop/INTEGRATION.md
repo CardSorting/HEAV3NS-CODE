@@ -1,5 +1,7 @@
 # HEAV3NS-CODE integration preview
 
+Linux is available through a native GTK 4 frontend using this same runtime protocol. See [Linux build, installation and verification](LINUX.md). `npm run desktop:build` selects the host platform; `npm run desktop:build:macos` and `npm run desktop:build:linux` select explicitly. The AppKit-specific instructions below continue to apply to macOS.
+
 Native **Saved State** now inspects selected-conversation run integrity and
 interrupted work through the existing Inspect navigation. Versioned content seals,
 journal chain validation and fail-closed checkpoint loading extend the runtime's

@@ -187,3 +187,7 @@ scratch/
 *.orig
 *.rej
 *.patch
+
+# Python native Linux client
+__pycache__/
+*.pyc

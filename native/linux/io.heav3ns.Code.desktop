@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=HEAV3NS-CODE
+Comment=Build with LUMI in a native conversation workspace
+Exec=heav3ns-code %F
+Icon=io.heav3ns.Code
+Terminal=false
+Categories=Development;
+StartupNotify=true
+StartupWMClass=io.heav3ns.Code
+MimeType=inode/directory;

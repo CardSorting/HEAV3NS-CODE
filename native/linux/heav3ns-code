@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+import sys
+try:
+    from heav3ns_code.app import main
+except (ImportError, ValueError) as error:
+    sys.exit("HEAV3NS-CODE requires Python 3, PyGObject and GTK 4.\n"
+             "Ubuntu/Debian: sudo apt install python3-gi gir1.2-gtk-4.0\n"
+             "Fedora: sudo dnf install python3-gobject gtk4\n" + str(error))
+sys.exit(main())

@@ -1,0 +1,60 @@
+name: Native Linux desktop
+
+on:
+  pull_request:
+    paths: ['native/**', 'src/desktop/**', 'scripts/*desktop*', 'scripts/fixtures/linux-desktop-worker.ts', 'package*.json', 'esbuild.mjs', '.github/workflows/desktop-linux.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb dbus-x11
+      - run: npm ci --ignore-scripts
+      - run: npm run desktop:build:linux
+      - name: Test shared desktop engine
+        run: npm run desktop:test
+      - run: node scripts/build-desktop-test-fixture.mjs
+      - name: Test Linux transport and bundled engine
+        env:
+          HEAV3NS_LINUX_ARCH: ${{ matrix.arch }}
+        run: |
+          tar -xzf build/HEAV3NS-CODE-linux-${HEAV3NS_LINUX_ARCH}.tar.gz -C build
+          export HEAV3NS_NODE="$PWD/build/HEAV3NS-CODE-linux-${HEAV3NS_LINUX_ARCH}/runtime/node"
+          export HEAV3NS_CLI="$PWD/build/HEAV3NS-CODE-linux-${HEAV3NS_LINUX_ARCH}/runtime/dist/index.js"
+          export HEAV3NS_TEST_CLI="$HEAV3NS_CLI"
+          cp build/linux-desktop-fixture.mjs "build/HEAV3NS-CODE-linux-${HEAV3NS_LINUX_ARCH}/runtime/"
+          export HEAV3NS_TEST_FIXTURE="$PWD/build/HEAV3NS-CODE-linux-${HEAV3NS_LINUX_ARCH}/runtime/linux-desktop-fixture.mjs"
+          export HOME="$(mktemp -d)"
+          export XDG_STATE_HOME="$HOME/state"
+          npm run desktop:test:linux
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_regressions.py
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_smoke.py
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_sidebar.py
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_git.py
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_shutdown.py
+          HEAV3NS_CLI="$HEAV3NS_TEST_FIXTURE" GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_execution.py
+          HEAV3NS_CLI="$HEAV3NS_TEST_FIXTURE" GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_advanced.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: HEAV3NS-CODE-linux-${{ matrix.arch }}
+          path: build/HEAV3NS-CODE-linux-${{ matrix.arch }}.tar.gz
