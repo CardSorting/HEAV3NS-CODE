@@ -952,7 +952,7 @@ export class BroccoliDbTable<T extends Record<string, unknown> = Record<string, 
   createSnapshot(): Map<string, T> {
     const snap = new Map<string, T>();
     for (const [k, v] of this.records.entries()) {
-      snap.set(k, { ...v });
+      snap.set(k, structuredClone(v));
     }
     return snap;
   }
@@ -960,7 +960,9 @@ export class BroccoliDbTable<T extends Record<string, unknown> = Record<string, 
   restoreSnapshot(snapshot: Map<string, T>): void {
     this.clear();
     for (const [k, v] of snapshot.entries()) {
-      this.putInternal(k, v);
+      const record = structuredClone(v);
+      this.putInternal(k, record);
+      this.branchingEngine.getActiveRecords().set(k, record);
     }
   }
 

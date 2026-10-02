@@ -13,7 +13,7 @@
 
 export type DbDurabilityMode = "SYNCHRONOUS" | "MICRO_BATCHED" | "SPECULATIVE";
 
-export type WalOperationType = "INSERT" | "UPDATE" | "DELETE" | "CLEAR" | "CHECKPOINT" | "ROLLBACK" | "BRANCH_MERGE";
+export type WalOperationType = "INSERT" | "UPDATE" | "DELETE" | "CLEAR" | "CHECKPOINT" | "ROLLBACK" | "BRANCH_MERGE" | "RESTORE";
 
 export interface WalFrame {
   readonly frameId: number;
@@ -435,10 +435,11 @@ export interface CasBlobDescriptor {
 }
 
 export interface CasStorageStats {
+  readonly rawBytesMeasured?: boolean;
   readonly totalBlobs: number;
-  readonly totalRawBytes: number;
+  readonly totalRawBytes: number | null;
   readonly totalStoredBytes: number;
-  readonly compressionSavingsPct: number;
+  readonly compressionSavingsPct: number | null;
   readonly corruptCount: number;
   readonly quarantinedBlobs: readonly string[];
 }
@@ -466,7 +467,7 @@ export interface DbHealthReport {
     readonly casIntegrity: {
       readonly totalBlobs: number;
       readonly corruptCount: number;
-      readonly compressionSavingsPct: number;
+      readonly compressionSavingsPct: number | null;
       readonly healthy: boolean;
     };
     readonly walJournal: {
@@ -519,6 +520,7 @@ export interface IBroccoliDatabaseKernel {
   health(): Promise<DbHealthReport>;
   storeBlob(content: Buffer | string): Promise<string>;
   readBlob(hash: string): Promise<Buffer | null>;
+  auditBlobs(): Promise<{ checked: number; verified: number; failed: number; failures: readonly { hash: string; error: string }[]; failuresLimited: boolean }>;
   gc(): Promise<number>;
 }
 
@@ -1169,7 +1171,5 @@ export interface IBroccoliMaterializedViewEngine {
   getViewRow(viewName: string, groupKey: string): MaterializedViewRow | undefined;
   listViews(): readonly string[];
 }
-
-
 
 

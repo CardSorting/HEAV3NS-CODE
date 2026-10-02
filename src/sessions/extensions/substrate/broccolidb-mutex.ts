@@ -2,10 +2,10 @@
  * [LAYER: SESSIONS EXTENSION]
  * broccolidb-mutex.ts
  *
- * Production-grade Re-Entrant Async Mutex with AsyncLocalStorage Context Propagation,
- * Deadlock Detection, and Adaptive Jittered Backoff (Phase 71 / ADR-120).
+ * Re-entrant async mutex with AsyncLocalStorage ownership and queued-wait timeouts.
  *
- * Enforces zero-deadlock nested transaction execution across async execution chains.
+ * Nested callbacks share ownership. Independent background jobs must detach their
+ * context; timeout detection does not cancel the callback that holds the lock.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -57,19 +57,20 @@ export class ReentrantAsyncMutex {
     // Re-entrancy: If current async continuation owns the lock, increment hold count and return release.
     if (this.locked && this.currentHolderId === callerId) {
       this.holdCount += 1;
-      return () => this.release(callerId);
+      return this.releaseOnce(callerId);
     }
 
     if (!this.locked) {
       this.locked = true;
       this.currentHolderId = callerId;
       this.holdCount = 1;
-      return () => this.release(callerId);
+      return this.releaseOnce(callerId);
     }
 
     return new Promise<() => void>((resolve, reject) => {
+      let waiter: MutexWaiter;
       const timer = setTimeout(() => {
-        const idx = this.queue.findIndex((w) => w.resolve === resolve);
+        const idx = this.queue.indexOf(waiter);
         if (idx >= 0) {
           this.queue.splice(idx, 1);
           const stack = new Error().stack || "";
@@ -81,7 +82,7 @@ export class ReentrantAsyncMutex {
         }
       }, this.timeoutMs);
 
-      this.queue.push({
+      waiter = {
         resolve: (releaseFn) => {
           clearTimeout(timer);
           resolve(releaseFn);
@@ -92,7 +93,8 @@ export class ReentrantAsyncMutex {
         },
         holderId: callerId,
         timestamp: Date.now(),
-      });
+      };
+      this.queue.push(waiter);
     });
   }
 
@@ -110,7 +112,7 @@ export class ReentrantAsyncMutex {
     if (next) {
       this.currentHolderId = next.holderId;
       this.holdCount = 1;
-      next.resolve(() => this.release(next.holderId));
+      next.resolve(this.releaseOnce(next.holderId));
     } else {
       this.locked = false;
       this.currentHolderId = null;
@@ -118,17 +120,23 @@ export class ReentrantAsyncMutex {
     }
   }
 
+  private releaseOnce(callerId: string): () => void {
+    let released = false;
+    return () => { if (!released) { released = true; this.release(callerId); } };
+  }
+
+  /** Background jobs must not inherit a foreground lock owner's identity. */
+  static detached<T>(callback: () => T): T { return mutexStorage.exit(callback); }
+
   /**
    * Executes an async callback within a protected re-entrant lock scope.
    */
   async runLocked<T>(callback: () => Promise<T>): Promise<T> {
     const callerId = mutexStorage.getStore() || crypto.randomUUID();
-    const release = await this.acquire();
-    try {
-      return await mutexStorage.run(callerId, callback);
-    } finally {
-      release();
-    }
+    return mutexStorage.run(callerId, async () => {
+      const release = await this.acquire();
+      try { return await callback(); } finally { release(); }
+    });
   }
 
   /**

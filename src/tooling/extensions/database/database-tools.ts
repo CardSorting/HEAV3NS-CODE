@@ -499,27 +499,29 @@ export class DatabaseToolSuite {
       {
         name: "db_cas_audit",
         description:
-          "Executes a cryptographic integrity audit across the Content-Addressable Storage (CAS) vault, quarantines any corrupt blobs, and optionally executes garbage collection.",
+          "Verifies saved blob checksums, preserves corrupt evidence, and optionally removes unreferenced blobs older than 24 hours. Retained database checkpoints and journal references are protected.",
         parameters: {
           runGc: {
             type: "boolean",
-            description: "Whether to execute mark-sweep garbage collection for unreferenced blobs",
+            description: "Whether to remove unreferenced blobs older than 24 hours after a successful integrity audit",
             required: false,
           },
         },
         execute: async (args: Record<string, unknown>) => {
           const runGc = Boolean(args.runGc);
+          const audit = await this.kernel.auditBlobs();
           let prunedCount = 0;
-          if (runGc) {
+          if (runGc && audit.failed === 0) {
             prunedCount = await this.kernel.gc();
           }
 
-          const health = await this.kernel.health();
           return {
-            success: true,
-            casIntegrity: health.pillars.casIntegrity,
+            success: audit.failed === 0,
+            scope: "Checks files currently in the CAS vault. Missing referenced content and external storage are not covered.",
+            audit,
             garbageCollectedBlobs: prunedCount,
-            healthy: health.pillars.casIntegrity.healthy,
+            garbageCollectionSkipped: runGc && audit.failed > 0,
+            healthy: audit.failed === 0,
           };
         },
       },

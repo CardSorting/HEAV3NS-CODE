@@ -11,6 +11,8 @@ import type { ModelResolver } from "../../../agents/extensions/resolution/model-
 import { WriteCoalescerSubstrate } from "../substrate/write-coalescer.js";
 import { BroccoliTaskStateEngine } from "./broccolidb-task-state.js";
 
+export const DEFAULT_SESSION_CAPACITY_BYTES = 16 * 1024 * 1024;
+
 export class PersistentSessionStore extends AbstractSessionStore {
   private readonly arena: ArenaAllocator;
   private readonly coalescer: WriteCoalescerSubstrate;
@@ -22,7 +24,7 @@ export class PersistentSessionStore extends AbstractSessionStore {
   constructor(initialMessages: SessionMessage[] = [], arenaCapacityBytes?: number) {
     super(initialMessages.map((message) => ({ ...message })));
     this.transcript = initialMessages.map((message) => ({ ...message }));
-    this.arena = new ArenaAllocator(arenaCapacityBytes ?? 16 * 1024 * 1024);
+    this.arena = new ArenaAllocator(arenaCapacityBytes ?? DEFAULT_SESSION_CAPACITY_BYTES);
     this.coalescer = new WriteCoalescerSubstrate();
     this.taskStateEngine = new BroccoliTaskStateEngine();
     this.rebuildTranscriptIndex();
@@ -96,6 +98,9 @@ export class PersistentSessionStore extends AbstractSessionStore {
         throw error;
       }
     });
+    // Admission must precede replacing messages, transcript or arena state.
+    const requiredBytes = parsed.reduce((total, message) => total + Math.ceil(Buffer.byteLength(message.content, "utf8") / 4) * 4, 0);
+    if (requiredBytes > this.arena.getCapacityBytes()) throw new Error("CONTEXT_LIMIT: saved messages exceed session capacity; existing context was kept");
     this.messages = parsed.map((message) => ({ ...message }));
     this.transcript = parsed.map((message) => ({ ...message }));
     this.rebuildTranscriptIndex();
