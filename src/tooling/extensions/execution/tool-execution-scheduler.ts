@@ -19,6 +19,10 @@ export interface ScheduledToolCall {
 }
 
 export interface SchedulerOptions {
+	readonly autoHeal?: boolean
+	readonly timeoutMs?: number
+	readonly isDryRun?: boolean
+	readonly nonBlockingAudit?: boolean
 	readonly maxConcurrency?: number
 	readonly enableCache?: boolean
 	readonly enableOutputGovernance?: boolean
@@ -27,6 +31,7 @@ export interface SchedulerOptions {
 	readonly bypassConfirmation?: boolean
 	readonly bypassThreatDetection?: boolean
 	readonly signal?: AbortSignal
+	readonly checkExecutionScope?: () => void
 	readonly onToolStart?: (call: ScheduledToolCall, wave: number) => void
 	readonly onToolComplete?: (record: ToolExecutionRecord) => void
 	readonly onToolOutput?: (call: ScheduledToolCall, chunk: ExecutionOutputChunk) => void
@@ -39,6 +44,12 @@ export interface SchedulerMetrics {
 	readonly executionTimeMs: number
 	readonly concurrencySpeedup: number
 	readonly disjointParallelWaves?: number
+}
+
+interface CallTarget {
+	mutating: boolean
+	global: boolean
+	resources?: string[]
 }
 
 export class ToolExecutionScheduler {
@@ -119,6 +130,46 @@ export class ToolExecutionScheduler {
 		}
 
 		return resources
+	}
+
+	/** Invocation-local conflict index; each owned call's resources are resolved at most once. */
+	public createConflictChecker(
+		registry: IToolRegistry,
+		cwd: string,
+		options: { allowParallelDisjointMutations?: boolean } = {},
+	): (left: ScheduledToolCall, right: ScheduledToolCall, unresolved?: { left?: boolean; right?: boolean }) => boolean {
+		const targets = new WeakMap<ScheduledToolCall, CallTarget>()
+		const describe = (call: ScheduledToolCall): CallTarget => {
+			const cached = targets.get(call)
+			if (cached) return cached
+			const tool = registry.getTool(call.name),
+				name = tool?.name ?? call.name
+			const target = {
+				mutating: tool?.isMutating === true || this.isKnownMutatingTool(name),
+				global: this.isGlobalTool(name),
+			}
+			targets.set(call, target)
+			return target
+		}
+		const overlaps = (parent: string, child: string) => {
+			const relative = path.relative(parent, child)
+			return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
+		}
+		return (left, right, unresolved = {}) => {
+			const a = describe(left),
+				b = describe(right)
+			if (!a.mutating && !b.mutating && !a.global && !b.global) return false
+			if (a.global || b.global || options.allowParallelDisjointMutations === false || unresolved.left || unresolved.right)
+				return true
+			a.resources ??= this.extractTargetResources(left, cwd)
+			b.resources ??= this.extractTargetResources(right, cwd)
+			const aResources = a.resources,
+				bResources = b.resources
+			if (!aResources.length || !bResources.length) return true
+			return aResources.some((resource) =>
+				bResources.some((other) => overlaps(resource, other) || overlaps(other, resource)),
+			)
+		}
 	}
 
 	/**
@@ -327,33 +378,11 @@ export class ToolExecutionScheduler {
 		const maxConcurrency = Number.isFinite(requestedConcurrency)
 			? Math.max(1, Math.floor(requestedConcurrency))
 			: this.defaultMaxConcurrency
-		const targets = calls.map((call) => ({
-			mutating:
-				registry.getTool(call.name)?.isMutating === true ||
-				this.isKnownMutatingTool(registry.getTool(call.name)?.name ?? call.name),
-			global: this.isGlobalTool(registry.getTool(call.name)?.name ?? call.name),
-			resources: this.extractTargetResources(call, cwd),
-		}))
-		const overlaps = (left: string, right: string): boolean => {
-			const relative = path.relative(left, right)
-			return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
-		}
-		const dependencies = targets.map((target, index) => {
+		const conflicts = this.createConflictChecker(registry, cwd, options)
+		const dependencies = calls.map((call, index) => {
 			const previous: number[] = []
 			for (let before = 0; before < index; before++) {
-				const prior = targets[before]
-				if (!target.mutating && !prior.mutating && !target.global && !prior.global) continue
-				if (
-					target.global ||
-					prior.global ||
-					options.allowParallelDisjointMutations === false ||
-					target.resources.length === 0 ||
-					prior.resources.length === 0 ||
-					target.resources.some((resource) =>
-						prior.resources.some((other) => overlaps(resource, other) || overlaps(other, resource)),
-					)
-				)
-					previous.push(before)
+				if (conflicts(call, calls[before])) previous.push(before)
 			}
 			return previous
 		})
@@ -427,18 +456,20 @@ export class ToolExecutionScheduler {
 		}
 
 		// 2. Check Read Cache
-		if (enableCache && !isMutating) {
-			const cached = this.cache.get(call.name, parsedArgs, cwd)
-			if (cached !== null) {
-				return {
-					name: call.name,
-					callId: call.id,
-					args: parsedArgs,
-					output: cached,
-					durationMs: 0,
-					success: true,
-					isCached: true,
-				}
+		const cached =
+			enableCache && !isMutating && !registry.managesExecutionCache
+				? await this.cache.lookup(call.name, parsedArgs, cwd, schedulerOptions.signal)
+				: { hit: false, ticket: undefined }
+		schedulerOptions.signal?.throwIfAborted()
+		if (cached.hit) {
+			return {
+				name: call.name,
+				callId: call.id,
+				args: parsedArgs,
+				output: cached.value,
+				durationMs: 0,
+				success: true,
+				isCached: true,
 			}
 		}
 
@@ -450,6 +481,11 @@ export class ToolExecutionScheduler {
 		let acceptingOutput = true
 
 		const execOptions: ToolExecutionOptions = {
+			autoHeal: schedulerOptions.autoHeal,
+			checkExecutionScope: schedulerOptions.checkExecutionScope,
+			timeoutMs: schedulerOptions.timeoutMs,
+			isDryRun: schedulerOptions.isDryRun,
+			nonBlockingAudit: schedulerOptions.nonBlockingAudit,
 			bypassConfirmation: schedulerOptions.bypassConfirmation ?? true,
 			bypassThreatDetection: schedulerOptions.bypassThreatDetection ?? true,
 			executionAuthority: schedulerOptions.executionAuthority ?? "autonomous",
@@ -480,7 +516,7 @@ export class ToolExecutionScheduler {
 
 			if (!isMutating && enableCache && isSuccess && !schedulerOptions.signal?.aborted) {
 				// Cache read-only result
-				this.cache.set(call.name, parsedArgs, cwd, rawResult)
+				await this.cache.store(cached.ticket, rawResult, schedulerOptions.signal)
 			}
 		} catch (err: unknown) {
 			isSuccess = false

@@ -1,181 +1,106 @@
-/**
- * tool-speculative-prefetcher.ts
- *
- * Speculative Tool Execution & Prefetch Warmer.
- * Anticipates read operations (file views, directory listings, symbol lookups)
- * based on partial argument streams or agent turn planning, warming results
- * in memory before the formal execution call arrives for sub-millisecond latency.
- */
-
-import * as crypto from "node:crypto";
-import type { IToolRegistry } from "../../../core/contracts/tooling.contracts.js";
-
-export interface PrefetchEntry {
-  readonly key: string;
-  readonly toolName: string;
-  readonly args: Record<string, unknown>;
-  readonly promise: Promise<unknown>;
-  readonly startTime: number;
-}
+/** Bounded background warming of the registry's validated cache. No second result store. */
+import { createHash } from "node:crypto"
+import type { IToolRegistry } from "../../../core/contracts/tooling.contracts.js"
+import { encodeJoyRideValue } from "../cache/joyride-cache.js"
 
 export class ToolSpeculativePrefetcher {
-  private activePrefetches = new Map<string, PrefetchEntry>();
-  private readonly maxTtlMs: number;
-  private totalPrefetched = 0;
-  private totalConsumed = 0;
-
-  constructor(options: { maxTtlMs?: number } = {}) {
-    this.maxTtlMs = options.maxTtlMs ?? 15_000;
-  }
-
-  /**
-   * Generates a deterministic cache key for a prefetch request.
-   */
-  public generateKey(toolName: string, args: Record<string, unknown>, cwd: string): string {
-    const serialized = JSON.stringify({ toolName, args, cwd });
-    return crypto.createHash("sha256").update(serialized).digest("hex").slice(0, 16);
-  }
-
-  /**
-   * Analyzes a streaming raw JSON token buffer and speculatively prefetches read targets early.
-   */
-  public onStreamChunk(
-    toolName: string,
-    partialJson: string,
-    cwd: string,
-    registry: IToolRegistry
-  ): boolean {
-    if (!partialJson || partialJson.length < 5) return false;
-
-    // Fast heuristic extraction of path or query arguments
-    const pathMatch = partialJson.match(/"(?:path|filePath|file|targetFile)"\s*:\s*"([^"]+)"/);
-    if (pathMatch && pathMatch[1]) {
-      const extractedPath = pathMatch[1];
-      if (toolName === "view_file" || toolName === "file_info" || toolName === "path_exists") {
-        this.prefetch(toolName, { path: extractedPath }, cwd, registry);
-        return true;
-      }
-    }
-
-    const queryMatch = partialJson.match(/"(?:query|pattern|search_term)"\s*:\s*"([^"]+)"/);
-    if (queryMatch && queryMatch[1] && toolName === "grep_search") {
-      this.prefetch(toolName, { query: queryMatch[1] }, cwd, registry);
-      return true;
-    }
-
-    const dirMatch = partialJson.match(/"(?:directory|dir)"\s*:\s*"([^"]+)"/);
-    if (dirMatch && dirMatch[1] && toolName === "list_dir") {
-      this.prefetch(toolName, { directory: dirMatch[1] }, cwd, registry);
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Starts a speculative prefetch execution in the background.
-   */
-  public prefetch(
-    toolName: string,
-    args: Record<string, unknown>,
-    cwd: string,
-    registry: IToolRegistry
-  ): void {
-    // Only prefetch read-only tools
-    const tool = registry.getTool(toolName);
-    if (tool?.isMutating) return;
-
-    const key = this.generateKey(toolName, args, cwd);
-    if (this.activePrefetches.has(key)) return;
-
-    this.totalPrefetched++;
-    const promise = registry.executeTool(toolName, args, cwd).catch((err) => {
-      // Isolate prefetch errors
-      return { prefetchError: err instanceof Error ? err.message : String(err) };
-    });
-
-    this.activePrefetches.set(key, {
-      key,
-      toolName,
-      args,
-      promise,
-      startTime: Date.now(),
-    });
-
-    // Auto-cleanup after TTL
-    setTimeout(() => {
-      this.activePrefetches.delete(key);
-    }, this.maxTtlMs).unref();
-  }
-
-  /**
-   * Proactively warms a collection of workspace paths into cache via view_file / file_info.
-   */
-  public warmPaths(paths: readonly string[], cwd: string, registry: IToolRegistry): number {
-    let count = 0;
-    for (const p of paths) {
-      if (typeof p === "string" && p.trim()) {
-        this.prefetch("view_file", { path: p.trim() }, cwd, registry);
-        this.prefetch("file_info", { path: p.trim() }, cwd, registry);
-        count++;
-      }
-    }
-    return count;
-  }
-
-  /**
-   * Attempts to consume a pre-warmed execution result.
-   */
-  public async consumePrefetch(
-    toolName: string,
-    args: Record<string, unknown>,
-    cwd: string
-  ): Promise<{ hit: boolean; result?: unknown }> {
-    const key = this.generateKey(toolName, args, cwd);
-    const entry = this.activePrefetches.get(key);
-
-    if (!entry) {
-      return { hit: false };
-    }
-
-    this.activePrefetches.delete(key);
-    this.totalConsumed++;
-
-    try {
-      const result = await entry.promise;
-      return { hit: true, result };
-    } catch {
-      return { hit: false };
-    }
-  }
-
-  /**
-   * Returns operational statistics of the speculative prefetcher.
-   */
-  public getStats(): {
-    activeCount: number;
-    totalPrefetched: number;
-    totalConsumed: number;
-    hitRatePercent: number;
-  } {
-    const hitRatePercent =
-      this.totalPrefetched > 0
-        ? Number(((this.totalConsumed / this.totalPrefetched) * 100).toFixed(1))
-        : 0;
-
-    return {
-      activeCount: this.activePrefetches.size,
-      totalPrefetched: this.totalPrefetched,
-      totalConsumed: this.totalConsumed,
-      hitRatePercent,
-    };
-  }
-
-  /**
-   * Clears all pending prefetches.
-   */
-  public clear(): void {
-    this.activePrefetches.clear();
-  }
+	private readonly active = new Map<string, AbortController>()
+	private readonly ttl: number
+	private scheduled = 0
+	private completed = 0
+	private failed = 0
+	private cancelled = 0
+	private rejected = 0
+	constructor(options: { maxTtlMs?: number } = {}) {
+		this.ttl = options.maxTtlMs ?? 15_000
+		if (!Number.isSafeInteger(this.ttl) || this.ttl < 1 || this.ttl > 60_000) throw new Error("Invalid prefetch TTL")
+	}
+	generateKey(toolName: string, args: Record<string, unknown>, cwd: string): string {
+		const encoded = encodeJoyRideValue([toolName, args, cwd], 64 * 1024, true)
+		if (encoded === undefined) throw new Error("Invalid speculative read arguments")
+		return createHash("sha256").update(encoded).digest("hex")
+	}
+	onStreamChunk(tool: string, partial: string, cwd: string, registry: IToolRegistry): boolean {
+		if (partial.length > 16_384) return false
+		// Partial JSON is not authorization or a reliable path. Wait for a full object.
+		try {
+			return this.prefetch(tool, JSON.parse(partial), cwd, registry)
+		} catch {
+			return false
+		}
+	}
+	prefetch(tool: string, args: Record<string, unknown>, cwd: string, registry: IToolRegistry): boolean {
+		const encoded = encodeJoyRideValue(args, 16_384)
+		const snapshot = encoded === undefined ? undefined : JSON.parse(encoded)
+		const scope = registry.captureSpeculativeReadScope?.()
+		if (
+			!registry.managesExecutionCache ||
+			!scope ||
+			tool !== "view_file" ||
+			registry.getTool(tool)?.isMutating ||
+			this.active.size >= 4 ||
+			typeof snapshot?.path !== "string" ||
+			snapshot.path.length === 0 ||
+			snapshot.path.length > 4096 ||
+			typeof cwd !== "string" ||
+			!cwd ||
+			cwd.length > 4096
+		) {
+			this.rejected++
+			return false
+		}
+		const parameters = { path: snapshot.path }
+		const key = this.generateKey(tool, parameters, cwd)
+		if (this.active.has(key)) return false
+		const controller = new AbortController()
+		this.active.set(key, controller)
+		this.scheduled++
+		const timer = setTimeout(() => controller.abort(), this.ttl)
+		timer.unref()
+		void Promise.resolve()
+			.then(() =>
+				registry.executeTool(tool, parameters, cwd, {
+					signal: controller.signal,
+					autoHeal: false,
+					speculative: true,
+					speculativeScope: scope,
+				}),
+			)
+			.then(
+				() => {
+					if (controller.signal.aborted) this.cancelled++
+					else this.completed++
+				},
+				() => {
+					if (controller.signal.aborted) this.cancelled++
+					else this.failed++
+				},
+			)
+			.finally(() => {
+				clearTimeout(timer)
+				if (this.active.get(key) === controller) this.active.delete(key)
+			})
+		return true
+	}
+	warmPaths(paths: readonly string[], cwd: string, registry: IToolRegistry): number {
+		let count = 0
+		for (const target of paths.slice(0, 8))
+			if (typeof target === "string" && this.prefetch("view_file", { path: target }, cwd, registry)) count++
+		return count
+	}
+	getStats() {
+		return {
+			activeCount: this.active.size,
+			maxConcurrentReads: 4,
+			totalPrefetched: this.scheduled,
+			completedReads: this.completed,
+			failedReads: this.failed,
+			cancelledReads: this.cancelled,
+			rejected: this.rejected,
+			resultRetention: "validated_registry_cache_only",
+		}
+	}
+	clear(): void {
+		for (const controller of this.active.values()) controller.abort()
+	}
 }
-

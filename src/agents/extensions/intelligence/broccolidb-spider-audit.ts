@@ -9,6 +9,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { SpiderPolicyCheck } from "./spider-policy-check.js";
 
 export interface SpiderAuditItem {
   id: string;
@@ -29,9 +30,11 @@ export interface SpiderAuditReport {
 
 export class BroccoliSpiderAuditEngine {
   private readonly workspaceRoot: string;
+  readonly policyCheck: SpiderPolicyCheck;
 
   constructor(workspaceRoot: string = process.cwd()) {
     this.workspaceRoot = workspaceRoot;
+    this.policyCheck = new SpiderPolicyCheck(workspaceRoot);
   }
 
   /**

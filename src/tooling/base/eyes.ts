@@ -1,7 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
+import { readBoundedFile } from "../extensions/perception/read-bounded-file.js";
 
 export interface FileReadOptions {
+  maxBytes?: number;
+  signal?: AbortSignal;
   startLine?: number;
   endLine?: number;
   contentOffset?: number;
@@ -23,7 +26,11 @@ export interface DirectoryEntryDetail {
 
 export class Eyes {
   async readFile(filePath: string, options?: FileReadOptions): Promise<FileViewResult> {
-    const rawContent = await fs.readFile(filePath, "utf-8");
+    options?.signal?.throwIfAborted();
+    const rawContent = options?.maxBytes === undefined
+      ? await fs.readFile(filePath, { encoding: "utf-8", signal: options?.signal })
+      : await readBoundedFile(filePath, options.maxBytes, options.signal);
+    options?.signal?.throwIfAborted();
     let contentToSlice = rawContent;
     if (typeof options?.contentOffset === "number" && options.contentOffset > 0) {
       contentToSlice = rawContent.slice(options.contentOffset);
@@ -107,11 +114,21 @@ export class Eyes {
     options?: FileReadOptions
   ): Promise<Array<FileViewResult & { error?: string }>> {
     const results: Array<FileViewResult & { error?: string }> = [];
+    const reads = new Map<string, FileViewResult & { error?: string }>();
     for (const fp of filePaths) {
+      options?.signal?.throwIfAborted();
       try {
-        const view = await this.readFile(fp, options);
-        results.push(view);
+        let view = reads.get(fp);
+        if (!view) {
+          view = await this.readFile(fp, options);
+          // The map references results already returned by this batch, bounded
+          // to 256 unique files. Preserve duplicate positions and owned objects.
+          if (reads.size < 256) reads.set(fp, view);
+        }
+        options?.signal?.throwIfAborted();
+        results.push({ ...view });
       } catch (err) {
+        options?.signal?.throwIfAborted();
         results.push({
           path: fp,
           content: "",

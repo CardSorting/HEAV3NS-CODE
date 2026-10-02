@@ -708,6 +708,7 @@ export type {
 export { BroccoliIntentTracer } from "./agents/extensions/intelligence/broccolidb-intent-tracer.js"
 export type { SpiderAuditItem, SpiderAuditReport } from "./agents/extensions/intelligence/broccolidb-spider-audit.js"
 export { BroccoliSpiderAuditEngine } from "./agents/extensions/intelligence/broccolidb-spider-audit.js"
+import type { BroccoliSpiderAuditEngine } from "./agents/extensions/intelligence/broccolidb-spider-audit.js"
 export type {
 	VerificationFinding,
 	VerificationReport,
@@ -3789,6 +3790,7 @@ export class LumiMonolith implements IAgentEngine {
 	readonly sessionCompactor: SessionCompactor
 	readonly sessionVfs: SessionVfs
 	readonly sessionMemoryStore: SessionMemoryStore
+	readonly broccoliSpiderAuditEngine: BroccoliSpiderAuditEngine
 	readonly stabilityDoctor: StabilityDoctor
 	readonly snapcompactEngine: SnapcompactEngine
 	readonly fileLockManager: FileLockManager
@@ -4351,6 +4353,7 @@ export class LumiMonolith implements IAgentEngine {
 		this.sessionCompactor = components.sessionCompactor
 		this.sessionVfs = components.sessionVfs
 		this.sessionMemoryStore = components.sessionMemoryStore
+		this.broccoliSpiderAuditEngine = components.broccoliSpiderAuditEngine
 		this.stabilityDoctor = components.stabilityDoctor
 		this.snapcompactEngine = components.snapcompactEngine
 		this.fileLockManager = components.fileLockManager

@@ -75,6 +75,7 @@ import { BroccoliCognitiveSuggestionEngine } from "../agents/extensions/intellig
 import { BroccoliEpistemicReasoningEngine } from "../agents/extensions/intelligence/broccolidb-epistemic-reasoning.js"
 import { BroccoliIntentTracer } from "../agents/extensions/intelligence/broccolidb-intent-tracer.js"
 import { BroccoliSpiderAuditEngine } from "../agents/extensions/intelligence/broccolidb-spider-audit.js"
+import { spiderCheckTool } from "../agents/extensions/intelligence/spider-policy-check.js"
 import { BroccoliVerificationPipeline } from "../agents/extensions/intelligence/broccolidb-verification-pipeline.js"
 import { KnowledgeGraphSubstrate } from "../agents/extensions/intelligence/knowledge-graph-substrate.js"
 import { WorkspaceIntelligenceEngine } from "../agents/extensions/intelligence/workspace-intelligence.js"
@@ -2250,7 +2251,10 @@ export class MonolithFactory {
 			daemonToolSuite,
 			runbookToolSuite,
 			adversarialToolSuite,
+			joyrideCache,
 		)
+
+		toolRegistry.registerTool(spiderCheckTool(broccoliSpiderAuditEngine.policyCheck))
 
 		// Bind supervisor in-process tool calling
 		codeExecutionSupervisor.setToolDispatcher(

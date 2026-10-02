@@ -1,4 +1,7 @@
 import assert from "node:assert/strict"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { setImmediate } from "node:timers/promises"
 import type { IToolRegistry, ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
 import { ToolApprovalDeniedError } from "../tool-confirmation-gatekeeper.js"
@@ -29,8 +32,23 @@ function call(id: string, name = "view_file", args: Record<string, unknown> = { 
 }
 
 describe("ToolExecutionScheduler ready-queue throughput", () => {
+	let folder: string
+	beforeEach(async () => {
+		folder = await mkdtemp(path.join(tmpdir(), "joyride-scheduler-"))
+		await mkdir(path.join(folder, "src"))
+		for (const file of ["one.ts", "two.ts", "shared.ts", "changed.ts", "unrelated.ts", "cached.ts", "first.ts", "src/app.ts"])
+			await writeFile(path.join(folder, file), "fixture")
+	})
+	afterEach(async () => {
+		await rm(folder, { recursive: true, force: true })
+	})
+	const makeScheduler = (options: ConstructorParameters<typeof ToolExecutionScheduler>[0] = {}) => {
+		const scheduler = new ToolExecutionScheduler(options)
+		scheduler.cache.beginTask("scheduler-fixture", folder)
+		return scheduler
+	}
 	it("keeps nested read arguments distinct and canonicalizes object key order", async () => {
-		const scheduler = new ToolExecutionScheduler()
+		const scheduler = makeScheduler()
 		let reads = 0
 		const tools = registry(async (_name, args) => {
 			reads++
@@ -41,12 +59,12 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 		const reordered = [{ range: { end: 10, start: 1 }, path: "one.ts" }]
 		const { results } = await scheduler.executeBatch(
 			[
-				call("one", "batch_view_files", { files }),
-				call("two", "batch_view_files", { files: other }),
-				call("again", "batch_view_files", { files: reordered }),
+				call("one", "batch_view_files", { paths: ["one.ts"], files }),
+				call("two", "batch_view_files", { paths: ["two.ts"], files: other }),
+				call("again", "batch_view_files", { paths: ["one.ts"], files: reordered }),
 			],
 			tools,
-			process.cwd(),
+			folder,
 			{ maxConcurrency: 1 },
 		)
 		assert.equal(reads, 2)
@@ -62,16 +80,16 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			{ name: "write_file", args: { path: "changed.ts" } },
 			{ name: "move_file", args: { source: "old.ts", target: "changed.ts" } },
 		]) {
-			const scheduler = new ToolExecutionScheduler()
+			const scheduler = makeScheduler()
 			let reads = 0
 			const tools = registry(async (name) => {
 				if (name === mutation.name) throw new Error("Write completed but follow-up operation failed")
 				return ++reads
 			})
-			await scheduler.executeBatch(
+			const initial = await scheduler.executeBatch(
 				[call("changed", "view_file", { path: "changed.ts" }), call("unrelated")],
 				tools,
-				process.cwd(),
+				folder,
 			)
 			const { results } = await scheduler.executeBatch(
 				[
@@ -80,24 +98,27 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 					call("unrelated"),
 				],
 				tools,
-				process.cwd(),
+				folder,
 			)
 			assert.equal(results[0].success, false)
 			assert.equal(reads, 3)
 			assert.equal(results[1].output, 3)
-			assert.equal(results[2].output, 2)
+			assert.equal(results[2].output, initial.results[1].output)
 		}
 	})
-	it("invalidates reads through file descriptors and alternate mutation path fields", () => {
-		const scheduler = new ToolExecutionScheduler()
+	it("invalidates reads through file descriptors and alternate mutation path fields", async () => {
+		const scheduler = makeScheduler()
 		for (const field of ["targetFile", "targetPath", "filePath", "source", "target"]) {
-			scheduler.cache.set("batch_view_files", { files: [{ path: "src/app.ts" }] }, "/workspace", "old")
-			scheduler.cache.invalidatePaths(scheduler.cache.extractPaths({ [field]: "src/app.ts" }, "/workspace"), "/workspace")
+			await scheduler.cache.store(
+				(await scheduler.cache.lookup("batch_view_files", { files: [{ path: "src/app.ts" }] }, folder)).ticket,
+				"old",
+			)
+			scheduler.cache.invalidatePaths(scheduler.cache.extractPaths({ [field]: "src/app.ts" }, folder), folder)
 			assert.equal(scheduler.cache.size, 0)
 		}
 	})
 	it("invalidates an earlier read even when caching is disabled for the mutation", async () => {
-		const scheduler = new ToolExecutionScheduler()
+		const scheduler = makeScheduler()
 		let version = "before"
 		const tools = registry(async (name) => {
 			if (name === "write_file") {
@@ -106,15 +127,15 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			}
 			return version
 		})
-		await scheduler.executeBatch([call("shared")], tools, process.cwd())
-		await scheduler.executeBatch([call("edit", "write_file", { path: "shared.ts" })], tools, process.cwd(), {
+		await scheduler.executeBatch([call("shared")], tools, folder)
+		await scheduler.executeBatch([call("edit", "write_file", { path: "shared.ts" })], tools, folder, {
 			enableCache: false,
 		})
-		const result = await scheduler.executeBatch([call("shared")], tools, process.cwd())
+		const result = await scheduler.executeBatch([call("shared")], tools, folder)
 		assert.equal(result.results[0].output, "after")
 	})
 	it("invalidates cached reads after a failed shell mutation despite a misleading path hint", async () => {
-		const scheduler = new ToolExecutionScheduler()
+		const scheduler = makeScheduler()
 		let reads = 0
 		const tools = registry(async (name) => {
 			if (name === "env_execute_command") return { success: false, result: { exitCode: 2, stderr: "Partially applied" } }
@@ -127,7 +148,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 				call("after", "view_file", { path: "before.ts" }),
 			],
 			tools,
-			process.cwd(),
+			folder,
 		)
 		assert.equal(reads, 2)
 		assert.equal(result.results[1].success, false)
@@ -144,7 +165,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			})
 			const getTool = tools.getTool.bind(tools)
 			tools.getTool = (name) => (name === "shell_alias" ? getTool("env_execute_command") : getTool(name))
-			const scheduler = new ToolExecutionScheduler()
+			const scheduler = makeScheduler()
 			const calls = [
 				call("command", commandName, { path: "src", command: "build" }),
 				call("skill", "use_skill", { skill_name: "qa" }),
@@ -154,7 +175,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 				scheduler.partitionWaves(calls, tools).map((wave) => wave.map((call) => call.id)),
 				[["command"], ["skill", "read"]],
 			)
-			const batch = scheduler.executeBatch(calls, tools, process.cwd(), { enableCache: false })
+			const batch = scheduler.executeBatch(calls, tools, folder, { enableCache: false })
 			try {
 				await setImmediate()
 				assert.deepEqual(started, [commandName])
@@ -176,9 +197,9 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 				executions++
 				return output
 			})
-			const scheduler = new ToolExecutionScheduler()
+			const scheduler = makeScheduler()
 			for (let attempt = 0; attempt < 2; attempt++) {
-				const { results } = await scheduler.executeBatch([call("failure")], tools, process.cwd())
+				const { results } = await scheduler.executeBatch([call("failure")], tools, folder)
 				assert.equal(results[0].success, false)
 			}
 			assert.equal(executions, 2)
@@ -190,7 +211,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			calls++
 			throw new ToolApprovalDeniedError("Denied for this operation")
 		})
-		const { results } = await new ToolExecutionScheduler().executeBatch([call("denied")], tools, process.cwd(), {
+		const { results } = await makeScheduler().executeBatch([call("denied")], tools, folder, {
 			enableCache: false,
 		})
 		assert.equal(calls, 1)
@@ -210,10 +231,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			active--
 			return file
 		})
-		const batch = new ToolExecutionScheduler({ maxConcurrency: 2 }).executeBatch(
+		const batch = makeScheduler({ maxConcurrency: 2 }).executeBatch(
 			[call("slow"), call("fast"), call("next")],
 			tools,
-			process.cwd(),
+			folder,
 			{ enableCache: false },
 		)
 		try {
@@ -238,7 +259,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			if (args.label === "first-read") await slow.promise
 			return name
 		})
-		const batch = new ToolExecutionScheduler({ maxConcurrency: 2 }).executeBatch(
+		const batch = makeScheduler({ maxConcurrency: 2 }).executeBatch(
 			[
 				call("first-read", "view_file", { path: "same.ts", label: "first-read" }),
 				call("write", "write_file", { path: "same.ts", label: "write" }),
@@ -246,7 +267,7 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 				call("last-read", "view_file", { path: "same.ts", label: "last-read" }),
 			],
 			tools,
-			process.cwd(),
+			folder,
 			{ enableCache: false },
 		)
 		try {
@@ -267,14 +288,14 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			if (args.label === "delete") await deletion.promise
 			return "Observed"
 		})
-		const batch = new ToolExecutionScheduler({ maxConcurrency: 3 }).executeBatch(
+		const batch = makeScheduler({ maxConcurrency: 3 }).executeBatch(
 			[
 				call("delete", "delete_directory", { directory: "src", label: "delete" }),
 				call("inside", "batch_view_files", { paths: ["src/inside.ts"], label: "inside" }),
 				call("outside", "view_file", { path: "src-other/outside.ts", label: "outside" }),
 			],
 			tools,
-			process.cwd(),
+			folder,
 			{ enableCache: false },
 		)
 		try {
@@ -295,10 +316,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			if (name === "run_command") await command.promise
 			return "Observed"
 		})
-		const batch = new ToolExecutionScheduler().executeBatch(
+		const batch = makeScheduler().executeBatch(
 			[call("command", "run_command", { path: "src", command: "build" }), call("read")],
 			tools,
-			process.cwd(),
+			folder,
 			{ enableCache: false },
 		)
 		try {
@@ -313,21 +334,24 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 
 	it("does not execute queued tools or serve cached successes after cancellation", async () => {
 		const controller = new AbortController()
-		const scheduler = new ToolExecutionScheduler({ maxConcurrency: 1 })
-		scheduler.cache.set("view_file", { path: "cached.ts" }, process.cwd(), "Cached success")
+		const scheduler = makeScheduler({ maxConcurrency: 1 })
+		await scheduler.cache.store(
+			(await scheduler.cache.lookup("view_file", { path: "cached.ts" }, folder)).ticket,
+			"Cached success",
+		)
 		let executions = 0
 		const tools = registry(async () => {
 			executions++
 			controller.abort(new Error("Stopped by user"))
 			return "First operation finished"
 		})
-		const batch = await scheduler.executeBatch([call("first"), call("cached"), call("queued")], tools, process.cwd(), {
+		const batch = await scheduler.executeBatch([call("first"), call("cached"), call("queued")], tools, folder, {
 			signal: controller.signal,
 		})
 		assert.equal(executions, 1)
 		assert.equal(
-			scheduler.cache.get("view_file", { path: "first.ts" }, process.cwd()),
-			null,
+			(await scheduler.cache.lookup("view_file", { path: "first.ts" }, folder)).hit,
+			false,
 			"A read completed after Stop must not enter the cache",
 		)
 		assert.deepEqual(
@@ -346,12 +370,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			if (args.path === "first.ts") await first.promise
 			return "Written"
 		})
-		const batch = new ToolExecutionScheduler().executeBatch(
-			[call("first", "write_file"), call("second", "write_file")],
-			tools,
-			process.cwd(),
-			{ enableCache: false, allowParallelDisjointMutations: false },
-		)
+		const batch = makeScheduler().executeBatch([call("first", "write_file"), call("second", "write_file")], tools, folder, {
+			enableCache: false,
+			allowParallelDisjointMutations: false,
+		})
 		try {
 			await setImmediate()
 			assert.deepEqual(started, ["first.ts"])
@@ -367,10 +389,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			if (args.path === "broken.ts") throw new Error("Cannot read broken.ts")
 			return args.path
 		})
-		const batch = await new ToolExecutionScheduler({ maxConcurrency: 2 }).executeBatch(
+		const batch = await makeScheduler({ maxConcurrency: 2 }).executeBatch(
 			[call("broken"), call("healthy"), call("next")],
 			tools,
-			process.cwd(),
+			folder,
 			{
 				enableCache: false,
 				onToolStart: () => {
@@ -401,10 +423,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 		})
 		const chunks: string[] = []
 		const consume = (async () => {
-			for await (const chunk of new ToolExecutionScheduler({ maxConcurrency: 2 }).executePipelinedStream(
+			for await (const chunk of makeScheduler({ maxConcurrency: 2 }).executePipelinedStream(
 				[call("slow"), call("fast"), call("next")],
 				tools,
-				process.cwd(),
+				folder,
 				{ enableCache: false },
 			)) {
 				chunks.push(chunk.callId)
@@ -441,10 +463,10 @@ describe("ToolExecutionScheduler ready-queue throughput", () => {
 			}
 			return "Observed"
 		})
-		const stream = new ToolExecutionScheduler({ maxConcurrency: 2 }).executePipelinedStream(
+		const stream = makeScheduler({ maxConcurrency: 2 }).executePipelinedStream(
 			[call("first"), call("active"), call("queued")],
 			tools,
-			process.cwd(),
+			folder,
 			{ enableCache: false },
 		)
 		assert.equal((await stream.next()).value?.callId, "first")

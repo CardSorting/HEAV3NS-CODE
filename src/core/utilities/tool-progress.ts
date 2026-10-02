@@ -74,6 +74,16 @@ export function describeToolProgress(name: string, raw: unknown, workspace: stri
 					? ("search" as const)
 					: undefined
 	const phase: EngineProgressPhase = editing ? "writing" : "tool"
+	if (name === "spider_check") {
+		const files = workspaceProgressFiles(Array.isArray(args.paths) ? args.paths : [], workspace)
+		return {
+			phase,
+			operation: "read" as const,
+			message: files.length ? `Check code · ${files[0]}${files.length > 1 ? ` +${files.length - 1}` : ""}` : "Check code",
+			files,
+			detail: "Read-only syntax, local imports and dependency cycles. Coverage and findings are reported separately; this is not a test run.",
+		}
+	}
 	if (name === "use_skill" || name === "list_skills") {
 		const skill = typeof args.skill_name === "string" ? sanitizeProgressText(args.skill_name, 160) : ""
 		return {

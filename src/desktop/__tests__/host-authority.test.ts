@@ -21,8 +21,11 @@ describe("native host execution authority", () => {
 				return "Late contents"
 			},
 		})
-		await registry.executeTool("view_file", { path: "late.ts" }, process.cwd(), { signal: controller.signal })
-		assert.equal(registry.cache.get("view_file", { path: "late.ts" }, process.cwd()), null)
+		await assert.rejects(
+			registry.executeTool("view_file", { path: "late.ts" }, process.cwd(), { signal: controller.signal }),
+			{ name: "AbortError" },
+		)
+		assert.equal((await registry.cache.lookup("view_file", { path: "late.ts" }, process.cwd())).hit, false)
 	})
 	it("invalidates the registry cache after a mutation partially succeeds and throws", async () => {
 		const folder = await mkdtemp(path.join(tmpdir(), "host-partial-edit-"))

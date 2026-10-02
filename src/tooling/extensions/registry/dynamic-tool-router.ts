@@ -17,6 +17,7 @@ const CORE_TOOL_NAMES = new Set<string>([
   "workspace_summary",
   "delete_file",
   "file_info",
+  "spider_check",
   "batch_view_files",
   "batch_write_files",
   "search_and_replace",
@@ -266,4 +267,3 @@ export class DynamicToolRouter {
     };
   }
 }
-

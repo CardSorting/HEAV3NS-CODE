@@ -7,7 +7,7 @@
  */
 
 import * as path from "node:path";
-import type { IToolRegistry } from "../../../core/contracts/tooling.contracts.js";
+import type { IToolRegistry, ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js";
 
 export type TemplateType = "service" | "controller" | "test" | "component" | "config";
 
@@ -20,17 +20,26 @@ export class FileTemplateScaffolder {
     name: string,
     targetPath: string,
     rootDir: string,
-    registry: IToolRegistry
+    registry: IToolRegistry,
+    options: ToolExecutionOptions = {}
   ): Promise<{ success: boolean; filePath: string; templateType: TemplateType; code: string }> {
+    options.signal?.throwIfAborted();
+    options.checkExecutionScope?.();
+    if (!["service", "controller", "test", "component", "config"].includes(templateType)) throw new Error("Unsupported file template type.");
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]{0,127}$/.test(name)) throw new Error("Template name must be a valid identifier of at most 128 characters.");
+    if (!targetPath.trim() || targetPath.length > 4096) throw new Error("Template target path must be nonempty and at most 4096 characters.");
     const code = this.generateTemplateCode(templateType, name);
     const relPath = path.isAbsolute(targetPath) ? path.relative(rootDir, targetPath) : targetPath;
 
-    await registry.executeTool(
+    const result = await registry.executeTool(
       "write_file",
       { path: relPath, content: code },
       rootDir,
-      { executionAuthority: "autonomous", bypassConfirmation: true }
-    );
+      options
+    ) as { success?: boolean } | undefined;
+    options.signal?.throwIfAborted();
+    options.checkExecutionScope?.();
+    if (result?.success !== true) throw new Error("Template write did not report success.");
 
     return {
       success: true,

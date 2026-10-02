@@ -164,7 +164,7 @@ describe("automatic tool repair boundaries", () => {
 		)
 		const controller = new AbortController()
 		const waiting = supervisor.attemptAutoRecovery(
-			"write_file",
+			"view_file",
 			{ path: "file" },
 			new Error("EBUSY"),
 			folder,

@@ -1,173 +1,130 @@
-/**
- * workflow-pipeline-executor.ts
- *
- * Chained Multi-Step Workflow Pipeline Execution Engine.
- * Executes sequenced tool calls in a single turn with dynamic output variable interpolation
- * (e.g. `$step1.output.result`), early exit conditions, and transaction safety.
- */
-
-import type { IToolRegistry, } from "../../../core/contracts/tooling.contracts.js";
+import { types } from "node:util"
+import type { IToolRegistry, ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js"
+import { resolveWorkflowArguments, snapshotWorkflowData, workflowReferences } from "./workflow-arguments.js"
 
 export interface WorkflowStep {
-  readonly id: string;
-  readonly tool: string;
-  readonly args: Record<string, unknown>;
+	readonly id: string
+	readonly tool: string
+	readonly args: Record<string, unknown>
 }
-
 export interface WorkflowPipelinePlan {
-  readonly name?: string;
-  readonly steps: WorkflowStep[];
-  readonly stopOnError?: boolean;
+	readonly name?: string
+	readonly steps: WorkflowStep[]
+	readonly stopOnError?: boolean
 }
-
 export interface WorkflowStepExecutionResult {
-  readonly stepId: string;
-  readonly tool: string;
-  readonly success: boolean;
-  readonly durationMs: number;
-  readonly output: unknown;
-  readonly error?: string;
+	readonly stepId: string
+	readonly tool: string
+	readonly success: boolean
+	readonly executed: boolean
+	readonly durationMs: number
+	readonly output: unknown
+	readonly error?: string
+}
+export interface WorkflowPipelineResult {
+	readonly success: boolean
+	readonly totalSteps: number
+	readonly executedStepsCount: number
+	readonly durationMs: number
+	readonly stepResults: WorkflowStepExecutionResult[]
+	readonly pendingStepIds: string[]
+	readonly finalOutput: unknown
+	readonly error?: string
 }
 
-export interface WorkflowPipelineResult {
-  readonly success: boolean;
-  readonly totalSteps: number;
-  readonly executedStepsCount: number;
-  readonly durationMs: number;
-  readonly stepResults: WorkflowStepExecutionResult[];
-  readonly finalOutput: unknown;
-  readonly error?: string;
+const referenceOptions = { bare: true, templates: true }
+
+function failureMessage(output: unknown): string | undefined {
+	if (!output || typeof output !== "object") return undefined
+	if (types.isProxy(output)) throw new Error("Workflow output must not be a proxy.")
+	const field = (name: string) => {
+		const descriptor = Object.getOwnPropertyDescriptor(output, name)
+		if (descriptor && !("value" in descriptor)) throw new Error("Workflow status must use data properties.")
+		return descriptor?.value
+	}
+	const exitCode = field("exitCode")
+	if (field("success") === false || field("denied") === true || (typeof exitCode === "number" && exitCode !== 0)) {
+		const error = field("error")
+		return typeof error === "string" && error ? error : "Tool reported failure"
+	}
+	return undefined
 }
 
 export class WorkflowPipelineExecutor {
-  /**
-   * Executes a sequenced multi-step workflow pipeline with variable interpolation.
-   */
-  public async executePipeline(
-    plan: WorkflowPipelinePlan,
-    registry: IToolRegistry,
-    cwd: string
-  ): Promise<WorkflowPipelineResult> {
-    const startTime = performance.now();
-    const stepOutputs = new Map<string, unknown>();
-    const stepResults: WorkflowStepExecutionResult[] = [];
-    const stopOnError = plan.stopOnError !== false;
-
-    for (const step of plan.steps) {
-      const stepStart = performance.now();
-      const interpolatedArgs = this.interpolateArgs(step.args, stepOutputs);
-
-      try {
-        const output = await registry.executeTool(
-          step.tool,
-          interpolatedArgs,
-          cwd,
-          { executionAuthority: "autonomous", bypassConfirmation: true }
-        );
-
-        const durationMs = Number((performance.now() - stepStart).toFixed(2));
-        const isSuccess = Boolean(output && (output as any).success !== false);
-
-        stepOutputs.set(step.id, output);
-        stepResults.push({
-          stepId: step.id,
-          tool: step.tool,
-          success: isSuccess,
-          durationMs,
-          output,
-          error: !isSuccess ? (output as any)?.error : undefined,
-        });
-
-        if (!isSuccess && stopOnError) {
-          const totalDuration = Number((performance.now() - startTime).toFixed(2));
-          return {
-            success: false,
-            totalSteps: plan.steps.length,
-            executedStepsCount: stepResults.length,
-            durationMs: totalDuration,
-            stepResults,
-            finalOutput: output,
-            error: `Step '${step.id}' (${step.tool}) failed: ${(output as any)?.error || "Unspecified error"}`,
-          };
-        }
-      } catch (err: unknown) {
-        const durationMs = Number((performance.now() - stepStart).toFixed(2));
-        const errMsg = err instanceof Error ? err.message : String(err);
-
-        stepResults.push({
-          stepId: step.id,
-          tool: step.tool,
-          success: false,
-          durationMs,
-          output: null,
-          error: errMsg,
-        });
-
-        if (stopOnError) {
-          const totalDuration = Number((performance.now() - startTime).toFixed(2));
-          return {
-            success: false,
-            totalSteps: plan.steps.length,
-            executedStepsCount: stepResults.length,
-            durationMs: totalDuration,
-            stepResults,
-            finalOutput: null,
-            error: `Step '${step.id}' threw exception: ${errMsg}`,
-          };
-        }
-      }
-    }
-
-    const totalDuration = Number((performance.now() - startTime).toFixed(2));
-    const lastResult = stepResults[stepResults.length - 1];
-
-    return {
-      success: stepResults.every((r) => r.success),
-      totalSteps: plan.steps.length,
-      executedStepsCount: stepResults.length,
-      durationMs: totalDuration,
-      stepResults,
-      finalOutput: lastResult ? lastResult.output : null,
-    };
-  }
-
-  private interpolateArgs(
-    args: Record<string, unknown>,
-    stepOutputs: Map<string, unknown>
-  ): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-
-    for (const [k, v] of Object.entries(args)) {
-      if (typeof v === "string" && v.startsWith("$")) {
-        // e.g. "$step1.output.name" or "$step1"
-        const resolved = this.resolvePath(v.slice(1), stepOutputs);
-        result[k] = resolved !== undefined ? resolved : v;
-      } else if (typeof v === "string" && v.includes("{{$")) {
-        // Template string: "Result is {{$step1.output.id}}"
-        result[k] = v.replace(/\{\{\$(.*?)\}\}/g, (_, pathExpr) => {
-          const val = this.resolvePath(pathExpr.trim(), stepOutputs);
-          return val !== undefined ? String(val) : `{{$${pathExpr}}}`;
-        });
-      } else {
-        result[k] = v;
-      }
-    }
-
-    return result;
-  }
-
-  private resolvePath(expr: string, context: Map<string, unknown>): unknown {
-    const parts = expr.split(".");
-    const stepId = parts[0];
-    let current: any = context.get(stepId);
-
-    if (parts.length === 1) return current;
-
-    for (let i = 1; i < parts.length; i++) {
-      if (current === null || current === undefined) return undefined;
-      current = current[parts[i]];
-    }
-
-    return current;
-  }
+	/** Own the sequence before starting; retain partial results on resolution or tool failure. */
+	public async executePipeline(
+		plan: WorkflowPipelinePlan,
+		registry: IToolRegistry,
+		cwd: string,
+		options: ToolExecutionOptions = {},
+	): Promise<WorkflowPipelineResult> {
+		options.signal?.throwIfAborted()
+		plan = snapshotWorkflowData(plan)
+		if (!plan || !Array.isArray(plan.steps) || plan.steps.length > 256)
+			throw new Error("A workflow supports at most 256 steps.")
+		const ids = new Set<string>()
+		for (const step of plan.steps) {
+			if (
+				!step ||
+				typeof step.id !== "string" ||
+				!step.id ||
+				step.id.length > 128 ||
+				ids.has(step.id) ||
+				typeof step.tool !== "string" ||
+				!step.tool ||
+				!step.args ||
+				typeof step.args !== "object" ||
+				Array.isArray(step.args)
+			)
+				throw new Error("Workflow steps require unique IDs, tool names and argument objects.")
+			if (!registry.getTool(step.tool)) throw new Error(`Workflow tool '${step.tool}' is unavailable.`)
+			for (const dependency of workflowReferences(step.args, referenceOptions))
+				if (!ids.has(dependency)) throw new Error(`Workflow reference '${dependency}' must identify an earlier step.`)
+			ids.add(step.id)
+		}
+		const started = performance.now()
+		const outputs = new Map<string, unknown>()
+		const stepResults: WorkflowStepExecutionResult[] = []
+		for (const step of plan.steps) {
+			options.signal?.throwIfAborted()
+			const stepStarted = performance.now()
+			let executed = false,
+				output: unknown = null,
+				error: string | undefined
+			try {
+				const args = resolveWorkflowArguments(step.args, outputs, referenceOptions)
+				executed = true
+				output = await registry.executeTool(step.tool, args, cwd, options)
+				options.signal?.throwIfAborted()
+				error = failureMessage(output)
+				// Failed producers never supply inputs, even if independent work continues.
+				if (!error) outputs.set(step.id, output)
+			} catch (failure) {
+				options.signal?.throwIfAborted()
+				error = (failure instanceof Error ? failure.message : String(failure)) || "Tool failed without an error message"
+			}
+			stepResults.push({
+				stepId: step.id,
+				tool: step.tool,
+				executed,
+				success: !error,
+				durationMs: performance.now() - stepStarted,
+				output,
+				...(error ? { error } : {}),
+			})
+			if (error && plan.stopOnError !== false) break
+		}
+		const last = stepResults.at(-1)
+		const failed = stepResults.find((step) => !step.success)
+		return {
+			success: !failed,
+			totalSteps: plan.steps.length,
+			executedStepsCount: stepResults.filter((step) => step.executed).length,
+			durationMs: performance.now() - started,
+			stepResults,
+			finalOutput: last?.output ?? null,
+			pendingStepIds: plan.steps.slice(stepResults.length).map((step) => step.id),
+			...(failed ? { error: `Step '${failed.stepId}' (${failed.tool}) failed: ${failed.error}` } : {}),
+		}
+	}
 }

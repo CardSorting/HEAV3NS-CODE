@@ -1,15 +1,30 @@
 import { TimeoutError } from "@utils/withTimeout"
+import { addAbortListener } from "node:events"
 
 export const SKILL_OPERATION_TIMEOUT_MS = 5_000
 
 /** Detach one caller without cancelling discovery shared by other tasks. */
 export function waitForSkillOperation<T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> {
 	if (!signal) return operation
-	if (signal.aborted) return Promise.reject(signal.reason)
+	if (signal.aborted) {
+		void operation.catch(() => {})
+		return Promise.reject(signal.reason)
+	}
 	return new Promise<T>((resolve, reject) => {
-		const aborted = () => reject(signal.reason)
-		signal.addEventListener("abort", aborted, { once: true })
-		operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", aborted))
+		let settled = false
+		let subscription: ReturnType<typeof addAbortListener> | undefined
+		const finish = (action: () => void) => {
+			if (settled) return
+			settled = true
+			subscription?.[Symbol.dispose]()
+			action()
+		}
+		const aborted = () => finish(() => reject(signal.reason))
+		subscription = addAbortListener(signal, aborted)
+		operation.then(
+			(value) => finish(() => resolve(value)),
+			(error) => finish(() => reject(error)),
+		)
 	})
 }
 
@@ -22,7 +37,7 @@ export async function runSkillOperation<T>(
 	signal?.throwIfAborted()
 	const controller = new AbortController()
 	const cancelled = () => controller.abort(signal?.reason)
-	signal?.addEventListener("abort", cancelled, { once: true })
+	const subscription = signal ? addAbortListener(signal, cancelled) : undefined
 	const timer = setTimeout(
 		() => controller.abort(new TimeoutError(label, SKILL_OPERATION_TIMEOUT_MS)),
 		SKILL_OPERATION_TIMEOUT_MS,
@@ -37,6 +52,6 @@ export async function runSkillOperation<T>(
 		)
 	} finally {
 		clearTimeout(timer)
-		signal?.removeEventListener("abort", cancelled)
+		subscription?.[Symbol.dispose]()
 	}
 }

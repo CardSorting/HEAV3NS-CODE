@@ -38,15 +38,18 @@ export class AstImportResolver {
     sourceCode: string,
     filePath: string,
     rootDir: string,
-    options: { newImports?: string[] } = {}
+    options: { newImports?: string[]; signal?: AbortSignal; checkExecutionScope?: () => void } = {}
   ): Promise<ImportResolveResult> {
     const fileDir = path.dirname(path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath));
+    const checkCurrent = () => { options.signal?.throwIfAborted(); options.checkExecutionScope?.(); };
+    checkCurrent();
     const lines = sourceCode.split(/\r?\n/);
     const imports: ImportStatementInfo[] = [];
     const importRegex = /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
 
     let match: RegExpExecArray | null;
     while ((match = importRegex.exec(sourceCode)) !== null) {
+      checkCurrent();
       const raw = match[0];
       const specifier = match[2];
       const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
@@ -59,11 +62,11 @@ export class AstImportResolver {
 
       if (isRelative) {
         // Test if file exists with common extensions (.ts, .js, .tsx, .jsx, /index.ts, /index.js)
-        const exists = await this.verifyModuleExists(fileDir, specifier);
+        const exists = await this.verifyModuleExists(fileDir, specifier, checkCurrent);
         if (!exists) {
           isBroken = true;
           const targetFilename = path.basename(specifier).replace(/\.(js|ts|jsx|tsx|mjs)$/, "");
-          const found = await this.findFileInWorkspace(rootDir, targetFilename);
+          const found = await this.findFileInWorkspace(rootDir, targetFilename, checkCurrent);
           if (found) {
             let rel = path.relative(fileDir, found).replace(/\\/g, "/");
             if (!rel.startsWith(".")) rel = "./" + rel;
@@ -137,7 +140,7 @@ export class AstImportResolver {
     };
   }
 
-  private async verifyModuleExists(fromDir: string, specifier: string): Promise<boolean> {
+  private async verifyModuleExists(fromDir: string, specifier: string, checkCurrent: () => void): Promise<boolean> {
     const candidateBase = path.resolve(fromDir, specifier);
     const candidates = [
       candidateBase,
@@ -151,17 +154,20 @@ export class AstImportResolver {
     ];
 
     for (const c of candidates) {
+      checkCurrent();
       try {
         const stat = await fs.stat(c);
+        checkCurrent();
         if (stat.isFile()) return true;
       } catch {
+        checkCurrent();
         // Continue
       }
     }
     return false;
   }
 
-  private async findFileInWorkspace(rootDir: string, targetBasename: string): Promise<string | null> {
+  private async findFileInWorkspace(rootDir: string, targetBasename: string, checkCurrent: () => void): Promise<string | null> {
     const candidates = [
       `${targetBasename}.ts`,
       `${targetBasename}.tsx`,
@@ -172,15 +178,19 @@ export class AstImportResolver {
     let foundPath: string | null = null;
 
     const walk = async (current: string) => {
+      checkCurrent();
       if (foundPath) return;
       let entries: any[] = [];
       try {
         entries = await fs.readdir(current, { withFileTypes: true });
+        checkCurrent();
       } catch {
+        checkCurrent();
         return;
       }
 
       for (const entry of entries) {
+        checkCurrent();
         if (foundPath) break;
         if (this.ignoredDirs.has(entry.name) || entry.name.startsWith(".")) continue;
 

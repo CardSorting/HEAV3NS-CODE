@@ -1,3 +1,5 @@
+import { readBoundedFile } from "../../../utilities/bounded-file-read.js"
+import { BoundedSingleFlight } from "../../../utilities/bounded-single-flight.js"
 import { diskRuntime } from "@core/storage/disk"
 import { GOLDEN_CARTRIDGE_SKILL_NAME } from "@shared/golden-cartridge"
 import type { SkillContent, SkillMetadata } from "@shared/skills"
@@ -5,6 +7,7 @@ import { BUNDLED_SKILL_URI_PREFIX } from "@shared/skills"
 import { fsRuntime } from "@utils/fs"
 import * as fs from "fs/promises"
 import * as path from "path"
+import { types } from "node:util"
 import { getRoadmapConfig } from "@/services/roadmap/RoadmapConfig"
 import {
 	BUNDLED_SKILL_NAME,
@@ -15,13 +18,22 @@ import {
 import { Logger } from "@/shared/services/Logger"
 import { parseYamlFrontmatter } from "./frontmatter"
 import { ROADMAP_SKILL_EXECUTION_DIGEST } from "./roadmapSkillDigest"
-import { runSkillOperation } from "./skillOperation"
+import { SKILL_OPERATION_TIMEOUT_MS } from "./skillOperation"
+
+const pendingSkillContent = new BoundedSingleFlight<string>("Skill loading", {
+	maxActive: 16,
+	maxWaiters: 256,
+	maxWaitersPerKey: 64,
+	timeoutMs: SKILL_OPERATION_TIMEOUT_MS,
+})
+export const getSkillContentReadMetrics = () => pendingSkillContent.getStats()
 
 /** Runtime filesystem seam for deterministic CLI tests and alternate hosts. */
 export const skillsRuntime = {
 	readdir: (dirPath: string) => fs.readdir(dirPath),
 	stat: (filePath: string) => fs.stat(filePath),
-	readFile: (filePath: string, encoding: BufferEncoding, signal?: AbortSignal) => fs.readFile(filePath, { encoding, signal }),
+	readFile: (filePath: string, encoding: BufferEncoding, signal?: AbortSignal) =>
+		readBoundedFile(filePath, MAX_SKILL_FILE_SIZE_BYTES, signal, { followSymlinks: true, encoding }),
 }
 
 const GOLDEN_CARTRIDGE_SKILL_DESCRIPTION =
@@ -341,14 +353,25 @@ export function getAvailableSkills(skills: SkillMetadata[]): SkillMetadata[] {
 
 	// Iterate backwards: global skills (added last) are seen first and take precedence
 	for (let i = skills.length - 1; i >= 0; i--) {
-		const skill = skills[i]
-		if (!seen.has(skill.name)) {
-			seen.add(skill.name)
+		const skill = snapshotSkillMetadata(skills[i])
+		if (skill && !seen.has(skill.name.toLowerCase())) {
+			seen.add(skill.name.toLowerCase())
 			result.unshift(skill)
 		}
 	}
 
 	return result
+}
+
+/** Own primitive metadata before joining a pending read; do not execute metadata hooks. */
+function snapshotSkillMetadata(value: unknown): SkillMetadata | undefined {
+	if (!value || typeof value !== "object" || types.isProxy(value)) return undefined
+	const field = (key: string) => Object.getOwnPropertyDescriptor(value, key)?.value as unknown
+	const name = field("name"), description = field("description"), skillPath = field("path"), source = field("source")
+	if (typeof name !== "string" || !name || typeof description !== "string" || typeof skillPath !== "string" || !skillPath ||
+		(source !== "bundled" && source !== "global" && source !== "project")) return undefined
+	const defaultEnabled = field("defaultEnabled")
+	return { name, description, path: skillPath, source, ...(typeof defaultEnabled === "boolean" ? { defaultEnabled } : {}) }
 }
 
 export type SkillLoadMode = "digest" | "full"
@@ -366,9 +389,10 @@ export async function getSkillContent(
 	availableSkills: SkillMetadata[],
 	options: SkillLoadOptions = {},
 ): Promise<SkillContent | null> {
-	options.signal?.throwIfAborted()
+	const signal = options.signal
+	signal?.throwIfAborted()
 	const trimmedName = skillName.trim()
-	const skill = availableSkills.find((s) => s.name === trimmedName || s.name.toLowerCase() === trimmedName.toLowerCase())
+	const skill = availableSkills.map(snapshotSkillMetadata).find((s) => s?.name.toLowerCase() === trimmedName.toLowerCase())
 	if (!skill) return null
 
 	const loadMode = options.mode ?? "digest"
@@ -382,15 +406,16 @@ export async function getSkillContent(
 	}
 
 	try {
-		const fileContent = await runSkillOperation(
-			"Skill loading",
+		const fileContent = await pendingSkillContent.run(
+			JSON.stringify([skill.path, skill.name, skill.source]),
 			async (signal) => {
 				const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
 				signal.throwIfAborted()
 				return skillsRuntime.readFile(readPath, "utf-8", signal)
 			},
-			options.signal,
+			signal,
 		)
+		signal?.throwIfAborted()
 		if (fileContent.includes("\0")) {
 			Logger.warn(`Corrupt binary content detected when loading skill instructions for ${skill.name}`)
 			return null
@@ -412,7 +437,7 @@ export async function getSkillContent(
 			instructions: parsed.body.trim(),
 		}
 	} catch (error) {
-		options.signal?.throwIfAborted()
+		signal?.throwIfAborted()
 		Logger.warn(`Failed to read skill content at ${skill.path}:`, error)
 		return null
 	}

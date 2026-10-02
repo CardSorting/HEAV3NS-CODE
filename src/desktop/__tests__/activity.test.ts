@@ -16,6 +16,14 @@ const event = (sequence: number, overrides: Partial<EngineProgressEvent> = {}): 
 })
 
 describe("structured walkthrough activity", () => {
+	it("names Spider checks and links scoped files without presenting them as passed tests", () => {
+		const activity = describeToolProgress("spider_check", { paths: ["entry.ts", "helper.ts", "../private.ts"] }, "/workspace")
+		assert.equal(activity.message, "Check code · entry.ts +1")
+		assert.equal(activity.operation, "read")
+		assert.equal(activity.phase, "tool")
+		assert.deepEqual(activity.files, ["entry.ts", "helper.ts"])
+		assert.match(activity.detail ?? "", /not a test run/)
+	})
 	it("names paginated and batched file operations with safe navigation targets", () => {
 		const read = describeToolProgress("file_view_paginated", { filePath: "src/game.ts", startLine: 20 }, "/workspace")
 		assert.equal(read.message, "Read workspace · src/game.ts")

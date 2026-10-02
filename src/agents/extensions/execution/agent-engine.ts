@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { AbstractAgentEngine } from "../../../core/abstracts/abstract-agent-engine.js"
@@ -15,9 +16,9 @@ import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	isClaudeSubscriptionDirectSdkProvider,
 } from "../../../core/providers/provider-ids.js"
+import { CommandOutputStream } from "../../../core/utilities/command-output-stream.js"
 import { sanitizeProgressText } from "../../../core/utilities/progress-sanitizer.js"
 import { progressPreview, streamedToolPreview, toolPreview } from "../../../core/utilities/tool-preview.js"
-import { CommandOutputStream } from "../../../core/utilities/command-output-stream.js"
 import { describeToolProgress } from "../../../core/utilities/tool-progress.js"
 import {
 	type ClaudeSubscriptionDirectSdkCompletionResponse,
@@ -33,7 +34,9 @@ import type { SessionVfs } from "../../../sessions/extensions/vfs/session-vfs.js
 import type { DietCodeStorageMessage } from "../../../shared/messages/content.js"
 import type { DietCodeTool } from "../../../shared/tools.js"
 import { ToolDependencyGraphPlanner } from "../../../tooling/extensions/execution/tool-dependency-graph-planner.js"
+import type { ToolExecutionCache } from "../../../tooling/extensions/execution/tool-execution-cache.js"
 import { type ScheduledToolCall, ToolExecutionScheduler } from "../../../tooling/extensions/execution/tool-execution-scheduler.js"
+import type { ToolSpeculativePrefetcher } from "../../../tooling/extensions/execution/tool-speculative-prefetcher.js"
 import { RoadmapCompletionGate } from "../../../tooling/extensions/policy/roadmap-completion-gate.js"
 import { DynamicToolRouter } from "../../../tooling/extensions/registry/dynamic-tool-router.js"
 import type { SkillManifest } from "../../../tooling/extensions/registry/skills-ingestor.js"
@@ -188,6 +191,8 @@ export class AgentEngine extends AbstractAgentEngine {
 	private readonly getOpenAiApiKey?: () => string | undefined
 	private readonly getOpenAiAuthMethod?: () => "oauth" | "api-key" | undefined
 	private readonly flappyBirdProjectSynthesizer = new FlappyBirdProjectSynthesizer()
+	private readonly runtimeToolCache?: ToolExecutionCache
+	private readonly runtimePrefetcher?: ToolSpeculativePrefetcher
 	private turnQueue: Promise<void> = Promise.resolve()
 	readonly requestQueue?: BroccoliRuntimeQueue
 
@@ -207,6 +212,8 @@ export class AgentEngine extends AbstractAgentEngine {
 		contextServices: AgentContextServices = {},
 	) {
 		super(config, sessionContext, sessionStore, toolRegistry)
+		this.runtimeToolCache = toolRegistry.cache
+		this.runtimePrefetcher = toolRegistry.prefetcher
 		this.promptComposer = promptComposer
 		this.sessionCompactor = sessionCompactor
 		this.modelResolver = modelResolver
@@ -240,7 +247,16 @@ export class AgentEngine extends AbstractAgentEngine {
 		input: EngineTickInput,
 		aroundExecution: (execute: () => Promise<EngineTickResult>) => Promise<EngineTickResult> = (execute) => execute(),
 	): Promise<EngineTickResult> {
-		const execute = (queuedInput: EngineTickInput) => aroundExecution(() => super.tick(queuedInput))
+		const execute = (queuedInput: EngineTickInput) =>
+			aroundExecution(async () => {
+				this.runtimeToolCache?.beginTask(randomUUID(), this.sessionContext.cwd)
+				try {
+					return await super.tick(queuedInput)
+				} finally {
+					this.runtimePrefetcher?.clear()
+					this.runtimeToolCache?.endTask()
+				}
+			})
 		if (this.requestQueue) return this.requestQueue.run(input, execute)
 		const predecessor = this.turnQueue
 		let releaseTurn: () => void = () => undefined
@@ -272,7 +288,14 @@ export class AgentEngine extends AbstractAgentEngine {
 	}
 
 	async close(): Promise<void> {
-		await this.requestQueue?.close()
+		try {
+			await this.requestQueue?.close()
+			await this.turnQueue
+		} finally {
+			this.runtimePrefetcher?.clear()
+			this.runtimeToolCache?.endTask()
+			this.scheduler.cache.endTask()
+		}
 	}
 
 	protected override async executeTick(input: EngineTickInput): Promise<EngineTickResult> {

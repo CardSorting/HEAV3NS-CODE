@@ -1,11 +1,13 @@
 import * as os from "node:os";
 import * as path from "node:path";
+import { readBoundedFile } from "../../../core/utilities/bounded-file-read.js";
 import { AbstractToolRegistry } from "../../../core/abstracts/abstract-tool-registry.js";
 import type {
   ExecutionAuthorityLevel,
   PipelinedStreamChunk,
   SchemaValidationResult,
   ToolExecutionOptions,
+  ToolDefinition,
 } from "../../../core/contracts/tooling.contracts.js";
 import type { ThreatBypassMode } from "../../../core/contracts/threat.contracts.js";
 
@@ -14,23 +16,28 @@ import type { AstPerceptionEyes } from "../perception/ast-eyes.js";
 import type { AnchoredHands } from "../hashline/hands.js";
 import type { ProtocolEars } from "../telemetry/ears.js";
 import { SkillsIngestor } from "./skills-ingestor.js";
+import { getSkillContentReadMetrics } from "../../../core/context/instructions/user-instructions/skills.js";
+import { getSkillDiscoveryMetrics } from "../../../core/context/instructions/user-instructions/skillRuntime.js";
 import { ToolCallArgParser } from "./tool-call-arg-parser.js";
 import { ToolSchemaSerializer } from "./tool-schema-serializer.js";
 import { ToolExecutionScheduler } from "../execution/tool-execution-scheduler.js";
-import { ToolExecutionCache } from "../execution/tool-execution-cache.js";
+import { encodeJoyRideValue, type JoyRideHotPathCache } from "../cache/joyride-cache.js";
+import { JoyRideReadInvalidatedError, ToolExecutionCache } from "../execution/tool-execution-cache.js";
 import { ToolOutputGovernor } from "../execution/tool-output-governor.js";
 import { ToolErrorAutoHealer } from "../execution/tool-error-auto-healer.js";
 import { ToolTransactionJournal } from "../execution/tool-transaction-journal.js";
 import { ToolSafetyPolicyManager } from "../execution/tool-safety-policy-manager.js";
 import { ToolConfirmationGatekeeper, ToolApprovalDeniedError } from "../execution/tool-confirmation-gatekeeper.js";
 import { ToolLoopBreaker } from "../execution/tool-loop-breaker.js";
+import { waitForProcessExit } from "../execution/process-waiter.js";
 import { ToolTelemetryLedger } from "../execution/tool-telemetry-ledger.js";
 import { MultiFileAtomicPatchOrchestrator } from "../execution/multi-file-atomic-patch-orchestrator.js";
 import { ToolPipelineMiddlewareChain } from "../execution/tool-pipeline-middleware.js";
 import { ToolSchemaCompressor } from "./tool-schema-compressor.js";
 import { ToolSpeculativePrefetcher } from "../execution/tool-speculative-prefetcher.js";
 import { DynamicToolRouter } from "./dynamic-tool-router.js";
-import { ToolDependencyGraphPlanner } from "../execution/tool-dependency-graph-planner.js";
+import { DAGExecutionError, ToolDependencyGraphPlanner } from "../execution/tool-dependency-graph-planner.js";
+import { MAX_WORKFLOW_BYTES, snapshotWorkflowData } from "../execution/workflow-arguments.js";
 import { ToolOutputSummarizer } from "../execution/tool-output-summarizer.js";
 import { ToolMockHarness } from "../execution/tool-mock-harness.js";
 import { ToolChoicePolicyOrchestrator } from "./tool-choice-policy-orchestrator.js";
@@ -343,7 +350,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     otlpToolSuite?: OtlpToolSuite,
     daemonToolSuite?: DaemonToolSuite,
     runbookToolSuite?: RunbookToolSuite,
-    adversarialToolSuite?: AdversarialToolSuite
+    adversarialToolSuite?: AdversarialToolSuite,
+    joyrideCache?: JoyRideHotPathCache
   ) {
     super(eyes, hands, ears);
     this.skillsIngestor = skillsIngestor ?? new SkillsIngestor(eyes);
@@ -438,7 +446,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.streamingExecutor = new BroccoliStreamingToolExecutor();
     this.argParser = new ToolCallArgParser();
     this.schemaSerializer = new ToolSchemaSerializer();
-    this.cache = new ToolExecutionCache();
+    this.cache = new ToolExecutionCache({ joyride: joyrideCache });
     this.governor = new ToolOutputGovernor();
     this.healer = new ToolErrorAutoHealer();
     this.journal = new ToolTransactionJournal();
@@ -494,6 +502,9 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       parser: this.argParser,
     });
     this.registerBuiltins();
+    this.speculativeReadTool = this.getTool("view_file");
+    for (const tool of this.listTools()) if (this.cache.isCacheable(tool.name)) this.nativeCachedReads.set(tool.name, tool.execute);
+    for (const tool of this.listTools()) this.nativeRecoveryTools.set(tool.name, tool.execute);
   }
 
   readonly cache: ToolExecutionCache;
@@ -516,8 +527,26 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
   /** Pins the existing confirmation gate for all nested desktop tool calls. */
   public requireInteractiveHost(hook: import("../execution/tool-confirmation-gatekeeper.js").ConfirmationHook): void {
     if (this.hostAutonomousPolicy) throw new Error("Autonomous host policy is already configured");
+    this.executionPolicyGeneration++;
+    this.cache.approvalBoundaryChanged();
+    this.prefetcher.clear();
     this.hostInteractivePolicy = true;
     this.confirmationGatekeeper.setRequiredHostHook(hook);
+  }
+  readonly managesExecutionCache = true;
+  captureSpeculativeReadScope(): object | undefined {
+    if (this.hostInteractivePolicy || !["autonomous", "high_throughput"].includes(this.currentAuthority)) return undefined;
+    return this.cache.captureTaskScope();
+  }
+  private executionPolicyGeneration = 0;
+  private readonly speculativeReadTool?: ToolDefinition;
+  private readonly nativeCachedReads = new Map<string, ToolDefinition["execute"]>();
+  private readonly nativeRecoveryTools = new Map<string, ToolDefinition["execute"]>();
+  private static readonly REPEATABLE_READ_TOOLS = new Set([
+    "view_file", "batch_view_files", "file_info", "file_hash", "path_exists", "list_dir", "search_symbols", "process_poll",
+  ]);
+  private isRepeatableNativeRead(tool: ToolDefinition): boolean {
+    return !tool.isMutating && ValidatingToolRegistry.REPEATABLE_READ_TOOLS.has(tool.name) && this.nativeRecoveryTools.get(tool.name) === tool.execute;
   }
   readonly loopBreaker: ToolLoopBreaker;
   readonly telemetryLedger: ToolTelemetryLedger;
@@ -625,11 +654,10 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
    */
   public setExecutionAuthority(authority: ExecutionAuthorityLevel): void {
     authority = this.hostAutonomousPolicy ? "autonomous" : this.hostInteractivePolicy ? "interactive" : authority;
+    if (this.currentAuthority !== authority) { this.executionPolicyGeneration++; this.cache.approvalBoundaryChanged(); this.prefetcher.clear(); }
     this.currentAuthority = authority;
     this.confirmationGatekeeper.setExecutionAuthority(authority);
-    if (authority === "autonomous" || authority === "high_throughput") {
-      this.loopBreaker.updateConfig({ softAdvisoryMode: true });
-    }
+    this.loopBreaker.updateConfig({ softAdvisoryMode: authority === "autonomous" || authority === "high_throughput" });
   }
 
   /**
@@ -654,18 +682,44 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     return validation;
   }
 
+  override registerTool(tool: ToolDefinition): void {
+    this.executionPolicyGeneration++;
+    this.cache?.clear(); this.prefetcher?.clear();
+    super.registerTool(tool);
+  }
+
   override async executeTool(
     name: string,
     rawArgs: Record<string, unknown>,
     cwd: string,
     options?: ToolExecutionOptions
   ): Promise<unknown> {
+    options?.signal?.throwIfAborted();
+    const parentScopeCheck = options?.checkExecutionScope;
+    const parentSignal = options?.signal;
+    parentScopeCheck?.();
     // A native host may pin the existing interactive policy. Nested tools cannot
     // elevate it by passing autonomous execution options.
     if (this.hostInteractivePolicy) options = { ...options, executionAuthority: "interactive", bypassConfirmation: false, bypassThreatDetection: false, autoHeal: false };
     if (this.hostAutonomousPolicy) options = { ...options, executionAuthority: "autonomous", bypassConfirmation: true, bypassThreatDetection: true };
     const canonicalName = this.getTool(name)?.name ?? name;
+    const policyGeneration = this.executionPolicyGeneration;
+    const taskScope = this.cache.captureTaskScope();
+    const requireCurrentPolicy = () => {
+      parentSignal?.throwIfAborted();
+      parentScopeCheck?.();
+      if (taskScope && taskScope !== this.cache.captureTaskScope()) {
+        const error = new Error("Tool task ended while execution was pending.");
+        error.name = "AbortError";
+        throw error;
+      }
+      if (policyGeneration !== this.executionPolicyGeneration) {
+        throw new ToolApprovalDeniedError("Tool policy changed while execution was pending. Retry under the current policy.");
+      }
+    };
     const effectiveAuthority = options?.executionAuthority ?? this.currentAuthority;
+    // Own the parent's options and carry its original lifetime through nested calls.
+    options = { ...options, executionAuthority: effectiveAuthority, checkExecutionScope: requireCurrentPolicy };
     const isAutonomous = effectiveAuthority === "autonomous" || effectiveAuthority === "high_throughput";
 
     if (!this.circuitBreaker.canExecute(canonicalName)) {
@@ -681,10 +735,22 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       throw new Error(`Tool standard target '${name}' not found in registry`);
     }
 
-    const { args: preparedArgs, validation } = this.argParser.prepareArguments(tool, rawArgs);
-    for (const [k, v] of Object.entries(preparedArgs)) {
+    const nativeCachedRead = !tool.isMutating && this.nativeCachedReads.get(canonicalName) === tool.execute;
+    // A replacement implementation cannot inherit replay safety from a built-in name.
+    const mayRecoverExecution = options?.autoHeal !== false && this.nativeRecoveryTools.get(canonicalName) === tool.execute;
+    if (options?.speculative && (
+      !options.speculativeScope || options.speculativeScope !== taskScope ||
+      !nativeCachedRead || !isAutonomous || this.hostInteractivePolicy || !this.cache.getStats().activeTask ||
+      tool !== this.speculativeReadTool || canonicalName !== "view_file"
+    )) throw new Error("Speculative read skipped: no current autonomous task or bounded built-in reader.");
+
+    const { args: parsedArgs, validation } = this.argParser.prepareArguments(tool, rawArgs);
+    for (const [k, v] of Object.entries(parsedArgs)) {
       rawArgs[k] = v;
     }
+    // Keep the actual read and its proof on the same owned arguments across awaits.
+    const encodedArgs = nativeCachedRead ? encodeJoyRideValue(parsedArgs, 64 * 1024) : undefined;
+    const preparedArgs = encodedArgs === undefined ? parsedArgs : JSON.parse(encodedArgs) as Record<string, unknown>;
 
     if (preparedArgs.isDryRun === true || options?.isDryRun === true) {
       return this.safetyPolicy.simulateDryRun(canonicalName, preparedArgs, cwd, tool, effectiveAuthority);
@@ -700,7 +766,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           cwd,
           this,
           tool,
-          options
+          options,
+          { phase: "validation", checkCurrent: requireCurrentPolicy }
         );
         if (aliasRecovery.recovered) {
           return aliasRecovery.result;
@@ -714,23 +781,53 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       throw new Error(`Tool '${canonicalName}' argument schema validation failed: ${validation.errors.join("; ")}${suggestionsMsg}`);
     }
 
+    const shareNativeRead = async () => {
+      try {
+        return await this.cache.readThrough(canonicalName, preparedArgs, cwd, async signal => {
+          const started = Date.now();
+          const result = await super.executeTool(canonicalName, preparedArgs, cwd, { ...options, signal });
+          signal.throwIfAborted();
+          this.telemetryLedger.recordSample(canonicalName, Date.now() - started, true, typeof result === "string" ? result.length : 0);
+          return result;
+        }, options?.signal);
+      } catch (error) {
+        requireCurrentPolicy();
+        if (error instanceof JoyRideReadInvalidatedError) return { handled: false, skipLookup: true };
+        // Recovery re-enters only after the failed flight has drained. Retrying
+        // inside its callback would join itself and stall every waiting caller.
+        if (mayRecoverExecution) {
+          const recovery = await this.resilienceSupervisor.attemptAutoRecovery(canonicalName, preparedArgs, error, cwd, this, tool, options, { checkCurrent: requireCurrentPolicy });
+          requireCurrentPolicy();
+          if (recovery.recovered) return { handled: true, value: recovery.result, skipLookup: false };
+        }
+        throw error;
+      }
+    };
+
     // ------------------------------------------------------------------------
     // Safe Fast-Path Execution for idempotent read-only tools
     // ------------------------------------------------------------------------
     if (isAutonomous && this.isSafeFastPathTool(canonicalName) && !tool.isMutating) {
-      // Check prefetcher
-      const prefetchHit = await this.prefetcher.consumePrefetch(canonicalName, preparedArgs, cwd);
-      if (prefetchHit.hit) return prefetchHit.result;
-
-      // Check read cache
-      const cached = this.cache.get(canonicalName, preparedArgs, cwd);
-      if (cached !== null) return cached;
+      let skipLookup = false;
+      // These native readers do not emit output chunks. Scheduler progress hooks
+      // remain per call and must not prevent identical file reads from sharing.
+      if (nativeCachedRead && encodedArgs !== undefined && !options?.speculative && options?.timeoutMs === undefined) {
+        const shared = await shareNativeRead();
+        requireCurrentPolicy();
+        if (shared.handled) return shared.value;
+        skipLookup = shared.skipLookup === true;
+      }
+      const cached = nativeCachedRead && !skipLookup ? await this.cache.lookup(canonicalName, preparedArgs, cwd, options?.signal) : { hit: false, ticket: undefined };
+      requireCurrentPolicy();
+      if (cached.hit) return cached.value;
+      if (options?.speculative && !cached.ticket) throw new Error("Speculative read skipped: no reusable file proof.");
 
       const fastStart = Date.now();
       try {
         const fastResult = await super.executeTool(canonicalName, preparedArgs, cwd, options);
+        requireCurrentPolicy();
         const fastElapsed = Date.now() - fastStart;
-        if (!options?.signal?.aborted) this.cache.set(canonicalName, preparedArgs, cwd, fastResult);
+        if (!options?.signal?.aborted) await this.cache.store(cached.ticket, fastResult, options?.signal);
         this.telemetryLedger.recordSample(
           canonicalName,
           fastElapsed,
@@ -739,7 +836,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         );
         return fastResult;
       } catch (err) {
-        if (options?.autoHeal !== false) {
+        requireCurrentPolicy();
+        if (mayRecoverExecution) {
           const fastRecovery = await this.resilienceSupervisor.attemptAutoRecovery(
             canonicalName,
             preparedArgs,
@@ -747,7 +845,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
             cwd,
             this,
             tool,
-            options
+            options,
+            { checkCurrent: requireCurrentPolicy }
           );
           if (fastRecovery.recovered) return fastRecovery.result;
         }
@@ -762,7 +861,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     }
 
     // Check recursive tool loop with soft mode in autonomous execution
-    const isSoftLoop = isAutonomous;
+    const isSoftLoop = isAutonomous || this.isRepeatableNativeRead(tool);
     const loopCheck = this.loopBreaker.recordAndCheck(canonicalName, preparedArgs, { softMode: isSoftLoop });
     if (loopCheck.loopDetected && !loopCheck.softAdvisory) {
       throw new Error(loopCheck.advisoryMessage);
@@ -779,26 +878,31 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         authority: effectiveAuthority,
       }
     );
-    options?.signal?.throwIfAborted();
+    requireCurrentPolicy();
     if (!confirmation.approved) {
       throw new ToolApprovalDeniedError(confirmation.rejectionFeedback || `Execution of tool '${canonicalName}' was denied by confirmation policy.`);
     }
 
-    // Check speculative prefetch cache
-    const prefetchHit = await this.prefetcher.consumePrefetch(canonicalName, preparedArgs, cwd);
-    if (prefetchHit.hit) {
-      return prefetchHit.result;
+    // Authorization is checked on every call, including validated cache hits.
+    let skipLookup = false;
+    if (isAutonomous && nativeCachedRead && encodedArgs !== undefined && options?.timeoutMs === undefined) {
+      const shared = await shareNativeRead();
+      requireCurrentPolicy();
+      if (shared.handled) return shared.value;
+      skipLookup = shared.skipLookup === true;
     }
-
-    // Check read cache
-    const cached = this.cache.get(canonicalName, preparedArgs, cwd);
-    if (cached !== null) {
-      return cached;
-    }
+    const cached = nativeCachedRead && !skipLookup ? await this.cache.lookup(canonicalName, preparedArgs, cwd, options?.signal) : { hit: false, ticket: undefined };
+    requireCurrentPolicy();
+    if (cached.hit) return cached.value;
+    const mutating = tool.isMutating || ["run_command", "env_execute_command", "env_switch_backend"].includes(canonicalName);
+    if (mutating) this.prefetcher.clear();
+    const finishMutation = mutating ? this.cache.beginMutation() : undefined;
 
     const startTime = Date.now();
     try {
       const result = await super.executeTool(canonicalName, preparedArgs, cwd, options);
+      options?.signal?.throwIfAborted();
+      if (nativeCachedRead) requireCurrentPolicy();
       const elapsed = Date.now() - startTime;
       this.circuitBreaker.recordSuccess(canonicalName);
       this.telemetryLedger.recordSample(
@@ -820,13 +924,14 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       });
 
       if (!tool.isMutating && !options?.signal?.aborted) {
-        this.cache.set(canonicalName, preparedArgs, cwd, result);
+        await this.cache.store(cached.ticket, result, options?.signal);
       }
 
       return result;
     } catch (err) {
+      requireCurrentPolicy();
       // In-turn resilience self-healing
-      if (options?.autoHeal !== false) {
+      if (mayRecoverExecution) {
         const recovery = await this.resilienceSupervisor.attemptAutoRecovery(
           canonicalName,
           preparedArgs,
@@ -834,7 +939,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           cwd,
           this,
           tool,
-          options
+          options,
+          { checkCurrent: requireCurrentPolicy }
         );
         if (recovery.recovered) {
           const elapsed = Date.now() - startTime;
@@ -849,8 +955,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       this.telemetryLedger.recordSample(canonicalName, elapsed, false);
       throw err;
     } finally {
-      if (["run_command", "env_execute_command", "env_switch_backend"].includes(canonicalName)) this.cache.invalidatePaths();
-      else if (tool.isMutating) this.cache.invalidatePaths(this.cache.extractPaths(preparedArgs, cwd), cwd);
+      finishMutation?.();
     }
   }
 
@@ -868,13 +973,13 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         endLine: { type: "number", required: false, description: "1-indexed ending line number" },
         contentOffset: { type: "number", required: false, description: "Byte offset to slice content from" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         const targetPath = String(args.path);
         const resolvedPath = targetPath.startsWith("/") ? targetPath : `${cwd}/${targetPath}`;
         const startLine = typeof args.startLine === "number" ? args.startLine : undefined;
         const endLine = typeof args.endLine === "number" ? args.endLine : undefined;
         const contentOffset = typeof args.contentOffset === "number" ? args.contentOffset : undefined;
-        return this.eyes.readFile(resolvedPath, { startLine, endLine, contentOffset });
+        return this.eyes.readFile(resolvedPath, { startLine, endLine, contentOffset, signal: options?.signal, ...(options?.speculative ? { maxBytes: 1024 * 1024 } : {}) });
       },
     });
 
@@ -1244,13 +1349,13 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "execute_parallel_batch",
-      description: "Execute a batch of tool calls concurrently in parallel waves using Resource-Aware Disjoint Concurrency Partitioning (Scheduler)",
+      description: "Execute up to 256 tool calls with bounded concurrency, preserving order for conflicting file operations.",
       parameters: {
         calls: { type: "array", required: false, description: "Array of tool calls: [{ id?: string, name?: string, tool?: string, args: object }]" },
         callsJson: { type: "string", required: false, description: "JSON array of tool calls: [{ id?: string, name: string, args: object }]" },
         allowDisjointMutations: { type: "boolean", required: false, description: "Whether to allow disjoint mutating tools in parallel (default: true)" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         let rawCalls: any[] = [];
         if (Array.isArray(args.calls)) {
           rawCalls = args.calls;
@@ -1262,8 +1367,8 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           }
         }
 
-        if (!Array.isArray(rawCalls)) {
-          return { success: false, error: "calls or callsJson must be an array." };
+        if (!Array.isArray(rawCalls) || rawCalls.length > 256 || rawCalls.some(c => !c || typeof c !== "object" || Array.isArray(c))) {
+          return { success: false, error: "calls or callsJson must contain at most 256 tool call objects." };
         }
 
         const scheduledCalls = rawCalls.map((c, i) => ({
@@ -1274,10 +1379,13 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
         const allowDisjoint = typeof args.allowDisjointMutations === "boolean" ? args.allowDisjointMutations : true;
         const result = await this.scheduler.executeBatch(scheduledCalls, this, cwd, {
+          ...options,
+          onToolOutput: options?.onOutput ? (_call, chunk) => options.onOutput?.(chunk) : undefined,
           allowParallelDisjointMutations: allowDisjoint,
-          executionAuthority: this.currentAuthority,
-          bypassConfirmation: true,
-          bypassThreatDetection: true,
+          executionAuthority: options?.executionAuthority ?? this.currentAuthority,
+          bypassConfirmation: options?.bypassConfirmation ?? ["autonomous", "high_throughput"].includes(options?.executionAuthority ?? this.currentAuthority),
+          bypassThreatDetection: options?.bypassThreatDetection,
+          signal: options?.signal,
         });
 
         const allResults = result.results;
@@ -1298,16 +1406,20 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "execute_pipelined_stream",
-      description: "Stream batch tool execution results wave by wave for high-throughput pipelining (Streaming)",
+      description: "Execute up to 256 calls with bounded concurrency and collect their ordered streaming results.",
       parameters: {
         callsJson: { type: "string", required: true, description: "JSON array of tool calls: [{ id?: string, name: string, args: object }]" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         let rawCalls: any[];
         try {
           rawCalls = JSON.parse(String(args.callsJson || "[]"));
         } catch {
-          return { error: "callsJson must be a valid JSON array of tool call objects." };
+          return { success: false, error: "callsJson must be a valid JSON array of tool call objects." };
+        }
+
+        if (!Array.isArray(rawCalls) || rawCalls.length > 256 || rawCalls.some(c => !c || typeof c !== "object" || Array.isArray(c))) {
+          return { success: false, error: "callsJson must contain at most 256 tool call objects." };
         }
 
         const scheduledCalls = rawCalls.map((c, i) => ({
@@ -1318,13 +1430,18 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
         const streamResults: PipelinedStreamChunk[] = [];
         for await (const chunk of this.scheduler.executePipelinedStream(scheduledCalls, this, cwd, {
-          executionAuthority: this.currentAuthority,
+          ...options,
+          onToolOutput: options?.onOutput ? (_call, output) => options.onOutput?.(output) : undefined,
+          executionAuthority: options?.executionAuthority ?? this.currentAuthority,
+          bypassConfirmation: options?.bypassConfirmation ?? ["autonomous", "high_throughput"].includes(options?.executionAuthority ?? this.currentAuthority),
+          bypassThreatDetection: options?.bypassThreatDetection,
+          signal: options?.signal,
         })) {
           streamResults.push(chunk);
         }
 
         return {
-          success: true,
+          success: streamResults.every((chunk) => chunk.record.success),
           streamedChunks: streamResults.length,
           chunks: streamResults,
         };
@@ -1359,20 +1476,26 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "execute_multi_step_workflow",
-      description: "Execute a multi-step DAG workflow with pipeline argument passing ($step1.result) and atomic rollback protection (Workflow)",
+      description: "Execute up to 256 dependent steps as their inputs become ready, with nested argument references ($step1.result), bounded concurrency, and cancellation. Failures include completed results and pending step IDs; completed changes are not rolled back.",
       parameters: {
-        stepsJson: { type: "string", required: true, description: "JSON array of DAG nodes: [{ id: string, toolName: string, args: object, dependencies?: string[] }]" },
+        stepsJson: { type: "string", required: true, description: "JSON array within 1 MiB: [{ id: string, toolName: string, args: object, dependencies?: string[] }]. Whole-value references like $step.output.path work in nested objects/arrays and automatically add dependencies." },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
+        if (typeof args.stepsJson !== "string" || args.stepsJson.length * 2 > MAX_WORKFLOW_BYTES) {
+          return { success: false, error: "stepsJson must be a JSON array within the 1 MiB workflow budget." };
+        }
         let rawSteps: any[];
         try {
-          rawSteps = JSON.parse(String(args.stepsJson || "[]"));
+          rawSteps = JSON.parse(args.stepsJson);
         } catch {
-          return { error: "stepsJson must be a valid JSON array of DAG step objects." };
+          return { success: false, error: "stepsJson must be a valid JSON array of DAG step objects." };
         }
 
-        if (!Array.isArray(rawSteps)) {
-          return { error: "stepsJson must be an array." };
+        if (!Array.isArray(rawSteps) || rawSteps.length > 256 || rawSteps.some(s => !s || typeof s !== "object" || Array.isArray(s))) {
+          return { success: false, error: "stepsJson must contain at most 256 DAG step objects." };
+        }
+        if (rawSteps.some(s => s.dependencies !== undefined && !Array.isArray(s.dependencies))) {
+          return { success: false, error: "Each step's dependencies must be an array of step IDs." };
         }
 
         const nodes = rawSteps.map((s, idx) => ({
@@ -1383,7 +1506,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         }));
 
         try {
-          const records = await this.dagPlanner.executeDAG(nodes, cwd, this);
+          const records = await this.dagPlanner.executeDAG(nodes, cwd, this, { ...options, executionAuthority: options?.executionAuthority ?? this.currentAuthority, bypassConfirmation: options?.bypassConfirmation ?? ["autonomous", "high_throughput"].includes(options?.executionAuthority ?? this.currentAuthority) });
           return {
             success: true,
             totalSteps: records.metrics.totalNodes,
@@ -1392,17 +1515,23 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
             concurrencySpeedup: records.metrics.speedup,
             results: Array.from(records.entries()).map(([stepId, rec]) => ({
               stepId,
-              toolName: rec.toolName,
+              toolName: rec.toolName ?? rec.name,
               success: rec.success,
               output: rec.output,
               durationMs: rec.durationMs,
             })),
           };
         } catch (err) {
-
           return {
             success: false,
             error: err instanceof Error ? err.message : String(err),
+            ...(err instanceof DAGExecutionError ? {
+              attemptedStepsCount: err.records.size,
+              successfulStepsCount: Array.from(err.records.values()).filter(record => record.success).length,
+              pendingStepIds: err.pendingStepIds,
+              results: Array.from(err.records.entries()).map(([stepId, record]) => ({ stepId, ...record, toolName: record.toolName ?? record.name })),
+              recovery: "Completed steps were not rolled back. Inspect their results before retrying failed or pending steps.",
+            } : {}),
           };
         }
       },
@@ -1444,17 +1573,17 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "prefetch_workspace_context",
-      description: "Proactively warm workspace files or directories into speculative execution cache (Prefetch)",
+      description: "Warm up to 8 workspace files through validated task-local JoyRide reads. Admission may reject large or sensitive results; subsequent reads validate current content.",
       parameters: {
-        paths: { type: "array", required: true, description: "List of file/directory paths to prefetch into memory" },
+        paths: { type: "array", required: true, description: "Workspace file paths to warm; at most 8 are scheduled per request" },
       },
       execute: async (args, cwd) => {
-        const rawPaths = Array.isArray(args.paths) ? args.paths.map(String) : [String(args.paths)];
+        const rawPaths = Array.isArray(args.paths) ? args.paths.slice(0, 8).map(String) : [String(args.paths)];
         const warmedCount = this.prefetcher.warmPaths(rawPaths, cwd, this);
         return {
           success: true,
-          warmedCount,
-          paths: rawPaths,
+          scheduledPaths: warmedCount,
+          requestedPaths: rawPaths.length,
           prefetchStats: this.prefetcher.getStats(),
         };
       },
@@ -1508,6 +1637,10 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           executionAuthority: this.getExecutionAuthority(),
           cache: cacheStats,
           prefetcher: prefetchStats,
+          skillContentReads: getSkillContentReadMetrics(),
+          skillDiscovery: getSkillDiscoveryMetrics(),
+          eventHistory: this.ears.getEventLogStats(),
+          loopDetection: this.loopBreaker.getStats(),
           telemetry: {
             trackedToolsCount: telemetryMetrics.length,
             topTools: telemetryMetrics.slice(0, 10),
@@ -1587,31 +1720,29 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "fast_batch_read_files",
-      description: "Execute ultra-fast parallel multi-file reads with safe fast-path caching and sub-millisecond latency (Fast Reader)",
+      description: "Read up to 256 files with eight active reads, ordered per-file results, shared eligible reads and parent cancellation. Reports partial failures.",
       parameters: {
         paths: { type: "array", required: true, description: "Array of relative or absolute file paths to read in parallel" },
       },
-      execute: async (args, cwd) => {
-        const rawPaths = Array.isArray(args.paths) ? args.paths.map(String) : [String(args.paths)];
-        const start = Date.now();
-
-        const readPromises = rawPaths.map(async (p) => {
-          try {
-            const content = await this.executeTool("view_file", { path: p }, cwd, { executionAuthority: "autonomous" });
-            return { path: p, success: true, content };
-          } catch (err) {
-            return { path: p, success: false, error: err instanceof Error ? err.message : String(err) };
-          }
+      execute: async (args, cwd, options) => {
+        const rawPaths = snapshotWorkflowData(args.paths);
+        if (!Array.isArray(rawPaths) || rawPaths.length > 256 || rawPaths.some(p => typeof p !== "string" || !p || p.length > 4096)) {
+          return { success: false, error: "paths must contain at most 256 nonempty file paths, each at most 4096 characters." };
+        }
+        const batch = await this.scheduler.executeBatch(rawPaths.map((p, i) => ({ id: `read_${i}`, name: "view_file", args: { path: p } })), this, cwd, {
+          ...options, maxConcurrency: 8, enableOutputGovernance: false,
+          executionAuthority: options?.executionAuthority ?? this.currentAuthority,
+          bypassConfirmation: options?.bypassConfirmation ?? ["autonomous", "high_throughput"].includes(options?.executionAuthority ?? this.currentAuthority),
+          onToolOutput: options?.onOutput ? (_call, output) => options.onOutput?.(output) : undefined,
         });
-
-        const files = await Promise.all(readPromises);
-        const totalDurationMs = Date.now() - start;
-
+        options?.signal?.throwIfAborted();
+        const files = batch.results.map((record, i) => ({ path: rawPaths[i], success: record.success === true,
+          ...(record.success ? { content: record.output } : { error: record.error ?? record.output }) }));
         return {
-          success: true,
+          success: files.every(file => file.success),
           totalFiles: files.length,
           successfulCount: files.filter((f) => f.success).length,
-          totalDurationMs,
+          totalDurationMs: batch.metrics.executionTimeMs,
           files,
         };
       },
@@ -2031,35 +2162,9 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       description: "Wait for a background task or process to terminate within a timeout, returning its final exit code and output tail (Process Wait)",
       parameters: {
         processId: { type: "string", required: true, description: "The process or task ID to wait for" },
-        timeoutMs: { type: "number", required: false, description: "Maximum wait time in milliseconds (default: 5000)" },
+        timeoutMs: { type: "number", required: false, description: "Maximum wait time in milliseconds, 1–300000 (default: 5000); timing out does not stop the process" },
       },
-      execute: async (args, cwd) => {
-        const processId = String(args.processId);
-        const timeoutMs = typeof args.timeoutMs === "number" ? args.timeoutMs : 5000;
-        const start = Date.now();
-
-        while (Date.now() - start < timeoutMs) {
-          const pollRes: any = await this.executeTool("process_poll", { processId, tailChars: 2048 }, cwd);
-          if (!pollRes || !pollRes.success || pollRes.status === "completed" || pollRes.status === "failed" || pollRes.status === "exited") {
-            return {
-              success: true,
-              processId,
-              status: pollRes?.status || "exited",
-              exitCode: pollRes?.exitCode ?? 0,
-              durationMs: Date.now() - start,
-              outputTail: pollRes?.outputTail || "",
-            };
-          }
-          await new Promise((r) => setTimeout(r, 100));
-        }
-
-        return {
-          success: false,
-          processId,
-          status: "running",
-          error: `Process '${processId}' did not exit within ${timeoutMs}ms`,
-        };
-      },
+      execute: (args, cwd, options) => waitForProcessExit(this, args.processId as string, args.timeoutMs === undefined ? 5000 : args.timeoutMs as number, cwd, options),
     });
 
     this.registerTool({
@@ -2297,21 +2402,23 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "execute_workflow_pipeline",
-      description: "Execute a sequenced chained workflow of multiple tool calls in a single turn with dynamic output variable interpolation (Workflow Pipeline)",
+      description: "Execute up to 256 ordered steps with nested $step.output.field references and scalar {{$step.field}} templates. Validates the plan before starting and returns partial results on failure; completed changes are not rolled back.",
       parameters: {
         steps: { type: "array", required: true, description: "Array of workflow steps with { id, tool, args }" },
         name: { type: "string", required: false, description: "Optional workflow pipeline name" },
         stopOnError: { type: "boolean", required: false, description: "Whether to abort remaining steps on failure (default: true)" },
       },
-      execute: async (args, cwd) => {
-        const steps = Array.isArray(args.steps) ? (args.steps as any[]) : [];
+      execute: async (args, cwd, options) => {
+        if (!Array.isArray(args.steps)) return { success: false, error: "steps must be an array of workflow steps." };
+        const steps = args.steps as any[];
         const name = typeof args.name === "string" ? args.name : "unnamed_pipeline";
         const stopOnError = args.stopOnError !== false;
 
         const res = await this.workflowExecutor.executePipeline(
           { name, steps, stopOnError },
           this,
-          cwd
+          cwd,
+          options
         );
 
         return {
@@ -2320,6 +2427,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           executedStepsCount: res.executedStepsCount,
           durationMs: res.durationMs,
           stepResults: res.stepResults,
+          pendingStepIds: res.pendingStepIds,
           finalOutput: res.finalOutput,
           error: res.error,
         };
@@ -2376,22 +2484,28 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "resolve_and_fix_imports",
       description: "Analyze, validate, and auto-heal broken relative import specifiers in a source file and insert new imports (Import Resolver)",
+      isMutating: true,
       parameters: {
         path: { type: "string", required: true, description: "Source file path to resolve and heal" },
         newImports: { type: "array", required: false, description: "Optional array of new import statements to insert at top" },
         save: { type: "boolean", required: false, description: "Whether to save changes directly to disk (default: true)" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
+        args = snapshotWorkflowData(args);
         const filePath = String(args.path);
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath);
-        const fs = await import("node:fs/promises");
-        const code = await fs.readFile(resolvedPath, "utf-8");
+        const code = await readBoundedFile(resolvedPath, MAX_WORKFLOW_BYTES, options?.signal, { followSymlinks: true });
+        options?.checkExecutionScope?.();
         const newImports = Array.isArray(args.newImports) ? args.newImports.map(String) : undefined;
         const shouldSave = args.save !== false;
 
-        const res = await this.importResolver.resolveAndFixImports(code, resolvedPath, cwd, { newImports });
+        const res = await this.importResolver.resolveAndFixImports(code, resolvedPath, cwd, { newImports, signal: options?.signal, checkExecutionScope: options?.checkExecutionScope });
+        options?.checkExecutionScope?.();
+        let savedToDisk = false;
         if (shouldSave && (res.fixedCount > 0 || res.addedCount > 0)) {
-          await this.executeTool("write_file", { path: filePath, content: res.healedCode }, cwd, { executionAuthority: "autonomous" });
+          const saved = await this.executeTool("write_file", { path: filePath, content: res.healedCode }, cwd, options) as { success?: boolean } | undefined;
+          if (saved?.success !== true) throw new Error("Import changes were prepared but the write did not report success.");
+          savedToDisk = true;
         }
 
         return {
@@ -2400,7 +2514,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           fixedCount: res.fixedCount,
           addedCount: res.addedCount,
           totalImportsFound: res.imports.length,
-          savedToDisk: shouldSave && (res.fixedCount > 0 || res.addedCount > 0),
+          savedToDisk,
           healedCode: res.healedCode,
         };
       },
@@ -2661,18 +2775,19 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "scaffold_file_template",
-      description: "Instantly scaffold ADR-compliant boilerplate files (service, controller, test, component, config) with zero hallucinations (Template Scaffolder)",
+      description: "Create a service, controller, test, component or config file from a built-in template using the current execution authority",
+      isMutating: true,
       parameters: {
         templateType: { type: "string", required: true, description: "Template type: service | controller | test | component | config" },
         name: { type: "string", required: true, description: "Identifier name for the module/component" },
         targetPath: { type: "string", required: true, description: "Destination file path" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         const templateType = String(args.templateType).toLowerCase() as any;
         const name = String(args.name);
         const targetPath = String(args.targetPath);
 
-        const res = await this.templateScaffolder.scaffold(templateType, name, targetPath, cwd, this);
+        const res = await this.templateScaffolder.scaffold(templateType, name, targetPath, cwd, this, options);
         return {
           success: res.success,
           filePath: res.filePath,
@@ -2684,30 +2799,37 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "benchmark_tool_latency",
-      description: "Profile execution latency percentiles (p50, p95, p99) and throughput for any tool over N iterations (Latency Benchmarker)",
+      description: "Measure latency percentiles and throughput for a native read-only tool over exactly N calls, using the current authority and cancellation context",
       parameters: {
         tool: { type: "string", required: true, description: "Tool name to benchmark" },
         args: { type: "object", required: false, description: "Tool arguments to pass" },
         iterations: { type: "number", required: false, description: "Number of iterations (default: 10, max: 100)" },
       },
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         const toolName = String(args.tool);
-        const toolArgs = (args.args && typeof args.args === "object") ? (args.args as Record<string, unknown>) : {};
-        const iterations = Math.min(100, Math.max(1, typeof args.iterations === "number" ? args.iterations : 10));
-
-        // Warm-up run
-        try {
-          await this.executeTool(toolName, toolArgs, cwd, { executionAuthority: "autonomous", bypassConfirmation: true });
-        } catch {
-          // Ignore warmup failure
-        }
+        const target = this.getTool(toolName);
+        if (!target || !this.isRepeatableNativeRead(target)) throw new Error("Latency measurement supports only native read-only tools; mutations, commands and replacement tools cannot be repeated.");
+        const canonicalTarget = target.name;
+        const toolArgs = snapshotWorkflowData(args.args ?? {});
+        if (!toolArgs || typeof toolArgs !== "object" || Array.isArray(toolArgs)) throw new Error("Benchmark arguments must be an object.");
+        const encoded = JSON.stringify(toolArgs);
+        const iterations = args.iterations === undefined ? 10 : args.iterations;
+        if (typeof iterations !== "number" || !Number.isSafeInteger(iterations) || iterations < 1 || iterations > 100)
+          throw new RangeError("Benchmark iterations must be an integer from 1 to 100.");
 
         const durations: number[] = [];
         const startTotal = performance.now();
 
         for (let i = 0; i < iterations; i++) {
+          options?.checkExecutionScope?.();
+          options?.signal?.throwIfAborted();
+          const currentTarget = this.getTool(canonicalTarget);
+          if (!currentTarget || !this.isRepeatableNativeRead(currentTarget)) throw new Error("The measured tool implementation changed; no further iterations were started.");
           const iterStart = performance.now();
-          await this.executeTool(toolName, toolArgs, cwd, { executionAuthority: "autonomous", bypassConfirmation: true });
+          const result = await this.executeTool(canonicalTarget, JSON.parse(encoded), cwd, { ...options, autoHeal: false });
+          options?.checkExecutionScope?.();
+          if (result && typeof result === "object" && (result as { success?: boolean }).success === false)
+            throw new Error("The measured tool reported failure; no further iterations were started.");
           durations.push(performance.now() - iterStart);
         }
 
@@ -2724,6 +2846,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           success: true,
           tool: toolName,
           iterations,
+          warmupIterations: 0,
           totalTimeMs: Number(totalTimeMs.toFixed(2)),
           avgMs: Number(avgMs.toFixed(3)),
           minMs: Number(durations[0].toFixed(3)),
@@ -2731,7 +2854,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
           p50Ms: Number(p50.toFixed(3)),
           p95Ms: Number(p95.toFixed(3)),
           p99Ms: Number(p99.toFixed(3)),
-          throughputOpsPerSec: Number((iterations / (totalTimeMs / 1000)).toFixed(1)),
+          throughputOpsPerSec: Number((iterations / (Math.max(totalTimeMs, 0.001) / 1000)).toFixed(1)),
         };
       },
     });
@@ -3939,7 +4062,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     this.registerTool({
       name: "batch_view_files",
       description: "Read multiple workspace files simultaneously in a single turn (Eyes)",
-      execute: async (args, cwd) => {
+      execute: async (args, cwd, options) => {
         let paths: string[] = [];
         if (Array.isArray(args.paths)) {
           paths = args.paths.map(String);
@@ -3952,7 +4075,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         }
         const resolvedPaths = paths.map((p) => (p.startsWith("/") ? p : `${cwd}/${p}`));
         const maxLines = typeof args.maxLines === "number" ? args.maxLines : undefined;
-        return this.eyes.readMultipleFiles(resolvedPaths, { maxLines });
+        return this.eyes.readMultipleFiles(resolvedPaths, { maxLines, signal: options?.signal });
       },
     });
 
@@ -4059,7 +4182,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       },
       execute: async (args, cwd) => {
         const query = String(args.query);
-        const searchPath = typeof args.path === "string" ? args.path : cwd;
+        const searchPath = typeof args.path === "string" ? path.resolve(cwd, args.path) : cwd;
         const astEyes = this.eyes as AstPerceptionEyes;
         return astEyes.searchSymbols ? astEyes.searchSymbols(searchPath, query) : [];
       },

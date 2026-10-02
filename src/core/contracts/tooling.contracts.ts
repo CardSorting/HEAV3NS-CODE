@@ -162,6 +162,10 @@ export interface ResourceConflictAssessment {
 }
 
 export interface ToolExecutionOptions {
+  /** Internal background read: must be bounded, task-scoped, and never prompt. */
+  readonly speculative?: boolean;
+  /** Opaque owner captured before background scheduling; never a task name supplied by a model. */
+  readonly speculativeScope?: object;
   readonly bypassConfirmation?: boolean;
   readonly bypassThreatDetection?: boolean;
   readonly executionAuthority?: ExecutionAuthorityLevel;
@@ -170,6 +174,8 @@ export interface ToolExecutionOptions {
   readonly timeoutMs?: number;
   readonly autoHeal?: boolean;
   readonly signal?: AbortSignal;
+  /** Internal parent task/policy guard, propagated to nested tools with the execution options. */
+  readonly checkExecutionScope?: () => void;
   readonly onOutput?: (chunk: import("./environment.contracts.js").ExecutionOutputChunk) => void;
 }
 
@@ -184,6 +190,8 @@ export interface PipelinedStreamChunk {
 }
 
 export interface IToolRegistry {
+  readonly managesExecutionCache?: boolean;
+  captureSpeculativeReadScope?(): object | undefined;
   registerTool(tool: ToolDefinition): void;
   getTool(name: string): ToolDefinition | undefined;
   listTools(): readonly ToolDefinition[];
