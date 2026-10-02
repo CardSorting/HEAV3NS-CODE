@@ -8,9 +8,18 @@ import { redactCredentialText } from "../core/utilities/progress-sanitizer.js"
 import { packageManagerLockfiles, projectPackageManager } from "../core/utilities/project-package-manager.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { ProjectDiagnostics } from "./project-diagnostics.js"
+import { inspectPreviewHTML, StaticPreview, staticPreviewSupported } from "./static-preview.js"
 import { desktopToolPath } from "./tool-environment.js"
 
-export type ProjectTarget = { id: string; title: string; command: string; cwd: string; revision: string; preview?: string }
+export type ProjectTarget = {
+	id: string
+	title: string
+	command: string
+	cwd: string
+	revision: string
+	preview?: string
+	kind?: "static"
+}
 export type ProjectConfiguration = { command: string; cwd: string; preview?: string }
 export function localPreview(value: string): string | undefined {
 	try {
@@ -48,6 +57,7 @@ const ignored = new Set([".git", ".broccolidb", "node_modules", "build", "dist",
 export class ProjectRunner {
 	readonly workspace: string
 	private process?: ChildProcess
+	private staticPreview?: StaticPreview
 	private ending?: Promise<void>
 	private state: "idle" | "running" | "stopping" | "stopped" | "completed" | "failed" = "idle"
 	private target?: ProjectTarget
@@ -71,7 +81,7 @@ export class ProjectRunner {
 		this.workspace = realpathSync(workspace)
 	}
 	get running() {
-		return this.starting || Boolean(this.process)
+		return this.starting || Boolean(this.process) || Boolean(this.staticPreview)
 	}
 	private async directory(relative: string) {
 		if (
@@ -112,7 +122,7 @@ export class ProjectRunner {
 		for (let i = 0; i < directories.length && i < 40; i++) {
 			const relative = directories[i],
 				directory = await this.directory(relative)
-			const add = (name: string, command: string, source = command, preview?: string) => {
+			const add = (name: string, command: string, source = command, preview?: string, kind?: "static") => {
 				const id = `${relative}:${name}`,
 					revision = createHash("sha256")
 						.update(JSON.stringify([id, command, source]))
@@ -125,6 +135,7 @@ export class ProjectRunner {
 						cwd: relative,
 						revision,
 						preview,
+						kind,
 					})
 			}
 			const pkg = await this.manifest(directory, "package.json")
@@ -134,13 +145,16 @@ export class ProjectRunner {
 					if (await this.hasFile(directory, file)) lockfiles.add(path.posix.join(relative, file))
 				}),
 			)
+			let hasRunScript = false
 			if (pkg) {
 				try {
 					const data = JSON.parse(pkg)
 					const manager = projectPackageManager(relative, manifests, (file) => lockfiles.has(file))
 					for (const name of ["dev", "start"])
-						if (typeof data.scripts?.[name] === "string" && data.scripts[name].trim())
+						if (typeof data.scripts?.[name] === "string" && data.scripts[name].trim()) {
+							hasRunScript = true
 							add(name === "dev" ? "Development server" : "Start app", `${manager} run ${name}`, pkg)
+						}
 				} catch {
 					/* Malformed package metadata is not executable configuration. */
 				}
@@ -152,8 +166,19 @@ export class ProjectRunner {
 					add("Python app", `python3 ${quote(file)}`)
 					break
 				}
-			if (!pkg && (await this.manifest(directory, "index.html")) !== undefined)
-				add("Static website", "python3 -m http.server 8000 --bind 127.0.0.1", "static-server", "http://127.0.0.1:8000/")
+			const html = staticPreviewSupported ? await inspectPreviewHTML(directory) : undefined
+			// Test/lint tooling does not make a browser-ready HTML app require npm.
+			// Framework entry points that visibly need compilation keep their run flow.
+			if (
+				!hasRunScript &&
+				html !== undefined &&
+				!/<script\b[^>]*\bsrc\s*=\s*["'][^"']*\.(?:tsx?|jsx)(?:[?#][^"']*)?["']|%PUBLIC_URL%|\/@vite\/client/i.test(
+					html.sample,
+				)
+			)
+				// Revalidate eligibility on every discovery, but ordinary content edits
+				// do not change the built-in serving action the user selected.
+				add("Web preview", "", "static-preview-v1:index.html", undefined, "static")
 			if (relative.split("/").length < 3) {
 				for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) =>
 					a.name.localeCompare(b.name),
@@ -206,6 +231,26 @@ export class ProjectRunner {
 		this.preview = target.preview
 		this.startedAt = Date.now()
 		this.launch = randomUUID()
+		if (target.kind === "static") {
+			const preview = new StaticPreview(cwd)
+			this.staticPreview = preview
+			try {
+				this.preview = await preview.start()
+				if (ticket !== this.generation) throw new Error("PROJECT_CANCELLED: start was cancelled")
+				this.state = "running"
+				this.output = `Web preview ready: ${this.preview}\nServing index.html. Reload the browser to see saved changes.\n`
+				this.totalBytes = Buffer.byteLength(this.output)
+				return this.status()
+			} catch (error) {
+				await preview.stop()
+				if (this.staticPreview === preview) this.staticPreview = undefined
+				if (ticket === this.generation) {
+					this.state = "failed"
+					this.preview = undefined
+				}
+				throw error
+			}
+		}
 		const env = Object.fromEntries(
 			Object.entries(process.env).filter(
 				([key]) => !/KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|^GIT_|^NODE_OPTIONS$|^NODE_PATH$/i.test(key),
@@ -291,7 +336,10 @@ export class ProjectRunner {
 		const current = this.status()
 		return {
 			state: current.state,
-			command: redactCredentialText(this.redactor.redact(this.target.command).sanitizedText),
+			command:
+				this.target.kind === "static"
+					? "Built-in web preview (index.html)"
+					: redactCredentialText(this.redactor.redact(this.target.command).sanitizedText),
 			cwd: this.target.cwd,
 			startedAt: current.startedAt,
 			exitCode: current.exitCode,
@@ -309,6 +357,16 @@ export class ProjectRunner {
 	async stop() {
 		clearTimeout(this.diagnosticTimer)
 		this.generation++
+		if (this.staticPreview) {
+			this.state = "stopping"
+			const preview = this.staticPreview
+			await preview.stop()
+			if (this.staticPreview === preview) {
+				this.staticPreview = undefined
+				this.preview = undefined
+				this.state = "stopped"
+			}
+		}
 		if (this.process) {
 			this.state = "stopping"
 			this.process.stdin?.end()

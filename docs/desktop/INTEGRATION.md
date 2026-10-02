@@ -252,7 +252,7 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `checkpoint.restore` | `{id, token}`; save a safety copy, restore included files/context and return a new conversation identity |
 | `project.discover` | `{}`; negotiated `project-run-v1`, bounded detected/saved commands with metadata revisions |
 | `project.configure` | `{command, cwd?, preview?}`; save a custom command without execution |
-| `project.start` | `{id, revision}`; revalidate metadata and start the selected local command |
+| `project.start` | `{id, revision}`; revalidate metadata and start the selected local command or built-in HTML preview |
 | `project.status`, `project.stop` | `{}`; bounded console/state/local preview, or stop the owned project process group |
 | `input.select` | Only `{surface:"native"}` is advertised/supported in this preview |
 | `shutdown` | Stop admission, cancel, flush, release ownership and exit |
@@ -332,3 +332,12 @@ Inspection history uses the familiar bracket-key navigation convention documente
 With `conversation-delete-v1`, each native sidebar row offers **Delete conversation…**. A native confirmation defaults to Cancel and explains that project files and saved checkpoints remain. The worker serializes `conversation.delete {id}` with conversation changes and instruction admission, refuses deletion while work is pending, and durably marks the conversation removed from browsing. Selecting a removed identity fails; repeating deletion is idempotent. Deleting the active identity creates a fresh empty conversation in the same persistence boundary. Native input stays gated until its authoritative snapshot arrives, then the deleted conversation's local draft is discarded. Deleting another conversation preserves the active context and draft.
 
 This is removal from conversation navigation, not secure erasure: historical run records and checkpoint evidence remain available to the checkpoint system. No project files, normal Git history, or checkpoint refs are removed.
+
+### Built-in HTML preview
+
+`project-static-preview-v1` advertises `kind: "static"` discovery targets. The existing
+`project.start`, `project.status`, and `project.stop` lifecycle owns the local HTTP
+listener, with preview URLs returned only after binding. The native client uses
+Preview App for these targets and opens the browser only on an explicit successful
+start response. See [Run and preview behavior](CHECKPOINTS-AND-RUN.md#run-console-and-preview)
+for discovery, confinement, port/storage, supported-resource, and reload boundaries.

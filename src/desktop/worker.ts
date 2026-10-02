@@ -618,6 +618,7 @@ export class DesktopSession {
 					"queue-remove",
 					"walkthrough-v1",
 					"project-run-v1",
+					"project-static-preview-v1",
 					...(this.lifecycle?.restoreContext && this.lifecycle.readContext ? ["checkpoints-v1"] : []),
 					...(this.lifecycle?.restoreContext && this.lifecycle.readContext
 						? ["conversations", "conversation-delete-v1"]

@@ -11,7 +11,7 @@ The acceptance task is a dependency-free Meteor Dodge browser game with arrow/A/
 ## Acceptance sequence
 
 1. Enter the project library without signing in. Open the disposable folder using the native folder picker.
-2. Open Model & Provider with Shift–Command–M. Verify provider-reported IDs and source/freshness. Type a draft, close/reopen, and Revert. During active work, confirm Apply is disabled while browsing remains available.
+2. Open Model & Provider with Shift–Command–M. Verify provider-reported IDs and source/freshness. Choose Other model ID, type a draft, and verify close/reopen preserves it. Selecting a listed model switches once and dismisses after confirmation from the runtime. During active work, confirm switching is disabled while provider browsing remains available.
 3. Submit the game request through the composer. Inspect real activities, generated file links, code/command previews, failures and repair. Distinguish provider drafts from executed tools. Never inject a completed result into the UI as a substitute for execution.
 4. Confirm the final outcome and check evidence. Navigate Changes, Code, and Run with native controls. Start the detected project command, inspect its output and readiness, and use Open Preview.
 5. In an isolated browser, test start/score progression, rendered ship movement, arrow-key scroll prevention, pause/resume, focus-loss pause, collision/game over, restart reset, and visible movement controls. Test a narrow viewport for horizontal overflow and reachable controls. Check browser exceptions. For persistence follow-ups, test reload persistence, denied reads/writes, and a throwing `window.localStorage` getter before application startup.

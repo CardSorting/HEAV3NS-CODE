@@ -14,8 +14,10 @@ final class ProjectRunTests: XCTestCase {
 private final class RunHarness {
     var replies = [(String, (Result<[String: Any], Error>) -> Void)]()
     var requests = [(String, [String: Any])] ()
-    lazy var view = ProjectRunView(request: { [weak self] method, params, reply in self?.requests.append((method, params)); self?.replies.append((method, reply)) }, ready: { true })
-    let target: [String: Any] = ["id": "dev", "title": "Development server", "command": "npm run dev", "cwd": ".", "revision": "1"]
+    var opened = [URL](), browserFails = false
+    var copied = [String]()
+    lazy var view = ProjectRunView(request: { [weak self] method, params, reply in self?.requests.append((method, params)); self?.replies.append((method, reply)) }, ready: { true }, openPreview: { [weak self] url in self?.opened.append(url); return self?.browserFails == false }, copyPreview: { [weak self] value in self?.copied.append(value); return true })
+    var target: [String: Any] = ["id": "dev", "title": "Development server", "command": "npm run dev", "cwd": ".", "revision": "1"]
     func answer(_ method: String, _ result: Result<[String: Any], Error>) {
         guard let index = replies.firstIndex(where: { $0.0 == method }) else { XCTFail("No pending \(method)"); return }
         replies.remove(at: index).1(result)
@@ -40,6 +42,77 @@ private final class RunHarness {
 }
 
 extension ProjectRunTests {
+    func testFailedDiscoveryCannotRunStaleSelectionEvenAfterStatusRecovers() {
+        let h = RunHarness(); h.ready(); h.edit("my unsaved command")
+        h.view.navigateProbe("refresh")
+        h.answer("project.discover", .failure(NSError(domain: "discovery", code: 1)))
+        h.answer("project.status", .success(["state": "idle"]))
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, false)
+        h.view.navigateProbe("start")
+        XCTAssertFalse(h.requests.contains { $0.0 == "project.start" })
+        h.view.navigateProbe("refresh")
+        h.answer("project.discover", .success(["targets": [h.target]]))
+        h.answer("project.status", .success(["state": "idle"]))
+        XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, true)
+        XCTAssertEqual(h.field("run.command").stringValue, "my unsaved command")
+    }
+    func testChangedCommandRefreshesWithoutExecutingAndPreservesDraft() {
+        let h = RunHarness(); h.ready(); h.edit("my unsaved command")
+        h.view.navigateProbe("start")
+        h.answer("project.start", .failure(RuntimeFailure(message: "PROJECT_CHANGED: refresh and review the updated run command", acceptanceUnknown: false)))
+        h.target["revision"] = "2"; h.target["command"] = "npm run start"
+        h.answer("project.discover", .success(["targets": [h.target]]))
+        h.answer("project.status", .success(["state": "idle"]))
+        XCTAssertEqual(h.requests.filter { $0.0 == "project.start" }.count, 1)
+        XCTAssertTrue((h.view.diagnostics["status"] as? String ?? "").contains("App setup changed"))
+        XCTAssertEqual(h.field("run.command").stringValue, "my unsaved command")
+        h.view.navigateProbe("start")
+        XCTAssertEqual(h.requests.last?.1["revision"] as? String, "2")
+    }
+    func testCopyPreviewRequiresConfirmedRunningLocalAddress() {
+        let h = RunHarness(); h.ready()
+        h.view.navigateProbe("copy-preview"); XCTAssertTrue(h.copied.isEmpty)
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "running", "preview": "http://localhost:3000/"]))
+        h.view.navigateProbe("copy-preview"); XCTAssertEqual(h.copied, ["http://localhost:3000/"])
+        h.view.navigateProbe("poll"); h.answer("project.status", .failure(NSError(domain: "timeout", code: 1)))
+        h.view.navigateProbe("copy-preview"); XCTAssertEqual(h.copied.count, 1)
+        for state in [["state": "stopped", "preview": "http://localhost:3000/"], ["state": "running", "preview": "https://example.com/"]] {
+            h.view.navigateProbe("poll"); h.answer("project.status", .success(state))
+            h.view.navigateProbe("copy-preview"); XCTAssertEqual(h.copied.count, 1)
+        }
+    }
+    func testStaticPreviewOpensOnlyAfterSuccessfulExplicitStartAndCanBeReopened() {
+        let h = RunHarness(); h.target = ["id": "web", "title": "Web preview", "kind": "static", "command": "", "cwd": ".", "revision": "1"]; h.ready()
+        h.view.navigateProbe("start"); h.view.navigateProbe("start")
+        XCTAssertEqual(h.requests.filter { $0.0 == "project.start" }.count, 1); XCTAssertTrue(h.opened.isEmpty)
+        let state: [String: Any] = ["state": "running", "launch": UUID().uuidString, "target": h.target, "preview": "http://127.0.0.1:42100/"]
+        h.answer("project.start", .success(state)); XCTAssertEqual(h.opened.count, 1)
+        h.view.navigateProbe("poll"); h.answer("project.status", .success(state)); XCTAssertEqual(h.opened.count, 1)
+        h.view.navigateProbe("preview"); XCTAssertEqual(h.opened.count, 2)
+        XCTAssertEqual(h.view.diagnostics["previewEnabled"] as? Bool, true)
+        XCTAssertTrue((h.view.diagnostics["command"] as? String ?? "").contains("Built-in web preview"))
+        h.view.navigateProbe("stop"); h.answer("project.stop", .success(["state": "stopped", "target": h.target]))
+        h.view.navigateProbe("preview"); XCTAssertEqual(h.opened.count, 2)
+    }
+    func testFailedOrStaleStaticStartNeverOpensABrowserAndBrowserFailureCanRetry() {
+        let h = RunHarness(); h.target = ["id": "web", "title": "Web preview", "kind": "static", "command": "", "cwd": ".", "revision": "1"]; h.ready()
+        h.view.navigateProbe("start"); h.answer("project.start", .failure(NSError(domain: "test", code: 1)))
+        h.answer("project.status", .success(["state": "idle"])); XCTAssertTrue(h.opened.isEmpty)
+        h.browserFails = true
+        h.view.navigateProbe("start")
+        h.answer("project.start", .success(["state": "running", "launch": UUID().uuidString, "target": h.target, "preview": "http://127.0.0.1:42100/"]))
+        XCTAssertTrue((h.view.diagnostics["status"] as? String ?? "").contains("browser couldn’t open"))
+        h.browserFails = false; h.view.navigateProbe("preview")
+        XCTAssertEqual(h.opened.count, 2)
+        XCTAssertFalse((h.view.diagnostics["status"] as? String ?? "").contains("browser couldn’t open"))
+        h.view.navigateProbe("stop"); h.answer("project.stop", .success(["state": "stopped", "revision": 3]))
+        h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "test", hint: "", automaticSupported: true)
+        h.view.navigateProbe("start")
+        h.view.receiveProjectState(["state": "stopped", "revision": 5])
+        h.answer("project.start", .success(["state": "running", "revision": 4, "launch": UUID().uuidString, "target": h.target, "preview": "http://127.0.0.1:42100/"]))
+        XCTAssertEqual(h.opened.count, 2)
+    }
     func testAutomaticRepairHasAStopControlBeforeTheAgentStartsAndRejectsStaleStatus() {
         let h = RunHarness(); h.ready()
         h.view.setRepairAvailability(supported: true, enabled: true, canOpen: true, conversation: "current", hint: "Ready", automaticSupported: true)

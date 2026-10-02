@@ -36,6 +36,55 @@ describe("workspace project runner", () => {
 		await writeFile(manifest, JSON.stringify({ scripts: { dev: "different" } }))
 		assert.notEqual((await runner.discover()).targets[0].revision, first.revision)
 	})
+	it("previews index.html even when package.json only provides project checks", async () => {
+		await writeFile(path.join(folder, "index.html"), "<h1>Game</h1>")
+		await writeFile(
+			path.join(folder, "package.json"),
+			JSON.stringify({ scripts: { check: "never execute me", test: "never execute me" } }),
+		)
+		const [web] = (await runner.discover()).targets
+		assert.equal(web.kind, "static")
+		assert.equal(web.command, "")
+		const started = await runner.start(web)
+		assert.equal(started.state, "running")
+		assert.ok(started.preview)
+		assert.match(await (await fetch(started.preview)).text(), /Game/)
+		await assert.rejects(runner.start(web), /PROJECT_RUNNING/)
+		assert.match(runner.agentObservation()?.command ?? "", /Built-in web preview/)
+		await runner.stop()
+		assert.equal(runner.status().state, "stopped")
+		assert.equal(runner.status().preview, undefined)
+		await assert.rejects(fetch(started.preview))
+	})
+	it("keeps static actions valid across content edits while rechecking eligibility", async () => {
+		await writeFile(path.join(folder, "index.html"), "<h1>Before</h1>")
+		const [before] = (await runner.discover()).targets
+		await writeFile(path.join(folder, "index.html"), "<h1>Updated game</h1>")
+		const [after] = (await runner.discover()).targets
+		assert.equal(after.id, before.id)
+		assert.equal(after.revision, before.revision)
+		await writeFile(path.join(folder, "index.html"), '<script src="/src/main.tsx"></script>')
+		assert.equal((await runner.discover()).targets.length, 0)
+	})
+	it("keeps real development scripts ahead of HTML and does not mislabel TypeScript entry points", async () => {
+		await writeFile(path.join(folder, "index.html"), '<script type="module" src="/src/main.tsx"></script>')
+		assert.equal((await runner.discover()).targets.length, 0)
+		await writeFile(path.join(folder, "package.json"), JSON.stringify({ scripts: { dev: "vite" } }))
+		const [dev] = (await runner.discover()).targets
+		assert.equal(dev.command, "npm run dev")
+		assert.equal(dev.kind, undefined)
+		await writeFile(path.join(folder, "index.html"), "<h1>Game</h1>")
+		assert.equal((await runner.discover()).targets.length, 1)
+	})
+	it("discovers large single-file HTML apps without the package-manifest size limit", async () => {
+		const html = `<h1>Large game</h1><script>${" ".repeat(300_000)}</script>`
+		await writeFile(path.join(folder, "index.html"), html)
+		const [target] = (await runner.discover()).targets
+		assert.equal(target.kind, "static")
+		const started = await runner.start(target)
+		assert.ok(started.preview)
+		assert.equal(await (await fetch(started.preview)).text(), html)
+	})
 	it("shows failure and bounded console output without launching a second concurrent command", async () => {
 		assert.equal(runner.agentObservation(), undefined)
 		await runner.start(

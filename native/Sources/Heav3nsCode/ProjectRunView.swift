@@ -10,8 +10,13 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     typealias Request = (String, [String: Any], @escaping (Result<[String: Any], Error>) -> Void) -> Void
     private var requestOverride: Request?
     private var readyOverride: (() -> Bool)?
+    private var previewOpener: (URL) -> Bool = { NSWorkspace.shared.open($0) }
     private var connected: Bool { readyOverride?() ?? (client?.isReady == true && client?.capabilities.contains("project-run-v1") == true) }
-    private var statusKnown = false, draftChanged = false
+    private var statusKnown = false, discoveryKnown = false, draftChanged = false
+    private var notice: String?
+    private var copyPreview: (String) -> Bool = { value in
+        NSPasteboard.general.clearContents(); return NSPasteboard.general.setString(value, forType: .string)
+    }
     private var statusFailure: String?
     private var pendingAction: String?
     private var projectRevision = -1
@@ -22,7 +27,9 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     private let status = JourneyStyle.label("No app is running.", size: 12, secondary: true)
     private let runButton = NSButton(title: "Run", target: nil, action: nil)
     private let stopButton = NSButton(title: "Stop App", target: nil, action: nil)
-    private let previewButton = NSButton(title: "Open Preview", target: nil, action: nil)
+    private let previewButton = NSButton(title: "Open in Browser", target: nil, action: nil)
+    private let copyButton = NSButton(title: "Copy Link", target: nil, action: nil)
+    private let previewAddress = JourneyStyle.label("", size: 11, secondary: true)
     private lazy var repairButton = JourneyButton("Fix with LUMI", symbol: "wrench.and.screwdriver") { [weak self] in self?.repair() }
     private let details = NSStackView()
     private lazy var detailsButton = JourneyButton("Show Details", symbol: "chevron.right") { [weak self] in self?.toggleDetails() }
@@ -49,35 +56,46 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         orientation = .vertical; alignment = .leading; spacing = 9; translatesAutoresizingMaskIntoConstraints = false
-        targets.target = self; targets.action = #selector(selectTarget); targets.setAccessibilityLabel("Project run command")
+        targets.target = self; targets.action = #selector(selectTarget); targets.setAccessibilityLabel("App to run")
         command.isSelectable = true; command.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         command.maximumNumberOfLines = 3; command.lineBreakMode = .byTruncatingMiddle
-        for (button, action) in [(runButton, #selector(run)), (stopButton, #selector(stop)), (previewButton, #selector(openPreview))] { button.target = self; button.action = action; button.bezelStyle = .rounded }
+        for (button, action) in [(runButton, #selector(run)), (stopButton, #selector(stop)), (previewButton, #selector(openPreview)), (copyButton, #selector(copyLink))] { button.target = self; button.action = action; button.bezelStyle = .rounded }
+        previewAddress.isSelectable = true; previewAddress.maximumNumberOfLines = 1; previewAddress.lineBreakMode = .byTruncatingMiddle
+        previewAddress.setAccessibilityLabel("Running app address")
+        let browserControls = JourneyStyle.stack([previewButton, copyButton], vertical: false, spacing: 8)
         runButton.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil); runButton.imagePosition = .imageLeading
-        let controls = JourneyStyle.stack([runButton, stopButton, NSView()], vertical: false, spacing: 8)
         let refresh = JourneyButton("Refresh", symbol: "arrow.clockwise") { [weak self] in self?.load() }
-        let tools = JourneyStyle.stack([configureButton, NSView(), refresh], vertical: false, spacing: 8)
+        refresh.toolTip = "Look for runnable apps and refresh their status."
+        let controls = JourneyStyle.stack([runButton, stopButton, NSView()], vertical: false, spacing: 8)
+        let selection = JourneyStyle.stack([targets, refresh], vertical: false, spacing: 8); selection.distribution = .fill
+        targets.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        targets.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        targets.cell?.lineBreakMode = .byTruncatingMiddle
+        refresh.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let tools = JourneyStyle.stack([configureButton, NSView()], vertical: false, spacing: 8)
         commandInput.placeholderString = "npm run dev"; commandInput.setAccessibilityLabel("Run command")
         directoryInput.placeholderString = "."; directoryInput.setAccessibilityLabel("Directory relative to workspace")
         previewInput.placeholderString = "http://localhost:3000 (optional)"; previewInput.setAccessibilityLabel("Local preview URL")
         configuration.orientation = .vertical; configuration.alignment = .leading; configuration.spacing = 6; configuration.isHidden = true
         for (input, identifier) in [(commandInput, "run.command"), (directoryInput, "run.directory"), (previewInput, "run.preview")] { input.delegate = self; input.identifier = NSUserInterfaceItemIdentifier(identifier) }
         for view in [JourneyStyle.label("Command", size: 11), commandInput, JourneyStyle.label("Project folder", size: 11), directoryInput, JourneyStyle.label("Preview URL", size: 11), previewInput, draftNote, JourneyStyle.stack([saveButton, discardButton, NSView()], vertical: false, spacing: 8)] { configuration.addArrangedSubview(view); view.widthAnchor.constraint(equalTo: configuration.widthAnchor).isActive = true }
-        let note = JourneyStyle.label("Commands run locally. Closing this workspace stops the app.", size: 11, secondary: true)
+        let note = JourneyStyle.label("Your app runs on this Mac. Closing this workspace stops it.", size: 11, secondary: true)
         console.isEditable = false; console.isSelectable = true; console.isRichText = false; console.font = .monospacedSystemFont(ofSize: 11, weight: .regular); console.textContainerInset = NSSize(width: 8, height: 8); console.isVerticallyResizable = true; console.autoresizingMask = [.width]
         console.setAccessibilityLabel("Project console output")
         let scroll = NSScrollView(); scroll.documentView = console; scroll.hasVerticalScroller = true; scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true; scroll.setContentHuggingPriority(.init(1), for: .vertical)
         details.orientation = .vertical; details.alignment = .leading; details.spacing = 9; details.isHidden = true
         for view in [command, tools, configuration, note, outputStatus, scroll] { details.addArrangedSubview(view); view.widthAnchor.constraint(equalTo: details.widthAnchor).isActive = true }
         let spacer = NSView(); spacer.setContentHuggingPriority(.init(1), for: .vertical)
-        for view in [targets, controls, status, repairButton, previewButton, automaticRepair, detailsButton, details, spacer] { addArrangedSubview(view); view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
+        for view in [selection, controls, status, repairButton, browserControls, previewAddress, automaticRepair, detailsButton, details, spacer] { addArrangedSubview(view); view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
         automaticRepair.toolTip = "LUMI repairs unexpected app stops, runs project checks, and relaunches the app. Stop ends the current recovery cycle."
         detailsButton.setAccessibilityLabel("Show app details")
         updateControls()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    convenience init(request: @escaping Request, ready: @escaping () -> Bool) {
+    convenience init(request: @escaping Request, ready: @escaping () -> Bool, openPreview: ((URL) -> Bool)? = nil, copyPreview: ((String) -> Bool)? = nil) {
         self.init(frame: .zero); requestOverride = request; readyOverride = ready
+        if let openPreview { previewOpener = openPreview }
+        if let copyPreview { self.copyPreview = copyPreview }
     }
     private func request(_ method: String, params: [String: Any] = [:], completion: @escaping (Result<[String: Any], Error>) -> Void) {
         if let requestOverride { requestOverride(method, params, completion) }
@@ -118,7 +136,7 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     }
     func connect(_ client: RuntimeClient) {
         self.client = client; generation += 1; busy = false; polling = false; failure = nil
-        pendingAction = nil; statusKnown = false; statusFailure = nil; projectRevision = -1
+        pendingAction = nil; statusKnown = false; discoveryKnown = false; statusFailure = nil; notice = nil; projectRevision = -1
         if visible { load() } else if running { poll() }
         updateTimer(); updateControls()
     }
@@ -131,15 +149,16 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
         if value { load() } else if running { poll() }
         updateTimer()
     }
-    private func load(select requestedID: String? = nil) {
+    private func load(select requestedID: String? = nil, notice: String? = nil) {
         guard connected, !busy else { return }
         let selected = requestedID ?? (options.indices.contains(targets.indexOfSelectedItem) ? options[targets.indexOfSelectedItem]["id"] as? String : nil)
-        busy = true; failure = nil; updateControls(); let ticket = generation
+        busy = true; discoveryKnown = false; failure = nil; self.notice = notice; updateControls(); let ticket = generation
         request("project.discover") { [weak self] result in
             guard let self, ticket == self.generation else { return }; self.busy = false
             switch result {
             case .failure(let error): self.failure = error.localizedDescription; self.status.stringValue = error.localizedDescription
             case .success(let data):
+                self.discoveryKnown = true
                 self.options = data["targets"] as? [[String: Any]] ?? []; self.targets.removeAllItems()
                 self.targets.addItems(withTitles: self.options.map { $0["title"] as? String ?? "Run command" })
                 if let index = self.options.firstIndex(where: { $0["id"] as? String == selected }) { self.targets.selectItem(at: index) }
@@ -152,12 +171,16 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     @objc private func selectTarget() {
         updateCommand()
         if !draftChanged { resetDraft() }
+        updateControls()
     }
     private var selectedTarget: [String: Any]? { options.indices.contains(targets.indexOfSelectedItem) ? options[targets.indexOfSelectedItem] : nil }
+    private var staticPreview: Bool { (running ? current["target"] as? [String: Any] ?? selectedTarget : selectedTarget)?["kind"] as? String == "static" }
     private func updateCommand() {
         let item = running ? (current["target"] as? [String: Any] ?? selectedTarget) : selectedTarget
         if let item {
-            command.stringValue = "\(item["command"] as? String ?? "")\nIn \(item["cwd"] as? String ?? ".")"
+            command.stringValue = item["kind"] as? String == "static"
+                ? "Built-in web preview · index.html\nIn \(item["cwd"] as? String ?? ".")"
+                : "\(item["command"] as? String ?? "")\nIn \(item["cwd"] as? String ?? ".")"
         } else { command.stringValue = "No run command found. Use Set Run Command to add one." }
         command.toolTip = command.stringValue
     }
@@ -169,16 +192,28 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     private func discardDraft() { draftChanged = false; resetDraft(); updateControls() }
     func controlTextDidChange(_ notification: Notification) { draftChanged = true; updateControls() }
     @objc private func run() {
-        guard connected, statusKnown, !busy, !running, !repairInProgress, !healingActive, options.indices.contains(targets.indexOfSelectedItem) else { return }
+        guard connected, statusKnown, discoveryKnown, !busy, !running, !repairInProgress, !healingActive, options.indices.contains(targets.indexOfSelectedItem) else { return }
         let target = options[targets.indexOfSelectedItem]
-        perform("project.start", params: ["id": target["id"] ?? "", "revision": target["revision"] ?? ""])
+        perform("project.start", params: ["id": target["id"] ?? "", "revision": target["revision"] ?? ""], openWhenReady: target["kind"] as? String == "static")
     }
     @objc private func stop() { guard connected, !busy, running || healingActive, current["state"] as? String != "stopping" else { return }; perform("project.stop") }
-    private func perform(_ method: String, params: [String: Any] = [:]) {
-        guard connected else { return }; generation += 1; polling = false; busy = true; failure = nil; pendingAction = method; updateControls(); let ticket = generation
+    private func perform(_ method: String, params: [String: Any] = [:], openWhenReady: Bool = false) {
+        guard connected else { return }; generation += 1; polling = false; busy = true; failure = nil; notice = nil; pendingAction = method; updateControls(); let ticket = generation
         request(method, params: params) { [weak self] result in
             guard let self, ticket == self.generation else { return }; self.busy = false; self.pendingAction = nil
-            if case .success(let data) = result { self.render(data) } else if case .failure(let error) = result { self.failure = error.localizedDescription; self.statusKnown = false; self.poll() }
+            if case .success(let data) = result {
+                self.render(data)
+                // Only the user's successful Preview App action opens a browser.
+                // Polling, reconnecting, and automatic recovery never steal focus.
+                if openWhenReady, let launch = data["launch"] as? String, launch == self.current["launch"] as? String,
+                   data["state"] as? String == "running", self.current["state"] as? String == "running",
+                   let url = Self.previewURL(self.current["preview"] as? String) { self.openBrowser(url) }
+            } else if case .failure(let error) = result {
+                self.statusKnown = false
+                if method == "project.start", error.localizedDescription.hasPrefix("PROJECT_CHANGED:") {
+                    self.load(notice: "App setup changed. Review the updated selection, then start it again.")
+                } else { self.failure = error.localizedDescription; self.poll() }
+            }
             self.updateControls()
         }
     }
@@ -226,9 +261,9 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
     private func updateControls() {
         let enabled = connected
         let editable = enabled && statusKnown && !busy && !running && !repairInProgress && !healingActive
-        runButton.isEnabled = editable && !options.isEmpty
-        runButton.title = pendingAction == "project.start" ? "Starting…" : "Run"
-        stopButton.title = pendingAction == "project.stop" || current["state"] as? String == "stopping" ? "Stopping…" : healingActive && !running ? "Stop Repair" : "Stop App"
+        runButton.isEnabled = editable && discoveryKnown && !options.isEmpty
+        runButton.title = pendingAction == "project.start" ? "Starting…" : staticPreview ? "Preview App" : "Run"
+        stopButton.title = pendingAction == "project.stop" || current["state"] as? String == "stopping" ? "Stopping…" : healingActive && !running ? "Stop Repair" : staticPreview ? "Stop Preview" : "Stop App"
         stopButton.isEnabled = enabled && !busy && (running || healingActive) && current["state"] as? String != "stopping"
         targets.isEnabled = editable
         configureButton.isEnabled = editable
@@ -238,8 +273,12 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
         draftNote.stringValue = draftChanged ? "Unsaved edits · Save Command to use them." : "Changes are saved only when you choose Save Command."
         for input in [commandInput, directoryInput, previewInput] { input.isEnabled = editable }
         previewButton.isEnabled = enabled && statusKnown && !busy && current["state"] as? String == "running" && Self.previewURL(current["preview"] as? String) != nil
+        copyButton.isEnabled = previewButton.isEnabled
+        previewAddress.stringValue = previewButton.isEnabled ? current["preview"] as? String ?? "" : ""
+        previewAddress.toolTip = previewAddress.stringValue
+        previewAddress.isHidden = previewAddress.stringValue.isEmpty
         let state = current["state"] as? String ?? "idle"
-        automaticRepair.isHidden = !automaticSupported
+        automaticRepair.isHidden = !automaticSupported || staticPreview
         automaticRepair.isEnabled = enabled && statusKnown && !busy
         automaticRepair.state = healing["enabled"] as? Bool == true ? .on : .off
         repairButton.isHidden = !repairSupported || (state != "failed" && recordedRepair == nil) || (healingActive && recordedRepair == nil) || (current["launch"] as? String).flatMap(UUID.init(uuidString:)) == nil
@@ -260,15 +299,15 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
             }
         case "paused" where healing["reason"] as? String == "time_limit": summary = "Automatic repair reached its time limit. Your changes are saved."
         default: switch state {
-        case "idle": summary = options.isEmpty ? "No run command found. Ask LUMI to prepare this project to run." : "Ready to run"
+        case "idle": summary = options.isEmpty ? "No runnable app found. Ask LUMI to prepare it, then choose Refresh." : staticPreview ? "Ready to preview in your browser. No setup needed." : "Ready to run"
         case "failed":
             if repairInProgress { summary = "LUMI is working on the app. Open the repair to follow progress." }
             else if recordedRepair?["state"] as? String == "completed" { summary = "LUMI finished the repair. Run the app to check startup." }
             else if recordedRepair != nil { summary = "The repair needs more work. Open it to continue with LUMI." }
             else { summary = repairSupported ? "The app stopped unexpectedly. LUMI can investigate and repair it." : "The app stopped unexpectedly. Ask LUMI to investigate." }
         case "completed": summary = "App finished"
-        case "stopped": summary = "App stopped"
-        default: summary = state == "running" && healing["enabled"] as? Bool == true ? "Running · Automatic repair on" : state.capitalized
+        case "stopped": summary = staticPreview ? "Preview stopped" : "App stopped"
+        default: summary = state == "running" && staticPreview ? "Preview is running. Reload the browser to see saved changes." : state == "running" && healing["enabled"] as? Bool == true ? "Running · Automatic repair on" : state.capitalized
         }
         }
         outputStatus.stringValue = [(current["exitCode"] as? Int).map { "Exit \($0)" }, current["outputLimited"] as? Bool == true ? "Showing recent output" : nil].compactMap { $0 }.joined(separator: " · ")
@@ -277,14 +316,27 @@ final class ProjectRunView: NSStackView, NSTextFieldDelegate {
             pendingAction == "project.start" ? "Starting app…" :
             pendingAction == "project.stop" ? "Stopping app…" :
             pendingAction == "project.healing" ? "Updating automatic repair…" :
-            statusFailure ?? ((!statusKnown ? "Checking app status…" : summary) + (failure.map { "\nLast request failed: \($0)" } ?? ""))
+            statusFailure ?? ((!statusKnown ? "Checking app status…" : summary) + (notice.map { "\n\($0)" } ?? "") + (failure.map { "\n\($0)" } ?? ""))
     }
     static func previewURL(_ value: String?) -> URL? {
         guard let value, let url = URL(string: value), ["http", "https"].contains(url.scheme ?? ""), ["localhost", "127.0.0.1", "[::1]", "::1"].contains(url.host ?? ""), url.user == nil, url.password == nil else { return nil }; return url
     }
-    @objc private func openPreview() { if connected, statusKnown, !busy, current["state"] as? String == "running", let url = Self.previewURL(current["preview"] as? String) { NSWorkspace.shared.open(url) } }
+    private func openBrowser(_ url: URL) {
+        notice = nil
+        if !previewOpener(url) { failure = "The preview is ready, but the browser couldn’t open. Try again or copy the link into your browser." }
+        else { failure = nil }
+        updateControls()
+    }
+    @objc private func openPreview() { if connected, statusKnown, !busy, current["state"] as? String == "running", let url = Self.previewURL(current["preview"] as? String) { openBrowser(url) } }
+    @objc private func copyLink() {
+        guard connected, statusKnown, !busy, current["state"] as? String == "running", let url = Self.previewURL(current["preview"] as? String) else { return }
+        if copyPreview(url.absoluteString) { failure = nil; notice = "Preview link copied." }
+        else { notice = nil; failure = "Couldn’t copy the link. Select the address and copy it, or choose Open in Browser." }
+        updateControls()
+    }
     func navigateProbe(_ step: String) {
-        if step == "start" { run() }; if step == "stop" { stop() }; if step == "configure" { if details.isHidden { toggleDetails() }; configuration.isHidden = false }
+        if step == "copy-preview" { copyLink() }
+        if step == "start" { run() }; if step == "stop" { stop() }; if step == "preview" { openPreview() }; if step == "configure" { if details.isHidden { toggleDetails() }; configuration.isHidden = false }
         if step == "repair" { repair() }; if step == "details" { toggleDetails() }
         if step == "automatic" { automaticRepair.state = automaticRepair.state == .on ? .off : .on; toggleAutomaticRepair() }
         if step == "configuration-end" { saveButton.scrollToVisible(saveButton.bounds) }

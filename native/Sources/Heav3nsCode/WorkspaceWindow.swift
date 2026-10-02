@@ -925,6 +925,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     /// They drive the same controls and real read-only bridge as the application.
     func navigateProbe(_ step: String) {
         if step.hasPrefix("model-draft:") { modelPicker?.editProbe(String(step.dropFirst("model-draft:".count))); return }
+        if step.hasPrefix("model-select:") { modelPicker?.selectProbe(String(step.dropFirst("model-select:".count))); return }
         if step.hasPrefix("palette-search:") { palette?.searchProbe(String(step.dropFirst("palette-search:".count))); return }
         if step.hasPrefix("quick-open:") { showQuickOpen(); quickOpen?.searchProbe(String(step.dropFirst("quick-open:".count))); return }
         if step.hasPrefix("walkthrough-") {
