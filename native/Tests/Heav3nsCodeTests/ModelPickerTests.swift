@@ -6,6 +6,52 @@ final class ModelPickerTests: XCTestCase {
     private func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
     private let state: [String: Any] = ["provider": "openai-codex", "model": "gpt-5.6-terra", "revision": 0,
         "providers": [["id": "openai-codex", "label": "OpenAI Codex", "models": ["gpt-5.6-terra"], "detail": "Existing connection"]]]
+    func testReopeningDuringKeySaveReconcilesAndUnlocksControls() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "openrouter", "label": "OpenRouter", "detail": "API key", "models": ["org/model"]]]
+        let parent = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 720), styleMask: [.titled], backing: .buffered, defer: false)
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss(); parent.orderOut(nil) }
+        picker.present(for: parent); requests[0].2(.success(data)); picker.providerProbe("openrouter")
+        requests[1].2(.success(["saved": false, "configured": false]))
+        picker.keyProbe("private-key"); picker.dismiss()
+        requests[2].2(.success(["saved": true, "configured": true]))
+        picker.present(for: parent); requests[3].2(.success(data))
+        XCTAssertEqual(requests[4].0, "openrouter.status")
+        requests[4].2(.success(["saved": true, "configured": true]))
+        let views = descendants(try XCTUnwrap(picker.window?.contentView))
+        let field = try XCTUnwrap(views.compactMap { $0 as? NSSecureTextField }.first)
+        XCTAssertTrue(field.isEnabled); XCTAssertEqual(field.stringValue, "")
+        XCTAssertTrue(try XCTUnwrap(views.compactMap { $0 as? NSButton }.first { $0.title == "Remove Key" }).isEnabled)
+        XCTAssertTrue((picker.diagnostics["keyStatus"] as? String ?? "").contains("saved"))
+    }
+
+    func testOpenRouterKeySetupAndModelSelection() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "openrouter", "label": "OpenRouter", "detail": "API key", "models": ["anthropic/claude-sonnet-4.5"]]]
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss() }
+        picker.load(); requests[0].2(.success(data)); picker.providerProbe("openrouter")
+        XCTAssertEqual(requests[1].0, "openrouter.status")
+        requests[1].2(.success(["saved": false, "configured": false]))
+        XCTAssertEqual(picker.diagnostics["credentialsVisible"] as? Bool, true)
+        picker.keyProbe("test-private-key")
+        XCTAssertEqual(requests[2].0, "openrouter.saveKey")
+        XCTAssertEqual(requests[2].1["apiKey"] as? String, "test-private-key")
+        requests[2].2(.success(["saved": true, "configured": true]))
+        XCTAssertFalse(String(describing: picker.diagnostics).contains("test-private-key"))
+        let views = descendants(try XCTUnwrap(picker.window?.contentView))
+        XCTAssertEqual(views.compactMap { $0 as? NSSecureTextField }.first?.stringValue, "")
+        picker.selectProbe("anthropic/claude-sonnet-4.5")
+        XCTAssertEqual(requests.last?.0, "models.select")
+        XCTAssertEqual(requests.last?.1["provider"] as? String, "openrouter")
+        XCTAssertEqual(WorkspaceModelSelection(["provider": "openrouter", "model": "org/model", "revision": 0])?.providerLabel, "OpenRouter")
+    }
+
     func testListSelectionSwitchesOnceWithoutConfirmationAndClosesAfterSuccess() throws {
         _ = NSApplication.shared
         var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()

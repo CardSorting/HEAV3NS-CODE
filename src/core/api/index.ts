@@ -1,9 +1,7 @@
+import { OpenRouterHandler } from "./providers/openrouter"
 import { ApiConfiguration } from "@shared/api"
 import { Mode } from "@shared/storage/types"
-import {
-	isClaudeSubscriptionDirectSdkProvider,
-	normalizeAgentProvider,
-} from "@/core/providers/provider-ids"
+import { isClaudeSubscriptionDirectSdkProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
 import { Logger } from "@/shared/services/Logger"
 import { ClaudeSubscriptionDirectSdkHandler } from "./providers/claude-subscription-directsdk"
 import { OpenAiCodexHandler } from "./providers/openai-codex"
@@ -19,6 +17,14 @@ function createHandlerForProvider(
 	mode: Mode,
 ): ApiHandler {
 	const normalizedProvider = normalizeAgentProvider(apiProvider)
+	if (normalizedProvider === "openrouter")
+		return new OpenRouterHandler({
+			openRouterApiKey: options.openRouterApiKey,
+			openRouterModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
+			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+			onRetryAttempt: options.onRetryAttempt,
+		})
 	if (isClaudeSubscriptionDirectSdkProvider(normalizedProvider)) {
 		return new ClaudeSubscriptionDirectSdkHandler({
 			onRetryAttempt: options.onRetryAttempt,
@@ -75,7 +81,7 @@ export function buildApiHandler(configuration: ApiConfiguration, mode: Mode): Ap
 		// would violate the user's account/billing intent and make the active
 		// provider header untrustworthy. OpenAI keeps the legacy compatibility
 		// fallback for non-Claude configurations only.
-		if (isClaudeSubscriptionDirectSdkProvider(apiProvider)) throw error
+		if (apiProvider === "openrouter" || isClaudeSubscriptionDirectSdkProvider(apiProvider)) throw error
 		return createHandlerForProvider("openai-codex", options, mode)
 	}
 }

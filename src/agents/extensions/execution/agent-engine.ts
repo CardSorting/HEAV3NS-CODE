@@ -1,3 +1,4 @@
+import { completeOpenRouter } from "../../../core/api/providers/openrouter-native.js"
 import { randomUUID } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -76,6 +77,7 @@ type ProviderCompletionResponse = ClaudeSubscriptionDirectSdkCompletionResponse 
 				type: "function"
 				function: { name: string; arguments: string }
 			}>
+			reasoning_details?: unknown[]
 			codex_reasoning?: Array<{ id: string; text: string; summary?: unknown[]; redacted_data?: string }>
 		}
 	}>
@@ -87,6 +89,7 @@ function toCodexOAuthTranscript(
 		content: string | null
 		tool_call_id?: string
 		tool_calls?: Array<{ id: string; item_id?: string; function: { name: string; arguments: string } }>
+		reasoning_details?: unknown[]
 		codex_reasoning?: Array<{ id: string; text: string; summary?: unknown[]; redacted_data?: string }>
 	}>,
 ): { instructions: string; transcript: DietCodeStorageMessage[] } {
@@ -422,19 +425,29 @@ export class AgentEngine extends AbstractAgentEngine {
 				authMethod === "oauth" ? undefined : this.getOpenAiApiKey?.() || this.openAiApiKey || process.env.OPENAI_API_KEY
 			const activeModel = this.modelResolver.getActiveModel()
 			const activeProvider = this.config.provider ?? "openai-codex"
+			const usesOpenRouter = activeProvider === "openrouter"
 			const usesClaudeSubscriptionDirectSdk = isClaudeSubscriptionDirectSdkProvider(activeProvider)
 			const hasConfiguredOpenAiProxy = Boolean(
 				this.proxyGateway?.getProxyConfig() || this.proxyGateway?.getProviderEndpoint("openai-codex"),
 			)
 			const usesCodexOAuth =
+				!usesOpenRouter &&
 				!usesClaudeSubscriptionDirectSdk &&
 				!hasConfiguredOpenAiProxy &&
 				authMethod !== "api-key" &&
 				hasOpenAiCodexOAuthCredentials(undefined)
-			const providerLabel = usesClaudeSubscriptionDirectSdk ? "Claude Code subscription" : "OpenAI Codex"
-			const progressSource = usesClaudeSubscriptionDirectSdk ? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER : "openai-codex-api"
+			const providerLabel = usesOpenRouter
+				? "OpenRouter"
+				: usesClaudeSubscriptionDirectSdk
+					? "Claude Code subscription"
+					: "OpenAI Codex"
+			const progressSource = usesOpenRouter
+				? "openrouter"
+				: usesClaudeSubscriptionDirectSdk
+					? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
+					: "openai-codex-api"
 
-			if (usesClaudeSubscriptionDirectSdk || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
+			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
 				const autonomous =
 					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
@@ -506,7 +519,7 @@ export class AgentEngine extends AbstractAgentEngine {
 							timeoutMs: 30000,
 						}
 						const providerTimeoutMs =
-							usesClaudeSubscriptionDirectSdk || usesCodexOAuth
+							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesCodexOAuth
 								? (this.config.providerTimeoutMs ?? 180_000)
 								: endpoint.timeoutMs
 						this.reportProgress(input.onProgress, {
@@ -516,7 +529,7 @@ export class AgentEngine extends AbstractAgentEngine {
 							message: attempt === 0 ? `Connecting to ${activeModel}` : `Retrying with ${activeModel}`,
 							detail: usesClaudeSubscriptionDirectSdk
 								? "Starting an isolated official Claude Code CLI subscription turn"
-								: "Sending authenticated model request to OpenAI Codex",
+								: `Sending authenticated model request to ${providerLabel}`,
 							timestamp: requestStartedAt,
 							sequence: nextProgressSequence(),
 							metadata: { source: progressSource, scope: "turn", attempt: attempt + 1 },
@@ -555,6 +568,7 @@ export class AgentEngine extends AbstractAgentEngine {
 								type: "function"
 								function: { name: string; arguments: string }
 							}>
+							reasoning_details?: unknown[]
 							codex_reasoning?: Array<{ id: string; text: string; summary?: unknown[]; redacted_data?: string }>
 						}> = preparedContext.messages.map((message) => ({
 							role: message.role,
@@ -687,6 +701,17 @@ export class AgentEngine extends AbstractAgentEngine {
 											signal: requestSignal,
 										},
 									)
+								} else if (usesOpenRouter) {
+									data = await completeOpenRouter({
+										model: activeModel,
+										messages: apiMessages,
+										tools: availableTools,
+										maxTokens: preparedContext.budget.reservedOutputTokens,
+										signal: requestSignal,
+										onText: () => {
+											lastProviderActivityAt = Date.now()
+										},
+									})
 								} else if (usesCodexOAuth) {
 									const codexOAuthHandler = new OpenAiCodexHandler({
 										openAiCodexModelId: activeModel,
@@ -858,6 +883,7 @@ export class AgentEngine extends AbstractAgentEngine {
 									content: choiceMessage?.content ?? null,
 									tool_calls: providerToolCalls,
 									codex_reasoning: choiceMessage?.codex_reasoning,
+									reasoning_details: choiceMessage?.reasoning_details,
 								})
 
 								const scheduledCalls = toolCalls.map((tc) => ({
@@ -1162,13 +1188,15 @@ export class AgentEngine extends AbstractAgentEngine {
 				responseText = `[Timed out] ${liveError}. You can retry with a narrower request.`
 			} else if (liveError) {
 				turnOutcome = "failed"
-				const actionHint = usesClaudeSubscriptionDirectSdk
-					? `[Check Claude Code: run \`claude auth login\`, verify the official CLI is compatible with your Node runtime, and set ${"LUMI_CLAUDE_SUBSCRIPTION_DIRECTSDK_PLUGIN_DIR"} if the plugin path is not auto-discovered.]`
-					: usesCodexOAuth
-						? "[Check your ChatGPT sign-in with `heav3ns whoami`; reconnect with `heav3ns login` if needed.]"
-						: authMethod === "api-key"
-							? "[The selected API key is missing. Configure OPENAI_API_KEY with `heav3ns setup`, or switch to ChatGPT sign-in in Settings.]"
-							: "[Connect your ChatGPT account with `heav3ns login`, or configure an OPENAI_API_KEY with `heav3ns setup`.]"
+				const actionHint = usesOpenRouter
+					? "[Open Model & Provider, choose OpenRouter, and check your saved API key and OpenRouter credits.]"
+					: usesClaudeSubscriptionDirectSdk
+						? `[Check Claude Code: run \`claude auth login\`, verify the official CLI is compatible with your Node runtime, and set ${"LUMI_CLAUDE_SUBSCRIPTION_DIRECTSDK_PLUGIN_DIR"} if the plugin path is not auto-discovered.]`
+						: usesCodexOAuth
+							? "[Check your ChatGPT sign-in with `heav3ns whoami`; reconnect with `heav3ns login` if needed.]"
+							: authMethod === "api-key"
+								? "[The selected API key is missing. Configure OPENAI_API_KEY with `heav3ns setup`, or switch to ChatGPT sign-in in Settings.]"
+								: "[Connect your ChatGPT account with `heav3ns login`, or configure an OPENAI_API_KEY with `heav3ns setup`.]"
 				responseText = `Live model request failed for ${activeModel}: ${liveError}\n${actionHint}`
 			} else {
 				turnOutcome = "failed"

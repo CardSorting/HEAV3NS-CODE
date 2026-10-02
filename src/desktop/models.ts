@@ -8,7 +8,7 @@ import {
 
 export const modelSelectionSchema = z
 	.object({
-		provider: z.enum([OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER]),
+		provider: z.enum([OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER, "openrouter"]),
 		reasoningEffort: z.enum(["default", ...REASONING_EFFORTS]).optional(),
 		model: z
 			.string()
@@ -24,10 +24,13 @@ export type DesktopModels = {
 	apply: (selection: ModelSelection) => void
 	catalog: () => { id: string; label: string; detail: string; models: string[] }[]
 	discover?: (provider: ModelSelection["provider"], refresh: boolean) => Promise<unknown>
+	credentials?: { status: () => { saved: boolean; configured: boolean }; save: (key: string) => Promise<void> }
 	close?: () => void
 }
 export function validateModelSelection(value: unknown): ModelSelection {
 	const selection = modelSelectionSchema.parse(value)
+	if (selection.provider === "openrouter" && !selection.model.includes("/"))
+		throw new Error("MODEL_MISMATCH: enter an OpenRouter model ID such as anthropic/claude-sonnet-4.5")
 	// Never silently replace an incompatible route with a different model.
 	if (
 		selection.provider === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER

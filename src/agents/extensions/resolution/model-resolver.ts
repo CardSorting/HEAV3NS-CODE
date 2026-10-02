@@ -21,11 +21,16 @@ export const KNOWN_CODEX_MODELS = ["gpt-5.6-terra"] as const
 export const KNOWN_CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS = CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS
 
 function providerDefaultModel(provider: AgentProviderId): string {
-	return isClaudeSubscriptionDirectSdkProvider(provider) ? CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL : "gpt-5.6-terra"
+	return provider === "openrouter"
+		? "anthropic/claude-sonnet-4.5"
+		: isClaudeSubscriptionDirectSdkProvider(provider)
+			? CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL
+			: "gpt-5.6-terra"
 }
 
 function isModelSupportedByProvider(model: string, provider: AgentProviderId): boolean {
 	const normalized = model.toLowerCase()
+	if (provider === "openrouter") return model.includes("/")
 	// Claude's native transport is strict about route identity. OpenAI/local
 	// compatibility paths historically accept arbitrary model IDs, so preserve
 	// that behavior outside the Claude provider while still preventing a Claude
@@ -118,6 +123,7 @@ export class ModelResolver {
 	}
 
 	static normalizeModelNameForProvider(input: string, provider: AgentProviderId = "openai-codex"): string {
+		if (provider === "openrouter") return input?.trim() || providerDefaultModel(provider)
 		if (!isClaudeSubscriptionDirectSdkProvider(provider)) {
 			return ModelResolver.normalizeModelName(input)
 		}

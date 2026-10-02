@@ -112,10 +112,8 @@ export async function readGlobalStateFromStorage(store: DietCodeMemento): Promis
 async function handleComputedProperties(result: Record<string, unknown>, stateValues: Map<string, unknown>): Promise<void> {
 	// 1. API Provider logic - set defaults based on existing values
 	const defaultApiProvider: ApiProvider = DEFAULT_API_PROVIDER
-	result.planModeApiProvider =
-		result.planModeApiProvider === "openrouter" ? defaultApiProvider : result.planModeApiProvider || defaultApiProvider
-	result.actModeApiProvider =
-		result.actModeApiProvider === "openrouter" ? defaultApiProvider : result.actModeApiProvider || defaultApiProvider
+	result.planModeApiProvider = result.planModeApiProvider || defaultApiProvider
+	result.actModeApiProvider = result.actModeApiProvider || defaultApiProvider
 
 	// 2. Plan/Act separate models setting with special logic
 	const planActSeparateModelsSettingRaw = stateValues.get("planActSeparateModelsSetting")

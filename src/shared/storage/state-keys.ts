@@ -387,6 +387,7 @@ const SECRETS_KEYS = [
 	"ocaApiKey",
 	"ocaRefreshToken",
 	"mcpOAuthSecrets",
+	"openRouterApiKey",
 	"openaiCodexOauthCredentials", // JSON blob containing OAuth tokens for OpenAI Codex (ChatGPT subscription)
 	"xai-oauth-credentials", // JSON blob containing OAuth tokens for xAI Grok subscriptions
 	"embeddingApiKey",

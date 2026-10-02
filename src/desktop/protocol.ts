@@ -19,6 +19,8 @@ export const requestSchema = z
 			"models.list",
 			"models.discover",
 			"models.select",
+			"openrouter.status",
+			"openrouter.saveKey",
 			"snapshot",
 			"task.submit",
 			"task.edit",

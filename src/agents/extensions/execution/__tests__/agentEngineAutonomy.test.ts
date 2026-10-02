@@ -1,3 +1,4 @@
+import { mockFetchForTesting } from "../../../../shared/net.js"
 import assert from "node:assert/strict"
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -29,6 +30,7 @@ import { BroccoliRuntimeQueue, runtimeQueueDatabase } from "../broccoli-runtime-
 
 function createEngine(
 	options: {
+		provider?: string
 		execute?: IToolRegistry["executeTool"]
 		cwd?: string
 		tools?: ToolDefinition[]
@@ -39,6 +41,7 @@ function createEngine(
 	} = {},
 ) {
 	const config = AgentConfig.createDefault()
+	if (options.provider) Object.assign(config, { provider: options.provider, modelName: "anthropic/claude-sonnet-4.5" })
 	const executeTool = sinon.spy(options.execute ?? (async () => "Observed file contents"))
 	const tool: ToolDefinition = {
 		name: "view_file",
@@ -62,7 +65,7 @@ function createEngine(
 		toolRegistry,
 		new PromptComposer(),
 		new SessionCompactor(),
-		new ModelResolver(config.modelName),
+		new ModelResolver(config.modelName, [], config.provider),
 		new SessionVfs(),
 		new SessionMemoryStore(),
 		new AgentSlashRouter(),
@@ -811,5 +814,72 @@ describe("CLI AgentEngine autonomous execution", () => {
 		assert.match(result.response, /\[Budget exhausted\]/)
 		assert.equal(requests, 2)
 		assert.equal(executeTool.callCount, 2)
+	})
+})
+
+describe("native engine OpenRouter routing", () => {
+	let savedKey: string | undefined
+	beforeEach(() => {
+		savedKey = process.env.OPENROUTER_API_KEY
+		process.env.OPENROUTER_API_KEY = "test-openrouter-key"
+	})
+	afterEach(() => {
+		sinon.restore()
+		if (savedKey === undefined) delete process.env.OPENROUTER_API_KEY
+		else process.env.OPENROUTER_API_KEY = savedKey
+	})
+	it("uses OpenRouter despite an OpenAI proxy and preserves tool reasoning across rounds", async () => {
+		const { engine, executeTool } = createEngine({ provider: "openrouter" })
+		const requests: any[] = []
+		const fetch = sinon.stub(globalThis, "fetch").rejects(new Error("must not call OpenAI"))
+		const result = await mockFetchForTesting(
+			async (url, init) => {
+				assert.equal(String(url), "https://openrouter.ai/api/v1/chat/completions")
+				assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-openrouter-key")
+				const body = JSON.parse(String(init?.body))
+				requests.push(body)
+				const chunk =
+					requests.length === 1
+						? {
+								choices: [
+									{
+										delta: {
+											content: "Inspecting",
+											reasoning_details: [{ type: "reasoning.encrypted", data: "opaque", index: 0 }],
+											tool_calls: [
+												{
+													index: 0,
+													id: "call-1",
+													type: "function",
+													function: { name: "view_file", arguments: '{"path":"a.ts"}' },
+												},
+											],
+										},
+										finish_reason: "tool_calls",
+									},
+								],
+							}
+						: { choices: [{ delta: { content: "Finished" }, finish_reason: "stop" }] }
+				return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+					headers: { "content-type": "text/event-stream" },
+				})
+			},
+			() => engine.tick({ prompt: "Read a.ts", executionAuthority: "interactive" }),
+		)
+		assert.equal(result.response, "Inspecting\nFinished")
+		assert.equal(requests.length, 2)
+		assert.equal(requests[0].model, "anthropic/claude-sonnet-4.5")
+		assert.ok(requests[1].messages.some((message: any) => message.reasoning_details?.length))
+		assert.equal(executeTool.callCount, 1)
+		assert.equal(fetch.callCount, 0)
+	})
+	it("fails without crossing to Codex when the OpenRouter key is missing", async () => {
+		delete process.env.OPENROUTER_API_KEY
+		const { engine } = createEngine({ provider: "openrouter" })
+		const fetch = sinon.stub(globalThis, "fetch").rejects(new Error("must not call OpenAI"))
+		const result = await engine.tick({ prompt: "Say hello" })
+		assert.equal(result.outcome, "failed")
+		assert.match(result.response, /OpenRouter API key is required/)
+		assert.equal(fetch.callCount, 0)
 	})
 })

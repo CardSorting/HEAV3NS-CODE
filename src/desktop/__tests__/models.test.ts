@@ -16,6 +16,7 @@ describe("desktop model selection", () => {
 	let bridge: DesktopSession
 	let current: ModelSelection
 	let release: (() => void) | undefined
+	let key = ""
 	const request = (method: DesktopRequest["method"], params: Record<string, unknown> = {}) =>
 		bridge.request({
 			v: 1,
@@ -29,6 +30,7 @@ describe("desktop model selection", () => {
 	beforeEach(async () => {
 		folder = await mkdtemp(path.join(tmpdir(), "desktop-models-"))
 		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
+		key = ""
 		current = { provider: "openai-codex", model: "gpt-5.6-terra" }
 		bridge = new DesktopSession(
 			{ path: folder, id: "fixture" },
@@ -47,6 +49,12 @@ describe("desktop model selection", () => {
 				sessionId: "fixture",
 				saveContext: () => {},
 				models: {
+					credentials: {
+						status: () => ({ saved: !!key, configured: !!key }),
+						save: async (value) => {
+							key = value
+						},
+					},
 					current: () => ({ ...current }),
 					apply: (value) => {
 						current = { ...value }
@@ -63,6 +71,21 @@ describe("desktop model selection", () => {
 		release = undefined
 		await bridge.stop()
 		await rm(folder, { recursive: true, force: true })
+	})
+	it("keeps credentials out of model metadata and blocks key changes during work", async () => {
+		assert.deepEqual(await request("openrouter.status"), { saved: false, configured: false })
+		assert.deepEqual(await request("openrouter.saveKey", { apiKey: "test-private-key" }), { saved: true, configured: true })
+		assert.ok(!JSON.stringify(await request("models.list")).includes("test-private-key"))
+		await assert.rejects(request("openrouter.saveKey", { apiKey: "key with spaces" }))
+		assert.equal(key, "test-private-key")
+		await request("task.submit", { text: "hold" })
+		await assert.rejects(request("openrouter.saveKey", { apiKey: "replacement" }), /WORK_PENDING/)
+		assert.equal(key, "test-private-key")
+	})
+	it("removes only the saved OpenRouter credential", async () => {
+		await request("openrouter.saveKey", { apiKey: "test-private-key" })
+		assert.deepEqual(await request("openrouter.saveKey", { apiKey: "" }), { saved: false, configured: false })
+		assert.equal(current.provider, "openai-codex")
 	})
 	it("validates provider/model pairs without silent substitution", () => {
 		assert.equal(validateModelSelection({ provider: claude, model: "claude-sonnet-5[1m]" }).model, "claude-sonnet-5[1m]")
@@ -134,6 +157,23 @@ describe("desktop model selection", () => {
 		await request("task.submit", { text: "hold" })
 		await assert.rejects(request("models.select", { ...current, reasoningEffort: "high", revision: 1 }), /WORK_PENDING/)
 		assert.equal(current.reasoningEffort, "low")
+	})
+
+	it("persists an OpenRouter route without substituting Codex or exposing credentials", async () => {
+		const selected = await request("models.select", {
+			provider: "openrouter",
+			model: "anthropic/claude-sonnet-4.5",
+			revision: 0,
+		})
+		assert.equal(selected.provider, "openrouter")
+		assert.equal(database.getTable("desktop.metadata.v1").get("model-selection")?.provider, "openrouter")
+		const resolver = new ModelResolver("gpt-5.6-terra")
+		resolver.setProvider("openrouter")
+		assert.equal(resolver.getActiveModel(), "anthropic/claude-sonnet-4.5")
+		resolver.setActiveModel("org/custom:free", true)
+		assert.equal(resolver.getActiveModel(), "org/custom:free")
+		assert.ok(resolver.triggerFallback().includes("/"))
+		assert.throws(() => validateModelSelection({ provider: "openrouter", model: "gpt-5.6-terra" }), /MODEL_MISMATCH/)
 	})
 
 	it("saves scoped choices and rejects a stale picker", async () => {

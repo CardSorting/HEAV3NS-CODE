@@ -796,20 +796,8 @@ export class StateManager {
 			throw new Error(STATE_MANAGER_NOT_INITIALIZED)
 		}
 
-		// OpenRouter is no longer supported. Migrate only that legacy selection at
-		// the persistence boundary while keeping unrelated legacy settings intact.
-		const normalizedApiConfiguration: ApiConfiguration = {
-			...apiConfiguration,
-			planModeApiProvider:
-				apiConfiguration.planModeApiProvider === "openrouter"
-					? DEFAULT_API_PROVIDER
-					: apiConfiguration.planModeApiProvider,
-			actModeApiProvider:
-				apiConfiguration.actModeApiProvider === "openrouter" ? DEFAULT_API_PROVIDER : apiConfiguration.actModeApiProvider,
-		}
-
 		// Automatically categorize the API configuration keys
-		const { settingsUpdates, secretsUpdates } = Object.entries(normalizedApiConfiguration).reduce(
+		const { settingsUpdates, secretsUpdates } = Object.entries(apiConfiguration).reduce(
 			(acc, [key, value]) => {
 				if (key === undefined || value === undefined) {
 					return acc // Skip undefined values
@@ -1403,7 +1391,7 @@ export class StateManager {
 			if (typeof provider !== "string") {
 				return undefined
 			}
-			return provider === "openrouter" ? DEFAULT_API_PROVIDER : provider
+			return provider
 		}
 
 		return {

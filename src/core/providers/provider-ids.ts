@@ -6,6 +6,7 @@
  * logs, and (for the legacy host) serialized settings, so changing one is a
  * migration rather than a harmless refactor.
  */
+export const OPENROUTER_PROVIDER = "openrouter" as const
 export const OPENAI_CODEX_PROVIDER = "openai-codex" as const
 export const CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER = "claude-subscription-directsdk-experimental" as const
 
@@ -107,6 +108,7 @@ export function isClaudeSubscriptionDirectSdkModel(model: string | undefined): b
 export function getAgentProviderLabel(provider: string | undefined): string {
 	const normalized = normalizeAgentProvider(provider)
 	if (normalized === OPENAI_CODEX_PROVIDER) return "OpenAI Codex"
+	if (normalized === OPENROUTER_PROVIDER) return "OpenRouter"
 	if (normalized === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER) return "Claude Code"
 
 	return normalized

@@ -1,3 +1,4 @@
+import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
 import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { stat } from "node:fs/promises"
@@ -595,6 +596,7 @@ export class DesktopSession {
 		if (
 			[
 				"task.submit",
+				"openrouter.saveKey",
 				"models.select",
 				"task.edit",
 				"conversation.create",
@@ -631,6 +633,7 @@ export class DesktopSession {
 					"autonomous-execution-v1",
 					...(this.lifecycle?.models ? ["model-selection-v1", "reasoning-selection-v1"] : []),
 					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
+					...(this.lifecycle?.models?.credentials ? ["openrouter-credentials-v1"] : []),
 					...(this.lifecycle?.memories ? ["conversation-memory-v1"] : []),
 					"snapshot",
 					"workspace-verification-v1",
@@ -784,6 +787,30 @@ export class DesktopSession {
 				}
 				this.event("memory.changed", { conversation: this.conversation })
 				return { conversation: this.conversation, saved: true, entry: planned.entry }
+			}
+			case "openrouter.status": {
+				z.object({}).strict().parse(request.params)
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: OpenRouter credentials are unavailable")
+				return credentials.status()
+			}
+			case "openrouter.saveKey": {
+				const { apiKey } = z
+					.object({
+						apiKey: z
+							.string()
+							.trim()
+							.max(1024)
+							.refine((value) => value === "" || /^[!-~]+$/.test(value), "Enter an API key without spaces"),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop work before changing the API key")
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: OpenRouter credentials are unavailable")
+				await credentials.save(apiKey)
+				return credentials.status()
 			}
 			case "models.discover": {
 				const { provider, refresh } = z
@@ -2086,6 +2113,7 @@ export async function runDesktopWorker(): Promise<void> {
 		const discovery = new DesktopModelDiscovery(
 			providerModelLoader({
 				gateway: engine.proxyGateway,
+				openRouterApiKey,
 				authMethod: () => engine!.setupWizard.getOpenAiAuthMethod(),
 				apiKey: () =>
 					engine!.authStorageVault.getToken(OPENAI_CODEX_PROVIDER) ||
@@ -2110,8 +2138,26 @@ export async function runDesktopWorker(): Promise<void> {
 				replace: (entries) => engine!.sessionMemoryStore.replaceMemories(entries),
 			},
 			models: {
+				credentials: {
+					status: () => ({
+						saved: !!StateManager.get().getSecretKey("openRouterApiKey"),
+						configured: !!openRouterApiKey(),
+					}),
+					save: async (key) => {
+						const state = StateManager.get()
+						const before = state.getSecretKey("openRouterApiKey")
+						state.setSecret("openRouterApiKey", key || undefined)
+						try {
+							await state.flushPendingState()
+						} catch {
+							state.setSecret("openRouterApiKey", before)
+							throw new Error("Could not save the OpenRouter key. Try again.")
+						}
+					},
+				},
 				current: () => ({
 					provider: engine!.modelResolver.getProvider() as
+						| "openrouter"
 						| "openai-codex"
 						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 					model: engine!.modelResolver.getActiveModel(),
@@ -2127,20 +2173,22 @@ export async function runDesktopWorker(): Promise<void> {
 				discover: (provider, refresh) => discovery.discover(provider, refresh),
 				close: () => discovery.close(),
 				catalog: () =>
-					[OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER].map((id) => ({
+					[OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER, "openrouter" as const].map((id) => ({
 						id,
 						label: getAgentProviderLabel(id),
 						detail:
-							id === OPENAI_CODEX_PROVIDER
-								? engine!.proxyGateway.getProxyConfig() ||
-									engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
-									? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
-									: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
-										? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
-										: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
-											? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
-											: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."
-								: "Uses your existing Claude Code connection. If needed, run claude auth login, then reconnect this workspace.",
+							id === "openrouter"
+								? "Uses your OpenRouter API key. Browse tool-capable models or enter an exact model ID. OpenRouter bills usage to your account."
+								: id === OPENAI_CODEX_PROVIDER
+									? engine!.proxyGateway.getProxyConfig() ||
+										engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
+										? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
+										: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
+											? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
+											: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
+												? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
+												: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."
+									: "Uses your existing Claude Code connection. If needed, run claude auth login, then reconnect this workspace.",
 						models: discovery.models(id),
 					})),
 			},

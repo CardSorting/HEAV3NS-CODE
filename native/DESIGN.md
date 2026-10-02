@@ -424,3 +424,7 @@ note separates retained messages from saved memory and other prompt sources;
 Reload captures a new snapshot. Page errors preserve the last valid content and
 name Reload as recovery. A localized observation time and page-search scope are
 available in the footer tooltip. No additional sidebar, modal or health gauge.
+
+### OpenRouter provider — October 2, 2026
+
+OpenRouter extends the existing modeless Model & Provider picker. When the runtime advertises `openrouter-credentials-v1`, choosing OpenRouter reveals a native secure API-key field with explicit Save Key and Remove Key buttons above model search. Inline status distinguishes a saved key, an environment-provided key, and missing credentials; saved status does not claim verified model access. Credential controls wait during active work and pending saves. Dismissal clears the secure draft, and reopening reads the saved state before completing credential reconciliation. OpenRouter uses the same searchable model list, exact custom-ID entry, immediate model selection, semantic light/dark colors, and system typography as the existing providers.

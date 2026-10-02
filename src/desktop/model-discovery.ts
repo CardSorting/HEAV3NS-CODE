@@ -85,13 +85,20 @@ export class DesktopModelDiscovery {
 					throw new ModelDiscoveryError(
 						"The provider returned no usable model IDs. Refresh later or enter an exact model ID.",
 					)
+				const visibleModels: DiscoveredModel[] = []
+				let bytes = 0
+				for (const model of models.values()) {
+					bytes += Buffer.byteLength(JSON.stringify(model)) + 1
+					if (visibleModels.length >= (provider === "openrouter" ? 1000 : 200) || bytes > 180_000) break
+					visibleModels.push(model)
+				}
 				const result: DiscoveryResult = {
 					provider,
-					models: [...models.values()].slice(0, 200),
+					models: visibleModels,
 					state: models.size ? "ready" : "empty",
 					source: listing.source,
 					checkedAt: this.now(),
-					limited: models.size > 200 || listing.models.length > 2000,
+					limited: models.size > visibleModels.length || listing.models.length > 2000,
 					message: models.size
 						? "Provider-reported models. Tool support and access are checked when you send."
 						: "This connection returned no models. Check its setup, refresh, or enter an exact model ID.",
@@ -109,9 +116,11 @@ export class DesktopModelDiscovery {
 					message:
 						error instanceof ModelDiscoveryError
 							? error.message
-							: provider === "openai-codex"
-								? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
-								: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
+							: provider === "openrouter"
+								? "Could not load OpenRouter models. Check your connection and API key, then refresh or enter an exact model ID."
+								: provider === "openai-codex"
+									? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
+									: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
 				}
 				if (!this.closed) this.cache.set(provider, { result, expires: this.now() + 30_000 })
 				return result
@@ -196,9 +205,21 @@ export function providerModelLoader(options: {
 	gateway: LlmProxyGateway
 	authMethod: () => "oauth" | "api-key" | undefined
 	apiKey: () => string | undefined
+	openRouterApiKey?: () => string | undefined
 	claude: ClaudeSubscriptionDirectSdkOptions
 }): ModelLoader {
 	return async (provider, signal) => {
+		if (provider === "openrouter") {
+			const key = options.openRouterApiKey?.()
+			return {
+				source: "OpenRouter",
+				models: await fetchModelList(
+					new URL("https://openrouter.ai/api/v1/models?supported_parameters=tools"),
+					key ? { Authorization: `Bearer ${key}` } : {},
+					signal,
+				),
+			}
+		}
 		if (provider === "claude-subscription-directsdk-experimental") {
 			const models = await discoverClaudeSubscriptionDirectSdkModels({ ...options.claude, signal, timeoutMs: 10_000 })
 			return { source: "Claude Code", models: models.map((model) => ({ ...model, detail: model.note })) }

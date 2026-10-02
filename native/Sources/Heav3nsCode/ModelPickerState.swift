@@ -10,8 +10,8 @@ struct WorkspaceModelSelection: Equatable {
     let busy: Bool
     let blocked: String?
     static let reasoningLevels: Set<String> = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
-    var providerLabel: String { provider == "openai-codex" ? "OpenAI Codex" : "Claude Code" }
-    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental"]
+    var providerLabel: String { provider == "openrouter" ? "OpenRouter" : provider == "openai-codex" ? "OpenAI Codex" : "Claude Code" }
+    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter"]
     static func validModel(_ value: String) -> Bool {
         value.utf8.count <= 200 && value.range(of: "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*\\z", options: .regularExpression) != nil
     }
@@ -55,7 +55,7 @@ struct WorkspaceModelCatalog {
             guard let id = item["id"] as? String, WorkspaceModelSelection.providers.contains(id), ids.insert(id).inserted,
                   let label = item["label"] as? String, !label.isEmpty, label.count <= 100,
                   let detail = item["detail"] as? String, detail.count <= 2000,
-                  let models = item["models"] as? [String], models.count <= 200,
+                  let models = item["models"] as? [String], models.count <= 1000,
                   models.allSatisfy(WorkspaceModelSelection.validModel) else { return nil }
             providers.append(Provider(id: id, label: label, detail: detail, models: models))
         }
@@ -86,7 +86,7 @@ struct WorkspaceModelDiscovery {
               let state = data["state"] as? String, ["ready", "empty", "stale", "unavailable"].contains(state),
               let source = data["source"] as? String, !source.isEmpty, source.count <= 100,
               let message = data["message"] as? String, message.count <= 2000,
-              let raw = data["models"] as? [[String: Any]], raw.count <= 200 else { return nil }
+              let raw = data["models"] as? [[String: Any]], raw.count <= 1000 else { return nil }
         var models = [Model](), ids = Set<String>()
         for item in raw {
             guard let id = item["id"] as? String, WorkspaceModelSelection.validModel(id), ids.insert(id).inserted,

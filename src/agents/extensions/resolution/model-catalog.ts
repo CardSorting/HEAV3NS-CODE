@@ -173,6 +173,18 @@ export class ModelCatalog {
 
 	getModelInfo(modelName: string, provider = "openai-codex"): ModelSpecs {
 		const normalizedProvider = normalizeAgentProvider(provider)
+		if (normalizedProvider === "openrouter")
+			return {
+				modelName,
+				provider: "openrouter",
+				contextWindowTokens: 32_768,
+				maxOutputTokens: 4096,
+				inputPricePer1M: 0,
+				outputPricePer1M: 0,
+				supportsVision: false,
+				description:
+					"OpenRouter route; conservative context budget until model limits are known. Pricing is reported by OpenRouter.",
+			}
 		const loweredModelName = modelName.toLowerCase()
 		const providerPrefix = `${normalizedProvider.toLowerCase()}/`
 		const canonical = loweredModelName.startsWith(providerPrefix)

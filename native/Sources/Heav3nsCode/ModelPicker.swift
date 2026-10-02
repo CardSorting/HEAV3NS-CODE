@@ -8,6 +8,14 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private let canApply: () -> Bool
     private let onSelection: (WorkspaceModelSelection) -> Void
     private let provider = NSPopUpButton()
+    private let apiKey = NSSecureTextField()
+    private let keyStatus = JourneyStyle.label("", size: 11, secondary: true)
+    private let saveKey = NSButton(title: "Save Key", target: nil, action: nil)
+    private let removeKey = NSButton(title: "Remove Key", target: nil, action: nil)
+    private let credentialsRow = NSStackView()
+    private var keyPending = false
+    private var keySaved = false
+    private let supportsCredentials: () -> Bool
     private let model = NSTextField()
     private let modelChoice = ModelChoiceList(frame: .zero)
     private let customRow = NSStackView()
@@ -41,13 +49,26 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var discoveryRequests = [String: UUID]()
 
     convenience init(client: RuntimeClient, canApply: @escaping () -> Bool, onSelection: @escaping (WorkspaceModelSelection) -> Void) {
-        self.init(request: { method, params, completion in client.request(method, params: params, completion: completion) }, connected: { client.isReady }, supportsDiscovery: { client.capabilities.contains("model-discovery-v1") }, canApply: canApply, onSelection: onSelection)
+        self.init(request: { method, params, completion in client.request(method, params: params, completion: completion) }, connected: { client.isReady }, supportsDiscovery: { client.capabilities.contains("model-discovery-v1") }, supportsCredentials: { client.capabilities.contains("openrouter-credentials-v1") }, canApply: canApply, onSelection: onSelection)
     }
-    init(request: @escaping (String, [String: Any], @escaping (Result<[String: Any], Error>) -> Void) -> Void, connected: @escaping () -> Bool, supportsDiscovery: @escaping () -> Bool = { false }, canApply: @escaping () -> Bool, onSelection: @escaping (WorkspaceModelSelection) -> Void) {
+    init(request: @escaping (String, [String: Any], @escaping (Result<[String: Any], Error>) -> Void) -> Void, connected: @escaping () -> Bool, supportsDiscovery: @escaping () -> Bool = { false }, supportsCredentials: @escaping () -> Bool = { false }, canApply: @escaping () -> Bool, onSelection: @escaping (WorkspaceModelSelection) -> Void) {
+        self.supportsCredentials = supportsCredentials
         self.request = request; self.connected = connected; self.supportsDiscovery = supportsDiscovery; self.canApply = canApply; self.onSelection = onSelection
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 560), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "Model & Provider"; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
         super.init(window: panel); panel.delegate = self
+        apiKey.placeholderString = "OpenRouter API key"; apiKey.setAccessibilityLabel("OpenRouter API key")
+        apiKey.delegate = self; apiKey.target = self; apiKey.action = #selector(storeKey)
+        apiKey.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        saveKey.target = self; saveKey.action = #selector(storeKey); saveKey.bezelStyle = .rounded
+        removeKey.target = self; removeKey.action = #selector(clearKey); removeKey.bezelStyle = .rounded
+        let keyEntry = JourneyStyle.stack([apiKey, saveKey, removeKey], vertical: false, spacing: 8)
+        credentialsRow.orientation = .vertical; credentialsRow.alignment = .leading; credentialsRow.spacing = 6
+        credentialsRow.addArrangedSubview(keyEntry); credentialsRow.addArrangedSubview(keyStatus)
+        keyEntry.widthAnchor.constraint(equalTo: credentialsRow.widthAnchor).isActive = true
+        keyStatus.widthAnchor.constraint(equalTo: credentialsRow.widthAnchor).isActive = true
+        keyStatus.maximumNumberOfLines = 2
+        credentialsRow.isHidden = true
         provider.target = self; provider.action = #selector(changeProvider); provider.setAccessibilityLabel("Provider")
         model.delegate = self; model.setAccessibilityLabel("Custom model ID")
         model.placeholderString = "Exact model ID"; model.target = self; model.action = #selector(save)
@@ -73,7 +94,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             JourneyStyle.label("Choose Model", size: 20, weight: .semibold),
             JourneyStyle.label("Choose a model to switch immediately in this workspace.", size: 12, secondary: true),
             status, JourneyStyle.rule(), JourneyStyle.label("Provider", size: 12, weight: .semibold), provider, detail,
-            modelChoice, customRow, modelInformation,
+            credentialsRow, modelChoice, customRow, modelInformation,
             availability, footer
         ], spacing: 10)
         panel.contentView?.addSubview(root)
@@ -108,17 +129,22 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var draftModel: String { model.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var dirty: Bool { guard let selection else { return false }; return displayedProvider != selection.provider || draftModel != selection.model }
     private var validation: String? {
+        if displayedProvider == "openrouter" && !draftModel.contains("/") { return "Enter an OpenRouter model ID, such as anthropic/claude-sonnet-4.5." }
         guard WorkspaceModelSelection.validModel(draftModel) else { return "Enter a model ID of up to 200 characters, without spaces." }
         if displayedProvider == "openai-codex" && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
         return nil
     }
     func refreshAvailability() {
         syncPresentation()
-        let editable = !dismissed && !pending && selection != nil
+        let editable = !dismissed && !pending && !keyPending && selection != nil
+        credentialsRow.isHidden = displayedProvider != "openrouter" || !supportsCredentials()
+        apiKey.isEnabled = connected() && editable && canApply()
+        saveKey.isEnabled = apiKey.isEnabled && !apiKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        removeKey.isEnabled = apiKey.isEnabled && keySaved
         provider.isEnabled = editable; model.isEnabled = editable
         modelChoice.setAvailability(browse: editable, canSwitch: editable && connected() && reconciled && blocked == nil && canApply(), customVisible: customMode)
         customRow.isHidden = !customMode
-        reload.isEnabled = connected() && !pending && discoveryRequests[displayedProvider ?? ""] == nil
+        reload.isEnabled = connected() && !pending && !keyPending && discoveryRequests[displayedProvider ?? ""] == nil
         apply.isEnabled = connected() && editable && reconciled && blocked == nil && canApply() && dirty && validation == nil
         apply.toolTip = "Switch to this exact model ID for future instructions"
         availability.stringValue = !connected() ? "Disconnected. Your edit is preserved. Reconnect the workspace to check the saved choice." : !canApply() ? "Finish or stop active and queued work before switching." : ""
@@ -167,7 +193,9 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         if let displayedProvider { remembered[displayedProvider] = model.stringValue }
         guard providers.indices.contains(provider.indexOfSelectedItem) else { return }
         let item = providers[provider.indexOfSelectedItem]
+        if displayedProvider != item.id { apiKey.stringValue = "" }
         displayedProvider = item.id
+        if item.id == "openrouter" { loadKeyStatus() }
         model.stringValue = remembered[item.id] ?? ""
         populateModels()
         customMode = customProviders.contains(item.id) || (!model.stringValue.isEmpty && !suggestions.contains(model.stringValue))
@@ -232,7 +260,44 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             self.populateModels(); self.refreshAvailability()
         }
     }
+    private func loadKeyStatus() {
+        guard supportsCredentials(), connected(), !keyPending else { return }
+        keyStatus.stringValue = "Checking saved key…"
+        let token = loadID
+        request("openrouter.status", [:]) { [weak self] result in
+            guard let self, self.loadID == token, !self.dismissed else { return }
+            self.installKeyStatus(result)
+        }
+    }
+    private func installKeyStatus(_ result: Result<[String: Any], Error>) {
+        switch result {
+        case .success(let data):
+            keySaved = data["saved"] as? Bool == true
+            keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using OPENROUTER_API_KEY from the environment." : "Add your key from openrouter.ai/keys to send instructions."
+        case .failure(let error): keyStatus.stringValue = error.localizedDescription
+        }
+        refreshAvailability()
+    }
+    @objc private func storeKey() {
+        let value = apiKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }; updateKey(value)
+    }
+    @objc private func clearKey() { updateKey("") }
+    private func updateKey(_ value: String) {
+        guard supportsCredentials(), connected(), canApply(), !pending, !keyPending, !dismissed else { return }
+        keyPending = true; keyStatus.stringValue = "Saving key…"; refreshAvailability()
+        let token = loadID
+        request("openrouter.saveKey", ["apiKey": value]) { [weak self] result in
+            guard let self, self.loadID == token, !self.dismissed else { return }
+            self.keyPending = false
+            if case .success = result { self.apiKey.stringValue = "" }
+            self.installKeyStatus(result)
+            if case .success = result { self.discoverModels(refresh: true) }
+        }
+    }
+    func keyProbe(_ value: String) { apiKey.stringValue = value; storeKey() }
     func controlTextDidChange(_ obj: Notification) {
+        if let field = obj.object as? NSTextField, field === apiKey { refreshAvailability(); return }
         if let displayedProvider { customProviders.insert(displayedProvider) }
         customMode = true; refreshAvailability()
     }
@@ -264,12 +329,12 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     /// Invalidate in-flight callbacks before allowing the new client to reconcile.
     func connectionChanged() {
         if connected() { load(); return }
-        loadID = UUID(); pending = false; reconciled = false; resetRevision = true
+        loadID = UUID(); pending = false; keyPending = false; apiKey.stringValue = ""; reconciled = false; resetRevision = true
         discoveryRequests.removeAll(); discoveries.removeAll()
         refreshAvailability()
     }
     func dismiss(restoreFocus: Bool = true) {
-        dismissed = true; loadID = UUID(); pending = false
+        dismissed = true; loadID = UUID(); pending = false; keyPending = false; apiKey.stringValue = ""
         discoveryRequests.removeAll()
         refreshAvailability()
         let parent = window?.parent
@@ -292,7 +357,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     func selectProbe(_ id: String) { modelChoice.selectProbe(id) }
     func searchProbe(_ value: String) { modelChoice.searchProbe(value) }
     var diagnostics: [String: Any] {
-        ["visible": window?.isVisible == true, "draft": model.stringValue, "dirty": dirty,
+        ["credentialsVisible": !credentialsRow.isHidden, "keyStatus": keyStatus.stringValue, "visible": window?.isVisible == true, "draft": model.stringValue, "dirty": dirty,
          "connected": connected(), "pending": pending, "reconciled": reconciled,
          "applyEnabled": apply.isEnabled, "status": status.stringValue, "availability": availability.stringValue,
          "catalogStatus": catalogStatus.stringValue, "modelInformation": modelInformation.stringValue, "modelSuggestions": suggestions, "customVisible": !customRow.isHidden, "list": modelChoice.diagnostics]

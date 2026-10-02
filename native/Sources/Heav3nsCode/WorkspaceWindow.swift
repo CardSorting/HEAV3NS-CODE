@@ -771,7 +771,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             self.client.request(method, params: params, completion: completion)
         }, connected: { [weak self] in
             self?.client.isReady == true && self?.client.capabilities.contains("model-selection-v1") == true
-        }, supportsDiscovery: { [weak self] in self?.client.capabilities.contains("model-discovery-v1") == true }, canApply: { [weak self] in
+        }, supportsDiscovery: { [weak self] in self?.client.capabilities.contains("model-discovery-v1") == true }, supportsCredentials: { [weak self] in self?.client.capabilities.contains("openrouter-credentials-v1") == true }, canApply: { [weak self] in
             guard let self else { return false }
             return self.canRequestRecovery && self.stopThenSend == nil && !self.reasoningPicker.pending
         }, onSelection: { [weak self] in self?.updateModel($0) })
@@ -1105,6 +1105,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "models-reopen": showModels()
         case "models-refresh", "models-refresh-retry": modelPicker?.refreshProbe()
         case "models-claude": modelPicker?.providerProbe("claude-subscription-directsdk-experimental")
+        case "models-openrouter": modelPicker?.providerProbe("openrouter")
         case "models-openai": modelPicker?.providerProbe("openai-codex")
         case "models-disconnect": client.closeInput()
         case "models-reconnect": reconnect()

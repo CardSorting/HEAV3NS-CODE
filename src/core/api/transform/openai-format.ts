@@ -295,7 +295,7 @@ type ReasoningDetail = {
 
 // Helper function to normalize reasoning_details arrays for OpenAI-compatible APIs
 // Takes an array of reasoning detail objects and consolidates them by index
-function consolidateReasoningDetails(reasoningDetails: ReasoningDetail[]): ReasoningDetail[] {
+export function consolidateReasoningDetails(reasoningDetails: ReasoningDetail[]): ReasoningDetail[] {
 	if (!reasoningDetails || reasoningDetails.length === 0) {
 		return []
 	}
