@@ -1,9 +1,7 @@
-import { exec } from "child_process"
-import { promisify } from "util"
 import { Logger } from "@/shared/services/Logger"
-
-const execAsync = promisify(exec)
-const GIT_OUTPUT_LINE_LIMIT = 500
+import { gitDiffBase, gitHead, inspectionDiffOptions, readGitText } from "./git-diff.js"
+import { decodeGitText, execGit, type GitReadOptions, gitFailure, gitOptions, withGitInspection } from "./git-inspection.js"
+import { readGitStatus } from "./git-status.js"
 
 export interface GitCommit {
 	hash: string
@@ -13,294 +11,204 @@ export interface GitCommit {
 	date: string
 }
 
-async function checkGitRepo(cwd: string): Promise<boolean> {
-	try {
-		await execAsync("git rev-parse --git-dir", { cwd })
-		return true
-	} catch (_error) {
-		return false
-	}
+function rethrowStopped(options: GitReadOptions) {
+	options.signal?.throwIfAborted()
+	options.checkExecutionScope?.()
 }
 
-async function checkGitInstalled(): Promise<boolean> {
-	try {
-		await execAsync("git --version")
-		return true
-	} catch (_error) {
-		return false
-	}
+function summarize(text: string, truncated = false): string {
+	const lines = text.split("\n")
+	return (
+		lines.slice(0, 500).join("\n") +
+		(truncated || lines.length > 500 ? "\n[Partial Git output: narrow the selected changes to inspect omitted content.]" : "")
+	)
 }
 
-async function checkGitRepoHasCommits(cwd: string): Promise<boolean> {
+export async function searchCommits(query: string, cwd: string, options: GitReadOptions = {}): Promise<GitCommit[]> {
 	try {
-		await execAsync("git rev-parse HEAD", { cwd })
-		return true
-	} catch (_error) {
-		return false
-	}
-}
-
-export async function searchCommits(query: string, cwd: string): Promise<GitCommit[]> {
-	try {
-		const isInstalled = await checkGitInstalled()
-		if (!isInstalled) {
-			Logger.error("Git is not installed")
-			return []
-		}
-
-		const isRepo = await checkGitRepo(cwd)
-		if (!isRepo) {
-			Logger.error("Not a git repository")
-			return []
-		}
-
-		// Check if repo has any commits
-		if (!(await checkGitRepoHasCommits(cwd))) {
-			// No commits yet in the repository
-			return []
-		}
-
-		// Search commits by hash or message, limiting to 10 results
-		const { stdout } = await execAsync(
-			`git log -n 10 --format="%H%n%h%n%s%n%an%n%ad" --date=short --grep="${query}" --regexp-ignore-case`,
-			{ cwd },
+		if (query.includes("\0") || Buffer.byteLength(query) > 4096)
+			throw new Error("Git search text is too long or contains NUL")
+		return await withGitInspection(
+			cwd,
+			async (context) => {
+				if (!(await gitHead(context))) return []
+				const format = [
+					"log",
+					"-n",
+					"10",
+					"--no-show-signature",
+					"--no-notes",
+					"--format=%H%x00%h%x00%s%x00%an%x00%ad%x00",
+					"--date=short",
+				]
+				let output = await readGitText(
+					context,
+					[...format, "--fixed-strings", `--grep=${query}`, "--regexp-ignore-case", "--"],
+					64 * 1024,
+				)
+				if (!output.text && /^[a-f0-9]{4,64}$/i.test(query)) {
+					try {
+						output = await readGitText(context, [...format, "--end-of-options", query, "--"], 64 * 1024)
+					} catch (error) {
+						if ((error as { code?: number }).code !== 128) throw error
+					}
+				}
+				if (output.truncated)
+					throw new Error("GIT_OUTPUT_LIMIT: Commit search exceeded its result budget; narrow the query.")
+				const fields = output.text.split("\0"),
+					commits: GitCommit[] = []
+				for (let i = 0; i + 4 < fields.length; i += 5) {
+					const hash = fields[i].replace(/^\n/, "")
+					if (!/^[a-f0-9]{40,64}$/.test(hash)) throw new Error("GIT_OUTPUT_INVALID: Invalid commit search record")
+					commits.push({
+						hash,
+						shortHash: fields[i + 1],
+						subject: fields[i + 2],
+						author: fields[i + 3],
+						date: fields[i + 4],
+					})
+				}
+				return commits
+			},
+			options,
 		)
-
-		let output = stdout
-		if (!output.trim() && /^[a-f0-9]+$/i.test(query)) {
-			// If no results from grep search and query looks like a hash, try searching by hash
-			const { stdout: hashStdout } = await execAsync(
-				`git log -n 10 --format="%H%n%h%n%s%n%an%n%ad" --date=short --author-date-order ${query}`,
-				{ cwd },
-			).catch(() => ({ stdout: "" }))
-
-			if (!hashStdout.trim()) {
-				return []
-			}
-
-			output = hashStdout
-		}
-
-		const commits: GitCommit[] = []
-		const lines = output
-			.trim()
-			.split("\n")
-			.filter((line) => line !== "--")
-
-		for (let i = 0; i < lines.length; i += 5) {
-			commits.push({
-				hash: lines[i],
-				shortHash: lines[i + 1],
-				subject: lines[i + 2],
-				author: lines[i + 3],
-				date: lines[i + 4],
-			})
-		}
-
-		return commits
 	} catch (error) {
-		Logger.error("Error searching commits:", error)
+		rethrowStopped(options)
+		Logger.error("Error searching commits:", gitFailure(error))
 		return []
 	}
 }
 
-export async function getCommitInfo(hash: string, cwd: string): Promise<string> {
+export async function getCommitInfo(hash: string, cwd: string, options: GitReadOptions = {}): Promise<string> {
 	try {
-		const isInstalled = await checkGitInstalled()
-		if (!isInstalled) {
-			return "Git is not installed"
-		}
-
-		const isRepo = await checkGitRepo(cwd)
-		if (!isRepo) {
-			return "Not a git repository"
-		}
-
-		// Check if repo has any commits
-		if (!(await checkGitRepoHasCommits(cwd))) {
-			return "Repository has no commits yet"
-		}
-
-		// Get commit info, stats, and diff separately
-		const { stdout: info } = await execAsync(`git show --format="%H%n%h%n%s%n%an%n%ad%n%b" --no-patch ${hash}`, {
+		if (!hash || hash.includes("\0") || Buffer.byteLength(hash) > 1024) throw new Error("Invalid commit reference")
+		return await withGitInspection(
 			cwd,
-		})
-		const [fullHash, shortHash, subject, author, date, body] = info.trim().split("\n")
-
-		const { stdout: stats } = await execAsync(`git show --stat --format="" ${hash}`, { cwd })
-
-		const { stdout: diff } = await execAsync(`git show --format="" ${hash}`, { cwd })
-
-		const summary = [
-			`Commit: ${shortHash} (${fullHash})`,
-			`Author: ${author}`,
-			`Date: ${date}`,
-			`\nMessage: ${subject}`,
-			body ? `\nDescription:\n${body}` : "",
-			"\nFiles Changed:",
-			stats.trim(),
-			"\nFull Changes:",
-		].join("\n")
-
-		const output = `${summary}\n\n${diff.trim()}`
-		return truncateOutput(output)
+			async (context) => {
+				const commit = decodeGitText(
+					(await context.run(["rev-parse", "--verify", "--end-of-options", `${hash}^{commit}`], 4096)).stdout,
+				).trim()
+				const output = await readGitText(context, [
+					"show",
+					"--no-show-signature",
+					"--no-notes",
+					...inspectionDiffOptions,
+					"--format=Commit: %h (%H)%nAuthor: %an%nDate: %ad%n%nMessage: %s%n%nDescription:%n%b",
+					"--date=iso-strict",
+					"--patch-with-stat",
+					"--stat-width=80",
+					"--stat-count=50",
+					commit,
+					"--",
+					".",
+					":(exclude).broccolidb",
+				])
+				return summarize(output.text, output.truncated)
+			},
+			options,
+		)
 	} catch (error) {
-		Logger.error("Error getting commit info:", error)
-		return `Failed to get commit info: ${error instanceof Error ? error.message : String(error)}`
+		rethrowStopped(options)
+		return `Failed to get commit info: ${gitFailure(error).message}`
 	}
 }
 
-export async function getWorkingState(cwd: string): Promise<string> {
+export async function getWorkingState(cwd: string, options: GitReadOptions = {}): Promise<string> {
 	try {
-		const isInstalled = await checkGitInstalled()
-		if (!isInstalled) {
-			return "Git is not installed"
-		}
-
-		const isRepo = await checkGitRepo(cwd)
-		if (!isRepo) {
-			return "Not a git repository"
-		}
-
-		// Get status of working directory
-		const { stdout: status } = await execAsync("git status --short", { cwd })
-		if (!status.trim()) {
-			return "No changes in working directory"
-		}
-
-		// Check if repo has any commits before trying to diff against HEAD
-		let diff = ""
-		if (await checkGitRepoHasCommits(cwd)) {
-			// Only run git diff if there are commits
-			const { stdout: diffOutput } = await execAsync("git diff HEAD", { cwd })
-			diff = diffOutput
-		} else {
-			// No commits yet, use status output only
-			return `Working directory changes (new repository):\n\n${status}`
-		}
-		const output = `Working directory changes:\n\n${status}\n\n${diff}`.trim()
-		return truncateOutput(output)
+		return await withGitInspection(
+			cwd,
+			async (context) => {
+				const status = await readGitStatus(context)
+				if (!status.entries.length && !status.limited)
+					return "No changes in working directory (submodule contents excluded)"
+				const summary = status.entries.map((entry) => `${entry.status} ${JSON.stringify(entry.path)}`).join("\n")
+				const remaining = Math.max(1024, 128 * 1024 - Buffer.byteLength(summary))
+				const diff = await readGitText(
+					context,
+					[
+						"diff",
+						...inspectionDiffOptions,
+						...(await gitDiffBase(context, "all", status.head)),
+						"--",
+						".",
+						":(exclude).broccolidb",
+					],
+					remaining,
+				)
+				return summarize(
+					`Working directory changes (untracked paths listed; submodule contents excluded):\n\n${summary}\n\n${diff.text}`,
+					status.limited || diff.truncated,
+				)
+			},
+			options,
+		)
 	} catch (error) {
-		Logger.error("Error getting working state:", error)
-		return `Failed to get working state: ${error instanceof Error ? error.message : String(error)}`
+		rethrowStopped(options)
+		return `Failed to get working state: ${gitFailure(error).message}`
 	}
 }
 
-export async function getGitDiff(cwd: string, stagedOnly = false): Promise<string> {
-	const isInstalled = await checkGitInstalled()
-	if (!isInstalled) {
-		throw new Error("Git is not installed")
-	}
-
-	const isRepo = await checkGitRepo(cwd)
-	if (!isRepo) {
-		throw new Error("Not a git repository")
-	}
-
-	let diff = ""
-	let command = "git --no-pager diff --staged --diff-filter=d"
-	if (await checkGitRepoHasCommits(cwd)) {
-		// Only run git diff if there are commits
-		const { stdout: staged } = await execAsync(command, { cwd })
-		diff = staged.trim()
-	}
-
-	if (!stagedOnly && !diff) {
-		command = "git --no-pager diff HEAD --diff-filter=d"
-		const { stdout: unstaged } = await execAsync(command, { cwd })
-		diff = unstaged.trim()
-	}
-
-	if (!diff) {
-		throw new Error("No changes in workspace for commit message")
-	}
-
-	return truncateOutput(`'${command}' Output:\n\n${diff}`.trim())
+export async function getGitDiff(cwd: string, stagedOnly = false, options: GitReadOptions = {}): Promise<string> {
+	return withGitInspection(
+		cwd,
+		async (context) => {
+			let diff = await readGitText(context, [
+				"diff",
+				...inspectionDiffOptions,
+				"--cached",
+				"--",
+				".",
+				":(exclude).broccolidb",
+			])
+			let baseline = "HEAD → index"
+			if (!stagedOnly && !diff.text && !diff.truncated) {
+				baseline = "HEAD → working tree"
+				diff = await readGitText(context, [
+					"diff",
+					...inspectionDiffOptions,
+					...(await gitDiffBase(context, "all")),
+					"--",
+					".",
+					":(exclude).broccolidb",
+				])
+			}
+			if (!diff.text && !diff.truncated) throw new Error("GIT_NO_CHANGES: No changes in workspace for commit message")
+			return summarize(`${baseline}:\n\n${diff.text}`, diff.truncated)
+		},
+		options,
+	)
 }
 
+// Metadata-only queries do not need a temporary working-tree configuration view.
 export async function getGitRemoteUrls(cwd: string): Promise<string[]> {
 	try {
-		const isInstalled = await checkGitInstalled()
-		if (!isInstalled) {
-			return []
-		}
-
-		const isRepo = await checkGitRepo(cwd)
-		if (!isRepo) {
-			return []
-		}
-
-		const { stdout } = await execAsync("git remote -v", { cwd })
-		if (!stdout.trim()) {
-			return []
-		}
-
-		// Parse output to extract unique URLs
-		// git remote -v output format: "remoteName remoteUrl (fetch|push)"
-		const remotes = stdout
-			.trim()
-			.split("\n")
-			.filter((line) => line.includes("(fetch)")) // Only fetch URLs to avoid duplicates
-			.map((line) => {
-				const match = line.match(/^(\S+)\s+(\S+)\s+\(fetch\)$/)
-				return match ? { name: match[1], url: match[2] } : null
-			})
-			.filter((remote): remote is { name: string; url: string } => remote !== null)
-
-		return remotes.map((remote) => `${remote.name}: ${remote.url}`)
-	} catch (error) {
-		Logger.error("Error getting git remotes:", error)
+		const output = decodeGitText((await execGit(cwd, [...gitOptions, "remote", "-v"], 64 * 1024)).stdout)
+		return output.split("\n").flatMap((line) => {
+			const match = /^(\S+)\s+(\S+)\s+\(fetch\)$/.exec(line)
+			return match ? [`${match[1]}: ${match[2]}`] : []
+		})
+	} catch {
 		return []
 	}
 }
 
 export async function getLatestGitCommitHash(cwd: string): Promise<string | null> {
 	try {
-		const isInstalled = await checkGitInstalled()
-		if (!isInstalled) {
-			return null
-		}
-
-		const isRepo = await checkGitRepo(cwd)
-		if (!isRepo) {
-			return null
-		}
-
-		const { stdout } = await execAsync("git rev-parse HEAD", { cwd })
-		return stdout.trim() || null
-	} catch (error) {
-		Logger.error("Error getting latest git commit hash:", error)
+		return (
+			decodeGitText(
+				(await execGit(cwd, [...gitOptions, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"], 4096)).stdout,
+			).trim() || null
+		)
+	} catch {
 		return null
 	}
 }
 
-function truncateOutput(content: string): string {
-	if (!GIT_OUTPUT_LINE_LIMIT) {
-		return content
-	}
-
-	const lines = content.split("\n")
-	if (lines.length <= GIT_OUTPUT_LINE_LIMIT) {
-		return content
-	}
-
-	const beforeLimit = Math.floor(GIT_OUTPUT_LINE_LIMIT * 0.2) // 20% of lines before
-	const afterLimit = GIT_OUTPUT_LINE_LIMIT - beforeLimit // remaining 80% after
-	return [
-		...lines.slice(0, beforeLimit),
-		`\n[...${lines.length - GIT_OUTPUT_LINE_LIMIT} lines omitted...]\n`,
-		...lines.slice(-afterLimit),
-	].join("\n")
-}
-
-// NEW: Additional functions for Stage 3 multi-workspace support
-// These are the ONLY new additions needed for workspace detection
-
-/**
- * Check if a directory is a Git repository (Stage 3 requirement)
- * @param dirPath - The directory path to check
- * @returns True if it's a Git repository
- */
 export async function isGitRepository(dirPath: string): Promise<boolean> {
-	return await checkGitRepo(dirPath)
+	try {
+		await execGit(dirPath, [...gitOptions, "rev-parse", "--git-dir"], 8192)
+		return true
+	} catch {
+		return false
+	}
 }

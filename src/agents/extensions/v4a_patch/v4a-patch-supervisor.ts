@@ -5,6 +5,7 @@
  * working tree diff collection, and in-memory substrate tracking (Phase 119 / ADR-095 / Target #52).
  */
 
+import type { GitReadOptions } from "../../../utils/git-inspection.js";
 import type { BroccoliV4aPatchSubstrate } from "../../../sessions/extensions/v4a_patch/broccoli-v4a-patch-substrate.js";
 import type { DeterministicV4aPatch } from "./deterministic-v4a-patch.js";
 import type {
@@ -69,9 +70,10 @@ export class V4aPatchSupervisor {
   public async collectWorkingDiff(
     cwd: string,
     mode: WorkingDiffMode = "working",
-    paths: readonly string[] = []
+    paths: readonly string[] = [],
+    options: GitReadOptions = {}
   ): Promise<WorkingDiffResult> {
-    return this.patchEngine.collectWorkingDiff(cwd, mode, paths);
+    return this.patchEngine.collectWorkingDiff(cwd, mode, paths, options);
   }
 
   public getPatchHistory(): readonly V4aApplyResult[] {

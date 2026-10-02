@@ -1,0 +1,984 @@
+{
+  "date": "2026-10-02",
+  "scope": "Bounded Git closure and regression pass",
+  "cas": {
+    "beforeMac": {
+      "platform": "darwin",
+      "node": "v26.8.1",
+      "rounds": 50,
+      "failedRounds": 9,
+      "failedWrites": 10,
+      "metadataChanges": 10,
+      "samples": [
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        }
+      ],
+      "errors": [
+        "Error: BLOB_CHANGED: saved content changed during inspection; reload it",
+        "Error: BLOB_CHANGED: saved content changed during inspection; reload it",
+        "Error: BLOB_CHANGED: saved content changed during inspection; reload it",
+        "Error: BLOB_CHANGED: saved content changed during inspection; reload it",
+        "Error: BLOB_CHANGED: saved content changed during inspection; reload it"
+      ]
+    },
+    "afterMac": {
+      "platform": "darwin",
+      "node": "v26.8.1",
+      "rounds": 200,
+      "failedRounds": 0,
+      "failedWrites": 0,
+      "metadataChanges": 40,
+      "samples": [
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        }
+      ],
+      "errors": []
+    },
+    "afterLinux": {
+      "platform": "linux",
+      "node": "v22.22.0",
+      "rounds": 200,
+      "failedRounds": 0,
+      "failedWrites": 0,
+      "metadataChanges": 32,
+      "samples": [
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        },
+        {
+          "sizeChanged": false,
+          "mtimeChanged": true,
+          "ctimeChanged": true,
+          "linksBefore": 1,
+          "linksAfter": 1
+        }
+      ],
+      "errors": []
+    }
+  },
+  "smallDiffBoundary": {
+    "platform": "darwin",
+    "node": "v26.8.1",
+    "git": "git version 2.48.1",
+    "files": 64,
+    "changed": 2,
+    "rounds": 30,
+    "warmups": 5,
+    "results": {
+      "rawDiff": {
+        "medianMs": 7.95,
+        "p95Ms": 8.56,
+        "processes": [
+          1
+        ]
+      },
+      "boundaryOnly": {
+        "medianMs": 9.26,
+        "p95Ms": 10.25,
+        "processes": [
+          4
+        ]
+      },
+      "protectedDiff": {
+        "medianMs": 17.31,
+        "p95Ms": 24.07,
+        "processes": [
+          5
+        ],
+        "queryMedianMs": 7.93
+      },
+      "desktopDiff": {
+        "medianMs": 17.2,
+        "p95Ms": 18.71,
+        "processes": [
+          5
+        ]
+      }
+    }
+  },
+  "representative": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v26.8.1",
+    "git": "git version 2.48.1",
+    "rounds": 7,
+    "warmup": 2,
+    "results": [
+      {
+        "fixture": "small",
+        "files": 64,
+        "changed": 2,
+        "operation": "status",
+        "concurrent": 1,
+        "medianMs": 20.57,
+        "p95Ms": 21.63,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 21.047791999999987,
+          "processes": 5,
+          "bytes": 799,
+          "entries": 2,
+          "limited": false
+        },
+        "maxRssKiB": 51152
+      },
+      {
+        "fixture": "small",
+        "files": 64,
+        "changed": 2,
+        "operation": "diff",
+        "concurrent": 1,
+        "medianMs": 17.61,
+        "p95Ms": 18.29,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 17.11095899999998,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 51408
+      },
+      {
+        "fixture": "small",
+        "files": 64,
+        "changed": 2,
+        "operation": "concurrent-status",
+        "concurrent": 8,
+        "medianMs": 21.09,
+        "p95Ms": 24.21,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 24.20666700000001,
+          "processes": 5,
+          "bytes": 799,
+          "entries": 2,
+          "limited": false
+        },
+        "maxRssKiB": 50672
+      },
+      {
+        "fixture": "small",
+        "files": 64,
+        "changed": 2,
+        "operation": "concurrent-diff",
+        "concurrent": 8,
+        "medianMs": 18.02,
+        "p95Ms": 18.77,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 18.405750000000012,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 53520
+      },
+      {
+        "fixture": "large-small-change",
+        "files": 20000,
+        "changed": 2,
+        "operation": "status",
+        "concurrent": 1,
+        "medianMs": 61.49,
+        "p95Ms": 63.04,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 61.292542000000026,
+          "processes": 5,
+          "bytes": 799,
+          "entries": 2,
+          "limited": false
+        },
+        "maxRssKiB": 51472
+      },
+      {
+        "fixture": "large-small-change",
+        "files": 20000,
+        "changed": 2,
+        "operation": "diff",
+        "concurrent": 1,
+        "medianMs": 19.68,
+        "p95Ms": 20.01,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 19.68383399999999,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 51280
+      },
+      {
+        "fixture": "large-small-change",
+        "files": 20000,
+        "changed": 2,
+        "operation": "concurrent-status",
+        "concurrent": 8,
+        "medianMs": 61.68,
+        "p95Ms": 64.55,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 61.67733400000009,
+          "processes": 5,
+          "bytes": 799,
+          "entries": 2,
+          "limited": false
+        },
+        "maxRssKiB": 50608
+      },
+      {
+        "fixture": "large-small-change",
+        "files": 20000,
+        "changed": 2,
+        "operation": "concurrent-diff",
+        "concurrent": 8,
+        "medianMs": 19.78,
+        "p95Ms": 20.17,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 19.863584000000003,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 54144
+      },
+      {
+        "fixture": "large-change",
+        "files": 20000,
+        "changed": 18000,
+        "operation": "status",
+        "concurrent": 1,
+        "medianMs": 158.64,
+        "p95Ms": 190.78,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 158.63958300000013,
+          "processes": 5,
+          "bytes": 131130,
+          "entries": 476,
+          "limited": true
+        },
+        "maxRssKiB": 71152
+      },
+      {
+        "fixture": "large-change",
+        "files": 20000,
+        "changed": 18000,
+        "operation": "diff",
+        "concurrent": 1,
+        "medianMs": 19.72,
+        "p95Ms": 20.29,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 19.721666999999997,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 51392
+      },
+      {
+        "fixture": "large-change",
+        "files": 20000,
+        "changed": 18000,
+        "operation": "full-diff",
+        "concurrent": 1,
+        "medianMs": 935.83,
+        "p95Ms": 972.44,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 968.7634580000004,
+          "processes": 5,
+          "bytes": 33527,
+          "limited": true
+        },
+        "maxRssKiB": 71728
+      },
+      {
+        "fixture": "large-change",
+        "files": 20000,
+        "changed": 18000,
+        "operation": "concurrent-status",
+        "concurrent": 8,
+        "medianMs": 157.32,
+        "p95Ms": 162.6,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 154.21558299999992,
+          "processes": 5,
+          "bytes": 131130,
+          "entries": 476,
+          "limited": true
+        },
+        "maxRssKiB": 68592
+      },
+      {
+        "fixture": "large-change",
+        "files": 20000,
+        "changed": 18000,
+        "operation": "concurrent-diff",
+        "concurrent": 8,
+        "medianMs": 19.9,
+        "p95Ms": 21.74,
+        "processesPerRound": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "result": {
+          "ms": 21.366458999999992,
+          "processes": 5,
+          "bytes": 692,
+          "limited": false
+        },
+        "maxRssKiB": 53872
+      }
+    ]
+  },
+  "limits": {
+    "platform": "darwin",
+    "node": "v26.8.1",
+    "results": [
+      {
+        "files": 24000,
+        "operation": "status",
+        "concurrent": 8,
+        "observations": [
+          {
+            "ms": 326.196209,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 313.113417,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 313.692,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 311.38191700000004,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 315.0801670000001,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          }
+        ],
+        "maxActive": 5,
+        "remainingProcesses": 0,
+        "before": {
+          "rss": 47923200,
+          "heapTotal": 7487488,
+          "heapUsed": 4964272,
+          "external": 2579267,
+          "arrayBuffers": 143737
+        },
+        "peak": {
+          "rss": 73056256,
+          "heapTotal": 16662528,
+          "heapUsed": 11148736,
+          "external": 6386221,
+          "arrayBuffers": 3694464
+        },
+        "after": {
+          "rss": 73170944,
+          "heapTotal": 16662528,
+          "heapUsed": 6143168,
+          "external": 4018510,
+          "arrayBuffers": 209336
+        }
+      },
+      {
+        "files": 24000,
+        "operation": "diff",
+        "concurrent": 8,
+        "observations": [
+          {
+            "ms": 205.959584,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 203.79424999999998,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 200.883333,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 203.27262499999995,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 204.37866700000006,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          }
+        ],
+        "maxActive": 5,
+        "remainingProcesses": 0,
+        "before": {
+          "rss": 47890432,
+          "heapTotal": 7487488,
+          "heapUsed": 4963536,
+          "external": 2579267,
+          "arrayBuffers": 143737
+        },
+        "peak": {
+          "rss": 64602112,
+          "heapTotal": 11419648,
+          "heapUsed": 7662032,
+          "external": 13190762,
+          "arrayBuffers": 6503084
+        },
+        "after": {
+          "rss": 65961984,
+          "heapTotal": 10895360,
+          "heapUsed": 6036632,
+          "external": 8996518,
+          "arrayBuffers": 143737
+        }
+      },
+      {
+        "files": 48000,
+        "operation": "status",
+        "concurrent": 8,
+        "observations": [
+          {
+            "ms": 582.072292,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 570.795291,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 573.350167,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 571.2425410000003,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          },
+          {
+            "ms": 572.5552499999999,
+            "bytes": 130839,
+            "processes": 5,
+            "retained": 156,
+            "totalExact": false,
+            "partial": true
+          }
+        ],
+        "maxActive": 5,
+        "remainingProcesses": 0,
+        "before": {
+          "rss": 47874048,
+          "heapTotal": 7487488,
+          "heapUsed": 4963536,
+          "external": 2579267,
+          "arrayBuffers": 143737
+        },
+        "peak": {
+          "rss": 71860224,
+          "heapTotal": 16662528,
+          "heapUsed": 11169680,
+          "external": 6187838,
+          "arrayBuffers": 3694464
+        },
+        "after": {
+          "rss": 72056832,
+          "heapTotal": 16138240,
+          "heapUsed": 6141024,
+          "external": 4018510,
+          "arrayBuffers": 209336
+        }
+      },
+      {
+        "files": 48000,
+        "operation": "diff",
+        "concurrent": 8,
+        "observations": [
+          {
+            "ms": 350.654375,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 354.334333,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 358.74866599999996,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 351.53208300000006,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          },
+          {
+            "ms": 349.4894999999999,
+            "bytes": 33161,
+            "processes": 5,
+            "retained": 1048576,
+            "partial": true
+          }
+        ],
+        "maxActive": 5,
+        "remainingProcesses": 0,
+        "before": {
+          "rss": 47759360,
+          "heapTotal": 7487488,
+          "heapUsed": 4964440,
+          "external": 2579267,
+          "arrayBuffers": 143737
+        },
+        "peak": {
+          "rss": 63930368,
+          "heapTotal": 11419648,
+          "heapUsed": 7176312,
+          "external": 13190762,
+          "arrayBuffers": 6503084
+        },
+        "after": {
+          "rss": 65224704,
+          "heapTotal": 11419648,
+          "heapUsed": 6055104,
+          "external": 8996518,
+          "arrayBuffers": 143737
+        }
+      }
+    ]
+  },
+  "verification": {
+    "focusedMac": {
+      "passed": 58,
+      "failed": 0,
+      "skipped": 1
+    },
+    "focusedLinux": {
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0
+    },
+    "desktop": {
+      "passed": 424,
+      "failed": 0,
+      "skipped": 1
+    },
+    "engineSchedulerQueue": {
+      "passed": 52,
+      "failed": 0,
+      "skipped": 0
+    },
+    "storageFocused": {
+      "passed": 18,
+      "failed": 0
+    },
+    "types": "passed",
+    "lint": {
+      "files": 26,
+      "status": "passed"
+    },
+    "productionBuild": "passed",
+    "packageBoundary": "passed",
+    "diffCheck": "passed",
+    "nativeMac": {
+      "passed": 188,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "package": {
+    "name": "heav3ns",
+    "version": "14.0.0",
+    "filename": "heav3ns-14.0.0.tgz",
+    "shasum": "f09e16da5b68d9bd36f806f92f2f135bb2028ff8",
+    "integrity": "sha512-my8b1eEXlegcBDdIebc1O+oMHL5yqOEQGHKckvXq/Hr5tTe1mIgOQeKsD8p3n4ZEJ6NpcnUyXYaRKJUIfcIWtQ==",
+    "size": 8200275,
+    "unpackedSize": 53902690,
+    "runtimeSha256": "ddbf6a3ecac90242aac4069bc306a29a5cab9a7c2a39d96ad50080f9dd35f6ed",
+    "mac": {
+      "platform": "darwin",
+      "node": "v26.8.1",
+      "runtime": "/Users/bozoegg/Desktop/LUMI-NEW/build/git-closure-package/package/dist/index.js",
+      "requests": 6,
+      "maxFrameBytes": 196364,
+      "status": "passed"
+    },
+    "linux": {
+      "platform": "linux",
+      "node": "v22.22.0",
+      "runtime": "/checks/package/dist/index.js",
+      "requests": 6,
+      "maxFrameBytes": 196364,
+      "status": "passed"
+    }
+  },
+  "measurementNotes": [
+    "Warm local measurements; no claim of isolated hardware timing.",
+    "Resource measurements sample the Node consumer every 2 ms and run GC for retained-heap readings; native Git child allocations are excluded.",
+    "Eight identical calls are admitted before each observation starts, five rounds per resource fixture.",
+    "Raw records and fixture sizes double; retained status/diff budgets are unchanged.",
+    "The closure makes no Git execution performance optimization."
+  ]
+}

@@ -5,7 +5,9 @@
  * (Phase 119 / ADR-095 / Target #52).
  */
 
-import type { ToolDefinition } from "../../../core/contracts/tooling.contracts.js";
+import { realpath } from "node:fs/promises";
+import path from "node:path";
+import type { ToolDefinition, ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js";
 import type { V4aPatchSupervisor } from "../../../agents/extensions/v4a_patch/v4a-patch-supervisor.js";
 import type { WorkingDiffMode } from "../../../core/contracts/v4a-patch.contracts.js";
 
@@ -90,27 +92,33 @@ export class V4aPatchToolSuite {
             description: "Diff mode: 'working' (unstaged + untracked), 'staged' (cached), or 'all' (HEAD -> worktree).",
             required: false,
           },
+          paths: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional literal filenames or folders, relative to cwd (at most 100). Narrow this when the result is partial.",
+            required: false,
+          },
           cwd: {
             type: "string",
-            description: "Optional working directory path (defaults to process.cwd()).",
+            description: "Optional subfolder inside the host-selected workspace.",
             required: false,
           },
         },
-        execute: async (args: Record<string, unknown>) => {
+        execute: async (args: Record<string, unknown>, hostCwd: string, options?: ToolExecutionOptions) => {
+          options?.signal?.throwIfAborted();
+          options?.checkExecutionScope?.();
+          if (!hostCwd) throw new Error("Git inspection requires a host-selected workspace");
+          const root = await realpath(hostCwd);
+          const cwd = typeof args.cwd === "string" ? await realpath(path.resolve(root, args.cwd)) : root;
+          const relative = path.relative(root, cwd);
+          if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+            throw new Error("OUTSIDE_WORKSPACE: Git inspection must stay inside the host-selected workspace");
+          }
+          const paths = args.paths ?? [];
+          if (!Array.isArray(paths) || paths.some(p => typeof p !== "string")) throw new Error("paths must be a list of filenames");
           const mode: WorkingDiffMode =
             args.mode === "staged" || args.mode === "all" ? args.mode : "working";
-          const cwd = typeof args.cwd === "string" ? args.cwd : process.cwd();
-
-          const result = await this.supervisor.collectWorkingDiff(cwd, mode);
-          return {
-            success: result.success,
-            mode: result.mode,
-            stat: result.stat,
-            diff: result.diff,
-            untracked: result.untracked,
-            empty: result.empty,
-            error: result.error,
-          };
+          return this.supervisor.collectWorkingDiff(cwd, mode, paths, options);
         },
       },
       {

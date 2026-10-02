@@ -59,6 +59,7 @@ export const requestSchema = z
 			"files.read",
 			"changes.read",
 			"changes.list",
+			"repository.initialize",
 			"input.select",
 			"shutdown",
 		]),

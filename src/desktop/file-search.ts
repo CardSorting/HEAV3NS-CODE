@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process"
 import { opendir, realpath } from "node:fs/promises"
 import path from "node:path"
-import { promisify } from "node:util"
+import { decodeGitText, execGit, gitOptions } from "./git.js"
 
-const exec = promisify(execFile)
 const INDEX_BYTES = 2 * 1024 * 1024
 const INDEX_PATHS = 20_000
 const excluded = new Set([".git", ".broccolidb"])
@@ -22,17 +20,13 @@ function safePath(value: string) {
 	)
 }
 
-async function collect(root: string): Promise<FileIndex> {
-	const options = { cwd: root, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, timeout: 3000 }
+async function collect(root: string, signal?: AbortSignal): Promise<FileIndex> {
 	let git = false
 	try {
 		git =
-			(
-				await exec("git", ["-c", "core.fsmonitor=false", "rev-parse", "--is-inside-work-tree"], {
-					...options,
-					maxBuffer: 4096,
-				})
-			).stdout.trim() === "true"
+			(await execGit(root, [...gitOptions, "rev-parse", "--is-inside-work-tree"], 4096, 3000, signal)).stdout
+				.toString("utf8")
+				.trim() === "true"
 	} catch (error) {
 		if (!["ENOENT", 128].includes((error as NodeJS.ErrnoException).code as string | number)) throw error
 	}
@@ -41,34 +35,35 @@ async function collect(root: string): Promise<FileIndex> {
 			limited = false
 		try {
 			bytes = (
-				await exec(
-					"git",
-					[
-						"--no-pager",
-						"-c",
-						"core.fsmonitor=false",
-						"ls-files",
-						"--cached",
-						"--others",
-						"--exclude-standard",
-						"-z",
-						"--",
-						".",
-					],
-					{ ...options, maxBuffer: INDEX_BYTES, encoding: "buffer" },
+				await execGit(
+					root,
+					[...gitOptions, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "."],
+					INDEX_BYTES,
+					3000,
+					signal,
 				)
 			).stdout
 		} catch (error) {
-			const failure = error as Error & { code?: string; stdout?: Buffer }
-			if (failure.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") throw error
+			const failure = error as Error & { code?: string; stdout?: Buffer; stream?: string }
+			if (failure.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" || failure.stream === "stderr") throw error
 			bytes = failure.stdout ?? Buffer.alloc(0)
 			limited = true
 		}
 		// Only complete NUL-delimited paths survive a bounded subprocess read.
 		const paths = new Set<string>()
 		const end = bytes.lastIndexOf(0)
-		for (const raw of bytes.subarray(0, Math.max(0, end)).toString("utf8").split("\0")) {
-			if (!safePath(raw) || raw.includes("\uFFFD")) continue
+		for (let start = 0; start < end; ) {
+			const separator = bytes.indexOf(0, start)
+			let raw: string
+			try {
+				raw = decodeGitText(bytes.subarray(start, separator))
+			} catch {
+				limited = true
+				start = separator + 1
+				continue
+			}
+			start = separator + 1
+			if (!safePath(raw)) continue
 			paths.add(raw)
 			if (paths.size >= INDEX_PATHS) {
 				limited = true
@@ -85,6 +80,7 @@ async function collect(root: string): Promise<FileIndex> {
 		limited = false
 	const deadline = Date.now() + 3000
 	for (let index = 0; index < directories.length; index++) {
+		signal?.throwIfAborted()
 		if (Date.now() > deadline || scanned >= INDEX_PATHS || bytes >= INDEX_BYTES) {
 			limited = true
 			break
@@ -96,6 +92,7 @@ async function collect(root: string): Promise<FileIndex> {
 				continue
 			}
 			for await (const entry of await opendir(directory)) {
+				signal?.throwIfAborted()
 				if (++scanned > INDEX_PATHS || Date.now() > deadline || bytes >= INDEX_BYTES) {
 					limited = true
 					break
@@ -120,18 +117,27 @@ async function collect(root: string): Promise<FileIndex> {
 export class WorkspaceFileSearch {
 	private cache?: { value: FileIndex; at: number }
 	private pending?: Promise<FileIndex>
+	private controller = new AbortController()
 	constructor(private readonly root: string) {}
+	clear() {
+		this.controller.abort(new Error("Git filename search cancelled"))
+		this.controller = new AbortController()
+		this.cache = undefined
+		this.pending = undefined
+	}
 	async search(query: string, refresh = false) {
 		if (refresh) this.cache = undefined
 		if (!this.cache || Date.now() - this.cache.at > 5000) {
 			if (!this.pending) {
-				this.pending = collect(this.root)
+				const controller = this.controller
+				this.pending = collect(this.root, controller.signal)
 					.then((value) => {
+						controller.signal.throwIfAborted()
 						this.cache = { value, at: Date.now() }
 						return value
 					})
 					.finally(() => {
-						this.pending = undefined
+						if (controller === this.controller) this.pending = undefined
 					})
 			}
 			await this.pending

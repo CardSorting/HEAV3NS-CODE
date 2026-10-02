@@ -1,20 +1,19 @@
-import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { constants } from "node:fs"
 import { open, opendir, realpath } from "node:fs/promises"
 import path from "node:path"
-import { promisify } from "node:util"
+import { BoundedSingleFlight } from "../core/utilities/bounded-single-flight.js"
+import { readGitStatus } from "../utils/git-status.js"
 import { WorkspaceFileSearch } from "./file-search.js"
+import { gitFailure, withGitInspection } from "./git.js"
 
-const exec = promisify(execFile)
 const PAGE = 32 * 1024
 const DIFF_LIMIT = 1024 * 1024
 const revisionOf = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
 // Read-only inspection must not launch repository-configured fsmonitor helpers,
 // pagers, diff drivers or text conversion commands.
-const gitOptions = ["--no-pager", "-c", "core.fsmonitor=false"]
-const readGitDiff = async (args: string[], cwd: string): Promise<Buffer> =>
-	(await exec("git", args, { cwd, maxBuffer: DIFF_LIMIT, timeout: 5000, encoding: "buffer" })).stdout
+const readGitDiff = async (args: string[], cwd: string, signal?: AbortSignal): Promise<Buffer> =>
+	withGitInspection(cwd, async (context) => (await context.run(args, DIFF_LIMIT)).stdout, { signal })
 
 // A bounded subprocess can stop in the middle of a UTF-8 scalar. Only trim that
 // incomplete suffix; invalid bytes elsewhere must still fail strict decoding.
@@ -107,7 +106,7 @@ export class WorkspaceInspection {
 				throw new Error("FILE_CHANGED: the file changed during this read; reload it")
 			return {
 				text: binary
-					? "This file is binary or uses an unsupported text encoding. Reveal it in Finder to open it deliberately."
+					? "This file is binary or uses an unsupported text encoding. Open it deliberately in your file manager."
 					: text,
 				binary,
 				size: info.size,
@@ -120,55 +119,31 @@ export class WorkspaceInspection {
 			await handle.close()
 		}
 	}
-	async changes() {
-		const prefix = (
-			await exec("git", [...gitOptions, "rev-parse", "--show-prefix"], {
-				cwd: this.root,
-				maxBuffer: 8192,
-				timeout: 3000,
-				env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-			})
-		).stdout.replace(/\n$/, "")
-		const result = await exec(
-			"git",
-			[...gitOptions, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ".", ":(exclude).broccolidb"],
-			{ cwd: this.root, maxBuffer: DIFF_LIMIT, timeout: 5000, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } },
-		)
-		const parts = result.stdout.split("\0")
-		const entries = []
-		for (let index = 0; index < parts.length && entries.length < 500; index++) {
-			const value = parts[index]
-			if (value.length < 4) continue
-			const status = value.slice(0, 2),
-				repositoryPath = value.slice(3)
-			if (/[RC]/.test(status)) index++ // -z reports destination first, then source.
-			if (!repositoryPath.startsWith(prefix)) continue
-			const file = repositoryPath.slice(prefix.length)
-			entries.push({
-				path: file,
-				name: path.basename(file),
-				status,
-				staged: status[0] !== " " && status[0] !== "?",
-				unstaged: status[1] !== " " || status === "??",
-				untracked: status === "??",
+	private readonly observations = new BoundedSingleFlight<unknown>("Git observation", {
+		maxActive: 4,
+		maxWaiters: 32,
+		maxWaitersPerKey: 16,
+		timeoutMs: 10_000,
+	})
+	private batch = 0
+	private advancing = false
+	private shared<T>(key: string, read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+		// Join only before the observation starts, never after a filesystem or
+		// Git read. Later callers may have observed an intervening mutation.
+		const batch = this.batch
+		if (!this.advancing) {
+			this.advancing = true
+			queueMicrotask(() => {
+				this.batch++
+				this.advancing = false
 			})
 		}
-		let branch = ""
-		try {
-			branch = (
-				await exec("git", ["symbolic-ref", "--short", "HEAD"], { cwd: this.root, maxBuffer: 4096, timeout: 3000 })
-			).stdout.trim()
-		} catch {
-			branch = "Detached HEAD"
-		}
-		return {
-			entries,
-			branch,
-			limited: entries.length === 500,
-			baseline: "Working tree and index; includes pre-existing and external changes.",
-		}
+		return this.observations.run(`${batch}:${key}`, read, signal) as Promise<T>
 	}
-	async readDiff(file: string | undefined, staged: boolean, offset: number, revision?: string) {
+	async changes(signal?: AbortSignal) {
+		return this.shared("status", (signal) => withGitInspection(this.root, readGitStatus, { signal }), signal)
+	}
+	async readDiff(file: string | undefined, staged: boolean, offset: number, revision?: string, signal?: AbortSignal) {
 		const relative = file ? path.relative(this.root, path.resolve(this.root, file)) : "."
 		if (relative === ".." || relative.startsWith(`..${path.sep}`)) throw new Error("OUTSIDE_WORKSPACE")
 		const key = JSON.stringify([relative, staged])
@@ -177,54 +152,65 @@ export class WorkspaceInspection {
 			if (!diff || diff.key !== key || diff.revision !== revision)
 				throw new Error("DIFF_EXPIRED: reload this diff before continuing")
 		} else {
-			const generation = ++this.diffGeneration
-			let stdout: Buffer = Buffer.alloc(0),
-				truncated = false
-			try {
-				stdout = await this.runDiff(
-					[
-						...gitOptions,
-						"diff",
-						"--no-ext-diff",
-						"--no-textconv",
-						"--no-color",
-						...(staged ? ["--cached"] : []),
-						"--",
-						file ? `:(literal)${relative}` : ".",
-						":(exclude).broccolidb",
-					],
-					this.root,
-				)
-			} catch (error) {
-				const failure = error as Error & { code?: string; stdout?: Buffer }
-				if (failure.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") throw error
-				stdout = failure.stdout ?? Buffer.alloc(0)
-				truncated = true
-			}
-			truncated ||= stdout.length > DIFF_LIMIT
-			const bounded = stdout.subarray(0, DIFF_LIMIT)
-			try {
-				// Streaming validation tolerates an incomplete final scalar while
-				// still rejecting malformed suffixes before anything is trimmed.
-				new TextDecoder("utf-8", { fatal: true }).decode(bounded, { stream: truncated })
-			} catch {
-				throw new Error(
-					"UNSUPPORTED_ENCODING: this diff contains text that is not UTF-8; open the file in an editor that supports its encoding",
-				)
-			}
-			const bytes = truncated ? completeUtf8Prefix(bounded) : bounded
-			diff = {
-				key,
-				bytes,
-				revision: revisionOf(bytes),
-				truncated,
-				baseline: staged
-					? "HEAD → index · includes pre-existing changes"
-					: "Index → working tree · includes pre-existing and external changes",
-			}
-			// An earlier, slower read must not evict the comparison selected later.
-			// clear() also advances the generation so shutdown cannot refill the cache.
-			if (generation === this.diffGeneration) this.diff = diff
+			diff = await this.shared(
+				`diff:${key}`,
+				async (sharedSignal) => {
+					const generation = ++this.diffGeneration
+					let stdout: Buffer = Buffer.alloc(0),
+						truncated = false
+					try {
+						stdout = await this.runDiff(
+							[
+								"diff",
+								"--no-ext-diff",
+								"--no-textconv",
+								"--no-color",
+								"--submodule=short",
+								"--ignore-submodules=dirty",
+								...(staged ? ["--cached"] : []),
+								"--",
+								file ? `:(literal)${relative}` : ".",
+								":(exclude).broccolidb",
+							],
+							this.root,
+							sharedSignal,
+						)
+					} catch (error) {
+						const failure = error as Error & { code?: string; stdout?: Buffer; stream?: string }
+						if (failure.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" || failure.stream === "stderr")
+							throw gitFailure(error)
+						stdout = failure.stdout ?? Buffer.alloc(0)
+						truncated = true
+					}
+					truncated ||= stdout.length > DIFF_LIMIT
+					const bounded = stdout.subarray(0, DIFF_LIMIT)
+					try {
+						// Streaming validation tolerates an incomplete final scalar while
+						// still rejecting malformed suffixes before anything is trimmed.
+						new TextDecoder("utf-8", { fatal: true }).decode(bounded, { stream: truncated })
+					} catch {
+						throw new Error(
+							"UNSUPPORTED_ENCODING: this diff contains text that is not UTF-8; open the file in an editor that supports its encoding",
+						)
+					}
+					const bytes = truncated ? completeUtf8Prefix(bounded) : bounded
+					const observed = {
+						key,
+						bytes,
+						revision: revisionOf(bytes),
+						truncated,
+						baseline: staged
+							? "HEAD → index · includes pre-existing changes"
+							: "Index → working tree · includes pre-existing and external changes",
+					}
+					// An earlier, slower read must not evict the comparison selected later.
+					// clear() also advances the generation so shutdown cannot refill the cache.
+					sharedSignal.throwIfAborted()
+					if (generation === this.diffGeneration) this.diff = observed
+					return observed
+				},
+				signal,
+			)
 		}
 		if (offset > diff.bytes.length) throw new Error("INVALID_OFFSET: reload this diff")
 		let end = Math.min(offset + PAGE, diff.bytes.length)
@@ -241,6 +227,9 @@ export class WorkspaceInspection {
 		}
 	}
 	clear() {
+		this.observations.clear()
+		this.batch++
+		this.fileSearch.clear()
 		this.diffGeneration++
 		this.diff = undefined
 	}

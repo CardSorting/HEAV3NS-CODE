@@ -48,6 +48,10 @@ export interface WorkingDiffResult {
   diff: string;
   untracked: readonly string[];
   empty: boolean;
+  /** True when output/path budgets omit content; empty is never true for partial evidence. */
+  truncated?: boolean;
+  untrackedLimited?: boolean;
+  notice?: string;
   error?: string;
 }
 

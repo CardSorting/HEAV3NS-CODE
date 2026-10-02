@@ -5,8 +5,8 @@
  * (Phase 119 / ADR-095 / Target #52).
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { collectGitWorkingDiff } from "../../../utils/git-diff.js";
+import type { GitReadOptions } from "../../../utils/git-inspection.js";
 import type {
   V4aApplyResult,
   V4aHunk,
@@ -16,8 +16,6 @@ import type {
   WorkingDiffMode,
   WorkingDiffResult,
 } from "../../../core/contracts/v4a-patch.contracts.js";
-
-const execFileAsync = promisify(execFile);
 
 export class DeterministicV4aPatch {
   /**
@@ -357,96 +355,9 @@ export class DeterministicV4aPatch {
   public async collectWorkingDiff(
     cwd: string,
     mode: WorkingDiffMode = "working",
-    paths: readonly string[] = []
+    paths: readonly string[] = [],
+    options: GitReadOptions = {}
   ): Promise<WorkingDiffResult> {
-    try {
-      // 1. Verify git repository
-      const { stdout: isRepo } = await execFileAsync(
-        "git",
-        ["rev-parse", "--is-inside-work-tree"],
-        { cwd }
-      );
-      if (isRepo.trim() !== "true") {
-        return {
-          success: false,
-          mode,
-          stat: "",
-          diff: "",
-          untracked: [],
-          empty: true,
-          error: "Not inside a git work tree.",
-        };
-      }
-
-      // 2. Base diff args
-      let baseArgs: string[] = [];
-      if (mode === "staged") {
-        baseArgs = ["diff", "--cached"];
-      } else if (mode === "all") {
-        baseArgs = ["diff", "HEAD"];
-      } else {
-        baseArgs = ["diff"];
-      }
-
-      const diffCmdArgs = ["-c", "core.quotePath=false", ...baseArgs];
-      const statCmdArgs = ["-c", "core.quotePath=false", ...baseArgs, "--stat"];
-
-      if (paths.length > 0) {
-        diffCmdArgs.push("--", ...paths);
-        statCmdArgs.push("--", ...paths);
-      }
-
-      const { stdout: diffOut } = await execFileAsync("git", diffCmdArgs, { cwd });
-      const { stdout: statOut } = await execFileAsync("git", statCmdArgs, { cwd });
-
-      // 3. Find untracked files for working / all modes
-      let untracked: string[] = [];
-      let untrackedDiffs: string[] = [];
-
-      if (mode === "working" || mode === "all") {
-        const lsArgs = ["ls-files", "--others", "--exclude-standard"];
-        if (paths.length > 0) lsArgs.push("--", ...paths);
-        const { stdout: lsOut } = await execFileAsync("git", lsArgs, { cwd });
-        untracked = lsOut.split("\n").map((s) => s.trim()).filter(Boolean);
-
-        for (const rel of untracked.slice(0, 50)) {
-          try {
-            const { stdout: unDiff } = await execFileAsync(
-              "git",
-              ["diff", "--no-index", "--", "/dev/null", rel],
-              { cwd }
-            );
-            if (unDiff.trim()) untrackedDiffs.push(unDiff.trim());
-          } catch (err: any) {
-            // git diff --no-index exits with 1 on difference, which is success here
-            if (err?.stdout?.trim()) {
-              untrackedDiffs.push(err.stdout.trim());
-            }
-          }
-        }
-      }
-
-      const combinedDiff = [diffOut.trim(), ...untrackedDiffs].filter(Boolean).join("\n\n");
-      const empty = combinedDiff.length === 0;
-
-      return {
-        success: true,
-        mode,
-        stat: statOut.trim(),
-        diff: combinedDiff,
-        untracked,
-        empty,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        mode,
-        stat: "",
-        diff: "",
-        untracked: [],
-        empty: true,
-        error: err?.message ?? String(err),
-      };
-    }
+    return collectGitWorkingDiff(cwd, mode, paths, options);
   }
 }

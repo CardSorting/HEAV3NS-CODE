@@ -263,7 +263,7 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `files.search` | `{query?, refresh?}`; negotiated `file-search-v1`, up to 50 filename/path matches, explicit Git/plain-folder scope and partial-scan indicator; never searches file content |
 | `activity.list` | `{run}`; bounded retained activity and total observed count for the current conversation |
 | `files.read` | `{path, offset?, revision?}`; complete UTF-8 scalars, revision check, or binary metadata |
-| `changes.list` | Up to 500 changed paths, Git status, staged/untracked distinctions, branch and explicit limit flag |
+| `changes.list` | Streamed porcelain v2; up to 500 paths / 128 KiB, staged/untracked/conflict distinctions, branch, HEAD, observed `total`, `totalExact` and explicit `limited` flag |
 | `changes.read` | `{path?, staged?, offset?, revision?}`; paged read-only diff with named baseline |
 | `checkpoint.list` | `{offset?, selected?, query?, filter?}`; negotiated `checkpoints-v1`; query ≤200 UTF-16 units searches message/revision across history, filter is `all`, `flagged`, or `safety`; returns ≤100 summaries, matching `total`, `workspaceTotal`, and resolved page offset; selected ID locates its filtered page or fails explicitly; stale offsets clamp to the last page |
 | `checkpoint.flag` | `{id, flagged}`; persist a checkpoint flag |
@@ -325,7 +325,7 @@ Follow-ups queue with a visible three-instruction bound. Up Next shows their ord
 
 Stop uses the workspace-wide cancellation boundary, including submissions not yet visible to the client. Stop & Send preserves the draft and waits for both confirmed terminal outcomes and the workspace-stop acknowledgment. An Interrupted outcome or lost connection cancels that pending intent instead of overlapping uncertain work. Persistent error messages are separate from changing activity status. Tool rows expand in place, and unchanged transcript rows are preserved where possible. Full selection/IME/VoiceOver behavior still needs an application walkthrough.
 
-Run-start Git preflight receives the cancellation signal and disables repository fsmonitor helpers. The adapter checks cancellation again immediately before engine admission. A stop before admission is recorded as Cancelled; an exception after engine admission remains Interrupted because tool cleanup is not proven by the exception alone.
+Run-start Git preflight receives the cancellation signal and uses the same executable-configuration boundary as desktop status and diffs. The adapter checks cancellation again immediately before engine admission. A stop before admission is recorded as Cancelled; an exception after engine admission remains Interrupted because tool cleanup is not proven by the exception alone. Git observations are retired after repository initialization, checkpoint restoration, agent runs, conversation changes and workspace shutdown. See [Git implementation pass](GIT-IMPLEMENTATION-PASS.md) for the exact bounds, sharing policy and verification results.
 
 ## Reproduce verification
 

@@ -199,12 +199,10 @@ export class BroccoliCASStorageService {
 				length += read.bytesRead
 			}
 			const after = await handle.stat()
-			if (
-				length !== before.size ||
-				before.size !== after.size ||
-				before.mtimeMs !== after.mtimeMs ||
-				before.ctimeMs !== after.ctimeMs
-			)
+			// Deduplication refreshes retention timestamps in other service instances.
+			// Timestamps do not establish content identity: the SHA-256 verification
+			// below validates every returned byte, including same-size mutations.
+			if (length !== before.size || before.size !== after.size)
 				throw new Error("BLOB_CHANGED: saved content changed during inspection; reload it")
 			stored = buffer.subarray(0, length)
 		} finally {

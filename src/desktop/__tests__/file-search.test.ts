@@ -49,6 +49,15 @@ describe("workspace filename search", () => {
 			["inside.swift"],
 		)
 	})
+	it("preserves leading byte-order characters and valid replacement characters as filename identity", async () => {
+		await exec("git", ["init", "-q"], { cwd: root })
+		await write("\ufefffirst.txt")
+		await write("\ufffd.txt")
+		const result = await new WorkspaceFileSearch(root).search(".txt")
+		assert.equal(result.scope, "git")
+		assert.equal(result.scanLimited, false)
+		assert.deepEqual(result.entries.map((e) => e.path).sort(), ["\ufefffirst.txt", "\ufffd.txt"].sort())
+	})
 	it("bounds matches and lets an explicit refresh find newly created files", async () => {
 		await Promise.all(Array.from({ length: 70 }, (_, index) => write(`src/File-${index}.swift`)))
 		const search = new WorkspaceFileSearch(root)

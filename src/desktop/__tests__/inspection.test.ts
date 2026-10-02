@@ -125,6 +125,7 @@ describe("bounded desktop inspection", () => {
 		inspection = new WorkspaceInspection(folder, () => new Promise((resolve) => pending.push(resolve)))
 		const earlier = inspection.readDiff("earlier.txt", false, 0)
 		const latest = inspection.readDiff("latest.txt", true, 0)
+		await Promise.resolve()
 		pending[1](Buffer.from("latest\n".repeat(10000)))
 		const first = await latest
 		pending[0](Buffer.from("earlier"))
@@ -147,10 +148,47 @@ describe("bounded desktop inspection", () => {
 				}),
 		)
 		const reading = inspection.readDiff("file.txt", false, 0)
+		const rejected = assert.rejects(reading, /invalidated/)
+		await Promise.resolve()
 		inspection.clear()
 		finish(Buffer.from("result"))
-		const page = await reading
-		await assert.rejects(inspection.readDiff("file.txt", false, 0, page.revision), /DIFF_EXPIRED/)
+		await rejected
+		await assert.rejects(inspection.readDiff("file.txt", false, 0, "expired"), /DIFF_EXPIRED/)
+	})
+	it("shares only observations admitted before work starts and keeps cancellation local to each waiter", async () => {
+		let calls = 0,
+			finish!: (value: Buffer) => void,
+			sharedSignal!: AbortSignal
+		inspection = new WorkspaceInspection(folder, async (_args, _cwd, signal) => {
+			calls++
+			sharedSignal = signal!
+			return new Promise((resolve) => {
+				finish = resolve
+			})
+		})
+		const controller = new AbortController()
+		const cancelled = inspection.readDiff("file", false, 0, undefined, controller.signal)
+		const rejected = assert.rejects(cancelled, /waiter stopped/)
+		const siblings = Array.from({ length: 7 }, () => inspection.readDiff("file", false, 0))
+		await Promise.resolve()
+		assert.equal(calls, 1)
+		controller.abort(new Error("waiter stopped"))
+		await rejected
+		assert.equal(sharedSignal.aborted, false)
+		finish(Buffer.from("first observation"))
+		assert.ok((await Promise.all(siblings)).every((page) => page.text === "first observation"))
+		const fresh = inspection.readDiff("file", false, 0)
+		await Promise.resolve()
+		assert.equal(calls, 2)
+		finish(Buffer.from("changed observation"))
+		assert.equal((await fresh).text, "changed observation")
+		const abandoned = inspection.readDiff("file", false, 0)
+		const closed = assert.rejects(abandoned, /invalidated/)
+		await Promise.resolve()
+		inspection.clear()
+		assert.equal(sharedSignal.aborted, true)
+		finish(Buffer.from("too late"))
+		await closed
 	})
 	it("trims only an incomplete UTF-8 suffix at the subprocess limit and rejects invalid encodings", async () => {
 		const limit = 1024 * 1024

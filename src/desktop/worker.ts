@@ -1,12 +1,10 @@
-import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
-import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { stat } from "node:fs/promises"
 import path from "node:path"
-import { promisify } from "node:util"
 import { z } from "zod"
 import { workspaceRevision } from "../agents/extensions/execution/workspace-verification.js"
 import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/intelligence/spider-policy-check.js"
+import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
 import type {
 	EngineProgressEvent,
 	EngineTickResult,
@@ -29,6 +27,7 @@ import { Logger } from "../shared/services/Logger.js"
 import { createStorageContext } from "../shared/storage/storage-context.js"
 import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/extensions/execution/tool-confirmation-gatekeeper.js"
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
+import { readGitStatus } from "../utils/git-status.js"
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
 import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
 import { ContextHistory, contextHistoryInput } from "./context-history.js"
@@ -44,6 +43,7 @@ import {
 	removeMemory,
 	writeMemory,
 } from "./conversation-memory.js"
+import { cancelGit, initializeRepository, withGitInspection } from "./git.js"
 import { WorkspaceInspection } from "./inspection.js"
 import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
 import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
@@ -64,7 +64,6 @@ import { assertRuntimeRecord, inspectRuntimeState, sealRuntimeRecord, verifyRunt
 import { desktopToolPath } from "./tool-environment.js"
 import { acquireWorkspace } from "./workspace-owner.js"
 
-const exec = promisify(execFile)
 const terminalStates = new Set(["completed", "failed", "cancelled", "interrupted"])
 type Run = Record<string, unknown> & {
 	id: string
@@ -137,18 +136,22 @@ const projectRun = (run: Run) => ({
 })
 
 const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<string> => {
-	const baseline = await exec(
-		"git",
-		["--no-pager", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "--untracked-files=normal"],
-		{
-			cwd: workspace,
-			maxBuffer: 128 * 1024,
-			timeout: 5000,
-			signal,
-			env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-		},
-	).catch(() => null)
-	return baseline ? shortText(baseline.stdout) : "Git status unavailable"
+	try {
+		const baseline = await withGitInspection(workspace, readGitStatus, { signal })
+		return shortText(
+			[
+				`Branch: ${baseline.branch}; HEAD: ${baseline.head ?? "unborn"}`,
+				...(baseline.limited ? ["Partial change list; omitted changes are not clean evidence."] : []),
+				"Submodule worktree contents excluded.",
+				...baseline.entries.map((entry) => `${entry.status} ${JSON.stringify(entry.path)}`),
+			].join("\n"),
+			24_000,
+			"\n[Partial change list; omitted changes are not clean evidence.]",
+		)
+	} catch (error) {
+		signal.throwIfAborted()
+		return `Git status unavailable: ${shortText(String(error))}`
+	}
 }
 
 type ConversationContext = { jsonl: string; turnCount: number; memories?: MemoryEntry[] }
@@ -647,6 +650,7 @@ export class DesktopSession {
 					"files",
 					"file-search-v1",
 					"changes",
+					"repository-initialize-v1",
 					"paged-inspection",
 					"workspace-stop",
 					"run-details",
@@ -1133,6 +1137,7 @@ export class DesktopSession {
 						throw error
 					}
 					this.conversation = replacement
+					this.inspection.clear()
 					return { conversation: replacement }
 				}
 				if (id === this.conversation) return { conversation: id }
@@ -1156,6 +1161,7 @@ export class DesktopSession {
 					throw error
 				}
 				this.conversation = id
+				this.inspection.clear()
 				return { conversation: id }
 			}
 			case "task.submit": {
@@ -1549,6 +1555,15 @@ export class DesktopSession {
 				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: open the output again")
 				return result
 			}
+			case "repository.initialize": {
+				z.object({}).strict().parse(request.params)
+				this.inspection.clear()
+				try {
+					return await initializeRepository(this.workspace.path)
+				} finally {
+					this.inspection.clear()
+				}
+			}
 			case "changes.list":
 				return this.inspection.changes()
 			case "changes.read": {
@@ -1662,6 +1677,9 @@ export class DesktopSession {
 				}
 			}
 			clearTimeout(repairTimer)
+			// Agent commands can mutate Git and files. Retire prior inspection
+			// observations before another task starts or the UI requests new pages.
+			this.inspection.clear()
 			await this.commit(run, "run.state")
 			this.finishHealing(run)
 			this.active = undefined
@@ -1965,6 +1983,7 @@ export class DesktopSession {
 	}
 	async stop() {
 		this.closing = true
+		cancelGit(this.workspace.path)
 		this.lifecycle?.models?.close?.()
 		this.projectEpoch++
 		clearTimeout(this.activityCheckpoint)
