@@ -6,6 +6,28 @@ import { OpenAiCodexOAuthService } from "../../services/auth/OpenAiCodexOAuthSer
 
 describe("provider parallel tool admission", () => {
 	afterEach(() => sinon.restore())
+	it("forwards known model reasoning even when catalog capability metadata is absent", async () => {
+		sinon.stub(OpenAiCodexOAuthService, "listModels").resolves({ "gpt-5.6-sol": { supportsPromptCache: false } })
+		for (const reasoningEffort of [undefined, "none", "high", "max"]) {
+			const handler = new OpenAiCodexHandler({ openAiCodexModelId: "gpt-5.6-sol", reasoningEffort })
+			let requested: any
+			const client = {
+				responses: {
+					create: async (params: unknown) => {
+						requested = params
+						return (async function* () {})()
+					},
+				},
+			} as unknown as OpenAI
+			sinon.stub(handler as unknown as { ensureClient(): Promise<OpenAI> }, "ensureClient").resolves(client)
+			for await (const _ of handler.createMessage("Fixture", [])) {
+				/* exhaust */
+			}
+			assert.equal(requested.reasoning?.effort, reasoningEffort)
+			if (!reasoningEffort) assert.equal("reasoning" in requested, false)
+		}
+	})
+
 	it("honors host policy and preserves interleaved tool identities", async () => {
 		sinon.stub(OpenAiCodexOAuthService, "listModels").resolves({ "qa-provider-model": { supportsPromptCache: false } })
 		for (const parallelToolCalls of [undefined, false, true]) {

@@ -591,15 +591,18 @@ export class AgentEngine extends AbstractAgentEngine {
 							}
 							totalProviderRounds++
 							stepCount++
+							const reasoningEffort = this.modelResolver.getReasoningEffort(activeModel)
 							const payload: {
 								model: string
 								messages: typeof apiMessages
 								max_tokens: number
 								tools?: typeof availableTools
+								reasoning_effort?: string
 							} = {
 								model: activeModel,
 								messages: apiMessages,
 								max_tokens: preparedContext.budget.reservedOutputTokens,
+								...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 							}
 
 							if (availableTools.length > 0) {
@@ -650,6 +653,7 @@ export class AgentEngine extends AbstractAgentEngine {
 											messages: payload.messages,
 											max_tokens: payload.max_tokens,
 											...(payload.tools ? { tools: payload.tools } : {}),
+											...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
 										},
 										{
 											pluginDir: this.config.claudePluginDir,
@@ -663,6 +667,7 @@ export class AgentEngine extends AbstractAgentEngine {
 								} else if (usesCodexOAuth) {
 									const codexOAuthHandler = new OpenAiCodexHandler({
 										openAiCodexModelId: activeModel,
+										reasoningEffort,
 										abortSignal: requestSignal,
 										parallelToolCalls: autonomous,
 									})

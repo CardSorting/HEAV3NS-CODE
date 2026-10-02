@@ -65,6 +65,7 @@ export interface ClaudeSubscriptionDirectSdkTool {
 
 export interface ClaudeSubscriptionDirectSdkCompletionRequest {
 	model: string
+	reasoning?: { effort: import("../../core/providers/reasoning-effort.js").ReasoningEffort }
 	messages: ClaudeSubscriptionDirectSdkMessage[]
 	max_tokens: number
 	tools?: ClaudeSubscriptionDirectSdkTool[]
@@ -459,10 +460,7 @@ export async function discoverClaudeSubscriptionDirectSdkModels(
 	)
 	const discovered = envelope.models ?? []
 	if (discovered.length === 0 && envelope.status?.detail) {
-		throw new ClaudeSubscriptionDirectSdkError(
-			envelope.status.detail,
-			"CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS_UNAVAILABLE",
-		)
+		throw new ClaudeSubscriptionDirectSdkError(envelope.status.detail, "CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS_UNAVAILABLE")
 	}
 	const models = new Map<string, ClaudeSubscriptionDirectSdkDiscoveredModel>()
 	for (const candidate of discovered) {

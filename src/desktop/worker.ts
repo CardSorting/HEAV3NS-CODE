@@ -30,6 +30,7 @@ import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
 import { WorkspaceInspection } from "./inspection.js"
 import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
 import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
+import { reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
@@ -557,6 +558,7 @@ export class DesktopSession {
 		if (!models) throw new Error("UNSUPPORTED: this runtime cannot switch models")
 		return {
 			...models.current(),
+			reasoningOptions: reasoningEfforts(models.current().provider, models.current().model),
 			revision: this.metadata.get("model-selection")?.revision ?? 0,
 			providers: models.catalog(),
 			recent: recentModelSelections(models.current(), this.metadata.get("model-selection")?.recent),
@@ -597,7 +599,7 @@ export class DesktopSession {
 				capabilities: [
 					"native",
 					"autonomous-execution-v1",
-					...(this.lifecycle?.models ? ["model-selection-v1"] : []),
+					...(this.lifecycle?.models ? ["model-selection-v1", "reasoning-selection-v1"] : []),
 					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
 					"snapshot",
 					"workspace-verification-v1",
@@ -655,7 +657,12 @@ export class DesktopSession {
 				if (revision !== (previous?.revision ?? 0))
 					throw new Error("STALE_MODEL: reload the current selection before applying")
 				const before = models.current()
-				if (before.provider === selection.provider && before.model === selection.model) return this.modelStatus()
+				if (
+					before.provider === selection.provider &&
+					before.model === selection.model &&
+					before.reasoningEffort === selection.reasoningEffort
+				)
+					return this.modelStatus()
 				try {
 					models.apply(selection)
 					this.metadata.put("model-selection", {
@@ -1845,9 +1852,14 @@ export async function runDesktopWorker(): Promise<void> {
 		engine = new LumiMonolith({ cwd: owner.path, sessionId, databaseKernel: database })
 		const savedSelection = metadata.get("model-selection")
 		if (savedSelection) {
-			const selection = validateModelSelection({ provider: savedSelection.provider, model: savedSelection.model })
+			const selection = validateModelSelection({
+				provider: savedSelection.provider,
+				model: savedSelection.model,
+				reasoningEffort: savedSelection.reasoningEffort,
+			})
 			engine.setProvider(selection.provider, false)
 			engine.setModel(selection.model, false, true)
+			engine.modelResolver.setReasoningEffort(selection.reasoningEffort)
 		}
 		const context = metadata.get("context")
 		if (typeof context?.jsonl === "string") {
@@ -1899,10 +1911,14 @@ export async function runDesktopWorker(): Promise<void> {
 						| "openai-codex"
 						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 					model: engine!.modelResolver.getActiveModel(),
+					...(engine!.modelResolver.getReasoningEffort()
+						? { reasoningEffort: engine!.modelResolver.getReasoningEffort() }
+						: {}),
 				}),
 				apply: (selection) => {
 					engine!.setProvider(selection.provider, false)
 					engine!.setModel(selection.model, false, true)
+					engine!.modelResolver.setReasoningEffort(selection.reasoningEffort)
 				},
 				discover: (provider, refresh) => discovery.discover(provider, refresh),
 				close: () => discovery.close(),

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { REASONING_EFFORTS, reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	isClaudeSubscriptionDirectSdkModel,
@@ -8,6 +9,7 @@ import {
 export const modelSelectionSchema = z
 	.object({
 		provider: z.enum([OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER]),
+		reasoningEffort: z.enum(["default", ...REASONING_EFFORTS]).optional(),
 		model: z
 			.string()
 			.trim()
@@ -34,6 +36,9 @@ export function validateModelSelection(value: unknown): ModelSelection {
 	) {
 		throw new Error("MODEL_MISMATCH: choose a model supported by this provider")
 	}
+	if (selection.reasoningEffort === "default") delete selection.reasoningEffort
+	if (selection.reasoningEffort && !reasoningEfforts(selection.provider, selection.model).includes(selection.reasoningEffort))
+		throw new Error("UNSUPPORTED_REASONING: choose a reasoning level supported by this model, or Default")
 	return selection
 }
 

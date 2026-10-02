@@ -9,7 +9,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private let onSelection: (WorkspaceModelSelection) -> Void
     private let provider = NSPopUpButton()
     private let model = NSTextField()
-    private let modelChoice = NSPopUpButton()
+    private let modelChoice = ModelChoiceList(frame: .zero)
     private let customRow = NSStackView()
     private var suggestions = [String]()
     private var customMode = false
@@ -30,6 +30,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var remembered = [String: String]()
     private var displayedProvider: String?
     private var pending = false
+    private var dismissed = false
     private var loadID = UUID()
     private var resetRevision = false
     private weak var previousResponder: NSResponder?
@@ -44,14 +45,16 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     }
     init(request: @escaping (String, [String: Any], @escaping (Result<[String: Any], Error>) -> Void) -> Void, connected: @escaping () -> Bool, supportsDiscovery: @escaping () -> Bool = { false }, canApply: @escaping () -> Bool, onSelection: @escaping (WorkspaceModelSelection) -> Void) {
         self.request = request; self.connected = connected; self.supportsDiscovery = supportsDiscovery; self.canApply = canApply; self.onSelection = onSelection
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 500, height: 480), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 560), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "Model & Provider"; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
         super.init(window: panel); panel.delegate = self
         provider.target = self; provider.action = #selector(changeProvider); provider.setAccessibilityLabel("Provider")
         model.delegate = self; model.setAccessibilityLabel("Custom model ID")
         model.placeholderString = "Exact model ID"; model.target = self; model.action = #selector(save)
-        modelChoice.target = self; modelChoice.action = #selector(chooseModel); modelChoice.setAccessibilityLabel("Model")
-        modelChoice.cell?.lineBreakMode = .byTruncatingMiddle
+        modelChoice.onChoose = { [weak self] in self?.chooseModel($0) }
+        modelChoice.onCustom = { [weak self] in self?.chooseCustom() }
+        modelChoice.onCancel = { [weak self] in self?.dismiss() }
+        modelChoice.setContentHuggingPriority(.init(1), for: .vertical)
         apply.target = self; apply.action = #selector(save); apply.bezelStyle = .rounded
         reload.target = self; reload.action = #selector(refreshProviderModels); reload.bezelStyle = .rounded
         reload.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil); reload.imagePosition = .imageLeading
@@ -63,7 +66,6 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         apply.setContentCompressionResistancePriority(.required, for: .horizontal)
         catalogStatus.maximumNumberOfLines = 2; catalogStatus.isSelectable = true
         modelInformation.maximumNumberOfLines = 2
-        let spacer = NSView(); spacer.setContentHuggingPriority(.init(1), for: .vertical)
         let footer = JourneyStyle.stack([catalogStatus, NSView(), reload], vertical: false, spacing: 8)
         catalogStatus.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         reload.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -71,8 +73,8 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             JourneyStyle.label("Choose Model", size: 20, weight: .semibold),
             JourneyStyle.label("Choose a model to switch immediately in this workspace.", size: 12, secondary: true),
             status, JourneyStyle.rule(), JourneyStyle.label("Provider", size: 12, weight: .semibold), provider, detail,
-            JourneyStyle.label("Model", size: 12, weight: .semibold), modelChoice, customRow, modelInformation,
-            availability, spacer, footer
+            modelChoice, customRow, modelInformation,
+            availability, footer
         ], spacing: 10)
         panel.contentView?.addSubview(root)
         if let content = panel.contentView {
@@ -86,11 +88,12 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func present(for parent: NSWindow) {
         guard let window else { return }
+        dismissed = false
         previousResponder = parent.firstResponder
         focusModelAfterLoad = true
         parent.addChildWindow(window, ordered: .above)
         syncPresentation(recenter: true)
-        window.makeKeyAndOrderFront(nil); window.makeFirstResponder(modelChoice); load()
+        window.makeKeyAndOrderFront(nil); window.makeFirstResponder(modelChoice.search); load()
     }
     func syncPresentation(recenter: Bool = false) {
         guard let window, let parent = window.parent else { return }
@@ -111,11 +114,10 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     }
     func refreshAvailability() {
         syncPresentation()
-        let editable = !pending && selection != nil
+        let editable = !dismissed && !pending && selection != nil
         provider.isEnabled = editable; model.isEnabled = editable
-        modelChoice.isEnabled = editable && connected() && reconciled && blocked == nil && canApply()
+        modelChoice.setAvailability(browse: editable, canSwitch: editable && connected() && reconciled && blocked == nil && canApply(), customVisible: customMode)
         customRow.isHidden = !customMode
-        if customMode { modelChoice.selectItem(at: modelChoice.numberOfItems - 1) }
         reload.isEnabled = connected() && !pending && discoveryRequests[displayedProvider ?? ""] == nil
         apply.isEnabled = connected() && editable && reconciled && blocked == nil && canApply() && dirty && validation == nil
         apply.toolTip = "Switch to this exact model ID for future instructions"
@@ -141,7 +143,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             }
             self.refreshAvailability()
             if self.focusModelAfterLoad, self.reconciled, self.window?.isKeyWindow == true {
-                self.window?.makeFirstResponder(self.customMode ? self.model : self.modelChoice)
+                self.window?.makeFirstResponder(self.customMode ? self.model : self.modelChoice.search)
             }
             self.focusModelAfterLoad = false
         }
@@ -177,29 +179,18 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         let draft = model.stringValue
         suggestions = []
         let current = selection?.provider == id ? [selection!.model] : []
-        for candidate in current + recentSelections.filter({ $0.provider == id }).map(\.model) + (discoveries[id]?.models.map(\.id) ?? item.models) where !suggestions.contains(candidate) { suggestions.append(candidate) }
-        modelChoice.removeAllItems()
-        modelChoice.addItem(withTitle: "Choose a model…")
-        modelChoice.lastItem?.isEnabled = false
-        for candidate in suggestions {
-            let entry = discoveries[id]?.models.first { $0.id == candidate }
-            let title = entry.map { $0.label.isEmpty || $0.label == candidate ? candidate : "\($0.label) · \(candidate)" } ?? candidate
-            modelChoice.addItem(withTitle: title)
-            modelChoice.lastItem?.representedObject = candidate
-            modelChoice.lastItem?.toolTip = entry?.detail
-        }
-        modelChoice.menu?.addItem(.separator())
-        modelChoice.addItem(withTitle: "Other model ID…")
-        if selection?.provider == id, let index = suggestions.firstIndex(of: selection!.model) { modelChoice.selectItem(at: index + 1) }
-        else { modelChoice.selectItem(at: 0) }
+        let discovered = (discoveries[id]?.models.map(\.id) ?? item.models).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        for candidate in current + recentSelections.filter({ $0.provider == id }).map(\.model) + discovered where !suggestions.contains(candidate) { suggestions.append(candidate) }
+        modelChoice.update(models: suggestions, current: selection?.provider == id ? selection?.model : nil, context: id)
         model.stringValue = draft
     }
-    @objc private func chooseModel() {
-        guard !pending, connected(), reconciled, blocked == nil, canApply() else { return }
-        guard let id = modelChoice.selectedItem?.representedObject as? String else {
-            if let displayedProvider { customProviders.insert(displayedProvider) }
-            customMode = true; refreshAvailability(); window?.makeFirstResponder(model); return
-        }
+    private func chooseCustom() {
+        guard !dismissed, !pending else { return }
+        if let displayedProvider { customProviders.insert(displayedProvider) }
+        customMode = true; refreshAvailability(); window?.makeFirstResponder(model)
+    }
+    private func chooseModel(_ id: String) {
+        guard !dismissed, !pending, connected(), reconciled, blocked == nil, canApply(), suggestions.contains(id) else { return }
         if let displayedProvider { customProviders.remove(displayedProvider) }
         customMode = false; model.stringValue = id
         if validation != nil { customMode = true; refreshAvailability(); return }
@@ -213,9 +204,8 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         else if let discovery { catalogStatus.stringValue = discovery.summary }
         else { catalogStatus.stringValue = supportsDiscovery() ? "Refresh to load models from this connection." : "Provider discovery requires a newer runtime. Enter an exact model ID." }
         catalogStatus.toolTip = discovery?.message ?? catalogStatus.stringValue
-        if let match = discovery?.models.first(where: { $0.id == draftModel }) {
-            modelInformation.stringValue = [match.label == match.id ? "" : match.label, match.detail].filter { !$0.isEmpty }.joined(separator: " · ")
-            if modelInformation.stringValue.isEmpty { modelInformation.stringValue = "Provider-reported ID · Access and tool support are checked when you send." }
+        if discovery?.models.contains(where: { $0.id == draftModel }) == true {
+            modelInformation.stringValue = "Press Return or choose Switch Model to use this ID."
         } else { modelInformation.stringValue = draftModel.isEmpty ? "Choose a model above, or use Other model ID." : discovery?.state == "ready" ? "This ID is not in the latest list. Choose a listed model or keep this exact custom ID." : "Current, recent, or custom ID · Access is checked when you send." }
         modelInformation.isHidden = !customMode
         modelInformation.toolTip = modelInformation.stringValue
@@ -226,7 +216,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     @objc private func refreshProviderModels() { guard !pending else { return }; forceDiscovery = true; load() }
     private func discoverModels(refresh: Bool = false) {
         guard connected(), supportsDiscovery(), let id = displayedProvider, discoveryRequests[id] == nil else { return }
-        let token = UUID(); discoveryRequests[id] = token; refreshDiscoveryPresentation()
+        let token = UUID(); discoveryRequests[id] = token; refreshAvailability()
         request("models.discover", ["provider": id, "refresh": refresh]) { [weak self] result in
             guard let self, self.discoveryRequests[id] == token else { return }
             self.discoveryRequests[id] = nil
@@ -247,7 +237,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         customMode = true; refreshAvailability()
     }
     @objc private func save() {
-        guard !pending, connected(), reconciled, blocked == nil, canApply(), dirty, validation == nil, let selection, let id = displayedProvider else { return }
+        guard !dismissed, !pending, connected(), reconciled, blocked == nil, canApply(), dirty, validation == nil, let selection, let id = displayedProvider else { return }
         pending = true; failure = nil; status.stringValue = "Saving selection…"; refreshAvailability()
         let token = loadID
         request("models.select", ["provider": id, "model": draftModel, "revision": selection.revision]) { [weak self] result in
@@ -279,8 +269,9 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         refreshAvailability()
     }
     func dismiss(restoreFocus: Bool = true) {
-        loadID = UUID(); pending = false
+        dismissed = true; loadID = UUID(); pending = false
         discoveryRequests.removeAll()
+        refreshAvailability()
         let parent = window?.parent
         if let window { parent?.removeChildWindow(window); window.orderOut(nil) }
         if restoreFocus, let parent, parent.isVisible, NSApp.isActive {
@@ -298,14 +289,12 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         provider.selectItem(at: index); changeProvider()
     }
     func refreshProbe() { refreshProviderModels() }
-    func selectProbe(_ id: String) {
-        guard let index = modelChoice.itemArray.firstIndex(where: { $0.representedObject as? String == id }) else { return }
-        modelChoice.selectItem(at: index); chooseModel()
-    }
+    func selectProbe(_ id: String) { modelChoice.selectProbe(id) }
+    func searchProbe(_ value: String) { modelChoice.searchProbe(value) }
     var diagnostics: [String: Any] {
         ["visible": window?.isVisible == true, "draft": model.stringValue, "dirty": dirty,
          "connected": connected(), "pending": pending, "reconciled": reconciled,
          "applyEnabled": apply.isEnabled, "status": status.stringValue, "availability": availability.stringValue,
-         "catalogStatus": catalogStatus.stringValue, "modelInformation": modelInformation.stringValue, "modelSuggestions": suggestions, "customVisible": !customRow.isHidden]
+         "catalogStatus": catalogStatus.stringValue, "modelInformation": modelInformation.stringValue, "modelSuggestions": suggestions, "customVisible": !customRow.isHidden, "list": modelChoice.diagnostics]
     }
 }

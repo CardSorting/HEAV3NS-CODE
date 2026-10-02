@@ -119,6 +119,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let noticeBar = NSStackView()
     private let modelButton = NSButton(title: "Model & Provider…", target: nil, action: nil)
     private var modelPicker: ModelPicker?
+    private let reasoningPicker = ReasoningPicker()
     private let hint = NSTextField(labelWithString: "Enter to send · Shift–Enter for a new line")
     private var sidebarPreferred = true
     private var compactSidebarRevealed = false
@@ -162,7 +163,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var canFindInInspection: Bool { showingInspector && !inspector.isHidden && window?.attachedSheet == nil }
     var canReviewApproval: Bool { currentApproval != nil && window?.attachedSheet == nil && !closing }
     var canOpenFile: Bool { client.isReady && client.capabilities.contains("file-search-v1") && !switchingConversation && !closing && window?.attachedSheet == nil }
-    var canChooseModels: Bool { client.isReady && client.capabilities.contains("model-selection-v1") && !closing && window?.attachedSheet == nil }
+    var canChooseModels: Bool { !reasoningPicker.pending && client.isReady && client.capabilities.contains("model-selection-v1") && !closing && window?.attachedSheet == nil }
     var canCreateConversation: Bool { canSwitchConversation && window?.attachedSheet == nil }
 
     init(folder: URL, runtimeClient: RuntimeClient? = nil, draftStore: WorkspaceDraftStore? = nil) {
@@ -201,6 +202,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 }
                 self.probe?.connected(self)
             } else if value != "Connecting to LUMI…" {
+                self.reasoningPicker.connectionLost()
                 self.switchingConversation = false; self.expectedConversation = nil
                 self.quickOpen?.dismiss()
                 self.stopThenSend = nil
@@ -440,9 +442,23 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         chatTitle.setContentHuggingPriority(.init(1), for: .horizontal); checkpointsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         let header = stack([titleLine, chatState], vertical: true, spacing: 5)
         let rule = JourneyStyle.rule()
-        let modelBar = stack([modelButton, hint])
+        reasoningPicker.request = { [weak self] method, params, completion in
+            guard let self else { completion(.failure(BridgeError.message("Workspace closed."))); return }
+            self.client.request(method, params: params, completion: completion)
+        }
+        reasoningPicker.canApply = { [weak self] in
+            guard let self else { return false }
+            return self.canRequestRecovery && self.stopThenSend == nil && self.window?.attachedSheet == nil
+        }
+        reasoningPicker.onSelection = { [weak self] data in
+            if let selection = WorkspaceModelSelection(data) { self?.updateModel(selection) }
+            self?.modelPicker?.receive(data)
+        }
+        reasoningPicker.onPending = { [weak self] in self?.updateStatus() }
+        reasoningPicker.onError = { [weak self] in self?.showNotice($0) }
+        let modelBar = stack([modelButton, reasoningPicker, hint], spacing: 8)
         hint.toolTip = "Enter to send · Shift–Enter for a new line. Autonomous execution runs tools without approval prompts. Use Stop to interrupt."
-        modelButton.widthAnchor.constraint(lessThanOrEqualTo: modelBar.widthAnchor, multiplier: 0.65).isActive = true
+        modelButton.widthAnchor.constraint(lessThanOrEqualTo: modelBar.widthAnchor, multiplier: 0.45).isActive = true
         modelButton.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
         let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, modelBar], vertical: true, spacing: 10)
         center.setContentHuggingPriority(.init(1), for: .horizontal)
@@ -717,6 +733,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         return item
     }
     private func updateModel(_ selection: WorkspaceModelSelection) {
+        reasoningPicker.receive(selection)
+        reasoningPicker.refresh(supported: client.isReady && client.capabilities.contains("reasoning-selection-v1"))
         modelButton.title = selection.model
         modelButton.toolTip = "\(selection.providerLabel) · \(selection.model) · Choose model and provider for this workspace"
         modelButton.setAccessibilityLabel("\(selection.providerLabel), model \(selection.model). Choose model and provider")
@@ -735,7 +753,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             self?.client.isReady == true && self?.client.capabilities.contains("model-selection-v1") == true
         }, supportsDiscovery: { [weak self] in self?.client.capabilities.contains("model-discovery-v1") == true }, canApply: { [weak self] in
             guard let self else { return false }
-            return self.canRequestRecovery && self.stopThenSend == nil
+            return self.canRequestRecovery && self.stopThenSend == nil && !self.reasoningPicker.pending
         }, onSelection: { [weak self] in self?.updateModel($0) })
         modelPicker?.present(for: window)
     }
@@ -753,6 +771,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             WorkspaceAction(title: "Toggle Navigation", shortcut: "⌘B", keywords: ["sidebar"]) { [weak self] in self?.toggleNavigation() },
             WorkspaceAction(title: "Refresh Current Destination", shortcut: "") { [weak self] in self?.refreshNavigation() }
         ]
+        if reasoningPicker.isEnabled { actions.insert(WorkspaceAction(title: "Change Reasoning Level…", shortcut: "", keywords: ["effort", "thinking", "speed", "depth"]) { [weak self] in self?.reasoningPicker.performClick(nil) }, at: 1) }
         if client.capabilities.contains("model-selection-v1") { actions.insert(WorkspaceAction(title: "Choose Model & Provider…", shortcut: "⇧⌘M", keywords: ["switch", "change", "AI"]) { [weak self] in self?.showModels() }, at: 1) }
         if !client.isReady, client.process?.isRunning != true, !closing { actions.insert(WorkspaceAction(title: "Reconnect Workspace", shortcut: "", keywords: ["connection", "retry", "recover"]) { [weak self] in self?.reconnect() }, at: 0) }
         if client.isReady, uncertainSubmission != nil, !checkingSubmission { actions.insert(WorkspaceAction(title: "Check Instruction Status", shortcut: "", keywords: ["retry", "submission", "recover"]) { [weak self] in self?.reconcileSubmission() }, at: 0) }
@@ -851,6 +870,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func submitInstruction(_ text: String, continuation: WorkspaceContinuation? = nil, repairLaunch: String? = nil) {
+        guard !reasoningPicker.pending else { showNotice("Wait for the reasoning setting to finish saving. Your draft is preserved."); return }
         guard !text.isEmpty, pendingRequest == nil, !switchingConversation else { return }
         guard text.utf16.count <= client.instructionLimit else { showNotice("Keep this instruction under \(client.instructionLimit.formatted()) characters; your draft is preserved."); return }
         guard client.isReady, uncertainSubmission == nil, !closing else { showNotice("Reconnect to check the last confirmed state before sending. Your draft is preserved."); return }
@@ -924,7 +944,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     /// Development-only entry points selected by the opt-in integration harness.
     /// They drive the same controls and real read-only bridge as the application.
     func navigateProbe(_ step: String) {
+        if step.hasPrefix("reasoning:") { reasoningPicker.select(String(step.dropFirst("reasoning:".count))); return }
         if step.hasPrefix("model-draft:") { modelPicker?.editProbe(String(step.dropFirst("model-draft:".count))); return }
+        if step.hasPrefix("model-search:") { modelPicker?.searchProbe(String(step.dropFirst("model-search:".count))); return }
         if step.hasPrefix("model-select:") { modelPicker?.selectProbe(String(step.dropFirst("model-select:".count))); return }
         if step.hasPrefix("palette-search:") { palette?.searchProbe(String(step.dropFirst("palette-search:".count))); return }
         if step.hasPrefix("quick-open:") { showQuickOpen(); quickOpen?.searchProbe(String(step.dropFirst("quick-open:".count))); return }
@@ -1029,13 +1051,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
+        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("reasoning", reasoningPicker), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "modelPicker": modelPicker?.diagnostics ?? [:], "actionPalette": palette?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
+        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "modelPicker": modelPicker?.diagnostics ?? [:], "reasoningPicker": reasoningPicker.diagnostics, "actionPalette": palette?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
@@ -1160,6 +1182,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func updateStatus() {
+        reasoningPicker.refresh(supported: client.isReady && client.capabilities.contains("reasoning-selection-v1"))
         modelButton.isEnabled = canChooseModels
         modelButton.toolTip = client.capabilities.contains("model-selection-v1") ? modelButton.toolTip : "This runtime does not support model switching. Rebuild the app and runtime together."
         modelPicker?.refreshAvailability()
@@ -1176,7 +1199,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         reconnectButton.isEnabled = !checkingSubmission && !closing
         reconnectButton.isHidden = closing || (!needsLookup && (client.isReady || client.process?.isRunning == true))
         let draft = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
-        sendButton.isEnabled = client.isReady && !switchingConversation && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit
+        sendButton.isEnabled = !reasoningPicker.pending && client.isReady && !switchingConversation && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit
         stopButton.isEnabled = forceAvailable || (!cancelRequested && hasWork) || (closing && !stopped)
         let run = runs.first(where: { $0["id"] as? String == active })
         let state = run?["state"] as? String

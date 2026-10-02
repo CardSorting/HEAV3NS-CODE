@@ -5,6 +5,8 @@ import path from "node:path"
 import { CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER as claude } from "../../core/providers/provider-ids.js"
 import { BroccoliDatabaseKernel } from "../../sessions/extensions/substrate/broccolidb-kernel.js"
 import { type ModelSelection, recentModelSelections, validateModelSelection } from "../models.js"
+import { ModelResolver } from "../../agents/extensions/resolution/model-resolver.js"
+import { reasoningEfforts } from "../../core/providers/reasoning-effort.js"
 import type { DesktopRequest } from "../protocol.js"
 import { DesktopSession } from "../worker.js"
 
@@ -78,6 +80,62 @@ describe("desktop model selection", () => {
 		])
 			assert.throws(() => validateModelSelection(value))
 	})
+	it("exposes supported levels and persists reasoning independently of the model", async () => {
+		assert.deepEqual((await request("models.list")).reasoningOptions, ["none", "low", "medium", "high", "xhigh", "max"])
+		const selected = await request("models.select", { ...current, reasoningEffort: "high", revision: 0 })
+		assert.equal(selected.model, "gpt-5.6-terra")
+		assert.equal(selected.reasoningEffort, "high")
+		assert.equal(selected.revision, 1)
+		assert.equal(database.getTable("desktop.metadata.v1").get("model-selection")?.reasoningEffort, "high")
+		assert.equal((await request("models.select", { ...current, revision: 1 })).revision, 1)
+		await assert.rejects(request("models.select", { ...current, reasoningEffort: "low", revision: 0 }), /STALE_MODEL/)
+		const reset = await request("models.select", { ...current, reasoningEffort: "default", revision: 1 })
+		assert.equal(reset.reasoningEffort, undefined)
+		assert.equal(reset.revision, 2)
+		assert.equal(reset.recent.length, 1)
+	})
+	it("rejects incompatible levels and leaves unknown routes at provider default", () => {
+		assert.deepEqual(reasoningEfforts(claude, "claude-haiku-4-5-20251001"), [])
+		assert.deepEqual(reasoningEfforts("openai-codex", "custom/gpt-5.6-terra"), [])
+		assert.ok(reasoningEfforts(claude, "claude-opus-5[1m]").includes("max"))
+		for (const [provider, model, reasoningEffort] of [
+			[claude, "claude-haiku-4-5-20251001", "high"],
+			[claude, "claude-opus-5[1m]", "none"],
+			["openai-codex", "unknown", "max"],
+			["openai-codex", "gpt-5.6-terra", "ultra"],
+		])
+			assert.throws(() => validateModelSelection({ provider, model, reasoningEffort }))
+	})
+	it("does not send an incompatible effort after runtime model fallback", () => {
+		const resolver = new ModelResolver("gpt-5.6-terra")
+		resolver.setReasoningEffort("max")
+		assert.equal(resolver.getReasoningEffort(), "max")
+		assert.equal(resolver.getReasoningEffort("unknown-fallback"), undefined)
+		resolver.setActiveModel("gpt-4o", true)
+		assert.equal(resolver.getReasoningEffort(), undefined)
+		assert.throws(() => resolver.setReasoningEffort("high"))
+	})
+	it("rolls back reasoning alone when persistence fails", async () => {
+		const flush = database.flush.bind(database)
+		let fail = true
+		database.flush = async () => {
+			if (fail) {
+				fail = false
+				throw new Error("disk unavailable")
+			}
+			await flush()
+		}
+		await assert.rejects(request("models.select", { ...current, reasoningEffort: "high", revision: 0 }), /disk unavailable/)
+		assert.equal(current.reasoningEffort, undefined)
+		assert.equal((await request("models.list")).revision, 0)
+	})
+	it("holds the admitted reasoning setting while instructions are pending", async () => {
+		await request("models.select", { ...current, reasoningEffort: "low", revision: 0 })
+		await request("task.submit", { text: "hold" })
+		await assert.rejects(request("models.select", { ...current, reasoningEffort: "high", revision: 1 }), /WORK_PENDING/)
+		assert.equal(current.reasoningEffort, "low")
+	})
+
 	it("saves scoped choices and rejects a stale picker", async () => {
 		assert.equal((await request("models.list")).revision, 0)
 		const selected = await request("models.select", { provider: claude, model: "claude-opus-5[1m]", revision: 0 })

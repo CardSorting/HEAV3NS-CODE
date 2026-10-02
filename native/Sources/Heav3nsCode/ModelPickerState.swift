@@ -5,6 +5,11 @@ struct WorkspaceModelSelection: Equatable {
     let provider: String
     let model: String
     let revision: Int
+    let reasoningEffort: String
+    let reasoningOptions: [String]
+    let busy: Bool
+    let blocked: String?
+    static let reasoningLevels: Set<String> = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
     var providerLabel: String { provider == "openai-codex" ? "OpenAI Codex" : "Claude Code" }
     static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental"]
     static func validModel(_ value: String) -> Bool {
@@ -16,6 +21,16 @@ struct WorkspaceModelSelection: Equatable {
               let revision = data["revision"] as? NSNumber, CFGetTypeID(revision) != CFBooleanGetTypeID(),
               revision.doubleValue >= 0, revision.doubleValue <= 9_007_199_254_740_991,
               revision.doubleValue.rounded(.towardZero) == revision.doubleValue else { return nil }
+        let effort = data["reasoningEffort"] as? String ?? "default"
+        guard data["reasoningEffort"] == nil || data["reasoningEffort"] is String,
+              effort == "default" || Self.reasoningLevels.contains(effort) else { return nil }
+        let options = data["reasoningOptions"] as? [String] ?? []
+        guard data["reasoningOptions"] == nil || data["reasoningOptions"] is [String],
+              options.count <= Self.reasoningLevels.count, Set(options).count == options.count,
+              options.allSatisfy(Self.reasoningLevels.contains),
+              data["reasoningOptions"] == nil || effort == "default" || options.contains(effort) else { return nil }
+        self.reasoningEffort = effort; self.reasoningOptions = options
+        busy = data["busy"] as? Bool ?? false; blocked = data["blocked"] as? String
         self.provider = provider; self.model = model; self.revision = revision.intValue
     }
 }

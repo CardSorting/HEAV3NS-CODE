@@ -8,6 +8,7 @@ import {
 	normalizeAgentProvider,
 } from "../../../core/providers/provider-ids.js"
 import { Logger } from "../../../shared/services/Logger.js"
+import { type ReasoningEffort, reasoningEfforts } from "../../../core/providers/reasoning-effort.js"
 
 export interface ModelResolutionMetrics {
 	totalTurns: number
@@ -143,6 +144,18 @@ export class ModelResolver {
 
 	getActiveModel(): string {
 		return this.currentActiveModel
+	}
+
+	private reasoningEffort?: ReasoningEffort
+	getReasoningEffort(model = this.currentActiveModel): ReasoningEffort | undefined {
+		return this.reasoningEffort && reasoningEfforts(this.provider, model).includes(this.reasoningEffort)
+			? this.reasoningEffort
+			: undefined
+	}
+	setReasoningEffort(effort?: ReasoningEffort | "default"): void {
+		if (effort && effort !== "default" && !reasoningEfforts(this.provider, this.currentActiveModel).includes(effort))
+			throw new Error("Unsupported reasoning level for this model")
+		this.reasoningEffort = effort === "default" ? undefined : effort
 	}
 
 	getPrimaryModel(): string {

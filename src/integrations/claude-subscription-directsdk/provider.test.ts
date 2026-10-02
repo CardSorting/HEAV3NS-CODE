@@ -37,7 +37,7 @@ function createFakePlugin(): string {
 	)
 	writeFileSync(
 		path.join(directory, "directsdk.py"),
-		`from types import SimpleNamespace\nimport time\n\nclass Client:\n    def __init__(self, **kwargs):\n        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))\n    def create(self, **kwargs):\n        if kwargs.get("model") == "slow":\n            time.sleep(30)\n        return {\n            "id": "fake-response",\n            "model": kwargs["model"],\n            "choices": [{"message": {"content": "bridge-ok", "tool_calls": None}}],\n            "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},\n        }\n    def close(self):\n        return None\n    def cancel(self):\n        return None\n`,
+		`from types import SimpleNamespace\nimport time\n\nclass Client:\n    def __init__(self, **kwargs):\n        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))\n    def create(self, **kwargs):\n        if kwargs.get("model") == "slow":\n            time.sleep(30)\n        return {\n            "id": "fake-response",\n            "model": kwargs["model"],\n            "choices": [{"message": {"content": str(kwargs.get("reasoning", {}).get("effort", "bridge-ok")), "tool_calls": None}}],\n            "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},\n        }\n    def close(self):\n        return None\n    def cancel(self):\n        return None\n`,
 	)
 	return directory
 }
@@ -119,6 +119,17 @@ describe("Claude subscription DirectSDK provider boundary", () => {
 		})
 		expect(authDiagnostic.detail).to.contain("Run `claude auth login`")
 		expect(authDiagnostic.detail).to.not.contain("supported Node runtime")
+	})
+
+	it("forwards reasoning effort through the Python bridge without converting it into a token budget", async () => {
+		const pluginDir = createFakePlugin()
+		for (const effort of ["low", "max"] as const) {
+			const response = await createClaudeSubscriptionDirectSdkCompletion(
+				{ model: "fake-model", messages: [{ role: "user", content: "fixture" }], max_tokens: 32, reasoning: { effort } },
+				{ pluginDir, pythonPath: "python3", timeoutMs: 10_000 },
+			)
+			expect(response.choices?.[0]?.message?.content).to.equal(effort)
+		}
 	})
 
 	it("executes a completion through the one-shot Python bridge", async () => {

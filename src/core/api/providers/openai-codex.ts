@@ -7,6 +7,7 @@ import { getOpenAiCodexModelInfo, OpenAiCodexOAuthService, openAiCodexProvider }
 import { DietCodeStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient } from "@/shared/net"
 import { DietCodeTool } from "@/shared/tools"
+import { type ReasoningEffort, reasoningEfforts } from "../../providers/reasoning-effort.js"
 import { withRetry } from "../retry"
 import { convertToOpenAIResponsesInput } from "../transform/openai-response-format"
 import { ApiStream } from "../transform/stream"
@@ -125,7 +126,11 @@ export class OpenAiCodexHandler implements ApiHandler {
 		if (model.info.maxTokens) {
 			requestParams.max_output_tokens = model.info.maxTokens
 		}
-		if (model.info.supportsReasoning && this.options.reasoningEffort) {
+		if (
+			this.options.reasoningEffort &&
+			(model.info.supportsReasoning ||
+				reasoningEfforts("openai-codex", model.id).includes(this.options.reasoningEffort as ReasoningEffort))
+		) {
 			requestParams.reasoning = {
 				effort: this.options.reasoningEffort as "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
 				summary: "auto",
