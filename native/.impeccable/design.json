@@ -5,10 +5,71 @@
   "title": "Design System: HEAV3NS-CODE Native",
   "extensions": {
     "native": {
+      "retainedHistory": {
+        "recordedAt": "2026-10-01",
+        "boundary": "../docs/desktop/AGENT-CONTEXT.md#retained-history-integration-pass",
+        "behavior": "Conversation Context → Open… → Retained History negotiates context-history-v1 and reads active engine messages and rolling summaries. Stable revision-scoped Unicode pages, native Find on the current page, Back/Forward and Reload reuse the existing inspector. Conversation changes invalidate snapshots. No model invocation or context mutation.",
+        "presentation": "Full-width read-only inspector, system 14-point prose and semantic label color. Role/date labels and a scope note distinguish retained messages from saved memory and other prompt sources. Compact KiB footer keeps Previous/Next readable; tooltip retains exact byte range and localized observation time.",
+        "verification": {
+          "runtimePassed": 263,
+          "nativePassed": 186,
+          "packagedFixturePassed": true,
+          "packagedFixture": "../build/desktop-context-1790911163263/evidence.json",
+          "captures": [
+            "../build/desktop-context-1790911163263/ui-context-history.png",
+            "../build/desktop-context-1790911163263/ui-context-history-next.png",
+            "../build/desktop-context-1790911163263/ui-context-history-empty.png"
+          ],
+          "limits": "Synthetic retained history with the actual packaged runtime, no provider execution. Two visual rounds; compact footer correction verified. Exact contrast, complete VoiceOver coverage and notarization were not independently checked."
+        }
+      },
       "framework": "Swift/AppKit",
       "platform": "macOS",
       "status": "Built journey-v3, user-approved September 30, 2026, extended by live Walkthrough and native file/conversation navigation, message-linked checkpoints and supporting local project Run; refined Run draft/status resilience and compact conversation role/evidence with a stable transcript footer; refined checkpoint full-history search, filters, paging, exact selection and local Git meaning; refined sidebar conversation deletion with protected confirmation and retained project evidence; replaced the Switch Project menu with a native Pods overview for concurrent independent projects, removed inspector close control, and coherent compact sidebar/context entry points; refined Pods into a command station with structured live activity and guarded inline decisions; refined Pods for long-running work with honest timing, isolated filters, reader-controlled bounded feeds, guarded recovery and occlusion-aware refresh; refined Pods viewport containment with one to three columns, fixed card heights, bounded wrapping text panes, native More recovery actions and reflow-safe activity following",
       "scope": "native/ only; no authority over root CLI design docs or reference gallery",
+      "spiderCheck": {
+        "recordedAt": "2026-10-01",
+        "boundary": "../docs/desktop/SPIDER-CODE-CHECKS.md",
+        "behavior": "Saved JS/TS inspection negotiates spider-check-v1 and shares bounded evidence with the agent spider_check tool. Reload checks current saved files. Prepare Review appends and saves the existing draft without truncation; Send is required before agent work.",
+        "presentation": "Full-height Code Check inspector: summary, selected file and incomplete qualification, then located findings and review guidance, then detailed scope and coverage. Semantic NSColor.labelColor, system 14-point prose and semibold headings are independent of code highlighting. Dated observation with full localized date/time tooltip. Existing Open File, Find, Back/Forward and Reload navigation.",
+        "verification": {
+          "verdict": "SHIP at the scope of three corrections: semantic report color, findings-first compact reading order and dated observations; all resolved. Not whole-application certification.",
+          "reportedTests": { "native": 182, "runtime": 213 },
+          "packagedFixture": "../build/desktop-spider-1790907825233/evidence.json",
+          "packagedFixturePassed": true,
+          "captures": [
+            "../build/desktop-spider-1790907825233/ui-light.png",
+            "../build/desktop-spider-1790907825233/ui-dark.png",
+            "../build/desktop-spider-1790907825233/ui-spider-review.png",
+            "../build/desktop-spider-1790907825233/ui-spider-file.png",
+            "../build/desktop-spider-1790907825233/ui-spider-reload.png"
+          ],
+          "limits": "Supplied validation and reviewer records; not independently rerun for documentation. No AppKit design detector or new shipped raster assets. Provider repair quality, full accessibility and distribution are outside this evidence."
+        }
+      },
+      "savedState": {
+        "recordedAt": "2026-10-01",
+        "boundary": "../docs/desktop/RUNTIME-STATE-STORE.md",
+        "authority": [
+          "Sources/Heav3nsCode/SavedStateDetails.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "Sources/Heav3nsCode/InspectionNavigation.swift"
+        ],
+        "behavior": "Workspace menu and Workspace Actions negotiate runtime-state-v1 for the selected conversation. Inspect reads up to 20 most recently updated saved instructions and discloses older history. Open Instruction opens Run Details; Find, Back/Forward and Reload reuse existing native navigation. Conversation changes invalidate stale replies. No automatic replay or project-file restore; reviewed Checkpoints retains restore.",
+        "presentation": "Full-height read-only report: summary, checksum/legacy and interrupted-work coverage, next action, newest saved instructions, scope and limits. Semantic NSColor.labelColor and system 14-point prose with semibold summary and section headings. Dated observation footer with Reload guidance. Empty state explains the next action and scope without an instruction menu. Matching checksums establish saved-content consistency, not correctness or passing project checks.",
+        "verification": {
+          "verdict": "SHIP at the Saved State UI scope; no material UI findings across all four supplied captures.",
+          "reportedTests": { "nativePassed": 185, "runtimePassed": 222 },
+          "packagedFixturePassed": true,
+          "captures": [
+            "../build/desktop-state-1790908508873/ui-light.png",
+            "../build/desktop-state-1790908508873/ui-dark.png",
+            "../build/desktop-state-1790908508873/ui-saved-state-open.png",
+            "../build/desktop-state-1790908508873/ui-saved-state-empty.png"
+          ],
+          "limits": "Supplied validation and reviewer records; not independently rerun for documentation. Exact contrast, VoiceOver and physical keyboard behavior were not independently checked. Backend-only continuation and checkpoint-hydration guards added no UI changes and do not broaden the visual verdict. No new shipping rasters or web detector."
+        }
+      },
       "authority": [
         "PRODUCT.md",
         "../docs/desktop/JOURNEY-V3.md",
@@ -891,6 +952,18 @@
     }
   },
   "components": [
+    {
+      "name": "Spider Code Check",
+      "kind": "custom",
+      "description": "Secondary full-height inspector with located findings before detailed scope/coverage, semantic system prose, dated observations and explicit review-draft handoff. Native navigation and Reload preserve the evidence workflow; Prepare Review preserves the existing draft and requires Send.",
+      "native": {
+        "api": "NSTextView / NSAttributedString / NSPopUpButton / NSButton",
+        "source": [
+          "Sources/Heav3nsCode/SpiderCheckDetails.swift",
+          "Sources/Heav3nsCode/WorkspaceWindow.swift"
+        ]
+      }
+    },
     {
       "name": "Native Action Controls",
       "kind": "button",

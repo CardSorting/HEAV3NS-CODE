@@ -84,6 +84,20 @@ Pods uses a 22-point semibold overview title, 18-point semibold project titles, 
 
 Run commands, console output, and restore path lists use 11-point monospaced text. Checkpoint explanations use system prose; moment, date, and file count stay secondary.
 
+Run Details uses selectable system prose for the recorded outcome, next step,
+project-check scope and evidence coverage before the instruction and result.
+Its native Related menu sits beside View Recorded Output and connects the
+inspected instruction to its own activity, preceding continuation source and
+available checkpoints. Navigation uses the existing Back/Forward history;
+checkpoint links open the existing review panel. See
+[run insights](../docs/desktop/RUN-INSIGHTS.md) for the source audit and limits.
+Recorded Output uses 14-point semantic system prose and the existing paged
+inspector. New pages state their content-verification coverage; a storage-limit
+notice describes incomplete saved evidence rather than a Git diff. Compact footer
+layout preserves at least 80 points for the model selector and lets the secondary
+hint truncate first, with its full current text in a tooltip. See
+[shared storage](../docs/desktop/BLOB-STORAGE.md).
+
 **The Evidence Type Rule.** Use system prose for intent, explanation, and decisions. Reserve monospaced text for code, exact paths, arguments, and identifiers.
 
 ## Layout
@@ -190,6 +204,18 @@ Walkthrough / Changes / Code / Run remain secondary. Code and Changes combine a 
 
 Changes identifies Working Tree or Staged baselines, including earlier and external edits. Diff prefixes accompany semantic color; untracked entries open as files. Byte-range labels, revision-aware paging, and Reload expose bounded snapshots. Inspection does not edit, stage, apply, undo, or attribute every change exclusively to LUMI.
 
+### Spider code checks
+
+Check Code opens a full-height Code Check inspector from a saved JavaScript/TypeScript file when `spider-check-v1` is available. Preserve the reading order: summary, selected file and any incomplete-coverage qualification, then located findings and review guidance, followed by detailed scope and coverage. Report prose uses semantic `NSColor.labelColor` and system type (14 points), with semibold summary, location and section headings, independent of prior code highlighting. The observation label includes the check date and time, with a full localized date/time tooltip and Reload guidance.
+
+Open File…, Find, Back/Forward and Reload reuse native inspection navigation; Reload checks current saved files. Prepare Review preserves and saves the existing composer draft, refuses an oversized combined draft without truncation, and requires Send before agent work. The report is bounded evidence, not a claim that project tests passed. [SpiderCheckDetails](Sources/Heav3nsCode/SpiderCheckDetails.swift), [WorkspaceWindow](Sources/Heav3nsCode/WorkspaceWindow.swift) and the [Spider boundary](../docs/desktop/SPIDER-CODE-CHECKS.md) define this local extension to the conversation-first workspace.
+
+### Saved State
+
+Saved State opens a full-height read-only Inspect report from the Workspace menu or Workspace Actions when `runtime-state-v1` is negotiated. The selected conversation owns the report and pending replies; switching conversations invalidates earlier results. Preserve the reading order: summary, checksum/legacy and interrupted-work coverage, Next step, newest saved instructions, then Scope and limits. Empty conversations show the next action and scope without an instruction menu. Reports disclose the 20-instruction window when older history exists.
+
+Use semantic `NSColor.labelColor` and 14-point system prose, with semibold summary and section headings. The footer dates the observation and says Reload to update. Open Instruction… opens the selected saved record in Run Details; native Find, Back/Forward and Reload retain their existing behavior. Matching checksums describe saved-content consistency, not project correctness or passing checks. Inspection never replays work, and project-file restore remains in reviewed Checkpoints. [SavedStateDetails](Sources/Heav3nsCode/SavedStateDetails.swift), [WorkspaceWindow](Sources/Heav3nsCode/WorkspaceWindow.swift), [InspectionNavigation](Sources/Heav3nsCode/InspectionNavigation.swift) and the [runtime boundary](../docs/desktop/RUNTIME-STATE-STORE.md) define this local extension.
+
 ### Live Walkthrough
 
 Walkthrough automatically follows running, approval-waiting, or cancelling work before queued work. The instruction dropdown is removed. A repair link can open its recorded instruction; reopening Walkthrough or accepting a new instruction resumes following current work. Recorded Runs supplies older history. Stage text derives from structured activity and known operations, with explicit approval, connection-loss, interrupted, and terminal states. No percentage or fixed linear checklist is implied. After 30 seconds without an update, explanatory copy reports quiet work without declaring failure.
@@ -233,6 +259,10 @@ Persistent notices above the composer distinguish recovery from changing activit
 Native menus, editing commands, inspector find/history, toolbar Stop, and a searchable Actions sheet preserve macOS conventions. Explicit accessibility labels cover major inputs, lists, task context, outline, inspection, approval, and actions. Native APIs and source-defined shortcuts do not establish complete keyboard, IME, VoiceOver, or focus-order acceptance.
 
 ### Authority and verification
+
+The October 1 Saved State finish review returned **SHIP at the Saved State UI scope**, with no material UI findings across the supplied [light](../build/desktop-state-1790908508873/ui-light.png), [dark](../build/desktop-state-1790908508873/ui-dark.png), [opened instruction](../build/desktop-state-1790908508873/ui-saved-state-open.png) and [empty conversation](../build/desktop-state-1790908508873/ui-saved-state-empty.png) captures. Validation reports 185 native tests, 222 runtime tests, TypeScript checking and the packaged fixture passed. Backend-only continuation and checkpoint-hydration guards added no UI changes and do not broaden the visual verdict. Exact contrast, VoiceOver and physical keyboard behavior were not independently checked. No new raster assets ship and no web detector ran for this AppKit surface.
+
+The October 1 Spider finish review returned **SHIP at the scope of three corrections**: semantic report color, findings-first compact reading order and dated observations, all resolved. The replacement captures are [light](../build/desktop-spider-1790907825233/ui-light.png), [dark](../build/desktop-spider-1790907825233/ui-dark.png), [preserved review draft](../build/desktop-spider-1790907825233/ui-spider-review.png), [file navigation](../build/desktop-spider-1790907825233/ui-spider-file.png) and [Reload](../build/desktop-spider-1790907825233/ui-spider-reload.png). The [packaged fixture](../build/desktop-spider-1790907825233/evidence.json) passed; supplied validation records report 182 native and 213 runtime tests passed. No new raster assets ship and no AppKit design detector ran. This scoped verdict is not whole-application certification; provider repair quality, full accessibility and distribution remain outside this evidence.
 
 Checkpoint and Run presentation authority includes [CheckpointWindow](Sources/Heav3nsCode/CheckpointWindow.swift) and [ProjectRunView](Sources/Heav3nsCode/ProjectRunView.swift). Pods presentation authority is [PodsWindow](Sources/Heav3nsCode/PodsWindow.swift), [PodLayout](Sources/Heav3nsCode/PodLayout.swift), [PodLiveView](Sources/Heav3nsCode/PodLiveView.swift) and [PodMonitoring](Sources/Heav3nsCode/PodMonitoring.swift); snapshot and recovery wiring in WorkspaceWindow and App, approval timestamps in the [desktop worker](../src/desktop/worker.ts), and the [integration contract](../docs/desktop/INTEGRATION.md) establish its behavior. Presentation authority is [JourneyStyle](Sources/Heav3nsCode/JourneyStyle.swift), [LauncherWindow](Sources/Heav3nsCode/LauncherWindow.swift), [ConversationSidebar](Sources/Heav3nsCode/ConversationSidebar.swift), [WorkspaceWindow](Sources/Heav3nsCode/WorkspaceWindow.swift), [WalkthroughView](Sources/Heav3nsCode/WalkthroughView.swift), [ApprovalReview](Sources/Heav3nsCode/ApprovalReview.swift), [QuickOpenWindow](Sources/Heav3nsCode/QuickOpenWindow.swift), [KeyboardListView](Sources/Heav3nsCode/KeyboardListView.swift), [NavigationSidebar](Sources/Heav3nsCode/NavigationSidebar.swift), and [CodeOutline](Sources/Heav3nsCode/CodeOutline.swift). Journey/state sources are [App](Sources/Heav3nsCode/App.swift), [ProjectLibrary](Sources/Heav3nsCode/ProjectLibrary.swift), [AccountClient](Sources/Heav3nsCode/AccountClient.swift), [WorkspaceDraftStore](Sources/Heav3nsCode/WorkspaceDraftStore.swift), [WalkthroughState](Sources/Heav3nsCode/WalkthroughState.swift), and [RuntimeClient](Sources/Heav3nsCode/RuntimeClient.swift). [IntegrationProbe](Sources/Heav3nsCode/IntegrationProbe.swift) provides native capture and bounds reporting. [PodsWindowTests](Tests/Heav3nsCodeTests/PodsWindowTests.swift) exercises containment, exact payloads, request guards and reading-state behavior.
 
@@ -345,6 +375,52 @@ Run keeps discovery validity separate from process status: a failed refresh cann
 
 Model selection uses the existing Workspace Actions search/list pattern. Single-line IDs omit descriptions; a checkmark identifies the active choice. Current/recent IDs precede naturally sorted discovery results. Click or Return activates, arrows browse, and Escape clears search before closing. Provider changes clear the query; catalog refresh preserves the highlighted ID and scroll position, or clears a removed highlight without choosing a replacement.
 
+### Conversation memory
+
+Workspace → Conversation Memory… (⌘8), also in Workspace Actions, opens a modeless
+search/list/detail editor scoped to the selected conversation. The main conversation
+and Stop remain reachable. Native fields and a resizable text editor use semantic
+colors and accessible labels. Save Memory (⌘S), Copy Draft, Discard & Refresh, and
+confirmed removal make changes explicit. Pending work permits inspection while
+edits wait; connection changes and conflicts preserve the draft. See the
+[capability audit](../docs/desktop/CONVERSATION-MEMORY.md).
+
+Stale memory edits offer an inline comparison between the saved version and the
+preserved draft, including their categories. Use Saved Version and Keep My Draft
+make the choice explicit; keeping a draft still requires Save Memory. The window
+grows for comparison while preserving a readable minimum width. Saved dates aid
+orientation, and refresh/save retain the selected record across pagination and
+sorting. ⌘F belongs to the key memory window; search-to-list arrows/Return, Escape
+to clear or return to search, and restored parent focus follow the existing
+native picker conventions.
+
+### Conversation context
+
+Workspace → Conversation Context (⌘9) uses the existing inspector with native
+Back/Forward, Find and Reload. A timestamp identifies its observed snapshot;
+plain-language sections explain active history, rolling summaries, saved memory
+and current work. Open… connects to memory, Saved State, recorded runs and checkpoints.
+The observation uses a localized date and time. Empty
+states explain the next action, and conversation switching clears previous
+inspection state. This surface reports observed counts without token percentages
+or context-quality scores. See the [full-layer audit](../docs/desktop/AGENT-CONTEXT.md).
+The shared Code tab is now named Inspect to reflect files, run evidence and
+conversation context. Context hides the unrelated file browser and uses the full
+reading pane; choosing Files restores browsing. Its compact title is Context,
+with the full name in the tooltip, and section headings use native semibold text.
+
 ### Reasoning control
 
 The composer footer places a compact native Reasoning menu beside the model name. Its visible label shows the saved level; the menu uses checkmarks and short speed/depth hints. One choice applies immediately for subsequent instructions. Default means the provider default. Unknown model capabilities leave the default visible with an explanatory tooltip. There is no separate activation button or settings sheet. Workspace Actions also exposes Change Reasoning Level. Active work, persistence, connection loss, and uncertain saves retain the existing model-selection safety boundaries; the menu reconciles uncertain state through a read-only check.
+
+
+### Retained history refinement — October 1, 2026
+
+Conversation Context's Open… menu now leads to Retained History in the same
+full-width reading pane. Native system body text, semantic colors, selectable
+content, Find, Back/Forward and Previous/Next preserve the established reading
+workflow. Role/date labels distinguish messages and rolling summaries. The scope
+note separates retained messages from saved memory and other prompt sources;
+Reload captures a new snapshot. Page errors preserve the last valid content and
+name Reload as recovery. A localized observation time and page-search scope are
+available in the footer tooltip. No additional sidebar, modal or health gauge.

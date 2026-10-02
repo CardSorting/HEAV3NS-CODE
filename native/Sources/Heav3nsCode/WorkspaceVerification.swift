@@ -32,7 +32,7 @@ enum WorkspaceVerificationPresentation {
         let checks = summary?["checks"] as? Int ?? 0
         let result: String
         switch status {
-        case "passed" where checks > 0 && summary?["revision"] is String:
+        case "passed" where checks > 0 && !(summary?["revision"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
             result = "\(checks) project \(checks == 1 ? "check" : "checks") passed"
         case "failed": result = "Changes need more work"
         case "unavailable": result = "Checks could not finish"

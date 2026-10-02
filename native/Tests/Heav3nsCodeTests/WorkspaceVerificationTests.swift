@@ -5,6 +5,7 @@ import AppKit
 final class WorkspaceVerificationTests: XCTestCase {
     func testOnlyScopedCheckEvidenceCanClaimPassed() {
         XCTAssertEqual(WorkspaceVerificationPresentation.label(["verification": "passed", "commandCount": 10]), "Checks not confirmed")
+        XCTAssertEqual(WorkspaceVerificationPresentation.label(["workspaceVerification": ["status": "passed", "checks": 2, "revision": " "]]), "Checks not confirmed")
         XCTAssertEqual(WorkspaceVerificationPresentation.label(["workspaceVerification": ["status": "passed", "checks": 2, "revision": "abc"]]), "2 project checks passed")
         XCTAssertEqual(WorkspaceVerificationPresentation.label(["verification": "evidence_available"]), "Tool results recorded · Checks not confirmed")
     }

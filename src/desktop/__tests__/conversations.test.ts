@@ -4,15 +4,16 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { EngineTickInput, EngineTickResult } from "../../core/contracts/agent.contracts.js"
 import { BroccoliDatabaseKernel } from "../../sessions/extensions/substrate/broccolidb-kernel.js"
-import type { WorkspaceInspection } from "../inspection.js"
 import type { DesktopRequest } from "../protocol.js"
 import { DesktopSession } from "../worker.js"
+
+const jsonl = (content: string) => JSON.stringify({ role: "user", content, timestamp: 1 })
 
 describe("desktop conversations", () => {
 	let folder: string
 	let database: BroccoliDatabaseKernel
 	let bridge: DesktopSession
-	let context = { jsonl: "legacy context", turnCount: 4 }
+	let context = { jsonl: jsonl("legacy context"), turnCount: 4 }
 	let calls: string[]
 	let execute: (input: EngineTickInput) => Promise<EngineTickResult>
 	const result = (): EngineTickResult => ({
@@ -46,9 +47,9 @@ describe("desktop conversations", () => {
 		folder = await mkdtemp(path.join(tmpdir(), "heav3ns-conversations-"))
 		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
 		calls = []
-		context = { jsonl: "legacy context", turnCount: 4 }
+		context = { jsonl: jsonl("legacy context"), turnCount: 4 }
 		execute = async (input) => {
-			context = { jsonl: String(input.prompt), turnCount: context.turnCount + 1 }
+			context = { jsonl: jsonl(String(input.prompt)), turnCount: context.turnCount + 1 }
 			return result()
 		}
 		bridge = new DesktopSession(
@@ -65,6 +66,11 @@ describe("desktop conversations", () => {
 				sessionId: "legacy",
 				saveContext: () => database.getTable("desktop.metadata.v1").put("context", { ...context }),
 				readContext: () => ({ ...context }),
+				readHistory: () =>
+					context.jsonl
+						.split("\n")
+						.filter(Boolean)
+						.map((line) => JSON.parse(line)),
 				restoreContext: (value) => {
 					context = { ...value }
 				},
@@ -77,6 +83,55 @@ describe("desktop conversations", () => {
 		await bridge.stop()
 		await rm(folder, { recursive: true, force: true })
 	})
+	it("captures real retained history without execution and invalidates snapshots across conversation switches", async () => {
+		assert.ok((await request("hello")).capabilities.includes("context-history-v1"))
+		const conversation = bridge.conversation
+		const first = await request("context.history", { conversation })
+		assert.match(first.text, /legacy context/)
+		context.jsonl = jsonl("new retained history")
+		assert.equal((await request("context.history", { conversation, revision: first.revision })).text, first.text)
+		const refreshed = await request("context.history", { conversation })
+		assert.match(refreshed.text, /new retained history/)
+		await assert.rejects(request("context.history", { conversation, revision: first.revision }), /HISTORY_EXPIRED/)
+		await request("conversation.create")
+		await assert.rejects(request("context.history", { conversation }), /CONVERSATION_CHANGED/)
+		assert.match((await request("context.history", { conversation: bridge.conversation })).text, /No retained messages/)
+		await request("conversation.select", { id: conversation })
+		await assert.rejects(request("context.history", { conversation, revision: refreshed.revision }), /HISTORY_EXPIRED/)
+		assert.match((await request("context.history", { conversation })).text, /new retained history/)
+		assert.equal(calls.length, 0)
+	})
+
+	it("waits for a conversation switch to commit before reading retained history", async () => {
+		const conversation = bridge.conversation
+		const flush = database.flush.bind(database)
+		let release!: () => void, entered!: () => void
+		const gate = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const started = new Promise<void>((resolve) => {
+			entered = resolve
+		})
+		database.flush = async () => {
+			entered()
+			await gate
+			await flush()
+		}
+		try {
+			const change = request("conversation.create")
+			await started
+			const read = request("context.history", { conversation })
+			const rejected = assert.rejects(read, /CONVERSATION_CHANGED/)
+			release()
+			await change
+			await rejected
+			assert.equal(calls.length, 0)
+		} finally {
+			release()
+			database.flush = flush
+		}
+	})
+
 	it("deletes inactive conversations without changing the active context and retries safely", async () => {
 		await request("task.submit", { text: "Keep checkpoint evidence" })
 		await idle()
@@ -102,7 +157,8 @@ describe("desktop conversations", () => {
 		await idle()
 		const replacement = (await request("conversation.delete", { id: original })).conversation
 		assert.notEqual(replacement, original)
-		assert.deepEqual(context, { jsonl: "", turnCount: 0 })
+		assert.equal(context.jsonl, "")
+		assert.equal(context.turnCount, 0)
 		assert.equal((await request("snapshot")).runs.length, 0)
 		assert.equal(database.getTable("desktop.metadata.v1").get("activeConversation")?.id, replacement)
 		assert.ok(database.getTable("desktop.conversations.v1").get(original)?.deletedAt)
@@ -118,7 +174,8 @@ describe("desktop conversations", () => {
 		const second = (await request("conversation.create")).conversation
 		assert.notEqual(first, second)
 		assert.equal(bridge.session, identity)
-		assert.deepEqual(context, { jsonl: "", turnCount: 0 })
+		assert.equal(context.jsonl, "")
+		assert.equal(context.turnCount, 0)
 		assert.equal((await request("snapshot")).runs.length, 0)
 		await assert.rejects(request("activity.list", { run: firstRun }), /UNKNOWN_RUN/)
 		await assert.rejects(request("history.read", { run: firstRun }), /UNKNOWN_RUN/)
@@ -126,7 +183,7 @@ describe("desktop conversations", () => {
 		await request("task.submit", { text: "Second conversation" })
 		await idle()
 		await request("conversation.select", { id: first })
-		assert.equal(context.jsonl, "First conversation")
+		assert.equal(context.jsonl, jsonl("First conversation"))
 		assert.equal(context.turnCount, 5)
 		assert.equal((await request("history.read", { run: firstRun })).run.text, "First conversation")
 		assert.deepEqual(
@@ -136,7 +193,7 @@ describe("desktop conversations", () => {
 		assert.deepEqual(calls, ["First conversation", "Second conversation"])
 		assert.equal((await request("conversation.list")).conversations.length, 2)
 		await request("conversation.select", { id: second })
-		assert.equal(context.jsonl, "Second conversation")
+		assert.equal(context.jsonl, jsonl("Second conversation"))
 		assert.equal(database.getTable("desktop.metadata.v1").get("activeConversation")?.id, second)
 	})
 	it("refuses context switching while a task is running or queued", async () => {
@@ -157,8 +214,39 @@ describe("desktop conversations", () => {
 		await assert.rejects(request("conversation.select", { id: "missing" }), /UNKNOWN_CONVERSATION/)
 		await assert.rejects(request("conversation.select", { id: "legacy", surprise: true }))
 		assert.equal(bridge.conversation, "legacy")
-		assert.equal(context.jsonl, "legacy context")
+		assert.equal(context.jsonl, jsonl("legacy context"))
 		assert.equal(calls.length, 0)
+	})
+	it("rejects an invalid saved context before changing the live conversation or selection", async () => {
+		const before = { ...context },
+			conversation = bridge.conversation
+		const metadata = database.getTable("desktop.metadata.v1")
+		const selection = metadata.get("activeConversation")
+		database.getTable("desktop.conversations.v1").put("damaged", {
+			id: "damaged",
+			context: { jsonl: jsonl("Other conversation"), turnCount: 1, memories: [null] },
+		})
+		await assert.rejects(request("conversation.select", { id: "damaged" }), /INVALID_MEMORY/)
+		assert.deepEqual(context, before)
+		assert.equal(bridge.conversation, conversation)
+		assert.deepEqual(metadata.get("activeConversation"), selection)
+	})
+	it("rejects an invalid checkpoint context before restoring project files or creating a safety journal", async () => {
+		await writeFile(path.join(folder, "app.txt"), "original")
+		await request("task.submit", { text: "Snapshot" })
+		await idle()
+		const id = (await request("snapshot")).runs[0].checkpointBefore
+		const checkpoints = database.getTable("desktop.checkpoints.v1")
+		checkpoints.put(id, { ...checkpoints.get(id), context: { jsonl: "broken", turnCount: 0 } })
+		await writeFile(path.join(folder, "app.txt"), "current edits")
+		const preview = await request("checkpoint.preview", { id })
+		const before = { ...context },
+			count = checkpoints.getAll().length
+		await assert.rejects(request("checkpoint.restore", { id, token: preview.token }), /INVALID_CONTEXT/)
+		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "current edits")
+		assert.deepEqual(context, before)
+		assert.equal(checkpoints.getAll().length, count)
+		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal"), undefined)
 	})
 	it("rejects stale conversation submissions before recording or executing work", async () => {
 		const previous = bridge.conversation
@@ -204,8 +292,7 @@ describe("desktop conversations", () => {
 		await request("task.submit", { text: "First conversation" })
 		await idle()
 		const run = (await request("snapshot")).runs[0].id
-		const inspection = (bridge as unknown as { inspection: WorkspaceInspection }).inspection
-		const read = inspection.read.bind(inspection)
+		const read = database.readBlob.bind(database)
 		let release!: () => void, started!: () => void
 		const entered = new Promise<void>((resolve) => {
 			started = resolve
@@ -213,18 +300,10 @@ describe("desktop conversations", () => {
 		const barrier = new Promise<void>((resolve) => {
 			release = resolve
 		})
-		inspection.read = async () => {
+		database.readBlob = async (hash) => {
 			started()
 			await barrier
-			return {
-				text: "Old conversation output",
-				binary: false,
-				size: 23,
-				offset: 0,
-				nextOffset: 23,
-				more: false,
-				revision: "fixture",
-			}
+			return read(hash)
 		}
 		const output = request("artifact.read", { run })
 		const rejected = assert.rejects(output, /CONVERSATION_CHANGED/)
@@ -232,13 +311,13 @@ describe("desktop conversations", () => {
 		await request("conversation.create")
 		release()
 		await rejected
-		inspection.read = read
+		database.readBlob = read
 	})
 	it("automatically links before/after checkpoints to a message and restores into a new conversation with a safety flag", async () => {
 		await writeFile(path.join(folder, "app.txt"), "original")
 		execute = async () => {
 			await writeFile(path.join(folder, "app.txt"), "agent edit")
-			context = { jsonl: "after instruction", turnCount: 5 }
+			context = { jsonl: jsonl("after instruction"), turnCount: 5 }
 			return result()
 		}
 		await request("task.submit", { text: "Change the app" })
@@ -252,7 +331,7 @@ describe("desktop conversations", () => {
 		const restored = await request("checkpoint.restore", { id: run.checkpointBefore, token: preview.token })
 		assert.notEqual(restored.conversation, original)
 		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "original")
-		assert.equal(context.jsonl, "legacy context")
+		assert.equal(context.jsonl, jsonl("legacy context"))
 		assert.equal(restored.safety.flagged, true)
 		assert.equal((await request("snapshot")).runs.length, 0)
 		await request("conversation.select", { id: original })
@@ -260,7 +339,7 @@ describe("desktop conversations", () => {
 		const forward = await request("checkpoint.preview", { id: run.checkpointAfter })
 		await request("checkpoint.restore", { id: run.checkpointAfter, token: forward.token })
 		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "agent edit")
-		assert.equal(context.jsonl, "after instruction")
+		assert.equal(context.jsonl, jsonl("after instruction"))
 		assert.deepEqual(calls, ["Change the app"])
 	})
 	it("rejects stale restore previews without overwriting newer manual edits", async () => {
@@ -375,7 +454,7 @@ describe("desktop conversations", () => {
 		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "external edit after preparation")
 		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal")?.pending, false)
 		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal")?.abortedBeforeWrite, true)
-		assert.equal(context.jsonl, "Snapshot")
+		assert.equal(context.jsonl, jsonl("Snapshot"))
 	})
 	it("recovers the safety copy and original context if applying a checkpoint fails halfway", async () => {
 		await writeFile(path.join(folder, "app.txt"), "original")
@@ -400,7 +479,7 @@ describe("desktop conversations", () => {
 		await assert.rejects(request("checkpoint.restore", { id, token: preview.token }), /fixture interrupted/)
 		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "latest")
 		assert.equal(bridge.conversation, original)
-		assert.equal(context.jsonl, "Snapshot")
+		assert.equal(context.jsonl, jsonl("Snapshot"))
 		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal")?.pending, false)
 	})
 	it("recovers a persisted interrupted restore before admitting work after restart", async () => {
@@ -420,7 +499,7 @@ describe("desktop conversations", () => {
 		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal")?.pending, true)
 		await bridge.stop()
 		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
-		context = { jsonl: "wrong interrupted context", turnCount: 0 }
+		context = { jsonl: jsonl("wrong interrupted context"), turnCount: 0 }
 		bridge = new DesktopSession(
 			{ path: folder, id: "fixture" },
 			{
@@ -435,6 +514,11 @@ describe("desktop conversations", () => {
 				saveContext: (conversation) =>
 					database.getTable("desktop.metadata.v1").put("context", { ...context, conversation }),
 				readContext: () => ({ ...context }),
+				readHistory: () =>
+					context.jsonl
+						.split("\n")
+						.filter(Boolean)
+						.map((line) => JSON.parse(line)),
 				restoreContext: (value) => {
 					context = { ...value }
 				},
@@ -444,7 +528,7 @@ describe("desktop conversations", () => {
 		await bridge.start()
 		assert.equal(await readFile(path.join(folder, "app.txt"), "utf8"), "latest")
 		assert.equal(bridge.conversation, original)
-		assert.equal(context.jsonl, "Snapshot")
+		assert.equal(context.jsonl, jsonl("Snapshot"))
 		assert.equal(database.getTable("desktop.metadata.v1").get("restore-journal")?.pending, false)
 		assert.deepEqual(calls, ["Snapshot"])
 	})

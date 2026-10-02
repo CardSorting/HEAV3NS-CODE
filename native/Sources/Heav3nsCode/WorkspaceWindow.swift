@@ -56,7 +56,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let chatTitle = JourneyStyle.label("New conversation", size: 21, weight: .semibold)
     private let chatState = JourneyStyle.label("Tell LUMI what you want to build.", size: 12, secondary: true)
     private let contextPanel = NSStackView()
-    private let contextTabs = NSSegmentedControl(labels: ["Walkthrough", "Changes", "Code", "Run"], trackingMode: .selectOne, target: nil, action: nil)
+    private let contextTabs = NSSegmentedControl(labels: ["Walkthrough", "Changes", "Inspect", "Run"], trackingMode: .selectOne, target: nil, action: nil)
     private let projectRun = ProjectRunView()
     private let projectRunScroll = NSScrollView()
     private var checkpointWindow: CheckpointWindow?
@@ -108,6 +108,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let inspectionForward = NSButton()
     private let inspectionFind = NSButton()
     private let recordedOutput = NSButton(title: "View Recorded Output", target: nil, action: nil)
+    private let checkCode = NSButton(title: "Check Code", target: nil, action: nil)
+    private let prepareCodeReview = NSButton(title: "Prepare Review", target: nil, action: nil)
+    private var spiderDetails: SpiderCheckDetails?
+    private var savedStateDetails: SavedStateDetails?
+    private let relatedEvidence = NSPopUpButton(frame: .zero, pullsDown: true)
+    private var memoryWindow: ConversationMemoryWindow?
+    private var evidenceLinks = [RunDetails.Related]()
+    private var contextLinks = [ConversationContextLink]()
+    private var showingContextSummary = false
     private let previousButton = NSButton(title: "Previous", target: nil, action: nil)
     private let pageLabel = NSTextField(labelWithString: "Read only")
     private let breadcrumb = NSPathControl()
@@ -338,7 +347,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         diffScope.target = self; diffScope.action = #selector(changeDiffScope); diffScope.isHidden = true; diffScope.selectedSegment = 0
         inspector.addArrangedSubview(diffScope)
         recordedOutput.target = self; recordedOutput.action = #selector(openRecordedOutput); recordedOutput.bezelStyle = .rounded; recordedOutput.isHidden = true
-        inspector.addArrangedSubview(recordedOutput)
+        relatedEvidence.target = self; relatedEvidence.action = #selector(openRelatedEvidence); relatedEvidence.isHidden = true
+        relatedEvidence.setAccessibilityLabel("Related evidence for this instruction")
+        relatedEvidence.toolTip = "Open activity, the previous instruction, or a recorded checkpoint"
+        checkCode.target = self; checkCode.action = #selector(showCodeCheck); checkCode.bezelStyle = .rounded; checkCode.isHidden = true
+        checkCode.toolTip = "Check saved JavaScript or TypeScript syntax, local imports and dependency cycles"
+        prepareCodeReview.target = self; prepareCodeReview.action = #selector(draftCodeReview); prepareCodeReview.bezelStyle = .rounded; prepareCodeReview.isHidden = true
+        prepareCodeReview.toolTip = "Add the findings to a review draft without sending it"
+        let evidenceBar = stack([recordedOutput, checkCode, relatedEvidence, prepareCodeReview], spacing: 6)
+        inspector.addArrangedSubview(evidenceBar)
         outline.target = self; outline.action = #selector(jumpToDeclaration); outline.isHidden = true
         outline.setAccessibilityLabel("Declarations in the displayed code page")
         inspector.addArrangedSubview(outline); outline.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
@@ -410,7 +427,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         queueContent.onEdit = { [weak self] in self?.editQueued($0) }
         queueContent.onRemove = { [weak self] in self?.removeQueued($0) }
         hint.lineBreakMode = .byTruncatingTail
-        hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        hint.setContentCompressionResistancePriority(.init(100), for: .horizontal)
         stopSendButton.target = self; stopSendButton.action = #selector(stopAndSend); stopSendButton.bezelStyle = .rounded; stopSendButton.isHidden = true
         reconnectButton.target = self; reconnectButton.action = #selector(reconnect); reconnectButton.bezelStyle = .rounded; reconnectButton.isHidden = true
         notice.font = .systemFont(ofSize: 11); notice.maximumNumberOfLines = 3; notice.isSelectable = true
@@ -460,6 +477,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         hint.toolTip = "Enter to send · Shift–Enter for a new line. Autonomous execution runs tools without approval prompts. Use Stop to interrupt."
         modelButton.widthAnchor.constraint(lessThanOrEqualTo: modelBar.widthAnchor, multiplier: 0.45).isActive = true
         modelButton.widthAnchor.constraint(lessThanOrEqualToConstant: 260).isActive = true
+        modelButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80).isActive = true
         let center = stack([surfaces, header, rule, work, approval, noticeBar, composerSurface, modelBar], vertical: true, spacing: 10)
         center.setContentHuggingPriority(.init(1), for: .horizontal)
         work.setContentHuggingPriority(.init(1), for: .vertical)
@@ -496,7 +514,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         openFileButton.toolTip = "Open a workspace file by name or path (⌘P)"
         let heading = stack([title, NSView(), openFileButton])
         contextTabs.target = self; contextTabs.action = #selector(changeContext); contextTabs.selectedSegment = 0
-        contextTabs.setAccessibilityLabel("Task context: Walkthrough, Changes, Code or Run")
+        contextTabs.setAccessibilityLabel("Task context: Walkthrough, Changes, Inspect or Run")
         browseContext.target = self; browseContext.action = #selector(toggleContextBrowser); browseContext.bezelStyle = .rounded
         walkthrough.onSelection = { [weak self] _ in self?.loadWalkthrough() }
         walkthrough.onOpenFile = { [weak self] path in self?.readFile(path) }
@@ -696,6 +714,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         inspectedFile = nil; inspectedDiff = nil; declarations = []
         inspection.string = "Choose a file, change, or recorded instruction to inspect."
         inspectorTitle.stringValue = "Inspect"; pageLabel.stringValue = "Read only"
+        evidenceLinks = []; contextLinks = []; showingContextSummary = false; relatedEvidence.isHidden = true
+        spiderDetails = nil; checkCode.isHidden = true; prepareCodeReview.isHidden = true
         [breadcrumb, diffScope, revealButton, outline, recordedOutput, moreButton, previousButton].forEach { $0.isHidden = true }
         nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
         navigationQuery = ""; navigation.resetFilter()
@@ -780,6 +800,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if canOpenFile { actions.insert(WorkspaceAction(title: "Open File…", shortcut: "⌘P") { [weak self] in self?.showQuickOpen() }, at: 1) }
         if client.capabilities.contains("project-run-v1") { actions.insert(WorkspaceAction(title: "Run Project", shortcut: "⌘R") { [weak self] in self?.showProjectRun() }, at: 1) }
         if client.capabilities.contains("checkpoints-v1") { actions.insert(WorkspaceAction(title: "Checkpoints", shortcut: "⌘7") { [weak self] in self?.showCheckpoints() }, at: 1) }
+        if canShowMemory { actions.insert(WorkspaceAction(title: "Conversation Memory…", shortcut: "⌘8", keywords: ["remember", "context", "facts", "preferences", "notes"]) { [weak self] in self?.showMemory() }, at: 1) }
+        if canShowContext { actions.insert(WorkspaceAction(title: "Conversation Context", shortcut: "⌘9", keywords: ["history", "summary", "retained", "memory", "inspect"]) { [weak self] in self?.showContext() }, at: 1) }
+        if canCheckCode { actions.insert(WorkspaceAction(title: "Check Code", shortcut: "", keywords: ["spider", "syntax", "imports", "cycles", "diagnostics"]) { [weak self] in self?.showCodeCheck() }, at: 1) }
+        if canShowSavedState { actions.insert(WorkspaceAction(title: "Saved State", shortcut: "", keywords: ["history", "storage", "integrity", "recovery", "runtime"]) { [weak self] in self?.showSavedState() }, at: 1) }
         if canSwitchConversation { actions.insert(WorkspaceAction(title: "New Conversation", shortcut: "⌘N") { [weak self] in self?.newConversation() }, at: 1) }
         if hasWork { actions.insert(WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
         if canReviewApproval { actions.insert(WorkspaceAction(title: "Review Request…", shortcut: "⌘5") { [weak self] in self?.showApprovalReview() }, at: 1) }
@@ -800,6 +824,44 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             self.client.request("files.search", params: ["query": query, "refresh": refresh], completion: completion)
         }, open: { [weak self] path in self?.readFile(path) })
         quickOpen?.present(for: window)
+    }
+    var canShowMemory: Bool { client.isReady && client.capabilities.contains("conversation-memory-v1") && !switchingConversation && !closing }
+    var canShowContext: Bool { client.isReady && client.capabilities.contains("conversation-context-v1") && !switchingConversation && !closing }
+    var canCheckCode: Bool {
+        guard client.isReady, client.capabilities.contains("spider-check-v1"), !switchingConversation, !closing, let file = inspectedFile else { return false }
+        return ["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"].contains((file as NSString).pathExtension.lowercased())
+    }
+    @objc func showCodeCheck() { if canCheckCode, let file = inspectedFile { inspect(.spider(file)) } }
+    @objc private func draftCodeReview() {
+        guard client.isReady, !switchingConversation, !closing, let details = spiderDetails, case .spider = inspectionHistory.current else { return }
+        guard let draft = details.appendingReview(to: composer.string, limit: client.instructionLimit) else { showNotice("Your draft is too long to add this review. Shorten it or copy the findings first."); return }
+        composer.string = draft; saveDraft(); focusComposer()
+        showNotice("Review request added to your draft. Edit it, then choose Send when ready.")
+    }
+    @objc func showContext() { if canShowContext, let conversation = currentConversation { inspect(.context(conversation)) } }
+    var canShowSavedState: Bool { client.isReady && client.capabilities.contains("runtime-state-v1") && currentConversation != nil && !switchingConversation && !closing }
+    @objc func showSavedState() { if canShowSavedState, let conversation = currentConversation { inspect(.savedState(conversation)) } }
+    var isMemoryKeyWindow: Bool { memoryWindow?.isKeyWindow == true }
+    var canFindMemory: Bool { memoryWindow?.canFocusSearch == true }
+    func findMemory() { memoryWindow?.focusSearch() }
+    @objc func showMemory() {
+        guard canShowMemory, let conversation = currentConversation, let window else { return }
+        if let memoryWindow, memoryWindow.window?.isVisible == true {
+            if memoryWindow.state.conversation == conversation || memoryWindow.state.dirty || memoryWindow.state.uncertain || memoryWindow.state.saving {
+                memoryWindow.present(for: window); return
+            }
+            memoryWindow.dismiss()
+        }
+        memoryWindow = ConversationMemoryWindow(folder: folder, conversation: conversation, title: chatTitle.stringValue,
+            request: { [weak self] method, params, completion in
+                guard let self else { completion(.failure(BridgeError.message("Workspace closed."))); return }
+                self.client.request(method, params: params) { [weak self] result in
+                    if case .failure(let error) = result, error.localizedDescription.contains("MEMORY_SAVE_UNCERTAIN") { self?.client.closeInput() }
+                    completion(result)
+                }
+            }, available: { [weak self] in self?.canShowMemory == true && self?.currentConversation == conversation },
+            writable: { [weak self] in self?.canShowMemory == true && self?.currentConversation == conversation && self?.canRequestRecovery == true })
+        memoryWindow?.present(for: window)
     }
     @objc func focusComposer() {
         palette?.cancelOperation(nil)
@@ -841,7 +903,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     /// Flush every workspace before Quit starts stopping workers.
-    @discardableResult func prepareToClose() -> Bool { saveDraft() }
+    @discardableResult func prepareToClose() -> Bool {
+        if let memoryWindow, memoryWindow.state.dirty || memoryWindow.state.uncertain || memoryWindow.state.saving {
+            showNotice("Save or discard your memory draft before closing this workspace. You can copy it first.")
+            if let window { memoryWindow.present(for: window) }; return false
+        }
+        return saveDraft()
+    }
     @objc func submit() {
         guard !composer.hasMarkedText() else { return }
         submitInstruction(composer.string.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -944,6 +1012,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     /// Development-only entry points selected by the opt-in integration harness.
     /// They drive the same controls and real read-only bridge as the application.
     func navigateProbe(_ step: String) {
+        if step == "memory" { showMemory(); return }
+        if step.hasPrefix("memory:") { memoryWindow?.navigateProbe(String(step.dropFirst(7))); return }
+        if step.hasPrefix("related:") {
+            let kind = String(step.dropFirst("related:".count))
+            if let index = evidenceLinks.firstIndex(where: { $0.kind.rawValue == kind }) {
+                relatedEvidence.selectItem(at: index + 1); openRelatedEvidence()
+            }
+            return
+        }
         if step.hasPrefix("reasoning:") { reasoningPicker.select(String(step.dropFirst("reasoning:".count))); return }
         if step.hasPrefix("model-draft:") { modelPicker?.editProbe(String(step.dropFirst("model-draft:".count))); return }
         if step.hasPrefix("model-search:") { modelPicker?.searchProbe(String(step.dropFirst("model-search:".count))); return }
@@ -959,6 +1036,30 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             return
         }
         switch step {
+        case "context", "context-empty": showContext()
+        case "spider-file": showFiles(); readFile("entry.ts")
+        case "saved-state", "saved-state-empty": showSavedState()
+        case "saved-state-open": relatedEvidence.selectItem(at: 1); openRelatedEvidence()
+        case "saved-state-reload": refreshInspection()
+        case "spider": showCodeCheck()
+        case "spider-reload": refreshInspection()
+        case "spider-review": composer.string = "Keep this existing draft."; draftCodeReview()
+        case "spider-open": relatedEvidence.selectItem(at: 1); openRelatedEvidence()
+        case "context-reload": refreshInspection()
+        case "context-files": showFiles()
+        case "context-history":
+            if let index = contextLinks.firstIndex(of: .history) { relatedEvidence.selectItem(at: index + 1); openRelatedEvidence() }
+        case "context-history-back": inspectBack()
+        case "context-history-find": findInInspection()
+        case "context-history-next": loadNextPage()
+        case "context-history-previous": loadPreviousPage()
+        case "context-history-reload": refreshInspection()
+        case "context-history-empty": if let conversation = currentConversation { inspect(.contextHistory(conversation)) }
+        case "context-memory":
+            if let index = contextLinks.firstIndex(of: .memory) { relatedEvidence.selectItem(at: index + 1); openRelatedEvidence() }
+        case "context-saved-state":
+            if let index = contextLinks.firstIndex(of: .savedState) { relatedEvidence.selectItem(at: index + 1); openRelatedEvidence() }
+        case "context-close-memory": memoryWindow?.dismiss(); memoryWindow = nil
         case "files": showFiles(); readFile("fixture.txt")
         case "code", "compact-code": showFiles(); readFile("WorkspaceExample.swift")
         case "walkthrough": showWalkthrough()
@@ -1051,13 +1152,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var probeLayout: [String: Any] {
         let bounds = NSRect(origin: .zero, size: window?.frame.size ?? .zero)
         var controls = [String: Any]()
-        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("reasoning", reasoningPicker), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput)] {
+        for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("reasoning", reasoningPicker), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput), ("relatedEvidence", relatedEvidence)] {
             if !view.isHiddenOrHasHiddenAncestor {
                 let frame = view.convert(view.bounds, to: nil)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
-        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "modelPicker": modelPicker?.diagnostics ?? [:], "reasoningPicker": reasoningPicker.diagnostics, "actionPalette": palette?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
+        return ["messageLayoutIssues": (0..<rows.count).compactMap { (transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell)?.layoutIssue }, "messageContentFits": (0..<rows.count).compactMap { transcript.view(atColumn: 0, row: $0, makeIfNecessary: false) as? TranscriptMessageCell }.allSatisfy { $0.contentFits }, "selectedSurface": surfaces.selectedSegment, "contextVisible": !contextPanel.isHidden, "conversationSidebarVisible": !conversations.isHidden, "conversationCount": conversationList.count, "deleteSheetVisible": window?.attachedSheet != nil, "projectRun": projectRun.diagnostics, "memory": memoryWindow?.diagnostics ?? [:], "checkpoints": checkpointWindow?.diagnostics ?? [:], "messageRoles": rows.map { $0.user ? "user" : $0.activity ? "activity" : "agent" }, "quickOpen": quickOpen?.diagnostics ?? [:], "modelPicker": modelPicker?.diagnostics ?? [:], "reasoningPicker": reasoningPicker.diagnostics, "actionPalette": palette?.diagnostics ?? [:], "workspaceKey": window?.isKeyWindow == true, "composerFocused": window?.firstResponder === composer, "conversation": currentConversation ?? "", "switchingConversation": switchingConversation, "walkthrough": walkthrough.diagnostics, "windowFrameWidth": bounds.width, "windowFrameHeight": bounds.height, "controls": controls, "destination": navigation.destination.title, "navigationVisible": !navigation.isHidden, "inspectionPreview": String(inspection.string.prefix(240)), "inspectionTitle": inspectorTitle.stringValue, "inspectionPage": pageLabel.stringValue, "canInspectBack": canInspectBack, "canInspectForward": canInspectForward, "recordedOutputAvailable": !recordedOutput.isHidden, "relatedEvidence": evidenceLinks.map { ["kind": $0.kind.rawValue, "id": $0.id, "label": $0.label] }, "findBarVisible": inspectionScroll.isFindBarVisible, "appearance": window?.effectiveAppearance.name.rawValue ?? "system", "forceStopAvailable": forceAvailable, "composerUTF16Count": composer.string.utf16.count, "draftSaveFailed": draftSaveFailed, "submissionNeedsReconciliation": uncertainSubmission != nil]
     }
     private func mergeRun(_ run: [String: Any]) {
         guard let id = run["id"] as? String else { return }
@@ -1182,6 +1283,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
     }
     private func updateStatus() {
+        memoryWindow?.syncAvailability()
         reasoningPicker.refresh(supported: client.isReady && client.capabilities.contains("reasoning-selection-v1"))
         modelButton.isEnabled = canChooseModels
         modelButton.toolTip = client.capabilities.contains("model-selection-v1") ? modelButton.toolTip : "This runtime does not support model switching. Rebuild the app and runtime together."
@@ -1214,6 +1316,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         stopSendButton.isHidden = !hasWork || draft.isEmpty
         stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
         hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? (client.isReady ? "Acceptance unknown · Check Status before sending" : "Acceptance unknown · reconnect to reconcile") : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
+        hint.toolTip = hint.stringValue + "\nEnter to send · Shift–Enter for a new line. Use Stop to interrupt."
         queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
         queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
         updateQueue()
@@ -1374,6 +1477,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     @objc func showSessions() { loadConversations(); navigation.select(.sessions) }
     private func navigate(_ destination: WorkspaceDestination) {
         navigationGeneration += 1; navigationQuery = ""; navigationOffset = 0; nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
+        showingContextSummary = false
         showingInspector = true; surfaces.selectedSegment = 1
         browsingCompact = true
         if destination == .files { contextTabs.selectedSegment = 2 }
@@ -1487,6 +1591,54 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         inspectionBack.isEnabled = inspectionHistory.canGoBack; inspectionForward.isEnabled = inspectionHistory.canGoForward
         reloadInspection = { [weak self] in self?.inspect(destination, addToHistory: false) }
         switch destination {
+        case .savedState(let conversation):
+            prepareInspection(title: "Saved State", file: nil, contextSummary: true)
+            guard canShowSavedState, currentConversation == conversation else {
+                inspectionFailed(BridgeError.message("Saved state is unavailable. Reconnect to a supported runtime."), initial: true); return
+            }
+            let generation = inspectionGeneration
+            client.request("state.inspect", params: ["conversation": conversation]) { [weak self] result in
+                guard let self, self.inspectionGeneration == generation, self.currentConversation == conversation else { return }
+                switch result {
+                case .success(let data):
+                    guard let details = SavedStateDetails(data, conversation: conversation) else {
+                        self.inspectionFailed(BridgeError.message("Saved state could not be read. Use Reload to try again."), initial: true); return
+                    }
+                    self.savedStateDetails = details
+                    self.inspection.textStorage?.setAttributedString(details.attributedText); self.inspection.scrollToBeginningOfDocument(nil)
+                    self.pageLabel.stringValue = details.observed; self.pageLabel.toolTip = details.observed
+                    self.relatedEvidence.removeAllItems(); self.relatedEvidence.addItems(withTitles: ["Open Instruction…"] + details.report.runs.map { String($0.title.prefix(60)) })
+                    self.relatedEvidence.setAccessibilityLabel("Open a saved instruction")
+                    self.relatedEvidence.toolTip = "Review the selected instruction’s saved result and related evidence"
+                    self.relatedEvidence.isHidden = details.report.runs.isEmpty
+                case .failure(let error): self.inspectionFailed(error, initial: true)
+                }
+            }
+        case .spider(let file):
+            prepareInspection(title: "Code Check", file: nil, contextSummary: true)
+            inspection.font = .systemFont(ofSize: 14)
+            guard client.isReady, client.capabilities.contains("spider-check-v1") else {
+                inspectionFailed(BridgeError.message("Code checks are unavailable. Reconnect to a supported runtime."), initial: true); return
+            }
+            let generation = inspectionGeneration
+            client.request("spider.check", params: ["paths": [file]]) { [weak self] result in
+                guard let self, self.inspectionGeneration == generation else { return }
+                switch result {
+                case .success(let data):
+                    guard let details = SpiderCheckDetails(data, file: file) else {
+                        self.inspectionFailed(BridgeError.message("The code-check report could not be verified. Use Reload to try again."), initial: true); return
+                    }
+                    self.spiderDetails = details; self.inspection.textStorage?.setAttributedString(details.attributedText)
+                    self.inspection.scrollToBeginningOfDocument(nil)
+                    self.pageLabel.stringValue = details.observed; self.pageLabel.toolTip = details.observedDetail
+                    self.relatedEvidence.removeAllItems(); self.relatedEvidence.addItems(withTitles: ["Open File…"] + details.files)
+                    self.relatedEvidence.setAccessibilityLabel("Open a code-check file")
+                    self.relatedEvidence.toolTip = "Inspect a file named in this report"
+                    self.relatedEvidence.isHidden = details.files.isEmpty
+                    self.prepareCodeReview.isHidden = false
+                case .failure(let error): self.inspectionFailed(error, initial: true)
+                }
+            }
         case .file(let path):
             let parent = (path as NSString).deletingLastPathComponent
             let folder = parent.isEmpty ? "." : parent
@@ -1500,6 +1652,50 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case .output(let run):
             prepareInspection(title: "Recorded Output", file: nil)
             showPage("artifact.read", params: ["run": run], offset: 0, trail: [], revision: nil)
+        case .contextHistory(let conversation):
+            prepareInspection(title: "Retained History", file: nil, contextSummary: true)
+            guard client.isReady, client.capabilities.contains("context-history-v1"), currentConversation == conversation else {
+                inspectionFailed(BridgeError.message("History is unavailable for this conversation. Reopen Conversation Context."), initial: true); return
+            }
+            showPage("context.history", params: ["conversation": conversation], offset: 0, trail: [], revision: nil)
+        case .context(let conversation):
+            prepareInspection(title: "Context", file: nil, contextSummary: true)
+            inspectorTitle.toolTip = "Conversation Context"
+            inspection.font = .systemFont(ofSize: 14)
+            guard canShowContext, currentConversation == conversation else {
+                inspectionFailed(BridgeError.message("Context is unavailable for this conversation. Reopen it from Workspace Actions."), initial: true); return
+            }
+            let generation = inspectionGeneration
+            client.request("context.inspect", params: ["conversation": conversation]) { [weak self] result in
+                guard let self, self.inspectionGeneration == generation, self.currentConversation == conversation else { return }
+                switch result {
+                case .success(let data):
+                    guard let details = ConversationContextDetails(data, conversation: conversation) else {
+                        self.inspectionFailed(BridgeError.message("The context snapshot could not be verified. Use Reload to try again."), initial: true); return
+                    }
+                    let text = NSMutableAttributedString(string: details.text, attributes: [.font: NSFont.systemFont(ofSize: 14), .foregroundColor: NSColor.labelColor])
+                    for heading in ConversationContextDetails.headings {
+                        let range = (details.text as NSString).range(of: heading + "\n")
+                        if range.location != NSNotFound { text.addAttribute(.font, value: NSFont.systemFont(ofSize: 14, weight: .semibold), range: range) }
+                    }
+                    self.inspection.textStorage?.setAttributedString(text); self.inspection.scrollToBeginningOfDocument(nil)
+                    self.pageLabel.stringValue = details.observed; self.pageLabel.toolTip = details.observed
+                    self.contextLinks = ConversationContextLink.allCases.filter {
+                        switch $0 {
+                        case .history: return self.client.capabilities.contains("context-history-v1")
+                        case .memory: return self.canShowMemory
+                        case .savedState: return self.canShowSavedState
+                        case .runs: return true
+                        case .checkpoints: return self.client.capabilities.contains("checkpoints-v1")
+                        }
+                    }
+                    self.relatedEvidence.removeAllItems(); self.relatedEvidence.addItems(withTitles: ["Open…"] + self.contextLinks.map(\.title))
+                    self.relatedEvidence.setAccessibilityLabel("Open conversation context controls")
+                    self.relatedEvidence.toolTip = "Open retained history, conversation memory, saved state, recorded runs, or checkpoints"
+                    self.relatedEvidence.isHidden = self.contextLinks.isEmpty
+                case .failure(let error): self.inspectionFailed(error, initial: true)
+                }
+            }
         case .run(let run):
             prepareInspection(title: "Run Details", file: nil)
             guard client.capabilities.contains("run-details") else {
@@ -1514,6 +1710,16 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                     let details = RunDetails(data)
                     self.inspection.string = details.text; self.inspection.scrollToBeginningOfDocument(nil)
                     self.recordedOutput.isHidden = !details.outputAvailable
+                    self.evidenceLinks = details.related.filter { link in
+                        switch link.kind {
+                        case .activity: return self.client.capabilities.contains("walkthrough-v1")
+                        case .checkpoint: return self.client.capabilities.contains("checkpoints-v1")
+                        case .run: return true
+                        }
+                    }
+                    self.relatedEvidence.removeAllItems()
+                    self.relatedEvidence.addItems(withTitles: ["Related…"] + self.evidenceLinks.map(\.label))
+                    self.relatedEvidence.isHidden = self.evidenceLinks.isEmpty
                     self.pageLabel.stringValue = "Last recorded state · Reload to update"
                     self.pageLabel.toolTip = self.pageLabel.stringValue
                 case .failure(let error): self.inspectionFailed(error, initial: true)
@@ -1521,16 +1727,24 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             }
         }
     }
-    private func prepareInspection(title: String, file: String?, diff: Bool = false) {
+    private func prepareInspection(title: String, file: String?, diff: Bool = false, contextSummary: Bool = false) {
         inspectionGeneration += 1
+        showingContextSummary = contextSummary
         let hideFind = NSMenuItem(); hideFind.tag = NSTextFinder.Action.hideFindInterface.rawValue
         inspection.performTextFinderAction(hideFind)
         inspectedFile = file; inspectedDiff = diff ? file : nil
         browsingCompact = false
         inspectorTitle.stringValue = title; inspectorTitle.toolTip = title
         inspection.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        inspection.textColor = .labelColor
+        inspection.typingAttributes = [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: NSColor.labelColor]
         inspection.string = "Loading…"; pageLabel.stringValue = "Loading…"; pageLabel.toolTip = nil
         recordedOutput.isHidden = true
+        spiderDetails = nil; prepareCodeReview.isHidden = true; checkCode.isHidden = !canCheckCode
+        savedStateDetails = nil
+        relatedEvidence.isHidden = true; evidenceLinks = []; contextLinks = []
+        relatedEvidence.setAccessibilityLabel("Related evidence for this instruction")
+        relatedEvidence.toolTip = "Open activity, the previous instruction, or a recorded checkpoint"
         outline.isHidden = true; declarations = []
         showingInspector = true; surfaces.selectedSegment = 1
         breadcrumb.isHidden = file == nil
@@ -1553,8 +1767,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             guard let self, self.inspectionGeneration == generation else { return }
             switch result {
             case .success(let data):
+                if method == "context.history" {
+                    guard let conversation = params["conversation"] as? String, self.currentConversation == conversation else { return }
+                    guard ContextHistoryPage.isValid(data, conversation: conversation, offset: offset, revision: revision) else {
+                        self.inspectionFailed(BridgeError.message("The retained-history page could not be verified."), initial: revision == nil); return
+                    }
+                }
                 let body = data["text"] as? String ?? ""
                 let baseline = data["baseline"] as? String
+                if method == "artifact.read" || method == "context.history" { self.inspection.font = .systemFont(ofSize: 14); self.inspection.textColor = .labelColor }
                 self.inspection.string = (baseline.map { $0 + "\n\n" } ?? "") + (body.isEmpty && method == "changes.read" ? "No changes in this comparison." : body)
                 if method == "files.read" || method == "changes.read" {
                     self.inspection.textStorage?.setAttributedString(CodeOutline.highlight(self.inspection.string, diff: method == "changes.read"))
@@ -1567,13 +1788,21 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 let size = data["size"] as? Int ?? end
                 self.pageLabel.stringValue = "\(offset)–\(end) / \(size) bytes · Read only\(data["truncated"] as? Bool == true ? " · Limited" : "")"
                 self.pageLabel.toolTip = self.pageLabel.stringValue
+                if method == "context.history", let timestamp = data["observedAt"] as? Double {
+                    let observed = DateFormatter.localizedString(from: Date(timeIntervalSince1970: timestamp / 1000), dateStyle: .short, timeStyle: .short)
+                    self.pageLabel.toolTip = self.pageLabel.stringValue + " · Observed " + observed + " · Find searches this page"
+                    self.pageLabel.stringValue = size == 0 ? "No messages · Read only" : "\(Int(ceil(Double(end) / 1024))) / \(Int(ceil(Double(size) / 1024))) KiB"
+                }
                 let token = data["revision"] as? String
                 self.moreButton.isHidden = data["more"] as? Bool != true; self.moreButton.isEnabled = true
                 self.nextChunk = data["more"] as? Bool == true ? { [weak self] in self?.showPage(method, params: params, offset: end, trail: Array((trail + [offset]).suffix(128)), revision: token) } : nil
                 self.previousButton.isEnabled = !trail.isEmpty
                 self.previousButton.isHidden = trail.isEmpty && data["more"] as? Bool != true
                 self.previousChunk = trail.last.map { previous in { [weak self] in self?.showPage(method, params: params, offset: previous, trail: Array(trail.dropLast()), revision: token) } }
-                if data["truncated"] as? Bool == true { self.showNotice("This diff exceeds the 1 MiB preview limit. The preview is incomplete; inspect the full diff with Git before reviewing it.") }
+                if data["truncated"] as? Bool == true {
+                    if method == "artifact.read" { self.showNotice("Recorded output reached its storage limit. This evidence is incomplete; review the instruction and its activity before continuing.") }
+                    else if method == "changes.read" { self.showNotice("This diff exceeds the 1 MiB preview limit. The preview is incomplete; inspect the full diff with Git before reviewing it.") }
+                }
             case .failure(let error): self.inspectionFailed(error, initial: revision == nil)
             }
         }
@@ -1599,6 +1828,38 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc private func openRecordedOutput() {
         if case .run(let run) = inspectionHistory.current, !recordedOutput.isHidden { inspect(.output(run)) }
+    }
+    @objc private func openRelatedEvidence() {
+        let index = relatedEvidence.indexOfSelectedItem - 1
+        if case .savedState(let conversation) = inspectionHistory.current {
+            guard canShowSavedState, currentConversation == conversation, let details = savedStateDetails, details.report.runs.indices.contains(index) else { return }
+            inspect(.run(details.report.runs[index].id)); return
+        }
+        if case .spider = inspectionHistory.current {
+            guard client.isReady, !switchingConversation, let details = spiderDetails, details.files.indices.contains(index) else { return }
+            readFile(details.files[index]); return
+        }
+        if case .context(let conversation) = inspectionHistory.current {
+            guard canShowContext, currentConversation == conversation, contextLinks.indices.contains(index) else { return }
+            relatedEvidence.selectItem(at: 0)
+            switch contextLinks[index] {
+            case .history: inspect(.contextHistory(conversation))
+            case .memory: showMemory()
+            case .savedState: showSavedState()
+            case .runs: showSessions()
+            case .checkpoints: showCheckpoints()
+            }
+            return
+        }
+        guard client.isReady, !switchingConversation, evidenceLinks.indices.contains(index),
+              case .run = inspectionHistory.current else { return }
+        let link = evidenceLinks[index]
+        relatedEvidence.selectItem(at: 0)
+        switch link.kind {
+        case .activity: showProjectRepair(link.id)
+        case .run: inspect(.run(link.id))
+        case .checkpoint: openCheckpoints(selected: link.id)
+        }
     }
     @objc private func refreshInspection() { reloadInspection?() }
     @objc private func loadNextPage() { nextChunk?() }
@@ -1626,10 +1887,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         contextPanel.isHidden = !showingInspector || (narrow && (surfaces.selectedSegment == 0 || compactSidebarRevealed))
         contextSeparator.isHidden = contextPanel.isHidden
         contextWidth?.constant = narrow ? 300 : min(400, max(330, (window?.frame.width ?? 1280) * 0.27))
-        browserHeight?.isActive = !short
-        browseContext.isHidden = !short || ![1, 2].contains(contextTabs.selectedSegment)
+        let contextSummary = showingContextSummary && contextTabs.selectedSegment == 2
+        browserHeight?.isActive = !short && !contextSummary
+        browseContext.isHidden = contextSummary || !short || ![1, 2].contains(contextTabs.selectedSegment)
         browseContext.title = browsingCompact ? "Back to preview" : (contextTabs.selectedSegment == 1 ? "Browse changed files" : "Browse files")
-        navigation.isHidden = ![1, 2].contains(contextTabs.selectedSegment) || (short && !browsingCompact)
+        navigation.isHidden = contextSummary || ![1, 2].contains(contextTabs.selectedSegment) || (short && !browsingCompact)
         walkthrough.isHidden = contextTabs.selectedSegment != 0
         walkthrough.setCompact(short)
         inspector.isHidden = ![1, 2].contains(contextTabs.selectedSegment) || (short && browsingCompact)
@@ -1675,6 +1937,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         closing = true; composer.isEditable = false; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
     }
     func windowWillClose(_ notification: Notification) {
+        memoryWindow?.dismiss(); memoryWindow = nil
         palette?.cancelOperation(nil); palette = nil; modelPicker?.dismiss(restoreFocus: false); modelPicker = nil; saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {

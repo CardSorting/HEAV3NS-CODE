@@ -136,6 +136,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Walkthrough", action: #selector(showWalkthrough), keyEquivalent: "6").target = self
         view.addItem(withTitle: "Run Project", action: #selector(showProjectRun), keyEquivalent: "r").target = self
         view.addItem(withTitle: "Checkpoints", action: #selector(showCheckpoints), keyEquivalent: "7").target = self
+        view.addItem(withTitle: "Conversation Memory…", action: #selector(showMemory), keyEquivalent: "8").target = self
+        view.addItem(withTitle: "Conversation Context", action: #selector(showContext), keyEquivalent: "9").target = self
+        view.addItem(withTitle: "Check Code", action: #selector(showCodeCheck), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Saved State", action: #selector(showSavedState), keyEquivalent: "").target = self
         view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
         view.addItem(withTitle: "Review Request…", action: #selector(showApprovalReview), keyEquivalent: "5").target = self
         view.addItem(.separator())
@@ -245,6 +249,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showWalkthrough() { current?.showWalkthrough() }
     @objc private func showProjectRun() { current?.showProjectRun() }
     @objc private func showCheckpoints() { current?.showCheckpoints() }
+    @objc private func showMemory() { current?.showMemory() }
+    @objc private func showContext() { current?.showContext() }
+    @objc private func showCodeCheck() { current?.showCodeCheck() }
+    @objc private func showSavedState() { current?.showSavedState() }
     @objc private func toggleNavigation() { current?.toggleNavigation() }
     @objc private func focusComposer() { current?.focusComposer() }
     @objc private func showFiles() { current?.showFiles() }
@@ -255,13 +263,19 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
     @objc private func findInInspection() {
-        if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() } else { current?.findInInspection() }
+        if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() }
+        else if current?.isMemoryKeyWindow == true { current?.findMemory() }
+        else { current?.findInInspection() }
     }
     @objc private func stop() { current?.stop() }
     @objc private func actions() {
         if let current { current.showActions() } else { openFolder() }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(showMemory) { return current?.canShowMemory == true }
+        if menuItem.action == #selector(showContext) { return current?.canShowContext == true }
+        if menuItem.action == #selector(showCodeCheck) { return current?.canCheckCode == true }
+        if menuItem.action == #selector(showSavedState) { return current?.canShowSavedState == true }
         if menuItem.action == #selector(showModels) { return current?.canChooseModels == true }
         if menuItem.action == #selector(showProjectRun) { return current?.client.capabilities.contains("project-run-v1") == true }
         if menuItem.action == #selector(showCheckpoints) { return current?.client.capabilities.contains("checkpoints-v1") == true }
@@ -270,6 +284,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
         if menuItem.action == #selector(findInInspection) {
+            if current?.isMemoryKeyWindow == true { menuItem.title = "Find Conversation Memory…"; return current?.canFindMemory == true }
             let inLibrary = launcher != nil && NSApp.keyWindow === launcher?.window
             menuItem.title = inLibrary ? "Find Projects…" : "Find in Current Page…"
             return inLibrary ? launcher?.canFindProjects == true : current?.canFindInInspection == true

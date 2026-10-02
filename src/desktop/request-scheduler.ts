@@ -13,6 +13,12 @@ const inspectionMethods = new Set([
 	"history.list",
 	"activity.list",
 	"conversation.list",
+	"memory.list",
+	"context.inspect",
+	"context.history",
+	"state.inspect",
+	"spider.check",
+	"memory.read",
 	"checkpoint.list",
 	"project.discover",
 	"project.status",
@@ -20,7 +26,7 @@ const inspectionMethods = new Set([
 ])
 // Discovery can involve network requests or workspace-wide scans. Keep two
 // inspection slots available for navigation and recorded task evidence.
-const discoveryMethods = new Set(["models.discover", "files.search", "project.discover", "changes.list"])
+const discoveryMethods = new Set(["models.discover", "files.search", "project.discover", "changes.list", "spider.check"])
 const controlMethods = new Set([
 	"task.cancel",
 	"task.cancelAll",

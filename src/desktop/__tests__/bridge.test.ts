@@ -237,6 +237,59 @@ describe("desktop runtime boundary", () => {
 			summary,
 		)
 	})
+	it("reads bounded legacy evidence and scopes related links to this conversation", async () => {
+		const table = database.getTable("desktop.runs.v1")
+		const id = "a".repeat(64),
+			source = "b".repeat(64),
+			checkpoint = "checkpoint-fixture"
+		const record = {
+			id,
+			session: bridge.session,
+			conversation: bridge.conversation,
+			request: "fixture",
+			fingerprint: "fixture",
+			state: "failed",
+			createdAt: 1,
+			updatedAt: 1,
+			revision: 1,
+			text: "Inspect saved work",
+			activities: [],
+			activityCount: 180,
+			verification: "not_run",
+			review: "not_reviewed",
+			response: "🌙\n".repeat(100_000),
+			baseline: "\t".repeat(100_000),
+			error: "Saved failure",
+			checkpointError: "Checkpoint disk full",
+			checkpointBefore: checkpoint,
+			continuation: { run: source },
+		}
+		table.put(id, record)
+		table.put(source, { ...record, id: source, continuation: undefined, response: "Original failure" })
+		database
+			.getTable("desktop.checkpoints.v1")
+			.put(checkpoint, { id: checkpoint, run: id, conversation: bridge.conversation })
+		const detail = await request("history.read", { run: id })
+		assert.match(detail.insight.coverage, /0 of 180/)
+		assert.equal(detail.run.error, "Saved failure")
+		assert.equal(detail.run.checkpointError, "Checkpoint disk full")
+		assert.deepEqual(
+			detail.related.map((link: { kind: string }) => link.kind),
+			["activity", "run", "checkpoint"],
+		)
+		assert.ok(Buffer.byteLength(encodeFrame({ v: 1, kind: "response", result: detail })) < MAX_FRAME_BYTES)
+		assert.match(detail.run.response, /Display truncated/)
+		assert.equal(table.get(id)?.response, record.response, "inspection does not rewrite stored evidence")
+		table.put(source, { ...table.get(source), conversation: "another-conversation" })
+		database
+			.getTable("desktop.checkpoints.v1")
+			.put(checkpoint, { id: checkpoint, run: id, conversation: "another-conversation" })
+		assert.deepEqual(
+			(await request("history.read", { run: id })).related.map((link: { kind: string }) => link.kind),
+			["activity"],
+		)
+		assert.equal(calls.length, 0, "inspection never executes an instruction")
+	})
 	it("accepts one task durably and returns the same acceptance after restart", async () => {
 		const first = await request("task.submit", { text: "Read the fixture", attachments: [] }, "repeat")
 		await waitFor(() => events.some((e) => e.payload?.state === "completed"))

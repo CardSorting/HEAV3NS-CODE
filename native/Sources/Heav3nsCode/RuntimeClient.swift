@@ -68,8 +68,8 @@ final class RuntimeClient {
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
     private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
-    private static let discoveries: Set<String> = ["models.discover", "files.search", "project.discover", "changes.list"]
-    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "task.lookup"]
+    private static let discoveries: Set<String> = ["models.discover", "files.search", "project.discover", "changes.list", "spider.check"]
+    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "task.lookup", "memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"]
     private var pendingWrites = 0
     private var pendingDeliveries = 0
     private let deliveryLock = NSLock()
@@ -288,7 +288,7 @@ final class RuntimeClient {
         case "project.status", "project.start", "project.stop", "project.healing": return ["idle", "running", "stopping", "stopped", "completed", "failed"].contains(result["state"] as? String ?? "") && result["output"] is String
         case "files.search": return result["entries"] is [[String: Any]] && result["matched"] is NSNumber && result["more"] is Bool && result["scanLimited"] is Bool && ["git", "workspace"].contains(result["scope"] as? String ?? "")
         case "approval.resolve": return result["resolved"] as? Bool == true
-        case "files.read", "artifact.read", "changes.read": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
+        case "files.read", "artifact.read", "changes.read", "context.history": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
         case "files.list", "changes.list": return result["entries"] is [[String: Any]]
         default: return true
         }

@@ -1,21 +1,24 @@
 import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { mkdir, open, realpath, stat } from "node:fs/promises"
+import { stat } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
 import { z } from "zod"
 import { workspaceRevision } from "../agents/extensions/execution/workspace-verification.js"
+import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/intelligence/spider-policy-check.js"
 import type {
 	EngineProgressEvent,
 	EngineTickResult,
 	IAgentEngine,
 	WorkspaceRuntimeObservation,
 } from "../core/contracts/agent.contracts.js"
+import type { SessionMessage } from "../core/contracts/session.contracts.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	getAgentProviderLabel,
 	OPENAI_CODEX_PROVIDER,
 } from "../core/providers/provider-ids.js"
+import { reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import { StateManager } from "../core/storage/StateManager.js"
 import { HostProvider } from "../hosts/host-provider.js"
 import { LumiMonolith } from "../index.js"
@@ -27,10 +30,22 @@ import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/exten
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
 import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
+import { ContextHistory, contextHistoryInput } from "./context-history.js"
+import { prepareConversationContext } from "./context-recovery.js"
+import { type ConversationContextSummary, summarizeConversationContext } from "./conversation-context.js"
+import {
+	listMemory,
+	memoryListSchema,
+	memoryReadSchema,
+	memoryRemoveSchema,
+	memoryWriteSchema,
+	readMemory,
+	removeMemory,
+	writeMemory,
+} from "./conversation-memory.js"
 import { WorkspaceInspection } from "./inspection.js"
 import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
 import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
-import { reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
@@ -41,7 +56,10 @@ import {
 	MAX_PENDING_BYTES,
 	requestSchema,
 } from "./protocol.js"
+import { readRecordedOutput, saveRecordedOutput, validateRecordedOutput } from "./recorded-output.js"
 import { DesktopRequestScheduler } from "./request-scheduler.js"
+import { explainRun } from "./run-insights.js"
+import { assertRuntimeRecord, inspectRuntimeState, sealRuntimeRecord, verifyRuntimeRecord } from "./runtime-state-store.js"
 import { desktopToolPath } from "./tool-environment.js"
 import { acquireWorkspace } from "./workspace-owner.js"
 
@@ -68,9 +86,8 @@ type Run = Record<string, unknown> & {
 	verification: "not_run" | "evidence_available" | "passed" | "failed" | "unavailable" | "cancelled" | "not_required"
 	review: "not_reviewed"
 }
-const shortText = (text: string, limit = 24_000) => {
+const shortText = (text: string, limit = 24_000, marker = "\n[Display truncated; open recorded output.]") => {
 	if (Buffer.byteLength(JSON.stringify(text)) <= limit) return text
-	const marker = "\n[Display truncated; open recorded output.]"
 	let low = 0,
 		high = Math.min(text.length, limit)
 	while (low < high) {
@@ -135,7 +152,11 @@ const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<
 
 type ConversationContext = { jsonl: string; turnCount: number; memories?: MemoryEntry[] }
 type DesktopLifecycle = {
+	checkCode?: (input: unknown) => Promise<SpiderPolicyReport>
+	inspectContext?: () => ConversationContextSummary
+	readHistory?: () => readonly SessionMessage[]
 	models?: DesktopModels
+	memories?: { list: () => MemoryEntry[]; replace: (entries: MemoryEntry[]) => void }
 	sessionId: string
 	saveContext: (conversation?: string) => void
 	readContext?: () => ConversationContext
@@ -184,6 +205,7 @@ export class DesktopSession {
 	private healingEnabled = true
 	private healing?: HealingEpisode
 	private healingTimer?: ReturnType<typeof setTimeout>
+	private readonly contextHistory = new ContextHistory()
 	private inspection: WorkspaceInspection
 	private submissions: Promise<unknown> = Promise.resolve()
 	private queueMutations = 0
@@ -230,6 +252,9 @@ export class DesktopSession {
 		this.healingEnabled = this.metadata.get("project-healing")?.enabled !== false
 		const meta = this.metadata.get("session")
 		this.session = typeof meta?.session === "string" ? meta.session : (this.lifecycle?.sessionId ?? randomUUID())
+		// Bind evidence to the durable identity, so moving a project folder does
+		// not invalidate its history. Check before recovery rewrites any row.
+		for (const run of this.runs.getAll()) assertRuntimeRecord(run, this.session)
 		this.seq = typeof meta?.seq === "number" ? meta.seq : 0
 		// The selected identity and its engine context share one WAL record. A
 		// crash between separate metadata writes must never attach another thread's context.
@@ -284,7 +309,7 @@ export class DesktopSession {
 		// Copies of a live run (for approval records) share the same monotonic
 		// version space, including commits still waiting for durable storage.
 		run.revision = this.revision = Math.max(this.revision, this.seq, run.revision ?? 0) + 1
-		const projection = structuredClone(run)
+		const projection = sealRuntimeRecord(structuredClone(run), this.session)
 		const operation = this.commits.then(async () => {
 			this.runs.put(run.id, projection)
 			const seq = ++this.seq
@@ -575,6 +600,8 @@ export class DesktopSession {
 				"conversation.create",
 				"conversation.select",
 				"conversation.delete",
+				"memory.write",
+				"memory.remove",
 				"checkpoint.preview",
 				"checkpoint.restore",
 				"checkpoint.flag",
@@ -597,10 +624,14 @@ export class DesktopSession {
 				path: this.workspace.path,
 				limits: { queuedInstructions: DESKTOP_QUEUE_LIMIT, instructionLength: MAX_INSTRUCTION_LENGTH },
 				capabilities: [
+					...(this.lifecycle?.inspectContext ? ["conversation-context-v1"] : []),
+					...(this.lifecycle?.readHistory ? ["context-history-v1"] : []),
+					...(this.lifecycle?.checkCode ? ["spider-check-v1"] : []),
 					"native",
 					"autonomous-execution-v1",
 					...(this.lifecycle?.models ? ["model-selection-v1", "reasoning-selection-v1"] : []),
 					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
+					...(this.lifecycle?.memories ? ["conversation-memory-v1"] : []),
 					"snapshot",
 					"workspace-verification-v1",
 					"task-continuation-v1",
@@ -616,6 +647,8 @@ export class DesktopSession {
 					"paged-inspection",
 					"workspace-stop",
 					"run-details",
+					"run-insights-v1",
+					"runtime-state-v1",
 					"queue-edit",
 					"queue-remove",
 					"walkthrough-v1",
@@ -632,6 +665,126 @@ export class DesktopSession {
 			throw new Error("IDENTITY_MISMATCH: attach to this workspace and session before execution")
 		if (this.closing && request.method !== "snapshot") throw new Error("SHUTTING_DOWN: no more work is admitted")
 		switch (request.method) {
+			case "state.inspect": {
+				const { conversation } = z
+					.object({ conversation: z.string().min(1).max(128) })
+					.strict()
+					.parse(request.params)
+				await this.submissions
+				await this.commits
+				if (conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: reopen saved state for the selected conversation")
+				const records = this.runs.query({
+					where: { session: this.session, conversation },
+					sortBy: ["updatedAt", "id"],
+					sortOrder: "desc",
+					limit: 21,
+				})
+				return inspectRuntimeState({
+					workspace: this.session,
+					session: this.session,
+					conversation,
+					records,
+					more: records.length > 20,
+					lookup: (id) => this.runs.get(id),
+				})
+			}
+			case "spider.check": {
+				const input = spiderCheckInput.parse(request.params)
+				if (!this.lifecycle?.checkCode) throw new Error("UNSUPPORTED: this runtime cannot check code")
+				return this.lifecycle.checkCode(input)
+			}
+			case "context.history": {
+				const input = contextHistoryInput.parse(request.params)
+				// Wait for a stable mutation boundary, including mutations queued while
+				// a prior commit was settling. Snapshot capture below is synchronous.
+				let submissions: Promise<unknown>, commits: Promise<unknown>
+				do {
+					submissions = this.submissions
+					commits = this.commits
+					await submissions
+					await commits
+				} while (submissions !== this.submissions || commits !== this.commits)
+				if (this.closing) throw new Error("SHUTTING_DOWN: reconnect before inspecting history")
+				if (input.conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: reopen history for the selected conversation")
+				if (!this.lifecycle?.readHistory) throw new Error("UNSUPPORTED: this runtime cannot inspect retained history")
+				return this.contextHistory.read(input, this.lifecycle.readHistory)
+			}
+			case "context.inspect": {
+				const { conversation } = z
+					.object({ conversation: z.string().min(1).max(128) })
+					.strict()
+					.parse(request.params)
+				await this.submissions
+				await this.commits
+				if (conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: reopen context for the selected conversation")
+				if (!this.lifecycle?.inspectContext) throw new Error("UNSUPPORTED: this runtime cannot inspect active context")
+				return {
+					conversation,
+					observedAt: Date.now(),
+					working: Boolean(this.active),
+					queued: this.queue.length,
+					...this.lifecycle.inspectContext(),
+				}
+			}
+			case "memory.list":
+			case "memory.read": {
+				await this.submissions
+				await this.commits
+				const params =
+					request.method === "memory.list"
+						? memoryListSchema.parse(request.params)
+						: memoryReadSchema.parse(request.params)
+				if (params.conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: reopen memory for the selected conversation")
+				const memories = this.lifecycle?.memories
+				if (!memories) throw new Error("UNSUPPORTED: this runtime cannot inspect conversation memory")
+				const entries = memories.list()
+				return {
+					conversation: this.conversation,
+					writable: !this.active && !this.queue.length && !this.cancellingAll && !this.closing,
+					...("query" in params
+						? listMemory(entries, params.query, params.offset, params.anchor)
+						: { entry: readMemory(entries, params.id) }),
+				}
+			}
+			case "memory.write":
+			case "memory.remove": {
+				const params =
+					request.method === "memory.write"
+						? memoryWriteSchema.parse(request.params)
+						: memoryRemoveSchema.parse(request.params)
+				if (params.conversation !== this.conversation)
+					throw new Error("CONVERSATION_CHANGED: this draft belongs to another conversation")
+				const memories = this.lifecycle?.memories
+				if (!memories) throw new Error("UNSUPPORTED: this runtime cannot edit conversation memory")
+				await this.commits
+				if (this.closing) throw new Error("SHUTTING_DOWN: reconnect before changing memory")
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop current work before changing memory")
+				const prior = memories.list()
+				const planned =
+					"value" in params
+						? writeMemory(prior, params)
+						: { entries: removeMemory(prior, params.id, params.revision), entry: undefined }
+				try {
+					memories.replace(planned.entries)
+					this.lifecycle!.saveContext(this.conversation)
+					await this.database.flush()
+				} catch {
+					// A failed WAL append can have an ambiguous outcome. Do not retry a
+					// mutation or admit a task with memory that has not been confirmed.
+					this.closing = true
+					memories.replace(prior)
+					throw new Error(
+						"MEMORY_SAVE_UNCERTAIN: saving memory could not be confirmed. Keep your draft and reconnect to inspect the saved state before trying again.",
+					)
+				}
+				this.event("memory.changed", { conversation: this.conversation })
+				return { conversation: this.conversation, saved: true, entry: planned.entry }
+			}
 			case "models.discover": {
 				const { provider, refresh } = z
 					.object({ provider: modelSelectionSchema.shape.provider, refresh: z.boolean().default(false) })
@@ -934,6 +1087,7 @@ export class DesktopSession {
 				}
 				if (deleting) {
 					await this.commits
+					this.contextHistory.clear()
 					this.lifecycle.restoreContext({ jsonl: "", turnCount: 0 })
 					const replacement = randomUUID()
 					this.conversations.put(id, { ...target, deletedAt: Date.now() })
@@ -956,10 +1110,11 @@ export class DesktopSession {
 				}
 				if (id === this.conversation) return { conversation: id }
 				await this.commits
-				const prior = this.lifecycle.readContext()
+				const prior = prepareConversationContext(this.lifecycle.readContext())
 				const restored = target?.context as ConversationContext | undefined
 				// Validate/restore in the engine before changing the durable selection.
-				this.lifecycle.restoreContext(restored ?? { jsonl: "", turnCount: 0 })
+				this.contextHistory.clear()
+				this.lifecycle.restoreContext(prepareConversationContext(restored ?? { jsonl: "", turnCount: 0 }))
 				this.conversations.put(this.conversation, { ...this.conversations.get(this.conversation), context: prior })
 				this.conversations.put(
 					id,
@@ -1001,6 +1156,7 @@ export class DesktopSession {
 				if (previous) {
 					if ((previous.conversation ?? previous.session) !== this.conversation)
 						throw new Error("CONVERSATION_CHANGED: this instruction belongs to another conversation")
+					assertRuntimeRecord(previous, this.session)
 					if (previous.fingerprint !== fingerprint)
 						throw new Error("REQUEST_ID_REUSED: the accepted instruction differs")
 					return { accepted: true, run: projectRun(previous), duplicate: true }
@@ -1035,6 +1191,7 @@ export class DesktopSession {
 						(source.conversation ?? source.session) !== this.conversation
 					)
 						throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
+					assertRuntimeRecord(source, this.session)
 					if (source.revision !== params.continueFrom.revision)
 						throw new Error("STALE_RUN: the recorded work changed; refresh before continuing")
 					if (!terminalStates.has(source.state) || source.state === "completed")
@@ -1244,18 +1401,69 @@ export class DesktopSession {
 					throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
 				const conversation = this.conversation
 				let outputAvailable = false
-				try {
-					const file = await this.inspection.resolve(path.join(".broccolidb", "desktop-output", `${id}.txt`))
-					outputAvailable = (await stat(file)).isFile()
-				} catch (error) {
-					if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-				}
+				if (run.output !== undefined) {
+					if (verifyRuntimeRecord(run, this.session) !== "verified")
+						throw new Error("OUTPUT_INVALID: recorded output requires an intact saved instruction")
+					validateRecordedOutput(run.output)
+					outputAvailable = true
+				} else
+					try {
+						const file = await this.inspection.resolve(path.join(".broccolidb", "desktop-output", `${id}.txt`))
+						outputAvailable = (await stat(file)).isFile()
+					} catch (error) {
+						if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+					}
 				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: open the instruction again")
+				const source = run.continuation ? this.runs.get(run.continuation.run) : undefined
+				const related: { kind: "activity" | "run" | "checkpoint"; id: string; label: string }[] = [
+					{ kind: "activity", id, label: "Instruction Activity" },
+				]
+				if (
+					source &&
+					source.id !== id &&
+					source.session === this.session &&
+					(source.conversation ?? source.session) === conversation
+				)
+					related.push({ kind: "run", id: source.id, label: "Previous Instruction" })
+				for (const [key, label] of [
+					["checkpointBefore", "Checkpoint Before"],
+					["checkpointAfter", "Checkpoint After"],
+				] as const) {
+					const checkpoint = typeof run[key] === "string" ? this.checkpoints.get(run[key] as string) : undefined
+					if (checkpoint?.run === id && checkpoint.conversation === conversation)
+						related.push({ kind: "checkpoint", id: String(checkpoint.id), label })
+				}
 				return {
-					run: { ...projectRun(run), text: run.text, response: run.response, baseline: run.baseline },
+					run: {
+						...projectRun(run),
+						text: shortText(run.text, 100_000, "\n[Instruction display truncated.]"),
+						response: run.response ? shortText(run.response) : undefined,
+						baseline:
+							typeof run.baseline === "string"
+								? shortText(run.baseline, 24_000, "\n[Baseline display truncated.]")
+								: undefined,
+						error:
+							typeof run.error === "string"
+								? shortText(run.error, 4000, "\n[Error display truncated.]")
+								: undefined,
+						checkpointError:
+							typeof run.checkpointError === "string"
+								? shortText(run.checkpointError, 4000, "\n[Checkpoint detail truncated.]")
+								: undefined,
+					},
+					insight: explainRun({
+						...run,
+						workspaceVerification: run.workspaceVerification as EngineTickResult["workspaceVerification"],
+						outputLimited: run.outputLimited === true,
+						checkpointError: typeof run.checkpointError === "string" ? run.checkpointError : undefined,
+					}),
+					storedEvidence: verifyRuntimeRecord(run, this.session),
+					related,
 					outputAvailable,
 					outputMessage: outputAvailable
-						? "Recorded output is available."
+						? run.output !== undefined
+							? "Saved output is available. Content checksums are verified when opened."
+							: "Older recorded output is available without content checksums."
 						: terminalStates.has(run.state)
 							? "No output was recorded for this run. Its instruction and last confirmed state are preserved."
 							: "Output will be available after LUMI records the result. Activity is shown in the conversation.",
@@ -1301,11 +1509,16 @@ export class DesktopSession {
 					conversation = this.conversation
 				if (!run || run.session !== this.session || (run.conversation ?? run.session) !== conversation)
 					throw new Error("UNKNOWN_RUN: this instruction is not in the current conversation")
-				const result = await this.inspection.read(
-					path.join(".broccolidb", "desktop-output", `${p.run}.txt`),
-					p.offset,
-					p.revision,
-				)
+				if (run.output !== undefined && verifyRuntimeRecord(run, this.session) !== "verified")
+					throw new Error("OUTPUT_INVALID: recorded output requires an intact saved instruction")
+				const result =
+					run.output !== undefined
+						? await readRecordedOutput(this.database, run.output, p.offset, p.revision)
+						: await this.inspection.read(
+								path.join(".broccolidb", "desktop-output", `${p.run}.txt`),
+								p.offset,
+								p.revision,
+							)
 				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: open the output again")
 				return result
 			}
@@ -1433,7 +1646,7 @@ export class DesktopSession {
 		return { id, run, conversation, moment, label, createdAt, commit, files, bytes, flagged: flagged === true }
 	}
 	private async saveCheckpoint(run: Run, moment: "before" | "after", signal?: AbortSignal) {
-		const context = this.lifecycle!.readContext!()
+		const context = prepareConversationContext(this.lifecycle!.readContext!())
 		if (Buffer.byteLength(JSON.stringify(context)) > 8 * 1024 * 1024)
 			throw new Error("CHECKPOINT_LIMIT: conversation context exceeds 8 MiB")
 		const saved = await this.checkpointFiles.capture(
@@ -1464,11 +1677,12 @@ export class DesktopSession {
 	private async restoreCheckpoint(id: string, fingerprint: string) {
 		const checkpoint = this.checkpoints.get(id)
 		if (!checkpoint) throw new Error("UNKNOWN_CHECKPOINT")
+		const restoredContext = prepareConversationContext(checkpoint.context)
 		const current = await this.checkpointFiles.scan()
 		if (current.fingerprint !== fingerprint)
 			throw new Error("WORKSPACE_CHANGED: files changed after the preview; review again")
 		const target = await this.checkpointFiles.read(String(checkpoint.commit))
-		const prior = this.lifecycle!.readContext!(),
+		const prior = prepareConversationContext(this.lifecycle!.readContext!()),
 			original = this.conversation
 		// Validate engine admission (including staged agent edits) before changing files.
 		this.lifecycle!.restoreContext!(prior)
@@ -1493,7 +1707,7 @@ export class DesktopSession {
 				await this.database.flush()
 				writesAdmitted = true
 			})
-			this.lifecycle!.restoreContext!(checkpoint.context as ConversationContext)
+			this.lifecycle!.restoreContext!(restoredContext)
 			const conversation = randomUUID()
 			this.conversations.put(original, { ...this.conversations.get(original), context: prior })
 			this.conversations.put(conversation, {
@@ -1501,7 +1715,7 @@ export class DesktopSession {
 				title: `Restored: ${String(checkpoint.label).slice(0, 80)}`,
 				createdAt: Date.now(),
 				updatedAt: Date.now(),
-				context: checkpoint.context,
+				context: restoredContext,
 				restoredFrom: id,
 			})
 			this.lifecycle!.saveContext(conversation)
@@ -1511,6 +1725,7 @@ export class DesktopSession {
 			await this.database.flush()
 			this.conversation = conversation
 			this.inspection.clear()
+			this.contextHistory.clear()
 			return {
 				conversation,
 				restored: this.projectCheckpoint(checkpoint),
@@ -1544,11 +1759,13 @@ export class DesktopSession {
 		if (!this.lifecycle?.restoreContext) throw new Error("RESTORE_INTERRUPTED: this runtime cannot recover a pending restore")
 		const checkpoint = this.checkpoints.get(String(journal.safety))
 		if (!checkpoint) throw new Error("RESTORE_INTERRUPTED: safety checkpoint missing")
+		const restoredContext = prepareConversationContext(journal.context)
 		await this.checkpointFiles.apply(
 			await this.checkpointFiles.read(String(checkpoint.commit)),
 			await this.checkpointFiles.scan(),
 		)
-		this.lifecycle.restoreContext(journal.context as ConversationContext)
+		this.contextHistory.clear()
+		this.lifecycle.restoreContext(restoredContext)
 		this.conversation = String(journal.conversation)
 		this.lifecycle.saveContext(this.conversation)
 		this.metadata.put("activeConversation", { id: this.conversation })
@@ -1615,30 +1832,9 @@ export class DesktopSession {
 		run.commandCount = result.toolResults.filter(
 			(tool) => tool.name === "run_command" || tool.name === "workspace_check",
 		).length
-		const folder = path.join(this.workspace.path, ".broccolidb", "desktop-output")
-		await mkdir(folder, { recursive: true, mode: 0o700 })
-		if ((await realpath(folder)) !== folder)
-			throw new Error("STORE_ISOLATION: recorded output directory must not be redirected by a symlink")
-		const handle = await open(path.join(folder, `${run.id}.txt`), "wx", 0o600)
-		let bytes = 0
-		try {
-			// Serialize one tool result at a time instead of retaining a second
-			// complete copy of all command evidence in the adapter.
-			for (let index = -1; index < result.toolResults.length; index++) {
-				const record = index < 0 ? result.response : JSON.stringify(result.toolResults[index], null, 2)
-				const data = Buffer.from(`${record}\n\n`)
-				if (bytes + data.length > 64 * 1024 * 1024) {
-					run.outputLimited = true
-					await handle.writeFile("\n[Output limit reached. Evidence is incomplete.]\n")
-					break
-				}
-				await handle.writeFile(data)
-				bytes += data.length
-			}
-			await handle.sync()
-		} finally {
-			await handle.close()
-		}
+		const output = await saveRecordedOutput(this.database, result.response, result.toolResults)
+		run.output = output
+		run.outputLimited = output.limited
 	}
 	async approve(request: ConfirmationRequest): Promise<ConfirmationResponse> {
 		const run = this.active
@@ -1747,6 +1943,7 @@ export class DesktopSession {
 		clearTimeout(this.activityCheckpoint)
 		clearTimeout(this.activityDelivery)
 		this.inspection.clear()
+		this.contextHistory.clear()
 		let failure: unknown
 		try {
 			await this.project.stop()
@@ -1861,7 +2058,8 @@ export async function runDesktopWorker(): Promise<void> {
 			engine.setModel(selection.model, false, true)
 			engine.modelResolver.setReasoningEffort(selection.reasoningEffort)
 		}
-		const context = metadata.get("context")
+		const rawContext = metadata.get("context")
+		const context = rawContext ? prepareConversationContext(rawContext) : undefined
 		if (typeof context?.jsonl === "string") {
 			engine.sessionStore.importJsonl(context.jsonl)
 			engine.sessionContext.turnCount = typeof context.turnCount === "number" ? context.turnCount : 0
@@ -1877,15 +2075,13 @@ export async function runDesktopWorker(): Promise<void> {
 		const restoreContext = (value: ConversationContext) => {
 			if (engine!.sessionVfs.exportStaged().length)
 				throw new Error("STAGED_EDITS: commit or discard the agent's staged edits before switching conversations")
-			engine!.sessionStore.importJsonl(value.jsonl)
-			engine!.sessionContext.turnCount = value.turnCount
-			engine!.sessionMemoryStore.clear()
-			for (const memory of value.memories ?? [])
-				engine!.sessionMemoryStore.saveMemory(memory.key, memory.value, memory.category)
+			const prepared = prepareConversationContext(value)
+			engine!.sessionStore.importJsonl(prepared.jsonl)
+			engine!.sessionContext.turnCount = prepared.turnCount
+			engine!.sessionMemoryStore.replaceMemories(prepared.memories ?? [])
 		}
 		if (context && Array.isArray(context.memories)) {
-			for (const memory of context.memories as MemoryEntry[])
-				engine.sessionMemoryStore.saveMemory(memory.key, memory.value, memory.category)
+			engine.sessionMemoryStore.replaceMemories(context.memories as MemoryEntry[])
 		}
 		const discovery = new DesktopModelDiscovery(
 			providerModelLoader({
@@ -1905,6 +2101,14 @@ export async function runDesktopWorker(): Promise<void> {
 		)
 		bridge = new DesktopSession(owner, engine, database, send, {
 			sessionId,
+			readHistory: () => engine!.sessionStore.getActiveMessages(),
+			inspectContext: () =>
+				summarizeConversationContext(engine!.sessionStore.getActiveMessages(), engine!.sessionMemoryStore.listMemories()),
+			checkCode: (input) => engine!.broccoliSpiderAuditEngine.policyCheck.check(input),
+			memories: {
+				list: () => engine!.sessionMemoryStore.listMemories(),
+				replace: (entries) => engine!.sessionMemoryStore.replaceMemories(entries),
+			},
 			models: {
 				current: () => ({
 					provider: engine!.modelResolver.getProvider() as
@@ -1945,7 +2149,10 @@ export async function runDesktopWorker(): Promise<void> {
 			saveContext: (conversation) => {
 				// Context selection/compaction remains in LUMI. The native client never
 				// rebuilds it from visible messages. Archived output remains separate.
-				metadata.put("context", { ...readContext(), conversation: conversation ?? bridge!.conversation })
+				metadata.put("context", {
+					...prepareConversationContext(readContext()),
+					conversation: conversation ?? bridge!.conversation,
+				})
 			},
 		})
 		engine.toolRegistry.requireAutonomousHost()

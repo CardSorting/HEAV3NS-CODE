@@ -40,4 +40,17 @@ final class InspectionNavigationTests: XCTestCase {
         XCTAssertTrue(details.text.contains("Recorded output incomplete"))
         XCTAssertTrue(details.outputAvailable)
     }
+    func testInsightPutsRecoveryAndEvidenceBeforeTheLongResult() {
+        let details = RunDetails([
+            "run": ["state": "interrupted", "text": "Original intent", "response": String(repeating: "Result ", count: 1000), "checkpointError": "Disk full"],
+            "insight": ["outcome": "Work was interrupted.", "nextStep": "Review activity before continuing.", "checks": "Checks could not finish.", "coverage": "120 of 150 entries retained.", "warnings": ["Checkpoint coverage is incomplete."]],
+            "related": [["kind": "run", "id": "original", "label": "Original Instruction"], ["kind": "execute", "id": "command", "label": "Execute"]]
+        ])
+        XCTAssertTrue(details.text.contains("Next step\nReview activity"))
+        XCTAssertTrue(details.text.contains("120 of 150"))
+        XCTAssertTrue(details.text.contains("Checkpoint detail\nDisk full"))
+        XCTAssertLessThan(details.text.range(of: "Next step")!.lowerBound, details.text.range(of: "Result ")!.lowerBound)
+        XCTAssertEqual(details.related.count, 1)
+        XCTAssertEqual(details.related.first?.kind, .run)
+    }
 }

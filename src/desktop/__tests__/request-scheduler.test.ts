@@ -20,6 +20,24 @@ const gate = () => {
 }
 
 describe("desktop request scheduling", () => {
+	it("keeps code scans in discovery capacity while file navigation and Stop remain available", async () => {
+		const scheduler = new DesktopRequestScheduler(),
+			blocked = gate()
+		const scans = Array.from({ length: 48 }, () =>
+			scheduler.dispatch(request("spider.check", { paths: ["entry.ts"] }), () => blocked.promise),
+		)
+		try {
+			await assert.rejects(
+				scheduler.dispatch(request("spider.check"), async () => {}),
+				/discovery is busy/,
+			)
+			await scheduler.dispatch(request("files.read"), async () => {})
+			await scheduler.dispatch(request("task.cancelAll"), async () => {})
+		} finally {
+			blocked.release()
+			await Promise.all(scans)
+		}
+	})
 	it("reserves queue admission for instructions and navigation under discovery saturation", async () => {
 		const scheduler = new DesktopRequestScheduler(),
 			blocked = gate()

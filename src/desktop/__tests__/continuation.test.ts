@@ -6,6 +6,7 @@ import path from "node:path"
 import type { EngineTickInput, EngineTickResult } from "../../core/contracts/agent.contracts.js"
 import { BroccoliDatabaseKernel } from "../../sessions/extensions/substrate/broccolidb-kernel.js"
 import type { DesktopRequest } from "../protocol.js"
+import { sealRuntimeRecord } from "../runtime-state-store.js"
 import { DesktopSession } from "../worker.js"
 
 describe("durable native work continuation", () => {
@@ -61,6 +62,16 @@ describe("durable native work continuation", () => {
 	}
 	const begin = async () => settled((await request("task.submit", { text: "Build the original dashboard" })).run.id)
 	const parameters = (run: any) => ({ text: "Continue the saved work", continueFrom: { run: run.id, revision: run.revision } })
+	it("refuses a continuation whose saved content changed after its checksum was recorded", async () => {
+		const original = await begin()
+		const stored = database.getTable("desktop.runs.v1").get(original.id)!
+		database.getTable("desktop.runs.v1").put(original.id, { ...stored, text: "Changed without a matching seal" })
+		await assert.rejects(request("task.submit", parameters(original)), /SAVED_STATE_INVALID/)
+		const report = await request("state.inspect", { conversation: bridge.conversation })
+		assert.equal(report.invalid, 1)
+		assert.equal(report.runs[0].integrity, "invalid")
+		assert.equal(calls.length, 1)
+	})
 	beforeEach(async () => {
 		folder = await realpath(await mkdtemp(path.join(tmpdir(), "native-continuation-")))
 		calls = []
@@ -105,7 +116,8 @@ describe("durable native work continuation", () => {
 	it("requires explicit continuation after interrupted work is recovered from storage", async () => {
 		const original = await begin()
 		const stored = database.getTable("desktop.runs.v1").get(original.id)!
-		database.getTable("desktop.runs.v1").put(original.id, { ...stored, state: "running" })
+		// Simulate a valid accepted running row at the crash boundary.
+		database.getTable("desktop.runs.v1").put(original.id, sealRuntimeRecord({ ...stored, state: "running" }, bridge.session))
 		await bridge.stop()
 		create()
 		await bridge.start()

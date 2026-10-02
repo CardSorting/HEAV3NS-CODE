@@ -1,5 +1,11 @@
 # HEAV3NS-CODE integration preview
 
+Native **Saved State** now inspects selected-conversation run integrity and
+interrupted work through the existing Inspect navigation. Versioned content seals,
+journal chain validation and fail-closed checkpoint loading extend the runtime's
+existing persistence. See [runtime saved state](RUNTIME-STATE-STORE.md) for the
+source audit, exact guarantees and remaining scope.
+
 The current native journey is documented in [JOURNEY-V3.md](JOURNEY-V3.md). The integrated activity stream, retention and recovery contract is in [WALKTHROUGH.md](WALKTHROUGH.md); it supersedes the original progress-display limits described below.
 
 Source baseline: `4930239` (`main`), CLI package `heav3ns@14.0.0`. Product specification: user-supplied v0.1, September 29, 2026. This implements the first integration proof and portions of the reliable native-session phase. It does **not** declare the v0.1 alpha complete.
@@ -26,6 +32,15 @@ The default signature is ad hoc with Hardened Runtime. Only the Node helper rece
 Do not rebuild the bundle while it or the native transport tests are running: replacing a signed executable can terminate that executable. Close the preview and finish tests first. The builder checks for running bundle executables before compilation and before replacement and refuses an active bundle. `HEAV3NS_NODE` and `HEAV3NS_CLI` are optional development overrides; neither is required by a packaged app.
 
 ## Actual integration boundary
+
+### Conversation memory
+
+View → **Conversation Memory… (⌘8)** and Workspace Actions open a searchable
+native editor over the same memory store used in the engine's prompts. Explicit
+save and confirmed removal use conversation scope, revision checks, pending-work
+guards and durable acknowledgment. Drafts remain available during conflict or
+disconnect. See [Conversation memory and capability audit](CONVERSATION-MEMORY.md)
+for the twelve-capability source review, persistence contract, limits and tests.
 
 ### Project creation and library dates
 
@@ -115,6 +130,10 @@ An ambiguous or stale lock is deliberately not stolen. The startup message ident
 Desktop run acceptance is a BroccoliDB row keyed by the session and request ID. It includes a fingerprint of the typed submission. Admission is serialized even when callers deliver duplicate requests concurrently. The WAL flush waits for file sync and fails closed after an ambiguous append failure. Only after that boundary does the adapter acknowledge acceptance or admit the task. Reusing an ID with different contents is rejected. This is task deduplication, not exactly-once external side effects.
 
 Run, session and approval records remain in BroccoliDB. Recorded output lives in private `.broccolidb/desktop-output/<run>.txt` files, retrieved in 32 KiB chunks. Active context is restored through LUMI's existing session-store API. Prior unfinished runs become Interrupted when a successfully owned worker starts; they are never replayed automatically. Approval IDs and decisions are recorded separately from the latest run projection.
+
+Run Details also exposes a bounded operator explanation and related activity,
+continuation-source and checkpoint navigation through `run-insights-v1`. See
+[the source audit, response contract and verification](RUN-INSIGHTS.md).
 
 Working-tree inspection states its Git baseline explicitly. It includes pre-existing and external changes and does not claim exact per-run attribution. Message-linked file restoration is a separate negotiated capability with a reviewed comparison, safety copy, durable journal and new conversation; see [Checkpoints and Run](CHECKPOINTS-AND-RUN.md) for its exclusions and recovery boundaries.
 
@@ -275,6 +294,19 @@ A file revision is checked before and after each read. Changed files require Rel
 
 ## Native navigation and recovery
 
+Check Code uses the negotiated `spider-check-v1` capability to inspect saved JS/TS
+syntax, local imports and dependency cycles. The agent's `spider_check` tool and
+native `spider.check` endpoint share one bounded runtime service. Findings link
+back to files; Prepare Review appends an unsent composer draft. See the
+[Spider audit, runtime contract and limits](SPIDER-CODE-CHECKS.md).
+
+Conversation Context (Workspace menu, ⌘9, and Workspace Actions) connects retained
+history, rolling summaries, saved memory and current work in the existing native
+inspector. Its read-only `context.inspect` projection is scoped to the selected
+conversation and supports Back/Forward, Find, Reload and related controls. Slow
+memory/context reads fail locally without disconnecting the workspace. See the
+[agent-context audit and runtime contract](AGENT-CONTEXT.md).
+
 Composer drafts are restored per canonical workspace from `~/Library/Application Support/HEAV3NS-CODE/Drafts/`. Exact text is saved atomically after 300 ms of typing, before submission, and before close/quit. Each encoded record is bounded to 1 MiB; the private directory and files use owner-only permissions. Drafts are plaintext local presentation state and are not written into the project. A failed save keeps text visible and prevents sending or normal close/quit; copy the text to a file and resolve the storage problem or shorten an oversized draft.
 
 A submission's request ID and sent text are saved before dispatch. Reopening uses `task.lookup` to reconcile acceptance; it never replays the request. A confirmed matching instruction clears, while a newer composer draft survives. Unaccepted text remains ready for explicit review/send. This restoration covers the composer; queued-edit sheets and inspection navigation are not persisted. A crash inside the debounce interval may lose the latest keystrokes, and atomic replacement does not promise power-loss durability.
@@ -341,3 +373,28 @@ listener, with preview URLs returned only after binding. The native client uses
 Preview App for these targets and opens the browser only on an explicit successful
 start response. See [Run and preview behavior](CHECKPOINTS-AND-RUN.md#run-console-and-preview)
 for discovery, confinement, port/storage, supported-resource, and reload boundaries.
+
+### Database and context recovery
+
+The [database recovery audit](RUNTIME-STATE-STORE.md#database-and-context-recovery-pass)
+records the native integration of explicit table keys, versioned snapshots,
+journal-boundary compaction, persistent rollback and complete context admission.
+Conversation Context links directly to Saved State. The implementation preserves
+one authoritative local store; it does not start the reference SQLite service or
+a second AgentContext lifecycle. Ambiguous legacy snapshots stop without source
+replacement. The audit describes transaction, scale and recovery limits.
+
+### Shared saved-content storage
+
+New recorded output uses the existing BroccoliDB blob store with bounded,
+checksum-verified pages in the native inspector. The [storage audit](BLOB-STORAGE.md)
+covers durable publication, corruption evidence, agent audits, historical cleanup
+roots, legacy output compatibility and operating limits.
+
+### JoyRide execution reuse
+
+The [JoyRide runtime audit](JOYRIDE-RUNTIME.md) describes the shared factory and
+registry cache, per-turn ownership, file-content validation, bounded retention,
+approval enforcement and cancellation cleanup. It includes packaged-runtime
+evidence and measured limits; command/verification and scratch reuse remain
+outside the enabled runtime surface.

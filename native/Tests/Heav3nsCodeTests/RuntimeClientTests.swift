@@ -85,13 +85,14 @@ final class RuntimeClientTests: XCTestCase {
         _ = NSApplication.shared
         let client = try peer("""
         globalThis.selected ??= 'first';
-        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['conversations']});
+        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['conversations','conversation-context-v1']});
         if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[],conversation:globalThis.selected});
         if (request.method === 'conversation.list') reply(request,{conversations:[{id:'second',title:'Second'},{id:'first',title:'First'}],more:false});
         if (request.method === 'conversation.create') { globalThis.selected='second'; setTimeout(() => reply(request,{conversation:'second'}),20); }
         if (request.method === 'conversation.select') { globalThis.selected=request.params.id; reply(request,{conversation:globalThis.selected}); }
         if (request.method === 'files.list') reply(request,{entries:[]});
         if (request.method === 'files.read') setTimeout(() => reply(request,{text:'Delayed old preview',revision:'r',nextOffset:19,size:19}),200);
+        if (request.method === 'context.inspect') setTimeout(() => reply(request,{conversation:'first',activeMessages:79,rollingSummaries:1,savedMemories:3,working:false,queued:0,observedAt:Date.now()}),210);
         """, timeout: 2)
         let drafts = WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts"))
         let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: drafts)
@@ -104,7 +105,7 @@ final class RuntimeClientTests: XCTestCase {
             connected?(value)
             guard client.isReady, !started else { return }; started = true
             composer.string = "Keep my first draft 🌙"; workspace.prepareToClose()
-            workspace.inspect(.file("slow.txt")); workspace.newConversation()
+            workspace.inspect(.file("slow.txt")); workspace.inspect(.context("first")); workspace.newConversation()
             XCTAssertFalse(composer.isEditable)
         }
         client.onEvent = { value in
@@ -114,6 +115,8 @@ final class RuntimeClientTests: XCTestCase {
                 XCTAssertFalse(workspace.canInspectBack)
                 XCTAssertFalse(workspace.window?.isVisible == true, "An asynchronous conversation reply must not present a background workspace")
                 XCTAssertFalse((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("Delayed"))
+                XCTAssertFalse((workspace.probeLayout["inspectionPreview"] as? String ?? "").contains("79 active"))
+                XCTAssertEqual(workspace.probeLayout["inspectionTitle"] as? String, "Inspect")
                 XCTAssertEqual(composer.string, ""); XCTAssertTrue(composer.isEditable)
                 XCTAssertEqual(try? drafts.load()?.conversations?["first"], "Keep my first draft 🌙")
                 composer.string = "Keep second draft"; workspace.prepareToClose()
@@ -452,6 +455,32 @@ final class RuntimeClientTests: XCTestCase {
             }
         }
         client.start(folder: directory); wait(for: [stopped], timeout: 3)
+    }
+    func testMemoryContextSpiderAndStateReadTimeoutsNeverDisconnectRunningWork() throws {
+        let client = try peer(hello + snapshot + """
+        if (['memory.list','memory.read','context.inspect','context.history','spider.check','state.inspect'].includes(request.method)) setTimeout(() => reply(request,{late:true}),450);
+        if (request.method === 'task.cancelAll') reply(request,{requested:true});
+        """)
+        let expired = expectation(description: "all context inspections time out locally"); expired.expectedFulfillmentCount = 6
+        let stopped = expectation(description: "Stop still works after late replies")
+        var started = false
+        client.onConnection = { _ in
+            guard client.isReady, !started else { return }; started = true
+            for method in ["memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"] {
+                client.request(method) { result in
+                    guard case .failure(let error) = result else { return XCTFail("Read should time out") }
+                    XCTAssertEqual((error as? RuntimeFailure)?.acceptanceUnknown, false); XCTAssertTrue(client.isReady)
+                    expired.fulfill()
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                client.request("task.cancelAll") { result in
+                    if case .failure(let error) = result { XCTFail(error.localizedDescription) }
+                    XCTAssertTrue(client.isReady); stopped.fulfill()
+                }
+            }
+        }
+        client.start(folder: directory); wait(for: [expired, stopped], timeout: 3)
     }
     func testDiscoverySaturationLeavesRoomToSendInspectAndStop() throws {
         let client = try peer(hello + snapshot + """
