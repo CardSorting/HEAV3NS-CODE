@@ -27,7 +27,7 @@
 
 </div>
 
-**HEAV3NS-CODE native preview:** The macOS AppKit and Linux GTK clients run the existing LUMI engine in an owned workspace worker. See the [Linux build and usage guide](docs/desktop/LINUX.md), [build and integration guide](docs/desktop/INTEGRATION.md) and [measured release evidence and remaining alpha work](docs/desktop/RELEASE-EVIDENCE.md). This is an integration preview, not the completed v0.1 alpha.
+**HEAV3NS-CODE native preview:** The macOS AppKit client runs the existing LUMI engine in an owned workspace worker. See the [build and integration guide](docs/desktop/INTEGRATION.md) and [measured release evidence and remaining alpha work](docs/desktop/RELEASE-EVIDENCE.md). This is an integration preview, not the completed v0.1 alpha.
 
 > *Dedicated to the open-source community and the creators at **Nous Research** & **Hermes**. Made with love so anyone can build with fast, reliable AI.*
 > — **William Andrew Cruz** (`bozoegg` / `CardSorting`) · [Read Author's Note](PREFACE.md)

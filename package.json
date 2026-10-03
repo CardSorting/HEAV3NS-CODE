@@ -120,10 +120,7 @@
 		"desktop:build": "bash scripts/build-desktop.sh",
 		"desktop:test": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json node --import tsx --import ./src/test/register-vscode-mock.mjs node_modules/mocha/bin/mocha.js --no-config --require ./src/test/requires.cjs --timeout 30000 'src/desktop/__tests__/*.test.ts'",
 		"desktop:test:native": "bash scripts/test-desktop-native.sh",
-		"desktop:build:macos": "bash scripts/build-desktop.sh macos",
-		"desktop:build:linux": "bash scripts/build-desktop.sh linux",
-		"desktop:linux": "python3 native/linux/heav3ns-code",
-		"desktop:test:linux": "python3 -m unittest discover -s native/linux/tests -v"
+		"desktop:build:macos": "bash scripts/build-desktop.sh macos"
 	},
 	"lint-staged": {
 		"src/shared/storage/state-keys.ts": [

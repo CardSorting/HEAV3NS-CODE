@@ -1,6 +1,6 @@
 # HEAV3NS-CODE integration preview
 
-Linux is available through a native GTK 4 frontend using this same runtime protocol. See [Linux build, installation and verification](LINUX.md). `npm run desktop:build` selects the host platform; `npm run desktop:build:macos` and `npm run desktop:build:linux` select explicitly. The AppKit-specific instructions below continue to apply to macOS.
+The native desktop client is available as a native macOS AppKit frontend. `npm run desktop:build` builds the macOS application (`npm run desktop:build:macos`).
 
 Native **Saved State** now inspects selected-conversation run integrity and
 interrupted work through the existing Inspect navigation. Versioned content seals,
@@ -144,7 +144,7 @@ Shared worker snapshots publish recorded lifecycle state while including current
 bounded activity. A final checkpoint can still be saving after the engine returns;
 the overview keeps the instruction working until the terminal record is ready.
 This prevents a premature Completed state followed by missing recorded output.
-Linux also retires pending event/write queues on close and checks the close
+The desktop client also retires pending event/write queues on close and checks the close
 boundary for every frame, including closures triggered by response callbacks.
 
 Requests appear before activity with Arguments, Reason and Workspace in a bounded detail viewport; Allow Once and Deny stay outside it. Displayed requests remain fixed when a replacement arrives, including identical operation IDs from a different worker or conversation. A single Review Next Request action replaces the unavailable decisions until the user explicitly loads the replacement. View and workspace guards compare the full request and workspace context, and reject stale, disconnected, stopping and duplicate decisions. Pending decisions have individual identities: a late reply cannot clear a newer decision. Explicit rejection permits retry; lost acknowledgement reports an unknown outcome and requires reconnecting to recorded state. The shared conversation review sheet uses the same full-request check. Approval and execution state continue updating while the feed is paused; text selection pauses the feed immediately.
