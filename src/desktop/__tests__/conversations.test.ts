@@ -83,6 +83,48 @@ describe("desktop conversations", () => {
 		await bridge.stop()
 		await rm(folder, { recursive: true, force: true })
 	})
+	it("keeps snapshot completion behind the final recorded result while activity stays current", async () => {
+		const files = (bridge as any).checkpointFiles,
+			capture = files.capture.bind(files)
+		let reached!: () => void, release!: () => void
+		const finalizing = new Promise<void>((resolve) => {
+			reached = resolve
+		})
+		const resume = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		files.capture = async (label: string, ...args: any[]) => {
+			if (label.startsWith("After:")) {
+				reached()
+				await resume
+			}
+			return capture(label, ...args)
+		}
+		execute = async (input) => {
+			input.onProgress?.({
+				activityId: "latest",
+				sequence: 1,
+				timestamp: Date.now(),
+				phase: "responding",
+				status: "completed",
+				message: "Latest activity",
+			})
+			return result()
+		}
+		const accepted = await request("task.submit", { text: "Finish and save the result" })
+		try {
+			await finalizing
+			const snapshot = await request("snapshot")
+			const run = snapshot.runs.find((run: any) => run.id === accepted.run.id)
+			assert.equal(run.state, "running", "A live object must not publish completion ahead of its recorded output")
+			assert.equal(run.activities.at(-1).message, "Latest activity")
+		} finally {
+			release()
+		}
+		await idle()
+		assert.equal((await request("snapshot")).runs.find((run: any) => run.id === accepted.run.id).state, "completed")
+		assert.match((await request("artifact.read", { run: accepted.run.id })).text, /Recorded response/)
+	})
 	it("captures real retained history without execution and invalidates snapshots across conversation switches", async () => {
 		assert.ok((await request("hello")).capabilities.includes("context-history-v1"))
 		const conversation = bridge.conversation

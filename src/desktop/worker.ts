@@ -361,7 +361,19 @@ export class DesktopSession {
 		const live = [this.active, ...this.queue].filter((run): run is Run => Boolean(run))
 		const ids = new Set(live.map((run) => run.id))
 		const history = this.recent().runs.filter((run) => !ids.has(run.id))
-		return [...live.map(projectRun), ...history.slice(-(6 - live.length))].sort(
+		// Lifecycle fields come from the recorded instruction. The mutable active
+		// object can already be terminal while its final checkpoint is still being
+		// saved; publishing it early makes artifact.read observe an older record.
+		// Display-only activity remains current between coalesced checkpoints.
+		const current = live.map((run) =>
+			projectRun({
+				...(this.runs.get(run.id) ?? run),
+				activities: run.activities,
+				activitySequence: run.activitySequence,
+				activityCount: run.activityCount,
+			}),
+		)
+		return [...current, ...history.slice(-(6 - live.length))].sort(
 			(a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
 		)
 	}
