@@ -227,6 +227,13 @@ class RuntimeClient:
             self.process.stdout.close()
 
     def _receive(self, frame):
+        # Future callbacks may close this channel while a decoded burst is being
+        # delivered. Serialize that boundary with shutdown and queue admission.
+        with self.lock:
+            if not self.closed:
+                self._receive_open(frame)
+
+    def _receive_open(self, frame):
         if frame.get("kind") == "protocol.error":
             raise ProtocolError("Runtime protocol error. Rebuild app and runtime together.")
         identity = frame.get("id")
@@ -289,6 +296,12 @@ class RuntimeClient:
                 return
             self.closed, self.ready, self.failure = True, False, message
             pending, self.pending = self.pending, {}
+            for mailbox in (self.events, self.writes):
+                while True:
+                    try:
+                        mailbox.get_nowait()
+                    except queue.Empty:
+                        break
         for future, method, _ in pending.values():
             suffix = " Acceptance unknown; reconnect to reconcile the saved request." if method == "task.submit" else ""
             if not future.done():

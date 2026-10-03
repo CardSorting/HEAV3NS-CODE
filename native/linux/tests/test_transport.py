@@ -42,6 +42,30 @@ for line in sys.stdin.buffer:
 
 
 class TransportTests(unittest.TestCase):
+    def test_close_discards_pending_display_and_write_buffers_and_rejects_late_frames(self):
+        client = self.make_client()
+        client.connect()
+        event = dict(v=1, kind='event', workspace='workspace', session='session', runtime='runtime',
+                     type='runtime.error', payload={'message': 'x' * 100_000})
+        client._receive(event)
+        self.assertEqual(client.events.qsize(), 1)
+        client.close()
+        client._receive(event)
+        self.assertTrue(client.events.empty())
+        self.assertTrue(client.writes.empty())
+
+    def test_response_callback_close_blocks_the_remainder_of_a_burst(self):
+        client = self.make_client()
+        client.connect()
+        future = client.request('files.search')
+        identity = next(key for key, pending in client.pending.items() if pending[0] is future)
+        future.add_done_callback(lambda _: client.close())
+        client._receive(dict(v=1, kind='response', id=identity, result={}))
+        client._receive(dict(v=1, kind='event', workspace='workspace', session='session', runtime='runtime',
+                             type='runtime.error', payload={'message': 'late'}))
+        self.assertTrue(client.closed)
+        self.assertTrue(client.events.empty())
+
     def test_startup_error_is_visible_and_stderr_is_drained_with_bounded_memory(self):
         code = "import sys; sys.stderr.write('noise' * 20000 + '\\nWORKSPACE_OWNED: existing owner; close its session first.\\n'); sys.exit(1)"
         client = RuntimeClient(tempfile.gettempdir(), [sys.executable, '-u', '-c', code])

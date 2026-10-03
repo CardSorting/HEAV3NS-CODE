@@ -48,6 +48,7 @@ jobs:
           export XDG_STATE_HOME="$HOME/state"
           npm run desktop:test:linux
           GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_regressions.py
+          GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_pods.py
           GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_smoke.py
           GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_sidebar.py
           GTK_A11Y=none GSK_RENDERER=cairo xvfb-run -a python3 native/linux/tests/gtk_git.py

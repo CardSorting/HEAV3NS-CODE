@@ -96,9 +96,24 @@ Release launches resolve their bundled runtime relative to the launcher.
 - Open or create a project, search/pin/remove recent projects, locate moved
   folders, and keep up to four independent workspace windows open. Removing a
   recent entry retains project files.
-- Open **Pods** to observe those workspaces without starting additional workers.
-  Review the exact operation, allow/deny it, stop work or reconnect the selected
-  project. Decisions are checked against the current conversation and operation.
+- **Pods** mirrors the macOS control room: **Load Projects…** selects one or more
+  folders, **Project Library…** opens recent projects, and stable project cards
+  reflow into one to three columns. Reopening a loaded project reuses its worker;
+  the four-project limit and unavailable folders are reported inside Pods.
+  **All / Working / Attention** and project/conversation/instruction search filter
+  the board without changing execution. **Next Request** (Ctrl+J) cycles through
+  approvals across all projects, clears filters and brings the review into view.
+  Ctrl+F focuses search; Ctrl+O loads projects; Ctrl+W closes only the overview.
+- Each pod shows durable run timing, queue state and a bounded activity feed.
+  Selecting text, scrolling back or choosing **Pause** holds the displayed feed;
+  **Resume** shows the newest output. A quiet agent is not labeled as stalled.
+  Pending requests open an inline **Review request** tab, with **Activity** still
+  available. Exact arguments, reason and workspace remain scrollable. A replaced
+  operation requires **Review next request** before Allow/Deny can be used.
+  Pods and the conversation share pending decisions and Stop state. **More**
+  contains checkpoints, connection details and reconnect. Reconnect never
+  automatically resubmits a task. Short windows keep actions visible and move
+  secondary timing/conversation details to the project-name tooltip.
 - Create, select and delete durable conversations. Drafts are saved separately
   per conversation. Ctrl+Enter sends; Ctrl+N creates a conversation; Ctrl+O opens
   a project. The Conversations button collapses navigation for compact windows.
@@ -219,6 +234,7 @@ npm run desktop:test:linux
 HEAV3NS_TEST_CLI="$PWD/dist/index.js" npm run desktop:test:linux
 GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_smoke.py
 GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_regressions.py
+GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_pods.py
 GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_sidebar.py
 GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_git.py
 GTK_A11Y=none xvfb-run -a python3 native/linux/tests/gtk_shutdown.py

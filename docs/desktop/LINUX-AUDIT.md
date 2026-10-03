@@ -36,6 +36,75 @@ adapted to the repository's existing conversation-first macOS product structure.
 
 ## Findings and implemented changes
 
+### Burst shutdown and recorded completion follow-up
+
+The shared completion audit reproduced a snapshot reporting Completed before its
+final checkpoint and result record were ready. Snapshots now use recorded
+lifecycle fields while retaining current bounded activity. A regression test
+holds the final checkpoint open, verifies that the run remains Working, then
+checks that completion and readable output arrive together.
+
+Linux transport shutdown clears both bounded event and write queues. Every
+decoded frame shares the shutdown lock, so a response callback that closes the
+workspace cannot deliver later frames from the same burst. This pass passes all
+40 Python tests, including scripted execution and the packaged runtime adapter,
+plus the shared worker suite (425 passed; the undecodable Linux filename case is
+platform-skipped on macOS). Native memory and lifecycle measurements are recorded
+in [the macOS follow-up evidence](../../build/macos-pods-memory-qa/verification.json).
+
+### Pods workflow and control ownership
+
+The original Linux Pods window was a list of workspace summaries. Comparing it
+with `PodsWindow`, `PodLiveView`, `PodMonitoring` and the macOS workspace snapshot
+exposed missing project loading, filtering, request navigation, live output and
+checkpoint access. Its approval closures also tracked pending state independently
+of the conversation window, and replacing a request could move new arguments
+under an existing decision button.
+
+Linux now provides the same project-control workflow through GTK's native
+[reflowing FlowBox](https://docs.gtk.org/gtk4/class.FlowBox.html), header bar,
+linked filters, searchable board and per-project activity/review tabs. It retains
+the existing system theme and fonts. Display order follows loaded projects rather
+than changing with live status. Opening Pods starts no worker and adds no runtime
+RPC polling. Loading a folder reuses the canonical workspace owner; batch failures
+stay visible in the originating window.
+
+`WorkspaceCommands` owns approval and Stop admission for Pods, the conversation
+and the action palette. Approval identity includes worker, conversation, run and
+the complete reviewed request. A second surface cannot submit a competing
+decision. Successful acknowledgements remain pending until authoritative state
+advances; explicit rejection allows retry, while uncertain outcomes remain
+blocked. Delayed callbacks cannot release a newer decision. Replacing an approval
+holds the old details and offers explicit Review next request. Stop blocks further
+decisions for that project. Reconnect is available after the previous process
+exits, including recovery from failure before a client could be created.
+
+The live projection keeps at most 30 activities and 24,000 characters, with
+coverage/truncation notices and a bounded final response. A paused reader retains
+only its displayed text and the newest projection. Selection, scrollback and
+Pause preserve text while agent state continues updating. Resume and unpaused
+reflow follow a native text mark after GTK validates wrapping. Timing uses stored
+start, end and activity dates; silence does not establish a stalled agent.
+
+The GTK checks caught long recovery messages changing grid width, delayed search
+resetting request navigation, and focus scrolling to pre-filter card geometry.
+Labels now have bounded natural width; local search updates immediately; request
+focus waits for the new allocation. Native
+[viewport focus scrolling](https://docs.gtk.org/gtk4/property.Viewport.scroll-to-focus.html)
+is explicitly enabled for older GTK versions. Temporary frame callbacks end after
+the reveal, and overview/feed sources are disposed on close or owner replacement.
+At 640 × 480, secondary card context collapses and remains available in tooltips;
+the complete request and its actions remain in the card's viewport.
+
+Dedicated tests cover cross-surface races, changed arguments under the same
+operation, late replies, disconnected and missing runtimes, held selections,
+bounded bursts, long Unicode input, 3/2/1-column layout, light/dark appearance,
+offscreen request navigation, batch-load errors and reopening a workspace at the
+same path. The existing production-protocol GTK execution and multi-workspace
+scenarios also exercise the shared controls. CI runs the new Pods suite on both
+Linux architectures. Local verification uses Ubuntu ARM64/Xvfb; physical Wayland,
+screen-reader behavior and provider-backed runs remain unverified.
+
 ### Git failure follow-up
 
 Reproduced in the running Ubuntu container with Git 2.43.0: the initial project

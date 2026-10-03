@@ -23,6 +23,8 @@ from .navigation import matches
 from .inspector import Inspector
 from .pickers import CommandPalette, QuickOpen
 from .pods import Pods
+from .approval import ApprovalView
+from .workspace_commands import WorkspaceCommands
 from .transcript import RunRow
 from .task_context import TaskContext
 
@@ -64,6 +66,7 @@ class Workspace(Gtk.ApplicationWindow):
         self.last_transcript = None
         self.last_conversations = None
         self.persist_source = None
+        self.commands = WorkspaceCommands(self)
         self.header = Gtk.HeaderBar()
         self.header.pack_start(button("Projects", app.show_library))
         self.header.pack_start(button("Conversations", self.toggle_sidebar))
@@ -135,7 +138,8 @@ class Workspace(Gtk.ApplicationWindow):
         history_actions.append(self.older)
         history_actions.append(button("Latest", self.to_latest))
         center.append(history_actions)
-        self.approval_box = box(margin=12)
+        self.approval_view = ApprovalView(self)
+        self.approval_box = self.approval_view.view
         self.approval_box.add_css_class("card")
         self.approval_box.set_visible(False)
         center.append(self.approval_box)
@@ -157,7 +161,7 @@ class Workspace(Gtk.ApplicationWindow):
         self.model_label.set_wrap(False)
         self.model_label.set_hexpand(True)
         actions.append(self.model_label)
-        self.stop = button("Stop all", lambda: self.rpc("task.cancelAll", {}, lambda _: self.refresh()))
+        self.stop = button("Stop all", self.commands.stop)
         actions.append(self.stop)
         self.send = button("Send", self.submit, "suggested-action")
         actions.append(self.send)
@@ -486,7 +490,6 @@ class Workspace(Gtk.ApplicationWindow):
             self.transcript.append(label("What would you like to build?", "title-1"))
             self.transcript.append(label("Describe a change or ask a question. Open Actions for files, project tools and saved evidence.", "dim-label"))
         previous = None
-        approval_run = None
         for run in ordered:
             row = self.transcript_rows.get(run["id"])
             if row is None:
@@ -495,15 +498,6 @@ class Workspace(Gtk.ApplicationWindow):
                 self.transcript.insert_child_after(row.view, previous)
             row.update(run)
             previous = row.view
-            if run.get("state") == "awaiting_approval" and run.get("approval"):
-                approval_run = run
-        approval_key = (self.client.runtime, approval_run["id"], approval_run["approval"]["operation"]) if approval_run else None
-        if approval_key != getattr(self, "approval_key", None):
-            self.approval_key = approval_key
-            clear(self.approval_box)
-            self.approval_box.set_visible(bool(approval_run))
-            if approval_run:
-                self.render_approval(approval_run)
         prepended = bool(previous_first and ordered and ordered[0]["id"] != previous_first)
         generation = self.conversation
         def restore_position():
@@ -511,35 +505,6 @@ class Workspace(Gtk.ApplicationWindow):
                 adjustment.set_value(adjustment.get_upper() if follow else position + (adjustment.get_upper() - upper if prepended else 0))
             return False
         GLib.idle_add(restore_position)
-
-    def render_approval(self, run):
-        approval = run["approval"]
-        self.approval_box.set_visible(True)
-        self.approval_box.append(label("LUMI needs your approval", "heading"))
-        details = text_view(monospace=True)
-        reason = label(approval.get("reason") or "Review this operation before it runs.")
-        reason.set_lines(2)
-        reason.set_ellipsize(Pango.EllipsizeMode.END)
-        reason.set_tooltip_text(approval.get("reason", ""))
-        self.approval_box.append(reason)
-        scope = label(f"{approval.get('tool', 'Operation')} · {approval.get('scope', self.folder)}", "dim-label")
-        scope.set_wrap(False)
-        scope.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
-        scope.set_tooltip_text(scope.get_text())
-        self.approval_box.append(scope)
-        details.get_buffer().set_text(approval.get("args", ""))
-        pane = scroll(details, False)
-        pane.set_min_content_height(80)
-        pane.set_max_content_height(160)
-        self.approval_box.append(pane)
-        actions = box(False)
-        def resolve(decision):
-            actions.set_sensitive(False)
-            self.rpc("approval.resolve", {"run": run["id"], "operation": approval["operation"], "decision": decision},
-                     lambda _: self.refresh(), lambda error: (actions.set_sensitive(True), self.show_error(error)))
-        actions.append(button("Deny", lambda: resolve("deny")))
-        actions.append(button("Allow once", lambda: resolve("allow"), "suggested-action"))
-        self.approval_box.append(actions)
 
     def update_controls(self):
         ready = bool(self.client and self.client.ready and not self.client.closed and self.connected_once)
@@ -550,8 +515,9 @@ class Workspace(Gtk.ApplicationWindow):
         self.state_recovery.set_visible(self.key in self.store.problems)
         self.send.set_label("Queue" if busy else "Send")
         self.continuation_control.set_visible(bool(self.continuation))
-        self.stop.set_sensitive(ready and busy)
-        self.approval_box.set_sensitive(ready)
+        self.stop.set_sensitive(self.commands.can_stop())
+        self.stop.set_label("Stopping…" if self.commands.stop_pending else "Stop all")
+        self.approval_view.update()
         self.models_button.set_sensitive(ready and "model-selection-v1" in self.client.capabilities)
         conversations = ready and "conversations" in self.client.capabilities
         self.new_conversation.set_sensitive(conversations and not busy and not self.switching and not self.pending_submission)
@@ -787,7 +753,7 @@ class Workspace(Gtk.ApplicationWindow):
             ("state", "Inspect saved state", "", "runtime-state-v1", lambda: self.evidence("Saved state", "state.inspect", {"conversation": self.conversation}), "recovery integrity interrupted"),
             ("check", "Check code…", "", "spider-check-v1", self.check_code, "syntax imports spider"),
             ("model", "Provider and model…", "", "model-selection-v1", self.models, "reasoning account key settings"),
-            ("stop", "Stop all project work", "", "cancel", lambda: self.rpc("task.cancelAll", {}, lambda _: self.refresh()), "cancel agent queue"),
+            ("stop", "Stop all project work", "", "cancel", self.commands.stop, "cancel agent queue"),
             ("pods", "Show Pods overview", "", None, self.app.show_pods, "projects monitor workspaces"),
             ("projects", "Open project…", "Ctrl+O", None, lambda: self.app.choose_folder(self), "folder workspace"),
             ("sidebar", "Toggle conversations", "Ctrl+B", None, self.toggle_sidebar, "sidebar navigation"),
@@ -799,7 +765,7 @@ class Workspace(Gtk.ApplicationWindow):
             if identity == "new":
                 enabled = enabled and idle
             if identity == "stop":
-                enabled = enabled and bool(getattr(self, "active", None) or getattr(self, "queued", []))
+                enabled = enabled and self.commands.can_stop()
             reason = ""
             if not enabled:
                 reason = ("Reconnect this workspace to use this action" if not ready else
@@ -1180,17 +1146,27 @@ class Application(Gtk.Application):
         window.set_child(body)
         window.present()
 
-    def choose_folder(self, parent, selected=None):
-        chooser = Gtk.FileChooserNative(title="Open project", transient_for=parent,
+    def choose_folder(self, parent, selected=None, multiple=False, finished=None):
+        chooser = Gtk.FileChooserNative(title="Load projects" if multiple else "Open project", transient_for=parent,
                                         action=Gtk.FileChooserAction.SELECT_FOLDER, accept_label="Open", cancel_label="Cancel")
+        chooser.set_select_multiple(multiple)
         def response(dialog, result):
-            if result == Gtk.ResponseType.ACCEPT:
-                file = dialog.get_file()
-                if file and file.get_path():
-                    (selected or self.open_workspace)(file.get_path())
-            dialog.destroy()
+            try:
+                if result == Gtk.ResponseType.ACCEPT:
+                    files = dialog.get_files()
+                    paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
+                    paths = [path for path in paths if path]
+                    if multiple:
+                        (selected or (lambda values: [self.open_workspace(path) for path in values]))(paths)
+                    elif paths:
+                        (selected or self.open_workspace)(paths[0])
+            finally:
+                dialog.destroy()
+                if finished:
+                    finished()
         chooser.connect("response", response)
         chooser.show()
+        return chooser
 
     def new_project(self, parent):
         panel = Panel(parent, "New project", 480, 240)
@@ -1214,14 +1190,27 @@ class Application(Gtk.Application):
         panel.body.append(button("Create project", create, "suggested-action"))
         panel.present()
 
-    def open_workspace(self, folder):
-        folder = str(Path(folder).resolve())
+    def open_workspace(self, folder, on_error=None):
+        def failed(message):
+            if on_error:
+                on_error(message)
+            else:
+                self.show_library()
+                self.library_error.set_text(message)
+        try:
+            folder = str(Path(folder).resolve())
+            exists = Path(folder).is_dir()
+        except (OSError, RuntimeError) as error:
+            failed('Could not open this project: ' + str(error))
+            return
         if folder in self.workspaces:
             self.workspaces[folder].present()
+            return self.workspaces[folder]
+        if not exists:
+            failed('Project folder is unavailable: ' + folder)
             return
-        if not Path(folder).is_dir() or len(self.workspaces) >= 4:
-            self.show_library()
-            self.library_error.set_text("Choose an existing folder. Up to four project windows can be open at once.")
+        if len(self.workspaces) >= 4:
+            failed('Four projects are already open. Close a workspace before loading ' + Path(folder).name + '.')
             return
         self.workspaces[folder] = Workspace(self, folder)
         projects = self.store.read("projects", [])
@@ -1233,6 +1222,7 @@ class Application(Gtk.Application):
             self.workspaces[folder].show_error("Could not update recent projects: " + str(error))
         if self.library:
             self.populate_library()
+        return self.workspaces[folder]
 
     def account(self, parent):
         if self.account_client and not self.account_client.closed:
