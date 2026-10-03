@@ -148,6 +148,7 @@ try {
 		assert.equal(stopped.pods.find((pod: PodReportEntry) => pod.path.endsWith("/API")).running, true)
 		assert.ok(decided.pods.find((pod: PodReportEntry) => pod.path.endsWith("/API")).stream.includes("Live update received"))
 		assert.equal(compact.columns, 1)
+		assert.equal(compact.layout.windowWidth, 720, "Compact verification must use the requested window width")
 		assert.equal(compact.count, 3)
 		assert.ok(!errors.includes("Unable to simultaneously satisfy constraints"), errors)
 		await writeFile(

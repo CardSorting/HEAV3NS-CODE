@@ -6,6 +6,13 @@ import AppKit
 // FIRST VIEWPORT: Compact controls above one to three contained project viewports, sized for the available board.
 // FORM: Operate surface extending the native workspace; live state changes do not reorder pods.
 // FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+/// A project path can outlive its window, worker, or conversation. Actions also
+/// carry the context that was visible when the user selected the control.
+struct PodTarget: Equatable {
+    let path: String
+    let context: UUID?
+}
+
 struct PodSnapshot: Equatable {
     let path: String
     let thread: String
@@ -31,18 +38,21 @@ struct PodSnapshot: Equatable {
     var activityCount: Int = 0
     var canReconnect: Bool = false
     var canOpenCheckpoints: Bool = false
-    var requiresAttention: Bool { needsReview || ["Disconnected", "Check connection", "Failed", "Interrupted", "Timed out"].contains(status) }
+    var contextID: UUID? = nil
+    var stopNeedsAttention = false
+    var target: PodTarget { PodTarget(path: path, context: contextID) }
+    var requiresAttention: Bool { needsReview || stopNeedsAttention || ["Disconnected", "Check connection", "Failed", "Interrupted", "Timed out"].contains(status) }
 }
 
 final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDelegate {
     var snapshots: () -> [PodSnapshot] = { [] }
     var onLoad: (() -> Void)?
     var onLibrary: (() -> Void)?
-    var onOpen: ((String) -> Void)?
-    var onStop: ((String) -> Void)?
-    var onDecision: ((String, ApprovalRequest, String) -> Void)?
-    var onReconnect: ((String) -> Void)?
-    var onCheckpoints: ((String) -> Void)?
+    var onOpen: ((PodTarget) -> Void)?
+    var onStop: ((PodTarget) -> Void)?
+    var onDecision: ((PodTarget, ApprovalRequest, String) -> Bool)?
+    var onReconnect: ((PodTarget) -> Void)?
+    var onCheckpoints: ((PodTarget) -> Void)?
     private let summary = JourneyStyle.label("Load a project to start an agent workflow.", size: 13, secondary: true)
     private let board = JourneyStyle.stack([], spacing: PodLayout.gap)
     private let scroll = NSScrollView()
@@ -53,6 +63,8 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
     private var noLoadedProjects = true
     private var timer: Timer?
     private var lastReviewedPath: String?
+    private var currentSnapshots = [PodSnapshot]()
+    private var palette: ActionPalette?
     private let search = NSSearchField()
     private let filters = NSSegmentedControl(labels: ["All", "Working", "Attention"], trackingMode: .selectOne, target: nil, action: nil)
     private lazy var attention = JourneyButton("Next Request", symbol: "hand.raised") { [weak self] in self?.focusNextRequest() }
@@ -70,6 +82,8 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
         filters.setAccessibilityLabel("Filter project pods")
         search.placeholderString = "Find project or task"; search.delegate = self
         search.setAccessibilityLabel("Find a project or task"); search.sendsSearchStringImmediately = true
+        search.toolTip = "Find projects, conversations, or tasks · ⌘F"
+        attention.toolTip = "Focus the next request's full details · ⌘J. Use ⇧⌘J for the previous request."
         let controls = JourneyStyle.stack([filters, search], vertical: false, spacing: 12)
         search.setContentHuggingPriority(.init(1), for: .horizontal)
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = false; scroll.drawsBackground = false
@@ -91,8 +105,11 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
         window.center()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+    deinit { timer?.invalidate() }
     func present() {
+        let opening = window?.isVisible != true
         refresh(); showWindow(nil); window?.makeKeyAndOrderFront(nil)
+        if opening { focusSearch() }
         if timer == nil { timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self, self.window?.occlusionState.contains(.visible) == true else { return }; self.refresh()
         } }
@@ -105,7 +122,8 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
         let scrollerWidth = scroll.scrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
         let chromeHeight = root.arrangedSubviews.filter { $0 !== scroll }.reduce(CGFloat(0)) { $0 + $1.fittingSize.height } + 32 + 32
         let layout = PodLayout(width: content.width - 36 - scrollerWidth, height: content.height - chromeHeight - 4)
-        let all = snapshots(), allIDs = all.map(\.path)
+        let all = snapshots(), allIDs = Set(all.map(\.path))
+        currentSnapshots = all
         let filter = PodFilter(rawValue: filters.selectedSegment) ?? .all
         let values = all.filter { filter.matches($0, query: search.stringValue) }, ids = values.map(\.path)
         let count = values.count, running = values.filter(\.running).count, review = values.filter(\.needsReview).count
@@ -115,7 +133,10 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
         summary.toolTip = summary.stringValue
         for (index, value) in all.enumerated() {
             if cards[value.path] == nil {
-                let card = PodView(open: { [weak self] in self?.onOpen?(value.path) }, stop: { [weak self] in self?.onStop?(value.path) }, decide: { [weak self] request, decision in self?.onDecision?(value.path, request, decision); self?.refresh() }, reconnect: { [weak self] in self?.onReconnect?(value.path) }, checkpoints: { [weak self] in self?.onCheckpoints?(value.path) })
+                let card = PodView(open: { [weak self] in self?.onOpen?($0) }, stop: { [weak self] in self?.onStop?($0); self?.refresh() }, decide: { [weak self] target, request, decision in
+                    let accepted = self?.onDecision?(target, request, decision) ?? false
+                    self?.refresh(); return accepted
+                }, reconnect: { [weak self] in self?.onReconnect?($0); self?.refresh() }, checkpoints: { [weak self] in self?.onCheckpoints?($0) })
                 cards[value.path] = card
             }
             cards[value.path]?.update(value, slot: index + 1, layout: layout)
@@ -158,13 +179,35 @@ final class PodsWindow: NSWindowController, NSWindowDelegate, NSSearchFieldDeleg
         let reset = JourneyButton("Show All Projects", symbol: "line.3.horizontal.decrease") { [weak self] in self?.showAll() }
         return JourneyStyle.stack([JourneyStyle.label("No matching projects", size: 18, weight: .semibold), JourneyStyle.label("Other agents keep working while this view is filtered.", secondary: true), reset], spacing: 12)
     }
-    func focusNextRequest() {
+    var hasRequests: Bool { snapshots().contains { $0.approval != nil } }
+    func focusSearch() { guard window?.attachedSheet == nil else { return }; window?.makeFirstResponder(search); search.selectText(nil) }
+    func showActions() {
+        guard let window, window.attachedSheet == nil else { return }
+        var actions = [
+            WorkspaceAction(title: "Find Project or Task", shortcut: "⌘F", keywords: ["search", "pods"], perform: { [weak self] in self?.focusSearch() }),
+            WorkspaceAction(title: "Load Projects…", shortcut: "⌘O", keywords: ["open", "folder", "pods"], perform: { [weak self] in self?.onLoad?() }),
+            WorkspaceAction(title: "Project Library…", shortcut: "", perform: { [weak self] in self?.onLibrary?() }),
+            WorkspaceAction(title: "Show All Projects", shortcut: "", perform: { [weak self] in self?.showAll() }),
+            WorkspaceAction(title: "Show Working Projects", shortcut: "", perform: { [weak self] in self?.selectFilter(.working) }),
+            WorkspaceAction(title: "Show Projects Needing Attention", shortcut: "", perform: { [weak self] in self?.selectFilter(.attention) })
+        ]
+        if hasRequests {
+            actions.append(WorkspaceAction(title: "Next Request", shortcut: "⌘J", perform: { [weak self] in self?.focusNextRequest() }))
+            actions.append(WorkspaceAction(title: "Previous Request", shortcut: "⇧⌘J", perform: { [weak self] in self?.focusNextRequest(backward: true) }))
+        }
+        palette?.close()
+        palette = ActionPalette(actions: actions); palette?.present(for: window)
+    }
+    func focusNextRequest(backward: Bool = false) {
+        guard window?.attachedSheet == nil else { return }
         showAll()
-        let paths = snapshots().filter { $0.approval != nil }.map(\.path)
+        let paths = currentSnapshots.filter { $0.approval != nil }.map(\.path)
         guard !paths.isEmpty else { return }
-        let index = lastReviewedPath.flatMap { paths.firstIndex(of: $0) }.map { ($0 + 1) % paths.count } ?? 0
+        let index = lastReviewedPath.flatMap { paths.firstIndex(of: $0) }.map { ($0 + (backward ? paths.count - 1 : 1)) % paths.count } ?? (backward ? paths.count - 1 : 0)
         lastReviewedPath = paths[index]
-        if let card = cards[paths[index]] { window?.contentView?.layoutSubtreeIfNeeded(); card.scrollToVisible(card.bounds) }
+        if let card = cards[paths[index]] {
+            window?.contentView?.layoutSubtreeIfNeeded(); card.scrollToVisible(card.bounds); card.focusRequest()
+        }
     }
     private func makeEmpty() -> NSView {
         let title = JourneyStyle.label("Load a project pod", size: 21, weight: .semibold)
@@ -202,19 +245,30 @@ final class PodView: NSBox {
     private let timing = JourneyStyle.label("", size: 12, secondary: true)
     private let note = JourneyStyle.label("", size: 12, secondary: true)
     private let feed = PodFeed()
-    private let requestView: PodApprovalView
-    private let stopButton: JourneyButton
+    private var target: PodTarget?
+    private let openAction: (PodTarget) -> Void
+    private let stopAction: (PodTarget) -> Void
+    private let decideAction: (PodTarget, ApprovalRequest, String) -> Bool
+    private lazy var requestView = PodApprovalView { [weak self] request, decision in
+        guard let self, let target else { return false }
+        return decideAction(target, request, decision)
+    }
+    private lazy var openButton = JourneyButton("Conversation", symbol: "bubble.left") { [weak self] in
+        guard let self, let target else { return }; openAction(target)
+    }
+    private lazy var stopButton = JourneyButton("Stop Agent", symbol: "stop.fill") { [weak self] in
+        guard let self, let target else { return }; stopAction(target)
+    }
     private let more = NSPopUpButton(frame: .zero, pullsDown: true)
     private let reconnectItem = NSMenuItem(title: "Reconnect Agent", action: #selector(reconnect), keyEquivalent: "")
     private let checkpointsItem = NSMenuItem(title: "Checkpoints…", action: #selector(checkpoints), keyEquivalent: "")
-    private let reconnectAction: () -> Void
-    private let checkpointsAction: () -> Void
+    private let reconnectAction: (PodTarget) -> Void
+    private let checkpointsAction: (PodTarget) -> Void
     private var tileHeight: NSLayoutConstraint!
     private var requestWidth: NSLayoutConstraint!
     private var root: NSStackView!
-    init(open: @escaping () -> Void, stop: @escaping () -> Void, decide: @escaping (ApprovalRequest, String) -> Void, reconnect: @escaping () -> Void = {}, checkpoints: @escaping () -> Void = {}) {
-        requestView = PodApprovalView(decide: decide)
-        stopButton = JourneyButton("Stop Agent", symbol: "stop.fill", action: stop)
+    init(open: @escaping (PodTarget) -> Void, stop: @escaping (PodTarget) -> Void, decide: @escaping (PodTarget, ApprovalRequest, String) -> Bool, reconnect: @escaping (PodTarget) -> Void = { _ in }, checkpoints: @escaping (PodTarget) -> Void = { _ in }) {
+        openAction = open; stopAction = stop; decideAction = decide
         reconnectAction = reconnect; checkpointsAction = checkpoints
         super.init(frame: .zero)
         stopButton.toolTip = "Stop active and queued agent work in this project. Project files are kept."
@@ -236,7 +290,7 @@ final class PodView: NSBox {
         checkpointsItem.toolTip = "Review saved project versions. Restoring remains unavailable while work is active."
         let top = JourneyStyle.stack([project, NSView(), status], vertical: false, spacing: 8)
         let context = JourneyStyle.stack([identity, thread], vertical: false, spacing: 8)
-        let actions = JourneyStyle.stack([JourneyButton("Conversation", symbol: "bubble.left", action: open), more, NSView(), stopButton], vertical: false, spacing: 6)
+        let actions = JourneyStyle.stack([openButton, more, NSView(), stopButton], vertical: false, spacing: 6)
         root = JourneyStyle.stack([top, context, instruction, timing, note, requestView, feed, actions], spacing: 6)
         for label in [project, thread, instruction, timing, note, status] {
             label.setContentCompressionResistancePriority(.init(1), for: .horizontal)
@@ -252,13 +306,19 @@ final class PodView: NSBox {
         tileHeight = heightAnchor.constraint(equalToConstant: 400); tileHeight.isActive = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    @objc private func reconnect() { if reconnectItem.isEnabled { reconnectAction() } }
-    @objc private func checkpoints() { if checkpointsItem.isEnabled { checkpointsAction() } }
+    @objc private func reconnect() { if reconnectItem.isEnabled, let target { reconnectAction(target) } }
+    @objc private func checkpoints() { if checkpointsItem.isEnabled, let target { checkpointsAction(target) } }
+    func focusRequest() { requestView.focusDetails() }
     func update(_ value: PodSnapshot, slot: Int, layout: PodLayout = PodLayout(width: 400, height: 400)) {
+        target = value.target
         tileHeight.constant = layout.height; root.spacing = layout.compact ? 4 : 6
         requestView.setCompact(layout.compact)
         identity.stringValue = "Pod \(slot) · LUMI"
         project.stringValue = (value.path as NSString).lastPathComponent
+        openButton.setAccessibilityLabel("Open conversation for \(project.stringValue)")
+        stopButton.setAccessibilityLabel("Stop agent in \(project.stringValue)")
+        more.setAccessibilityLabel("More actions for \(project.stringValue)")
+        feed.text.setAccessibilityLabel("Agent activity in \(project.stringValue)")
         project.toolTip = value.path; project.setAccessibilityHelp(value.path)
         status.stringValue = value.status + (value.queued > 0 ? " · \(value.queued) queued" : ""); status.textColor = value.needsReview ? .systemOrange : value.running ? .controlAccentColor : .secondaryLabelColor
         thread.stringValue = layout.compact && !value.instruction.isEmpty ? "You: \(value.instruction)" : value.thread
@@ -271,7 +331,7 @@ final class PodView: NSBox {
         note.stringValue = PodMonitoring.note(value, now: now); note.toolTip = note.stringValue
         note.isHidden = note.stringValue.isEmpty || (layout.compact && value.approval != nil)
         if note.isHidden && !note.stringValue.isEmpty { timing.stringValue = note.stringValue; timing.toolTip = note.stringValue + "\n" + (timing.toolTip ?? "") }
-        feed.update(value.stream, identity: value.streamIdentity, live: value.running || value.needsReview, compact: value.approval != nil)
+        feed.update(value.stream, identity: (value.contextID?.uuidString ?? "") + ":" + value.streamIdentity, live: value.running || value.needsReview, compact: value.approval != nil, emptyMessage: PodMonitoring.emptyActivity(value))
         requestView.update(value)
         requestWidth.isActive = value.approval != nil
         stopButton.isEnabled = value.canStop

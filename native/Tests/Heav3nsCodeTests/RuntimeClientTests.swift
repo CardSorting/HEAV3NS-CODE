@@ -41,6 +41,159 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testRepeatedBurstsDrainOneHundredThousandEventsWithoutRetainingQueues() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'burst') {
+          const frames=Array.from({length:5000},(_,n)=>({v:1,kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'fixture',payload:{n}}));
+          process.stdout.write(frames.map(JSON.stringify).join('\\n')+'\\n'); reply(request,{});
+        }
+        """, timeout: 5)
+        func peakResidentBytes() -> Int64 {
+            var usage = rusage(); _ = getrusage(RUSAGE_SELF, &usage)
+            return Int64(usage.ru_maxrss)
+        }
+        let finished = expectation(description: "twenty bursts fully drained")
+        var received = 0, rounds = 0, midPeak: Int64 = 0
+        let initialPeak = peakResidentBytes()
+        client.onEvent = { event in
+            guard event["type"] as? String == "fixture" else { return }
+            if (event["payload"] as? [String: Any])?["n"] as? Int != received % 5000 { XCTFail("Burst order changed") }
+            received += 1
+        }
+        func next() {
+            client.request("burst") { result in
+                guard case .success = result else { XCTFail("Burst disconnected"); finished.fulfill(); return }
+                rounds += 1
+                XCTAssertEqual(received, rounds * 5000)
+                XCTAssertEqual(client.pendingDeliveryBytes, 0); XCTAssertEqual(client.pendingRequestCount, 0)
+                if rounds == 10 { midPeak = peakResidentBytes() }
+                if rounds == 20 {
+                    print("Transport burst memory: events=\(received), peakRSSInitial=\(initialPeak), peakRSSAfter50000=\(midPeak), peakRSSAfter100000=\(peakResidentBytes()) bytes (macOS process high-water RSS; no allocator baseline assertion)")
+                    finished.fulfill()
+                } else { DispatchQueue.main.async { next() } }
+            }
+        }
+        client.onConnection = { _ in if client.isReady { next() } }
+        client.start(folder: directory); wait(for: [finished], timeout: 30)
+        client.onConnection = nil; client.onEvent = nil
+        client.closeInput()
+    }
+    func testActiveRunFloodCannotGrowTheWorkspacePastItsAdvertisedQueue() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'burst') {
+          for(let n=1;n<=100;n++) send({kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'run.accepted',seq:n,
+            payload:{id:'run-'+n,text:'queued',state:'queued',session:'session',createdAt:1}});
+        }
+        """)
+        let ended = expectation(description: "invalid active cardinality disconnects")
+        var received = 0
+        client.onEvent = { if $0["type"] as? String == "run.accepted" { received += 1 } }
+        client.onConnection = { _ in if client.isReady { client.request("burst") } }
+        client.onExit = { ended.fulfill() }
+        client.start(folder: directory); wait(for: [ended], timeout: 3)
+        XCTAssertEqual(received, client.queueLimit + 1); XCTAssertFalse(client.isReady)
+    }
+    func testUnsafeEventClockAndTimestampAreRejectedBeforePresentation() throws {
+        for (clock, timestamp) in [("9223372036854775807", "1"), ("1", "-1e300")] {
+            let client = try peer(hello + snapshot + """
+            if(request.method==='burst') process.stdout.write('{"v":1,"kind":"event","workspace":"ws","session":"session","runtime":"runtime","type":"run.state","seq":\(clock),"payload":{"id":"run","text":"task","state":"running","session":"session","createdAt":1,"startedAt":\(timestamp)}}\\n');
+            """)
+            let ended = expectation(description: "unsafe numeric state rejected")
+            client.onEvent = { if $0["type"] as? String == "run.state" { XCTFail("Unsafe numbers reached the view") } }
+            client.onConnection = { _ in if client.isReady { client.request("burst") } }
+            client.onExit = { ended.fulfill() }
+            client.start(folder: directory); wait(for: [ended], timeout: 3)
+        }
+    }
+    func testClosedClientAndPendingCompletionReleaseTheirOwners() throws {
+        final class Capture {}
+        var client: RuntimeClient? = try peer(hello + snapshot, timeout: 30)
+        weak var releasedClient: RuntimeClient?
+        releasedClient = client
+        var capture: Capture? = Capture()
+        weak var releasedCapture: Capture?
+        releasedCapture = capture
+        let ended = expectation(description: "closed client exits")
+        client?.onConnection = { [weak client] _ in
+            guard let client, client.isReady else { return }
+            client.request("files.search") { [retained = capture!] _ in withExtendedLifetime(retained) {} }
+            client.closeInput()
+        }
+        client?.onExit = { ended.fulfill() }
+        client?.start(folder: directory); wait(for: [ended], timeout: 3)
+        clients.removeAll { $0 === client }; client = nil; capture = nil
+        autoreleasepool { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        XCTAssertNil(releasedClient); XCTAssertNil(releasedCapture)
+    }
+    func testProtocolFailureStopsLaterMessagesFromTheSameBurst() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'burst') {
+          const frames = [{v:1,kind:'protocol.error'}, {v:1,kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'fixture',payload:{}}];
+          process.stdout.write(frames.map(JSON.stringify).join('\\n') + '\\n');
+        }
+        """)
+        let ended = expectation(description: "protocol failure stops worker")
+        client.onEvent = { if $0["type"] as? String == "fixture" { XCTFail("Post-failure event escaped") } }
+        client.onConnection = { _ in if client.isReady { client.request("burst") } }
+        client.onExit = { ended.fulfill() }
+        client.start(folder: directory); wait(for: [ended], timeout: 3)
+        XCTAssertEqual(client.pendingDeliveryBytes, 0); XCTAssertEqual(client.pendingRequestCount, 0)
+    }
+    func testResponseCallbackCanCloseTheChannelBeforeLaterBurstEvents() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'burst') {
+          process.stdout.write([
+            {v:1,kind:'response',id:request.id,result:{}},
+            {v:1,kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'fixture',payload:{}}
+          ].map(JSON.stringify).join('\\n') + '\\n');
+        }
+        """)
+        let ended = expectation(description: "callback closes channel")
+        client.onEvent = { if $0["type"] as? String == "fixture" { XCTFail("Callback close was ignored") } }
+        client.onConnection = { _ in if client.isReady { client.request("burst") { _ in client.closeInput() } } }
+        client.onExit = { ended.fulfill() }
+        client.start(folder: directory); wait(for: [ended], timeout: 3)
+    }
+    func testBurstYieldsToTheMainQueueAndDrainsBeforeProcessExit() throws {
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'burst') {
+          const frames = Array.from({length:1000},(_,n)=>({v:1,kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'fixture',payload:{n}}));
+          process.stdout.write(frames.map(JSON.stringify).join('\\n') + '\\n', () => process.exit(0));
+        }
+        """, timeout: 3)
+        let ended = expectation(description: "all output drained before exit")
+        var received = 0, atYield = 0
+        client.onEvent = { event in
+            guard event["type"] as? String == "fixture" else { return }
+            XCTAssertEqual((event["payload"] as? [String: Any])?["n"] as? Int, received)
+            received += 1
+            if received == 1 { DispatchQueue.main.async { atYield = received } }
+        }
+        client.onConnection = { _ in if client.isReady { client.request("burst") } }
+        client.onExit = { ended.fulfill() }
+        client.start(folder: directory); wait(for: [ended], timeout: 5)
+        XCTAssertEqual(received, 1000); XCTAssertGreaterThan(atYield, 0)
+        XCTAssertLessThanOrEqual(atYield, ControlFrameInbox.batchLimit)
+        XCTAssertEqual(client.pendingDeliveryBytes, 0)
+    }
+    func testSnapshotWaitersAreBoundedAndReleasedWhenRefreshOverflows() throws {
+        let client = try peer(hello + """
+        if (request.method === 'snapshot' && !globalThis.attached) {
+          globalThis.attached = true;
+          reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[]});
+        }
+        """, timeout: 3)
+        let ended = expectation(description: "bounded refresh fanout")
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            for _ in 0..<RuntimeClient.snapshotWaiterLimit { client.requestSnapshot { XCTFail("Unconfirmed snapshot") } }
+            XCTAssertEqual(client.pendingSnapshotCount, RuntimeClient.snapshotWaiterLimit)
+            client.requestSnapshot { XCTFail("Overflow snapshot") }
+            XCTAssertFalse(client.isReady); XCTAssertEqual(client.pendingSnapshotCount, 0)
+        }
+        client.onExit = { ended.fulfill() }
+        client.start(folder: directory); wait(for: [ended], timeout: 5)
+    }
     func testClosingInputImmediatelyRevokesReadinessAndCompletesPendingRequestsOnce() throws {
         let client = try peer(hello + snapshot, timeout: 2)
         let finished = expectation(description: "connection close completes its observer and pending request")
@@ -304,25 +457,27 @@ final class RuntimeClientTests: XCTestCase {
             client.onEvent = nil; client.onConnection = nil; workspace.window?.close()
         }
         let checked = expectation(description: "live queue state invalidates an open edit")
-        let connection = client.onConnection
+        let connection = client.onConnection, event = client.onEvent
         var requested = false
+        client.onEvent = { value in
+            event?(value)
+            guard value["type"] as? String == "run.state", (value["payload"] as? [String: Any])?["state"] as? String == "running" else { return }
+            // Assert after the recorded transition, independent of sheet animation
+            // and the transport's bounded scheduling between UI turns.
+            func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+            let views = workspace.window?.attachedSheet?.contentView.map(descendants) ?? []
+            let text = views.compactMap { $0 as? NSTextView }.first
+            text?.string = "Preserved follow-up"; text?.didChangeText()
+            XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Save Changes" }?.isEnabled, false)
+            XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Copy Edit" }?.isEnabled, true)
+            XCTAssertTrue(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("no longer waiting") })
+            XCTAssertEqual(text?.string, "Preserved follow-up")
+            checked.fulfill()
+        }
         client.onConnection = { value in
             connection?(value)
             guard client.isReady, !requested else { return }; requested = true
-            client.requestSnapshot {
-                workspace.navigateProbe("queue-edit")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
-                    let views = workspace.window?.attachedSheet?.contentView.map(descendants) ?? []
-                    let text = views.compactMap { $0 as? NSTextView }.first
-                    text?.string = "Preserved follow-up"; text?.didChangeText()
-                    XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Save Changes" }?.isEnabled, false)
-                    XCTAssertEqual(views.compactMap { $0 as? NSButton }.first { $0.title == "Copy Edit" }?.isEnabled, true)
-                    XCTAssertTrue(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("no longer waiting") })
-                    XCTAssertEqual(text?.string, "Preserved follow-up")
-                    checked.fulfill()
-                }
-            }
+            client.requestSnapshot { workspace.navigateProbe("queue-edit") }
         }
         workspace.attach(); wait(for: [checked], timeout: 4)
     }
@@ -652,6 +807,124 @@ final class RuntimeClientTests: XCTestCase {
             }
         }
         workspace.attach(); wait(for: [checked], timeout: 9)
+    }
+    func testChangedApprovalArgumentsInvalidateTheSheetAndLateFailureCannotClearANewerDecision() throws {
+        _ = NSApplication.shared
+        let client = try peer(hello + """
+        globalThis.run ??= {id:'review',text:'Review',state:'awaiting_approval',session:'session',createdAt:1,revision:1,approval:{operation:'same',tool:'fixture',scope:'/workspace',args:'Original',reason:'Review'}};
+        globalThis.decisions ??= 0;
+        if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:globalThis.changed ? 1 : 0,runs:[globalThis.run]});
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        if (request.method === 'approval.resolve') {
+          globalThis.decisions++;
+          if (globalThis.decisions === 1) {
+            setTimeout(() => {
+              globalThis.changed=true; globalThis.run.revision++; globalThis.run.approval.args='Replacement';
+              send({kind:'event',workspace:'ws',session:'session',runtime:'runtime',run:'review',type:'approval.requested',seq:1,payload:globalThis.run});
+            },20);
+            setTimeout(() => send({kind:'response',id:request.id,error:{message:'Late rejection of original'}}),80);
+          }
+        }
+        if (request.method === 'history.read') reply(request,{run:{...globalThis.run,text:String(globalThis.decisions)},outputAvailable:false});
+        """, timeout: 2)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        defer {
+            if let parent = workspace.window, let sheet = parent.attachedSheet { parent.endSheet(sheet); sheet.orderOut(nil) }
+            client.onEvent = nil; client.onConnection = nil; client.forceStop(); workspace.window?.close()
+        }
+        let checked = expectation(description: "replacement decision survives late original failure")
+        let connection = client.onConnection, event = client.onEvent
+        var original: ApprovalRequest?, allow: NSButton?
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, original == nil else { return }
+            original = workspace.podSnapshot.approval
+            workspace.showApprovalReview()
+            func views(_ parent: NSView) -> [NSView] { [parent] + parent.subviews.flatMap(views) }
+            allow = workspace.window?.attachedSheet?.contentView.map(views)?.compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" }
+            XCTAssertTrue(allow?.isEnabled == true); allow?.performClick(nil)
+        }
+        client.onEvent = { value in
+            event?(value)
+            guard value["type"] as? String == "approval.requested", let original, let replacement = workspace.podSnapshot.approval else { return }
+            XCTAssertEqual(original.identity, replacement.identity); XCTAssertNotEqual(original, replacement)
+            XCTAssertFalse(allow?.isEnabled == true)
+            XCTAssertFalse(workspace.resolveApproval(original, decision: "allow"))
+            XCTAssertTrue(workspace.resolveApproval(replacement, decision: "deny"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                XCTAssertTrue(workspace.podSnapshot.decisionPending); XCTAssertNil(workspace.podSnapshot.approvalError)
+                XCTAssertFalse(workspace.resolveApproval(replacement, decision: "allow"))
+                client.request("history.read", params: ["run": "review"]) { result in
+                    if case .success(let data) = result { XCTAssertEqual((data["run"] as? [String: Any])?["text"] as? String, "2") }
+                    else { XCTFail("Could not inspect decisions") }
+                    checked.fulfill()
+                }
+            }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 3)
+    }
+    func testLostApprovalReplyReportsUnknownOutcomeAndDoesNotAllowResubmission() throws {
+        _ = NSApplication.shared
+        let client = try peer(hello + """
+        if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[{id:'review',text:'Review',state:'awaiting_approval',session:'session',createdAt:1,revision:1,approval:{operation:'one',tool:'fixture',scope:'/workspace',args:'Arguments'}}]});
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        """, timeout: 0.15)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        defer { client.onEvent = nil; client.onConnection = nil; client.forceStop(); workspace.window?.close() }
+        let checked = expectation(description: "lost acknowledgement is not a rejection")
+        let connection = client.onConnection
+        var request: ApprovalRequest?, checking = false
+        client.onConnection = { value in
+            connection?(value)
+            if client.isReady, request == nil {
+                request = workspace.podSnapshot.approval
+                XCTAssertTrue(workspace.resolveApproval(request!, decision: "allow"))
+            } else if !client.isReady, let request, !checking {
+                checking = true
+                DispatchQueue.main.async {
+                    XCTAssertTrue(workspace.podSnapshot.decisionPending)
+                    XCTAssertTrue(workspace.podSnapshot.approvalError?.contains("outcome unknown") == true)
+                    XCTAssertFalse(workspace.podSnapshot.canDecide)
+                    XCTAssertFalse(workspace.resolveApproval(request, decision: "allow"))
+                    checked.fulfill()
+                }
+            }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 3)
+    }
+    func testExplicitStopRejectionRestoresRetryAndASecondStopCanComplete() throws {
+        _ = NSApplication.shared
+        let client = try peer("""
+        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['workspace-stop']});
+        globalThis.attempts ??= 0;
+        if (request.method === 'snapshot') reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[{id:'run',text:'Work',state:globalThis.attempts > 1 ? 'cancelled' : 'running',session:'session',createdAt:1,revision:globalThis.attempts+1}]});
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        if (request.method === 'task.cancelAll') {
+          globalThis.attempts++;
+          if (globalThis.attempts === 1) send({kind:'response',id:request.id,error:{message:'Try Stop again'}});
+          else reply(request,{requested:true});
+        }
+        """, timeout: 2)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        defer { client.onEvent = nil; client.onConnection = nil; client.forceStop(); workspace.window?.close() }
+        let checked = expectation(description: "an explicit rejection releases the stop control")
+        let connection = client.onConnection, event = client.onEvent
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, !requested else { return }; requested = true
+            workspace.stop(); XCTAssertFalse(workspace.podSnapshot.canStop)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                XCTAssertTrue(workspace.podSnapshot.canStop)
+                XCTAssertEqual(workspace.probeLayout["forceStopAvailable"] as? Bool, false)
+                workspace.stop()
+            }
+        }
+        client.onEvent = { value in
+            event?(value)
+            if requested, !workspace.hasWork { XCTAssertTrue(client.isReady); checked.fulfill() }
+        }
+        workspace.attach(); wait(for: [checked], timeout: 3)
     }
     func testWorkspaceStopIncludesUnseenQueuedWorkAndWaitsForAcknowledgment() throws {
         _ = NSApplication.shared

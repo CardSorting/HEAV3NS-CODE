@@ -3,6 +3,21 @@ import XCTest
 @testable import Heav3nsCode
 
 final class PodsWindowTests: XCTestCase {
+    func testClosedBoardAndFeedReleaseTheirTimersAndObservers() {
+        _ = NSApplication.shared
+        weak var releasedBoard: PodsWindow?
+        weak var releasedFeed: PodFeed?
+        autoreleasepool {
+            let board = PodsWindow(), feed = PodFeed()
+            releasedBoard = board; releasedFeed = feed
+            board.present(); board.window?.close()
+        }
+        let released = expectation(description: "AppKit releases closed views")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            XCTAssertNil(releasedBoard); XCTAssertNil(releasedFeed); released.fulfill()
+        }
+        wait(for: [released], timeout: 2)
+    }
     private func pod(_ path: String, running: Bool = false, review: Bool = false) -> PodSnapshot {
         PodSnapshot(path: path, thread: "Thread", status: review ? "Needs review" : running ? "Working" : "Idle", activity: "Activity", instruction: "Task", response: "", queued: 0, running: running, needsReview: review, canStop: running)
     }
@@ -71,7 +86,7 @@ final class PodContainmentTests: XCTestCase {
     }
     func testPayloadWrappingPreservesExactSelectableArgumentsAndReplacementControls() throws {
         _ = NSApplication.shared
-        let view = PodView(open: {}, stop: {}, decide: { _, _ in })
+        let view = PodView(open: { _ in }, stop: { _ in }, decide: { _, _, _ in true })
         let host = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 400))
         host.addSubview(view); JourneyStyle.pin(view, to: host)
         var value = snapshot(1, approval: true)
@@ -134,7 +149,7 @@ final class PodCommandTests: XCTestCase {
         _ = NSApplication.shared
         let request = ApprovalRequest(run: "run", operation: "one", tool: "run_command", scope: "/project", reason: "Run tests", arguments: String(repeating: "argument 🌙\n", count: 100))
         var decisions = [String]()
-        let view = PodApprovalView { request, decision in decisions.append(request.operation + ":" + decision) }
+        let view = PodApprovalView { request, decision in decisions.append(request.operation + ":" + decision); return true }
         var value = snapshot(request); view.update(value)
         let descendants = views(view)
         let allow = try XCTUnwrap(descendants.compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" })
@@ -156,7 +171,7 @@ final class PodCommandTests: XCTestCase {
         _ = NSApplication.shared
         let request = ApprovalRequest(run: "run", operation: "one", tool: "tool", scope: "/project", reason: "", arguments: "")
         var count = 0
-        let view = PodApprovalView { _, _ in count += 1 }
+        let view = PodApprovalView { _, _ in count += 1; return true }
         var value = snapshot(request)
         let allow = try XCTUnwrap(views(view).compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" })
         value.canDecide = false; view.update(value); allow.performClick(nil)
@@ -168,6 +183,35 @@ final class PodCommandTests: XCTestCase {
         XCTAssertEqual(count, 2)
         view.update(value); allow.performClick(nil)
         XCTAssertEqual(count, 2)
+    }
+    func testChangedWorkspaceContextRequiresReviewEvenWhenOperationIDsAndArgumentsMatch() throws {
+        _ = NSApplication.shared
+        let request = ApprovalRequest(run: "same", operation: "same", tool: "tool", scope: "/project", reason: "", arguments: "exact arguments")
+        var count = 0
+        let view = PodApprovalView { _, _ in count += 1; return true }
+        var value = snapshot(request); value.contextID = UUID(); view.update(value)
+        let buttons = views(view).compactMap { $0 as? NSButton }
+        let allow = try XCTUnwrap(buttons.first { $0.title == "Allow Once" })
+        value.contextID = UUID(); view.update(value)
+        XCTAssertFalse(allow.isEnabled); XCTAssertTrue(allow.isHidden); allow.performClick(nil)
+        XCTAssertEqual(count, 0)
+        try XCTUnwrap(buttons.first { $0.title == "Review Next Request" }).performClick(nil)
+        XCTAssertTrue(allow.isEnabled); allow.performClick(nil); XCTAssertEqual(count, 1)
+        value.connected = false; value.canDecide = false; value.decisionPending = true; view.update(value)
+        XCTAssertTrue(views(view).compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("Disconnected") })
+        XCTAssertFalse(allow.isEnabled)
+    }
+    func testRejectedAdmissionDoesNotLeaveTheInlineControlSavingForever() throws {
+        _ = NSApplication.shared
+        let request = ApprovalRequest(run: "run", operation: "one", tool: "tool", scope: "/project", reason: "", arguments: "")
+        var calls = 0
+        let view = PodApprovalView { _, _ in calls += 1; return false }
+        view.update(snapshot(request))
+        let allow = try XCTUnwrap(views(view).compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" })
+        allow.performClick(nil)
+        XCTAssertTrue(allow.isEnabled)
+        XCTAssertFalse(views(view).compactMap { $0 as? NSTextField }.contains { $0.stringValue == "Saving your decision…" })
+        allow.performClick(nil); XCTAssertEqual(calls, 2)
     }
     func testStreamPreservesStructuredDetailAndBoundsHistory() {
         let activities: [[String: Any]] = (1...40).map { ["sequence": $0, "message": "Activity \($0)", "detail": "Detail \($0)", "status": "completed"] }
@@ -213,6 +257,7 @@ final class PodLongRunTests: XCTestCase {
         let feed = PodFeed()
         feed.update("Selectable activity", identity: "run", live: true)
         feed.text.setSelectedRange(NSRange(location: 0, length: 10))
+        XCTAssertFalse(feed.isFollowing, "Selecting text must pause immediately, before the next worker update")
         feed.update("Newest activity", identity: "run", live: true)
         XCTAssertEqual(feed.text.string, "Selectable activity")
         XCTAssertEqual(feed.text.selectedRange().length, 10)
@@ -254,5 +299,41 @@ final class PodLongRunTests: XCTestCase {
         XCTAssertEqual(board.diagnostics["count"] as? Int, 3)
         XCTAssertTrue(PodFilter.working.matches(values[0], query: "website"))
         XCTAssertFalse(PodFilter.attention.includes(values[0]))
+        XCTAssertTrue(PodFilter.all.matches(values[0], query: "CAFE website migration"))
+        XCTAssertFalse(PodFilter.all.matches(values[0], query: "CAFE website missing"))
+    }
+    func testRequestNavigationCyclesBothWaysAndFocusesDetailsWithoutDeciding() throws {
+        _ = NSApplication.shared
+        let board = PodsWindow(); defer { board.close() }
+        let values = ["/first", "/second", "/third"].map { path -> PodSnapshot in
+            var value = pod(path, review: true)
+            value.approval = ApprovalRequest(run: path, operation: "op", tool: "tool", scope: path, reason: "", arguments: path)
+            value.canDecide = true; return value
+        }
+        board.snapshots = { values }
+        var decisions = 0; board.onDecision = { _, _, _ in decisions += 1; return true }
+        board.window?.setFrame(NSRect(x: 0, y: 0, width: 640, height: 480), display: false)
+        board.selectFilter(.all, query: "hidden")
+        for (backward, path) in [(false, "/first"), (false, "/second"), (true, "/first"), (true, "/third")] {
+            board.focusNextRequest(backward: backward)
+            let detail = try XCTUnwrap(board.window?.firstResponder as? NSTextView)
+            XCTAssertEqual(detail.string, PodApprovalView.details(values.first { $0.path == path }!.approval!))
+            XCTAssertTrue(detail.isSelectable); XCTAssertFalse(detail.isEditable)
+            XCTAssertEqual(board.diagnostics["visiblePaths"] as? [String], values.map(\.path))
+        }
+        XCTAssertEqual(decisions, 0); XCTAssertNil(board.window?.defaultButtonCell)
+        board.focusSearch()
+        XCTAssertTrue((board.window?.firstResponder as? NSTextView)?.isFieldEditor == true)
+    }
+    func testEmptyActivityAndSlowStopExplainTheActualState() {
+        var value = pod("/project")
+        XCTAssertTrue(PodMonitoring.emptyActivity(value).contains("Waiting"))
+        value = PodSnapshot(path: "/project", thread: "", status: "Completed", activity: "", instruction: "done", response: "", queued: 0, running: false, needsReview: false, canStop: false)
+        XCTAssertTrue(PodMonitoring.emptyActivity(value).contains("No activity was recorded"))
+        value.stopNeedsAttention = true
+        XCTAssertTrue(value.requiresAttention)
+        XCTAssertTrue(PodMonitoring.note(value, now: 0).contains("Open Conversation"))
+        value.connected = false
+        XCTAssertTrue(PodMonitoring.emptyActivity(value).contains("reconnects"))
     }
 }

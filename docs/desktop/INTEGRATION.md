@@ -113,15 +113,43 @@ The original `run_command` did not pass the tick's cancellation signal to its sh
 
 ## Ownership and persistence
 
-The native **Pods** overview (sidebar or ⌘0) shows currently open projects in stable opening order. **Load Projects…** accepts several folders; each canonical workspace retains its independent worker, conversation, queue and checkpoints. Search matches project paths, thread names and instructions; All, Working and Attention filters retain loaded workers and reader state. Next Request clears filters and cycles through waiting requests without reordering projects.
+The native **Pods** overview (sidebar or ⌘0) shows currently open projects in stable opening order. **Load Projects…** (⌘O while Pods is active) accepts several folders without bringing each conversation to the front; each canonical workspace retains its independent worker, conversation, queue and checkpoints. Repeated Load cannot stack file pickers. Unavailable folders are reported together after the other selections load. Search (⌘F) matches unordered words across project paths, thread names and instructions, ignoring case and diacritics; All, Working and Attention filters retain loaded workers and reader state. Next Request (⌘J or ⌘5) and Previous Request (⇧⌘J) clear filters, cycle in opening order, and focus selectable request details without deciding. The existing Actions palette (⇧⌘P) offers Pods navigation, loading and filtering.
 
 Pods use one to three columns based on available board width, with a 360-point minimum column width and 12-point gaps. Their height follows the available viewport between 300 and 400 points. Short windows put the current user instruction in the context row and compress secondary metadata. Repeated Allow Once help yields space to request arguments; pending and error messages remain visible. Activity takes the remaining space. Conversation and Stop Agent stay outside the scrolling payloads. Checkpoints and Reconnect are in the native More menu when available. Project paths and truncated metadata retain full tooltips. The board clips and scrolls vertically; additional rows remain accessible without painting over neighboring pods. Hidden approval views do not participate in the card's width constraints.
 
 The feed shows up to 30 recent structured activities, within a 24,000-character preview budget. Large individual activity previews and completed responses are shortened with explicit notices; exact approval arguments remain complete and selectable. Both text panes follow [AppKit's width-tracking scrolling-text pattern](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/TextUILayer/Tasks/TextInScrollView.html) and wrap long unbroken strings without changing the copied payload. The CLI supplies lifecycle updates, not token-by-token response text. Scrolling back, selecting text or choosing Pause freezes only the displayed feed. Incoming updates replace one pending projection; Resume applies the newest, and a different run resets the feed identity. Following feeds re-anchor after native layout and column changes even when the snapshot text is unchanged; a paused reader or active selection takes precedence over that deferred update. Retention notices identify shown versus observed activity counts and point to Conversation → Walkthrough for retained detail.
 
-Requests appear before activity with Arguments, Reason and Workspace in a bounded detail viewport; Allow Once and Deny stay outside it. Displayed requests remain fixed when a replacement arrives. A single Review Next Request action replaces the unavailable decisions until the user explicitly loads the replacement. View and workspace guards reject stale, disconnected, stopping and duplicate decisions. Approval and execution state continue updating while the feed is paused.
+The macOS workspace and account pipes share a bounded reader: at most 4 MiB of
+encoded input and 1,024 queued fragments, with one decoded batch awaiting the UI.
+Each batch contains at most 32 frames and consumes at most a 256 KiB framing
+window plus one partial frame. Each frame remains limited to 256 KiB. A bounded
+single pipe read returns currently available bytes; it does not wait to fill a
+buffer. The decoder uses [per-work-item autorelease pools](https://developer.apple.com/documentation/dispatch/dispatchqueue/autoreleasefrequency)
+and yields between batches. Closing discards encoded and decoded queues, cancels
+the shared deadline timer, and blocks the remainder of an in-flight batch after
+a callback closes its connection. Overflow disconnects with a recovery message;
+reconnecting reconciles recorded state without replaying instructions.
 
-Pods show elapsed or terminal duration, activity age, activity count and approval waiting age. Quiet streams receive a neutral note after two minutes; inactivity never triggers cancellation or retry. More → Reconnect becomes available only after the old worker exits and recovers recorded state without resubmitting work. More → Checkpoints opens reviewed version history; restoring retains existing work and project-process guards. Overview polling skips obscured windows. Stop Agent cancels active and queued agent work only in its project. Opening a conversation or closing Pods does not stop other workers. Pod slots are current window/session state; cross-launch board persistence and multiple agents in one project are outside this contract.
+Native retained activity keeps only display fields, at most 120 entries and
+256 KiB of serialized activity per run. UTF-8 byte limits also bound unusually
+long combining-character sequences. Whole activity batches are reduced once,
+with monotonic counts and explicit coverage of omitted history. Both snapshot
+and event paths retain at most 12 finished runs; protocol admission bounds live
+instructions to the advertised queue plus one active task. Invalid clocks,
+timestamps, duplicate run identities and excessive activity lists are rejected
+before presentation. These representation budgets are not exact process RAM
+limits. Full approval arguments remain governed by the review protocol.
+
+Shared worker snapshots publish recorded lifecycle state while including current
+bounded activity. A final checkpoint can still be saving after the engine returns;
+the overview keeps the instruction working until the terminal record is ready.
+This prevents a premature Completed state followed by missing recorded output.
+Linux also retires pending event/write queues on close and checks the close
+boundary for every frame, including closures triggered by response callbacks.
+
+Requests appear before activity with Arguments, Reason and Workspace in a bounded detail viewport; Allow Once and Deny stay outside it. Displayed requests remain fixed when a replacement arrives, including identical operation IDs from a different worker or conversation. A single Review Next Request action replaces the unavailable decisions until the user explicitly loads the replacement. View and workspace guards compare the full request and workspace context, and reject stale, disconnected, stopping and duplicate decisions. Pending decisions have individual identities: a late reply cannot clear a newer decision. Explicit rejection permits retry; lost acknowledgement reports an unknown outcome and requires reconnecting to recorded state. The shared conversation review sheet uses the same full-request check. Approval and execution state continue updating while the feed is paused; text selection pauses the feed immediately.
+
+Pods show elapsed or terminal duration, activity age, activity count and approval waiting age. Empty feeds distinguish idle, working, waiting for review, disconnected and recorded runs. Quiet streams receive a neutral note after two minutes; inactivity never triggers cancellation or retry. More → Reconnect becomes available only after the old worker exits and recovers recorded state without resubmitting work. More → Checkpoints opens reviewed version history; restoring retains existing work and project-process guards. Overview polling skips obscured windows. Stop Agent cancels active and queued agent work only in its project. Explicitly rejected Stop requests release the control for retry; a slow stop directs the reader to Conversation to review Force Stop. All card actions revalidate the displayed workspace context before dispatch, and callbacks from replaced clients are ignored. Opening a conversation or closing Pods does not stop other workers. Pod slots are current window/session state; cross-launch board persistence and multiple agents in one project are outside this contract.
 
 `scripts/verify-desktop-pods.ts` verifies independent workers, live activity, approval visibility, inline denial, targeted cancellation and compact layout without a provider. Its `--containment` pass adds real scripted event bursts and long approval arguments, captures three/two/one columns and the exact 640 × 480 minimum frame, and asserts viewport/card bounds, non-overlap, text width and visible request controls. This is layout and scripted lifecycle evidence, not production-provider or long-duration endurance evidence.
 

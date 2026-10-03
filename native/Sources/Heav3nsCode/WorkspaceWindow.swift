@@ -85,7 +85,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let reviewApprovalButton = NSButton(title: "Review Request…", target: nil, action: nil)
     private let denyButton = NSButton(title: "Deny", target: nil, action: nil)
     private var approvalReview: ApprovalReview?
-    private var decidingApproval: String?
+    private struct ApprovalDecision: Equatable {
+        let id = UUID()
+        let request: ApprovalRequest
+        let context: UUID
+    }
+    private var decidingApproval: ApprovalDecision?
+    private var approvalFailureAttempt: ApprovalDecision?
+    private var approvalReviewContext: UUID?
+    private var podContextID = UUID()
     private var approvalFailure: String?
     private let surfaces = NSSegmentedControl(labels: ["Conversation", "Task context"], trackingMode: .selectOne, target: nil, action: nil)
     private var rows = [TranscriptRow]()
@@ -193,8 +201,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         window.center()
     }
     private func configureClient() {
-        client.onConnection = { [weak self] value in
-            guard let self else { return }; self.connection = value; self.updateStatus(); self.walkthroughLoaded = nil; self.updateWalkthrough()
+        let source = client
+        client.onConnection = { [weak self, weak source] value in
+            guard let self, let source, self.client === source else { return }; self.connection = value; self.updateStatus(); self.walkthroughLoaded = nil; self.updateWalkthrough()
             self.modelPicker?.connectionChanged()
             self.projectRun.connect(self.client)
             if self.client.isReady {
@@ -205,8 +214,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.refreshNavigation()
                 self.loadConversations()
                 if self.client.capabilities.contains("model-selection-v1") {
-                    self.client.request("models.list", params: [:]) { [weak self] result in
-                        if case .success(let data) = result, let selection = WorkspaceModelSelection(data) { self?.updateModel(selection) }
+                    source.request("models.list", params: [:]) { [weak self, weak source] result in
+                        guard let self, self.client === source else { return }
+                        if case .success(let data) = result, let selection = WorkspaceModelSelection(data) { self.updateModel(selection) }
                     }
                 }
                 self.probe?.connected(self)
@@ -220,9 +230,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.updateStatus()
             }
         }
-        client.onEvent = { [weak self] event in self?.receive(event) }
-        client.onExit = { [weak self] in
-            guard let self else { return }
+        client.onEvent = { [weak self, weak source] event in
+            guard let self, self.client === source else { return }; self.receive(event)
+        }
+        client.onExit = { [weak self, weak source] in
+            guard let self, self.client === source else { return }
             self.stopped = true; self.reconnectButton.isHidden = self.closing
             self.elapsedTimer?.invalidate(); self.elapsedTimer = nil
             if self.closing { self.window?.close() }
@@ -253,8 +265,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             approvalRequestedAt: review ? (run?["approval"] as? [String: Any])?["createdAt"] as? Double : nil,
             activityCount: max(run?["activityCount"] as? Int ?? 0, activities.count),
             canReconnect: !client.isReady && client.process?.isRunning != true && !closing,
-            canOpenCheckpoints: client.isReady && client.capabilities.contains("checkpoints-v1") && !switchingConversation && !closing && window?.attachedSheet == nil)
+            canOpenCheckpoints: client.isReady && client.capabilities.contains("checkpoints-v1") && !switchingConversation && !closing && window?.attachedSheet == nil,
+            contextID: podContextID, stopNeedsAttention: cancelRequested && forceAvailable)
     }
+    func matchesPodTarget(_ target: PodTarget) -> Bool { target.path == folder.path && target.context == podContextID && !closing }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func attach() { client.start(folder: folder); window?.makeFirstResponder(composer) }
 
@@ -654,7 +668,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     private func switchConversation(_ id: String?, deleting: Bool = false) {
         guard canSwitchConversation, saveDraft() else { return }
-        switchingConversation = true; expectedConversation = nil
+        switchingConversation = true; expectedConversation = nil; podContextID = UUID()
         navigationGeneration += 1; inspectionGeneration += 1; conversationGeneration += 1
         walkthroughLoadGeneration += 1; quickOpen?.dismiss()
         updateStatus()
@@ -698,7 +712,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             draftByConversation[previous] = composer.string
             composer.string = draftByConversation[id] ?? ""
         }
-        currentConversation = id
+        currentConversation = id; podContextID = UUID()
         runs = []; active = nil; expandedActions.removeAll()
         resetConversationInspection()
         walkthrough.reset(); walkthroughLoaded = nil; walkthroughLoadGeneration += 1
@@ -1005,7 +1019,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     @objc func reconnect() {
         if client.isReady, uncertainSubmission != nil { reconcileSubmission(); return }
         guard client.process?.isRunning != true, !closing else { return }
-        client = RuntimeClient(); stopped = false; sequence = 0; cancelRequested = false; stopAcknowledged = true; cancellationToken = nil; forceAvailable = false; recovering = true
+        client = RuntimeClient(); podContextID = UUID(); decidingApproval = nil; approvalFailure = nil
+        stopped = false; sequence = 0; cancelRequested = false; stopAcknowledged = true; cancellationToken = nil; forceAvailable = false; recovering = true
         configureClient(); reconnectButton.isHidden = true; client.start(folder: folder)
     }
     func submitProbe(_ instruction: String) { composer.string = instruction; submit() }
@@ -1166,7 +1181,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if let index = runs.firstIndex(where: { $0["id"] as? String == id }) {
             if let incoming = run["revision"] as? Int, let current = runs[index]["revision"] as? Int, incoming < current { return }
             runs[index] = WalkthroughProjection.merged(runs[index], run)
-        } else { runs.append(run) }
+        } else { runs.append(WalkthroughProjection.bounded(run)) }
+        trimRecordedRuns()
+    }
+    private func trimRecordedRuns() {
         let retained = Set(runs.filter { terminalStates.contains($0["state"] as? String ?? "") }.suffix(12).compactMap { $0["id"] as? String })
         runs.removeAll { terminalStates.contains($0["state"] as? String ?? "") && !retained.contains($0["id"] as? String ?? "") }
     }
@@ -1180,7 +1198,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             sequence = payload["seq"] as? Int ?? 0
             let incoming = payload["runs"] as? [[String: Any]] ?? []
             let previous = Dictionary(runs.compactMap { run in (run["id"] as? String).map { ($0, run) } }, uniquingKeysWith: { _, newest in newest })
-            runs = incoming.map { run in previous[run["id"] as? String ?? ""].map { WalkthroughProjection.merged($0, run) } ?? run }
+            runs = incoming.map { run in previous[run["id"] as? String ?? ""].map { WalkthroughProjection.merged($0, run) } ?? WalkthroughProjection.bounded(run) }
+            trimRecordedRuns()
             walkthroughLoaded = nil; rebuildRows()
             renderConversations()
             finishStopAndSend()
@@ -1196,20 +1215,18 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if event["type"] as? String == "project.state" { projectRun.receiveProjectState(payload); return }
         if ["activity", "activity.batch"].contains(event["type"] as? String ?? ""), let runID = event["run"] as? String, let index = runs.firstIndex(where: { $0["id"] as? String == runID }) {
             let values = event["type"] as? String == "activity.batch" ? payload["activities"] as? [[String: Any]] ?? [] : [payload]
-            var changed = false
-            for activity in values.sorted(by: { ($0["sequence"] as? Int ?? 0) < ($1["sequence"] as? Int ?? 0) }) {
-                if WalkthroughProjection.apply(activity, to: &runs[index]) {
-                    changed = true
-                    let metadata = activity["metadata"] as? [String: Any]
-                    if ["completed", "failed"].contains(activity["status"] as? String ?? ""), activity["phase"] as? String == "writing" || metadata?["itemType"] as? String == "run_command" { scheduleWorkspaceRefresh() }
-                }
-            }
-            guard changed else { return }
+            let previousSequence = runs[index]["activitySequence"] as? Int ?? 0
+            guard WalkthroughProjection.apply(values, to: &runs[index]) else { return }
+            if values.contains(where: { activity in
+                let metadata = activity["metadata"] as? [String: Any]
+                return (activity["sequence"] as? Int ?? 0) > previousSequence && ["completed", "failed"].contains(activity["status"] as? String ?? "")
+                    && (activity["phase"] as? String == "writing" || metadata?["itemType"] as? String == "run_command")
+            }) { scheduleWorkspaceRefresh() }
             if let count = payload["activityCount"] as? Int { runs[index]["activityCount"] = max(count, runs[index]["activityCount"] as? Int ?? 0) }
             needsRebuild = true
             if window?.isMiniaturized == true || window?.occlusionState.contains(.visible) != true { return }
             if layoutTimer == nil { layoutTimer = Timer.scheduledTimer(withTimeInterval: window?.isKeyWindow == true ? 0.1 : 1, repeats: false) { [weak self] _ in self?.layoutTimer = nil; self?.rebuildRows() } }
-        } else if payload["id"] is String {
+        } else if RuntimeClient.runEvents.contains(event["type"] as? String ?? ""), payload["id"] is String {
             if let conversation = payload["conversation"] as? String, conversation != currentConversation { return }
             mergeRun(payload); rebuildRows(); finishStopAndSend()
             if event["type"] as? String == "run.accepted" { walkthrough.followCurrentInstruction(); loadConversations() }
@@ -1273,14 +1290,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         updateWalkthrough(); updateStatus()
     }
     private func updateApproval() {
-        if let decidingApproval, decidingApproval != currentApproval?.identity { self.decidingApproval = nil; approvalFailure = nil }
+        if let decidingApproval, decidingApproval.request != currentApproval || decidingApproval.context != podContextID { self.decidingApproval = nil; approvalFailure = nil }
+        if let failure = approvalFailureAttempt, failure.request != currentApproval || failure.context != podContextID { approvalFailure = nil; approvalFailureAttempt = nil }
         approval.isHidden = currentApproval == nil
         reviewApprovalButton.isEnabled = canReviewApproval
         denyButton.isEnabled = currentApproval != nil && client.isReady && decidingApproval == nil && !cancelRequested && !closing
         let summary = currentApproval.map { "\($0.tool)\n\($0.scope)" } ?? ""
         if approvalText.string != summary { approvalText.string = summary }
         if let review = approvalReview {
-            review.update(isCurrent: currentApproval?.identity == review.request.identity, connected: client.isReady, submitting: decidingApproval == review.request.identity, stopping: cancelRequested || closing, error: approvalFailure)
+            review.update(isCurrent: currentApproval == review.request && approvalReviewContext == podContextID, connected: client.isReady, submitting: decidingApproval?.request == review.request, stopping: cancelRequested || closing || switchingConversation, error: approvalFailure)
         }
     }
     private func updateStatus() {
@@ -1340,27 +1358,38 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     @objc func stop() {
         if forceAvailable { stopThenSend = nil; client.forceStop(); showNotice("Force Stop interrupted LUMI. Existing edits remain; remote effects may be unknown."); return }
         guard !cancelRequested else { return }
+        let source = client
         let token = UUID(); cancellationToken = token; cancelRequested = true
         stopAcknowledged = !client.capabilities.contains("workspace-stop"); updateStatus()
         if client.capabilities.contains("workspace-stop") {
             client.request("task.cancelAll", params: [:]) { [weak self] result in
-                guard let self, self.cancellationToken == token else { return }
+                guard let self, self.client === source, self.cancellationToken == token else { return }
                 switch result {
                 case .success:
                     self.stopAcknowledged = true
-                    self.client.requestSnapshot { [weak self] in self?.updateStatus(); self?.finishStopAndSend() }
-                case .failure(let error): self.showNotice(error.localizedDescription); self.stopThenSend = nil
+                    source.requestSnapshot(afterPending: true) { [weak self] in
+                        guard let self, self.client === source, self.cancellationToken == token else { return }
+                        self.updateStatus(); self.finishStopAndSend()
+                    }
+                case .failure(let error):
+                    self.showNotice(error.localizedDescription); self.stopThenSend = nil
+                    if source.isReady {
+                        self.cancelRequested = false; self.cancellationToken = nil; self.stopAcknowledged = true
+                        self.forceAvailable = false; self.stopButton.title = "Stop"
+                    }
+                    self.updateStatus()
                 }
             }
         } else {
             for run in runs where !terminalStates.contains(run["state"] as? String ?? "") {
                 if let id = run["id"] as? String { client.request("task.cancel", params: ["run": id]) { [weak self] result in
-                    if case .failure(let error) = result { self?.showNotice(error.localizedDescription); self?.stopThenSend = nil }
+                    guard let self, self.client === source, self.cancellationToken == token else { return }
+                    if case .failure(let error) = result { self.showNotice(error.localizedDescription); self.stopThenSend = nil }
                 } }
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self, self.cancellationToken == token, self.cancelRequested, self.hasWork || (self.closing && !self.stopped) else { return }
+            guard let self, self.client === source, self.cancellationToken == token, self.cancelRequested, self.hasWork || (self.closing && !self.stopped) else { return }
             self.forceAvailable = true; self.stopButton.title = "Force Stop"; self.stopButton.isEnabled = true
         }
     }
@@ -1447,23 +1476,32 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc func showApprovalReview() {
         guard canReviewApproval, let request = currentApproval, let window else { return }
+        let context = podContextID; approvalReviewContext = context
         approvalReview = ApprovalReview(request: request, decide: { [weak self] request, decision in
-            self?.resolveApproval(request, decision: decision)
+            guard let self, self.podContextID == context else { return }
+            self.resolveApproval(request, decision: decision)
         }, didClose: { [weak self] in self?.approvalReview = nil; self?.updateApproval() })
         approvalReview?.present(for: window); updateApproval()
     }
     @objc private func deny() { if let request = currentApproval { resolveApproval(request, decision: "deny") } }
-    func resolveApproval(_ approval: ApprovalRequest, decision: String) {
-        guard ["allow", "deny"].contains(decision), currentApproval == approval, client.isReady, decidingApproval == nil, !cancelRequested, !closing, !switchingConversation else { return }
-        decidingApproval = approval.identity; approvalFailure = nil; updateStatus()
-        client.request("approval.resolve", params: ["operation": approval.operation, "run": approval.run, "decision": decision]) { [weak self] result in
-            guard let self else { return }
-            if case .failure(let error) = result, self.decidingApproval == approval.identity {
-                self.decidingApproval = nil; self.approvalFailure = error.localizedDescription
-                self.showNotice(error.localizedDescription)
+    @discardableResult func resolveApproval(_ approval: ApprovalRequest, decision: String) -> Bool {
+        guard ["allow", "deny"].contains(decision), currentApproval == approval, client.isReady, decidingApproval == nil, !cancelRequested, !closing, !switchingConversation else { return false }
+        let source = client, attempt = ApprovalDecision(request: approval, context: podContextID)
+        decidingApproval = attempt; approvalFailure = nil; approvalFailureAttempt = nil; updateStatus()
+        source.request("approval.resolve", params: ["operation": approval.operation, "run": approval.run, "decision": decision]) { [weak self] result in
+            guard let self, self.client === source, self.podContextID == attempt.context, self.decidingApproval == attempt else { return }
+            if case .failure(let error) = result {
+                self.approvalFailureAttempt = attempt
+                // An explicit rejection can be retried. A lost connection cannot
+                // establish whether the decision reached the worker.
+                if source.isReady { self.decidingApproval = nil; self.approvalFailure = error.localizedDescription }
+                else { self.approvalFailure = "Decision outcome unknown. Reconnect to recover recorded state before deciding again." }
+                self.showNotice(self.approvalFailure ?? error.localizedDescription)
             }
-            self.client.requestSnapshot(); self.updateStatus()
+            if source.isReady { source.requestSnapshot(afterPending: true) }
+            self.updateStatus()
         }
+        return decidingApproval == attempt
     }
     @objc private func jumpLatest() { if !rows.isEmpty { transcript.scrollRowToVisible(rows.count - 1) }; jumpButton.isHidden = true }
     @objc func toggleNavigation() {

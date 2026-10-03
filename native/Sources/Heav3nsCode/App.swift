@@ -44,11 +44,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
                 if let first = workspaceOrder.first { workspaces[first]?.stop() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
                     probe.capturePods(pods, suffix: "pods-stopped")
-                    pods.window?.setContentSize(NSSize(width: 720, height: 720)); pods.window?.appearance = NSAppearance(named: .aqua)
+                    // Set the frame explicitly, as the containment fixture does.
+                    // setContentSize can clamp against the previous grid's fitting size.
+                    if let window = pods.window {
+                        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 720, height: 720)), display: true)
+                        window.appearance = NSAppearance(named: .aqua)
+                    }
                     pods.focusNextRequest()
                     probe.capturePods(pods, suffix: "pods-compact")
                     if let workspace = workspaces.values.first(where: { $0.podSnapshot.approval != nil }), let request = workspace.podSnapshot.approval {
-                        pods.onDecision?(workspace.podSnapshot.path, request, "deny")
+                        _ = pods.onDecision?(workspace.podSnapshot.target, request, "deny")
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [self] in
                         probe.capturePods(pods, suffix: "pods-decided")
@@ -142,6 +147,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Saved State", action: #selector(showSavedState), keyEquivalent: "").target = self
         view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
         view.addItem(withTitle: "Review Request…", action: #selector(showApprovalReview), keyEquivalent: "5").target = self
+        view.addItem(withTitle: "Next Request in Pods", action: #selector(nextPodRequest), keyEquivalent: "j").target = self
+        let previousRequest = view.addItem(withTitle: "Previous Request in Pods", action: #selector(previousPodRequest), keyEquivalent: "j")
+        previousRequest.keyEquivalentModifierMask = [.command, .shift]; previousRequest.target = self
         view.addItem(.separator())
         view.addItem(withTitle: "Back in Inspector", action: #selector(inspectBack), keyEquivalent: "[").target = self
         view.addItem(withTitle: "Forward in Inspector", action: #selector(inspectForward), keyEquivalent: "]").target = self
@@ -154,10 +162,15 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         NSApp.mainMenu = main
     }
     private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent || $0.window === NSApp.keyWindow?.parent } }
+    private var currentPods: PodsWindow? {
+        guard let pods, let window = pods.window, window === NSApp.keyWindow || window === NSApp.keyWindow?.sheetParent || window === NSApp.keyWindow?.parent else { return nil }
+        return pods
+    }
     @objc private func about() {
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HEAV3NS-CODE", .applicationVersion: "0.1 · Integration Preview", .credits: NSAttributedString(string: "A native workspace for LUMI.\nExecution and credentials remain in the CLI.")])
     }
     @objc func openFolder() {
+        if currentPods != nil { loadPods(); return }
         let panel = NSOpenPanel(); panel.title = "Open a Workspace"; panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false; panel.prompt = "Open Workspace"
         if panel.runModal() == .OK, let url = panel.url { open(url) }
     }
@@ -169,10 +182,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.onClose = { [weak self] in self?.newProjectWindow = nil }
         newProjectWindow = controller; controller.present(on: parent)
     }
-    private func open(_ url: URL) {
+    private func open(_ url: URL, activate: Bool = true, unavailable: ((String) -> Void)? = nil) {
         let canonical = url.resolvingSymlinksInPath().standardizedFileURL
         var isDirectory: ObjCBool = false
         guard canonical.isFileURL, FileManager.default.fileExists(atPath: canonical.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            if let unavailable { unavailable(canonical.path); return }
             let alert = NSAlert(); alert.messageText = "This workspace folder is unavailable."
             alert.informativeText = "It may have moved or been removed. Choose its current location to open it.\n\n\(canonical.path)"
             alert.addButton(withTitle: "Choose Folder…"); alert.addButton(withTitle: "Cancel")
@@ -181,7 +195,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
         if let existing = workspaces[canonical.path] {
             if !ProcessInfo.processInfo.arguments.contains("--integration-probe") { projects.opened(canonical) }
-            existing.showWindow(nil); existing.window?.makeKeyAndOrderFront(nil); return
+            if activate { existing.showWindow(nil); existing.window?.makeKeyAndOrderFront(nil) }; return
         }
         let workspace = WorkspaceWindow(folder: canonical)
         workspace.configurePods { [weak self] in self?.showPods() }
@@ -189,15 +203,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         workspace.onAccount = { [weak self] in self?.showLauncher(account: true) }
         workspaces[canonical.path] = workspace
         workspaceOrder.append(canonical.path)
-        workspace.onClosed = { [weak self] in
-            guard let self else { return }
+        workspace.onClosed = { [weak self, weak workspace] in
+            guard let self, self.workspaces[canonical.path] === workspace else { return }
             self.workspaces.removeValue(forKey: canonical.path)
             self.workspaceOrder.removeAll { $0 == canonical.path }
             if self.quitting && self.workspaces.isEmpty { NSApp.reply(toApplicationShouldTerminate: true) }
             else if self.workspaces.isEmpty { if self.pods?.window?.isVisible == true { self.pods?.refresh() } else { self.showLauncher() } }
         }
         launcher?.suspend()
-        workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil); workspace.attach()
+        if activate { workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil) }
+        workspace.attach()
         if !ProcessInfo.processInfo.arguments.contains("--integration-probe") {
             projects.opened(canonical)
             var recent = UserDefaults.standard.stringArray(forKey: "recentWorkspaces") ?? []
@@ -211,23 +226,41 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             overview.snapshots = { [weak self] in guard let self else { return [] }; return self.workspaceOrder.compactMap { self.workspaces[$0]?.podSnapshot } }
             overview.onLoad = { [weak self] in self?.loadPods() }
             overview.onLibrary = { [weak self] in self?.showLauncher() }
-            overview.onOpen = { [weak self] path in self?.open(URL(fileURLWithPath: path)) }
-            overview.onStop = { [weak self] path in guard let workspace = self?.workspaces[path], workspace.podSnapshot.canStop else { return }; workspace.stop() }
-            overview.onDecision = { [weak self] path, request, decision in self?.workspaces[path]?.resolveApproval(request, decision: decision) }
-            overview.onReconnect = { [weak self] path in guard let workspace = self?.workspaces[path], workspace.podSnapshot.canReconnect else { return }; workspace.reconnect() }
-            overview.onCheckpoints = { [weak self] path in guard let workspace = self?.workspaces[path] else { return }; workspace.showCheckpoints() }
+            overview.onOpen = { [weak self] target in
+                guard let workspace = self?.podWorkspace(target) else { return }
+                workspace.showWindow(nil); workspace.window?.makeKeyAndOrderFront(nil)
+            }
+            overview.onStop = { [weak self] target in guard let workspace = self?.podWorkspace(target), workspace.podSnapshot.canStop else { return }; workspace.stop() }
+            overview.onDecision = { [weak self] target, request, decision in self?.podWorkspace(target)?.resolveApproval(request, decision: decision) ?? false }
+            overview.onReconnect = { [weak self] target in guard let workspace = self?.podWorkspace(target), workspace.podSnapshot.canReconnect else { return }; workspace.reconnect() }
+            overview.onCheckpoints = { [weak self] target in guard let workspace = self?.podWorkspace(target), workspace.podSnapshot.canOpenCheckpoints else { return }; workspace.showCheckpoints() }
             pods = overview
         }
         pods?.present()
     }
+    private func podWorkspace(_ target: PodTarget) -> WorkspaceWindow? {
+        guard let workspace = workspaces[target.path], workspace.matchesPodTarget(target) else { pods?.refresh(); return nil }
+        return workspace
+    }
     private func loadPods() {
+        guard let window = pods?.window, window.attachedSheet == nil else { return }
         let panel = NSOpenPanel(); panel.title = "Load Project Pods"; panel.prompt = "Load Projects"
         panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = true
-        guard let window = pods?.window else { return }
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK else { return }
-            for url in panel.urls { self.open(url) }
+            var failures = [String]()
+            for url in panel.urls { self.open(url, activate: false, unavailable: { failures.append($0) }) }
             self.showPods()
+            if !failures.isEmpty {
+                let alert = NSAlert(); alert.messageText = "\(failures.count) project folder\(failures.count == 1 ? " is" : "s are") unavailable."
+                let outcome = failures.count == panel.urls.count ? "No projects were loaded." : "The other selected projects were loaded."
+                alert.informativeText = outcome + " These folders may have moved or been removed. Choose their current locations with Load Projects."
+                let detail = NSTextView(), scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 420, height: 120))
+                PodTextViewport.configure(detail, in: scroll); detail.string = failures.joined(separator: "\n\n")
+                detail.font = .systemFont(ofSize: 12); detail.setAccessibilityLabel("Project folders that could not be loaded")
+                alert.accessoryView = scroll; alert.addButton(withTitle: "OK")
+                alert.beginSheetModal(for: window)
+            }
         }
     }
     private func showLauncher(account: Bool = false) {
@@ -259,19 +292,28 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showChanges() { current?.showChanges() }
     @objc private func showSessions() { current?.showSessions() }
     @objc private func showQueue() { current?.showQueue() }
-    @objc private func showApprovalReview() { current?.showApprovalReview() }
+    @objc private func showApprovalReview() { if let currentPods { currentPods.focusNextRequest() } else { current?.showApprovalReview() } }
+    @objc private func nextPodRequest() { currentPods?.focusNextRequest() }
+    @objc private func previousPodRequest() { currentPods?.focusNextRequest(backward: true) }
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
     @objc private func findInInspection() {
-        if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() }
+        if let currentPods { currentPods.focusSearch() }
+        else if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() }
         else if current?.isMemoryKeyWindow == true { current?.findMemory() }
         else { current?.findInInspection() }
     }
     @objc private func stop() { current?.stop() }
     @objc private func actions() {
-        if let current { current.showActions() } else { openFolder() }
+        if let currentPods { currentPods.showActions() }
+        else if let current { current.showActions() } else { openFolder() }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(openFolder) {
+            menuItem.title = currentPods == nil ? "Open Workspace…" : "Load Projects…"
+            return currentPods?.window?.attachedSheet == nil
+        }
+        if [#selector(nextPodRequest), #selector(previousPodRequest)].contains(menuItem.action) { return currentPods?.window?.attachedSheet == nil && currentPods?.hasRequests == true }
         if menuItem.action == #selector(showMemory) { return current?.canShowMemory == true }
         if menuItem.action == #selector(showContext) { return current?.canShowContext == true }
         if menuItem.action == #selector(showCodeCheck) { return current?.canCheckCode == true }
@@ -284,13 +326,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
         if menuItem.action == #selector(findInInspection) {
+            if let currentPods { menuItem.title = "Find Project or Task…"; return currentPods.window?.attachedSheet == nil }
             if current?.isMemoryKeyWindow == true { menuItem.title = "Find Conversation Memory…"; return current?.canFindMemory == true }
             let inLibrary = launcher != nil && NSApp.keyWindow === launcher?.window
             menuItem.title = inLibrary ? "Find Projects…" : "Find in Current Page…"
             return inLibrary ? launcher?.canFindProjects == true : current?.canFindInInspection == true
         }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
-        if menuItem.action == #selector(showApprovalReview) { return current?.canReviewApproval == true }
+        if menuItem.action == #selector(showApprovalReview) { return currentPods.map { $0.hasRequests && $0.window?.attachedSheet == nil } ?? (current?.canReviewApproval == true) }
         if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue), #selector(showWalkthrough)].contains(menuItem.action) { return current != nil }
         return true
     }

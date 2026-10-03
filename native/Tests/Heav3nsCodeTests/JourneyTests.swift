@@ -3,6 +3,38 @@ import AppKit
 @testable import Heav3nsCode
 
 final class JourneyTests: XCTestCase {
+    func testAccountFailureRetiresItsBurstBeforeFailureCallbackReconnects() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var repository = URL(fileURLWithPath: #filePath)
+        for _ in 0..<4 { repository.deleteLastPathComponent() }
+        let node = repository.appendingPathComponent("build/HEAV3NS-CODE.app/Contents/Resources/runtime/node")
+        guard FileManager.default.isExecutableFile(atPath: node.path) else { throw XCTSkip("Build the desktop app first") }
+        let peer = root.appendingPathComponent("account.cjs")
+        try """
+        require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+          const r=JSON.parse(line);
+          const frames=r.method==='signIn' ? [
+            {v:1,event:'browser',url:'https://example.invalid/oauth/authorize'},
+            {v:1,event:'browser',url:'https://auth.openai.com/oauth/authorize?state=stale'}
+          ] : [{v:1,id:r.id,result:{saved:false}}];
+          process.stdout.write(frames.map(JSON.stringify).join('\\n')+'\\n');
+        }).on('close',()=>process.exit(0));
+        """.write(to: peer, atomically: true, encoding: .utf8)
+        let client = AccountClient(node: node, cli: peer)
+        defer { client.stop() }
+        let recovered = expectation(description: "new account channel survives old failure")
+        client.onBrowser = { _ in XCTFail("A stale browser request escaped the failed channel") }
+        client.request("signIn") { result in
+            guard case .failure = result else { XCTFail("Unsafe sign-in succeeded"); recovered.fulfill(); return }
+            client.request("status") { result in
+                guard case .success = result else { XCTFail("Reentrant reconnect was closed by the old channel"); recovered.fulfill(); return }
+                recovered.fulfill()
+            }
+        }
+        wait(for: [recovered], timeout: 3)
+    }
     func testFirstInteractionEntersProjectsWithoutAnAccount() throws {
         _ = NSApplication.shared
         let suite = "LauncherTests.\(UUID().uuidString)"

@@ -28,23 +28,51 @@ struct WalkthroughActivity: Equatable {
               let sequence = value["sequence"] as? Int, sequence > 0,
               let phase = value["phase"] as? String, let status = value["status"] as? String,
               let message = value["message"] as? String else { return nil }
-        self.id = id; self.sequence = sequence; self.phase = phase; self.status = status
-        order = value["startedSequence"] as? Int ?? sequence
-        self.message = String(message.prefix(1000)); detail = String((value["detail"] as? String ?? "").prefix(2000))
+        self.id = id; self.sequence = sequence
+        self.phase = Self.boundedText(phase, bytes: 80); self.status = Self.boundedText(status, bytes: 80)
+        order = (value["startedSequence"] as? Int).flatMap { $0 > 0 ? $0 : nil } ?? sequence
+        self.message = Self.boundedText(message, bytes: 1000)
+        detail = Self.boundedText(value["detail"] as? String ?? "", bytes: 2000)
         let metadata = value["metadata"] as? [String: Any] ?? [:]
-        scope = metadata["scope"] as? String ?? "activity"; tool = metadata["itemType"] as? String ?? ""
-        operation = metadata["operation"] as? String ?? ""
-        files = Array((metadata["files"] as? [String] ?? []).filter(Self.safeRelativePath).prefix(3))
+        scope = metadata["scope"] as? String == "turn" ? "turn" : "activity"
+        tool = Self.boundedText(metadata["itemType"] as? String ?? "", bytes: 80)
+        operation = Self.boundedText(metadata["operation"] as? String ?? "", bytes: 80)
+        files = Array((metadata["files"] as? [String] ?? []).lazy.filter(Self.safeRelativePath).prefix(3))
         exitCode = metadata["exitCode"] as? Int
         func count(_ key: String) -> Int? { (metadata[key] as? Int).flatMap { $0 >= 0 ? $0 : nil } }
         outputBytes = count("outputBytes"); outputLines = count("outputLines")
         completedSteps = count("completedSteps"); totalSteps = count("totalSteps")
         elapsed = (value["elapsedMs"] as? Double).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
-        timestamp = value["timestamp"] as? Double ?? 0
+        timestamp = (value["timestamp"] as? Double).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil } ?? 0
         if let raw = value["preview"] as? [String: Any], let kind = raw["kind"] as? String,
            ["draft", "code", "command", "output", "message"].contains(kind), let text = raw["text"] as? String, text.utf8.count <= 1200 {
             preview = Preview(kind: kind, text: text, limited: raw["limited"] as? Bool ?? false)
         } else { preview = nil }
+    }
+    /// Character counts do not bound memory: one grapheme can contain thousands
+    /// of combining scalars. Keep valid UTF-8, with an honest excerpt marker.
+    private static func boundedText(_ text: String, bytes: Int) -> String {
+        guard text.utf8.count > bytes else { return text }
+        var result = "", used = 0
+        for scalar in text.unicodeScalars {
+            let count = scalar.utf8.count
+            guard used + count <= bytes - 3 else { break }
+            result.unicodeScalars.append(scalar); used += count
+        }
+        return result + "…"
+    }
+    /// Retain only the fields the native reader uses, never the source dictionary
+    /// or arbitrary provider metadata hidden behind a shortened display label.
+    var retainedValue: [String: Any] {
+        var metadata: [String: Any] = ["scope": scope, "itemType": tool, "operation": operation, "files": files]
+        metadata["exitCode"] = exitCode; metadata["outputBytes"] = outputBytes; metadata["outputLines"] = outputLines
+        metadata["completedSteps"] = completedSteps; metadata["totalSteps"] = totalSteps
+        var value: [String: Any] = ["activityId": id, "sequence": sequence, "startedSequence": order,
+                                  "phase": phase, "status": status, "message": message, "detail": detail,
+                                  "timestamp": timestamp, "metadata": metadata]
+        value["elapsedMs"] = elapsed
+        if let preview { value["preview"] = ["kind": preview.kind, "text": preview.text, "limited": preview.limited] }
+        return value
     }
     static func safeRelativePath(_ path: String) -> Bool {
         !path.isEmpty && path.utf8.count <= 2048 && !path.hasPrefix("/") && !path.contains("://") && !path.contains("\\")
@@ -145,6 +173,7 @@ enum WalkthroughFilter: String, CaseIterable {
 /// projections can add context but cannot erase newer activity or reopen a run.
 enum WalkthroughProjection {
     static let limit = 120
+    static let byteLimit = 256 * 1024
     static let terminal: Set<String> = ["completed", "failed", "cancelled", "interrupted", "timed_out"]
 
     static func progressSummary(_ activities: [WalkthroughActivity], live: Bool) -> String {
@@ -167,28 +196,63 @@ enum WalkthroughProjection {
     static func activities(_ run: [String: Any]) -> [WalkthroughActivity] {
         (run["activities"] as? [[String: Any]] ?? []).compactMap(WalkthroughActivity.init)
     }
+    private static func retained(_ entries: [[String: Any]]) -> [[String: Any]] {
+        let ordered = entries.compactMap(WalkthroughActivity.init).sorted {
+            $0.order == $1.order ? $0.sequence < $1.sequence : $0.order < $1.order
+        }
+        var result = [[String: Any]](), bytes = 2
+        for activity in ordered.suffix(limit).reversed() {
+            let value = activity.retainedValue
+            guard let data = try? JSONSerialization.data(withJSONObject: value) else { continue }
+            let cost = data.count + (result.isEmpty ? 0 : 1)
+            guard bytes + cost <= byteLimit else { break }
+            result.append(value); bytes += cost
+        }
+        return result.reversed()
+    }
+    static func bounded(_ run: [String: Any]) -> [String: Any] {
+        var result = run
+        let entries = run["activities"] as? [[String: Any]] ?? []
+        result["activities"] = retained(entries)
+        result["activityCount"] = max(run["activityCount"] as? Int ?? 0, entries.count)
+        result["activitySequence"] = max(run["activitySequence"] as? Int ?? 0, entries.compactMap { $0["sequence"] as? Int }.max() ?? 0)
+        return result
+    }
     static func merged(_ previous: [String: Any], _ incoming: [String: Any]) -> [String: Any] {
-        if (incoming["revision"] as? Int ?? 0) < (previous["revision"] as? Int ?? 0) { return previous }
+        if (incoming["revision"] as? Int ?? 0) < (previous["revision"] as? Int ?? 0) { return bounded(previous) }
         var result = incoming
         var entries = [String: [String: Any]]()
         for value in (previous["activities"] as? [[String: Any]] ?? []) + (incoming["activities"] as? [[String: Any]] ?? []) {
             guard let item = WalkthroughActivity(value) else { continue }
-            if (entries[item.id]?["sequence"] as? Int ?? -1) < item.sequence { entries[item.id] = value }
+            if (entries[item.id]?["sequence"] as? Int ?? -1) < item.sequence { entries[item.id] = item.retainedValue }
         }
-        result["activities"] = Array(entries.values.sorted { ($0["startedSequence"] as? Int ?? $0["sequence"] as? Int ?? 0) < ($1["startedSequence"] as? Int ?? $1["sequence"] as? Int ?? 0) }.suffix(limit))
-        result["activitySequence"] = max(previous["activitySequence"] as? Int ?? 0, incoming["activitySequence"] as? Int ?? 0)
+        result["activities"] = retained(Array(entries.values))
+        result["activitySequence"] = max(previous["activitySequence"] as? Int ?? 0, incoming["activitySequence"] as? Int ?? 0, entries.values.compactMap { $0["sequence"] as? Int }.max() ?? 0)
         result["activityCount"] = max(previous["activityCount"] as? Int ?? 0, incoming["activityCount"] as? Int ?? 0, entries.count)
         return result
     }
     static func apply(_ value: [String: Any], to run: inout [String: Any]) -> Bool {
-        guard !terminal.contains(run["state"] as? String ?? ""), let item = WalkthroughActivity(value) else { return false }
+        apply([value], to: &run)
+    }
+    static func apply(_ values: [[String: Any]], to run: inout [String: Any]) -> Bool {
+        guard !terminal.contains(run["state"] as? String ?? "") else { return false }
         let current = activities(run)
-        guard item.sequence > (run["activitySequence"] as? Int ?? current.map(\.sequence).max() ?? 0) else { return false }
-        var entries = run["activities"] as? [[String: Any]] ?? []
-        if let index = entries.firstIndex(where: { $0["activityId"] as? String == item.id }) { entries[index] = value }
-        else { entries.append(value); run["activityCount"] = (run["activityCount"] as? Int ?? current.count) + 1 }
-        run["activities"] = Array(entries.sorted { ($0["startedSequence"] as? Int ?? $0["sequence"] as? Int ?? 0) < ($1["startedSequence"] as? Int ?? $1["sequence"] as? Int ?? 0) }.suffix(limit))
-        run["activitySequence"] = item.sequence
+        var clock = max(run["activitySequence"] as? Int ?? 0, current.map(\.sequence).max() ?? 0)
+        var count = max(0, run["activityCount"] as? Int ?? current.count), changed = false
+        var entries = Dictionary(current.map { ($0.id, $0.retainedValue) }, uniquingKeysWith: { first, last in
+            (first["sequence"] as? Int ?? 0) > (last["sequence"] as? Int ?? 0) ? first : last
+        })
+        for item in values.compactMap(WalkthroughActivity.init).sorted(by: { $0.sequence < $1.sequence }) {
+            guard item.sequence > clock else { continue }
+            var value = item.retainedValue
+            if let previous = entries[item.id] { value["startedSequence"] = previous["startedSequence"] }
+            else if count < Int.max { count += 1 }
+            entries[item.id] = value; clock = item.sequence; changed = true
+        }
+        guard changed else { return false }
+        // Normalize, sort and trim once for the entire worker batch.
+        run["activities"] = retained(Array(entries.values))
+        run["activitySequence"] = clock; run["activityCount"] = count
         return true
     }
     static func preferredRun(in runs: [[String: Any]], pinned: String?) -> [String: Any]? {

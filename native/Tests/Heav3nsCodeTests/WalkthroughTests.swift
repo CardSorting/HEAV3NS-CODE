@@ -6,6 +6,50 @@ final class WalkthroughTests: XCTestCase {
     private func activity(_ sequence: Int, id: String = "read", status: String = "in_progress") -> [String: Any] {
         ["activityId": id, "sequence": sequence, "startedSequence": 1, "phase": "tool", "status": status, "message": "Read workspace", "metadata": ["scope": "activity", "itemType": "view_file", "files": ["src/app.swift", "../private", "/etc/passwd"]]]
     }
+    func testRetainedActivityDropsOpaqueMetadataAndBoundsCombiningCharacters() throws {
+        var value = activity(1)
+        let text = "a" + String(repeating: "\u{301}", count: 100_000)
+        value["message"] = text; value["detail"] = text; value["opaque"] = String(repeating: "x", count: 200_000)
+        value["metadata"] = ["scope": "activity", "itemType": text, "operation": text, "opaque": text, "files": ["src/app.swift"]]
+        let bounded = WalkthroughProjection.bounded(["state": "running", "activities": [value]])
+        let stored = try XCTUnwrap((bounded["activities"] as? [[String: Any]])?.first)
+        XCTAssertNil(stored["opaque"])
+        XCTAssertNil((stored["metadata"] as? [String: Any])?["opaque"])
+        let item = try XCTUnwrap(WalkthroughActivity(stored))
+        XCTAssertLessThanOrEqual(item.message.utf8.count, 1000); XCTAssertTrue(item.message.hasSuffix("…"))
+        XCTAssertLessThanOrEqual(item.detail.utf8.count, 2000); XCTAssertLessThanOrEqual(item.tool.utf8.count, 80)
+        XCTAssertEqual(item.files, ["src/app.swift"])
+        XCTAssertLessThan(try JSONSerialization.data(withJSONObject: stored).count, 4000)
+    }
+    func testRepeatedLargeActivityBatchesRetainAByteBudgetAndMonotonicCoverage() throws {
+        var run: [String: Any] = ["state": "running", "activities": []]
+        for batch in 0..<20 {
+            let entries = (1...120).map { index -> [String: Any] in
+                let sequence = batch * 120 + index
+                var value = activity(sequence, id: "entry-\(sequence)")
+                value["startedSequence"] = sequence
+                value["message"] = String(repeating: "m", count: 1000)
+                value["detail"] = String(repeating: "d", count: 2000)
+                value["preview"] = ["kind": "output", "text": String(repeating: "p", count: 1200)]
+                return value
+            }
+            XCTAssertTrue(WalkthroughProjection.apply(Array(entries.reversed()), to: &run))
+            let retained = try XCTUnwrap(run["activities"] as? [[String: Any]])
+            XCTAssertLessThanOrEqual(retained.count, WalkthroughProjection.limit)
+            XCTAssertLessThanOrEqual(try JSONSerialization.data(withJSONObject: retained).count, WalkthroughProjection.byteLimit)
+            XCTAssertEqual(retained.last?["sequence"] as? Int, (batch + 1) * 120)
+            XCTAssertEqual(run["activityCount"] as? Int, (batch + 1) * 120)
+        }
+        XCTAssertFalse(WalkthroughProjection.apply(activity(1), to: &run))
+        XCTAssertEqual(run["activitySequence"] as? Int, 2400)
+    }
+    func testActivityCountCannotOverflowAndBatchUpdatesKeepOriginalOrder() throws {
+        var run: [String: Any] = ["state": "running", "activityCount": Int.max, "activities": [activity(1)]]
+        XCTAssertTrue(WalkthroughProjection.apply([activity(3, id: "new"), activity(2)], to: &run))
+        XCTAssertEqual(run["activityCount"] as? Int, Int.max)
+        XCTAssertEqual(WalkthroughProjection.activities(run).first(where: { $0.id == "read" })?.order, 1)
+        XCTAssertEqual(run["activitySequence"] as? Int, 3)
+    }
     func testQueuedInstructionsDoNotStealActiveFocusAndHistoryRemainsPinned() {
         let runs: [[String: Any]] = [["id": "old", "state": "completed"], ["id": "active", "state": "awaiting_approval"], ["id": "queued", "state": "queued"]]
         XCTAssertEqual(WalkthroughProjection.preferredRun(in: runs, pinned: nil)?["id"] as? String, "active")

@@ -9,6 +9,7 @@ final class PodFeed: NSStackView {
     private var live = false
     private var scrollObserver: NSObjectProtocol?
     private var documentObserver: NSObjectProtocol?
+    private var selectionObserver: NSObjectProtocol?
     private var streamHeight: NSLayoutConstraint!
     private var minimumHeight: NSLayoutConstraint!
     private var lastViewportSize = NSSize.zero
@@ -31,6 +32,10 @@ final class PodFeed: NSStackView {
         scrollObserver = NotificationCenter.default.addObserver(forName: NSScrollView.didLiveScrollNotification, object: scroll, queue: .main) { [weak self] _ in
             self?.pauseWhileReading()
         }
+        selectionObserver = NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
+            guard let self, text.selectedRange().length > 0 else { return }
+            state.pause(); updateHeading()
+        }
         text.postsFrameChangedNotifications = true
         documentObserver = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: text, queue: .main) { [weak self] _ in
             // TextKit may refine the document height after the surrounding grid has finished layout.
@@ -43,7 +48,7 @@ final class PodFeed: NSStackView {
         minimumHeight = scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 32)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    deinit { for observer in [scrollObserver, documentObserver].compactMap({ $0 }) { NotificationCenter.default.removeObserver(observer) } }
+    deinit { for observer in [scrollObserver, documentObserver, selectionObserver].compactMap({ $0 }) { NotificationCenter.default.removeObserver(observer) } }
     override func layout() {
         super.layout()
         let size = scroll.contentView.bounds.size
@@ -99,11 +104,11 @@ final class PodFeed: NSStackView {
         latest.title = state.paused ? "Resume" : "Latest"
         latest.setAccessibilityLabel(state.paused ? "Resume activity updates" : "Latest activity")
     }
-    func update(_ value: String, identity: String, live: Bool, compact: Bool = false) {
+    func update(_ value: String, identity: String, live: Bool, compact: Bool = false, emptyMessage: String? = nil) {
         streamHeight.constant = compact ? 65 : 150
         self.live = live
         let changedRun = state.identity != identity
-        let next = value.isEmpty ? "Waiting for agent activity. Updates will appear here." : value
+        let next = value.isEmpty ? (emptyMessage ?? (live ? "Waiting for agent activity. Updates will appear here." : "No recorded activity in this run.")) : value
         let reading = !changedRun && text.selectedRange().length > 0
         state.update(next, identity: identity, readingHistory: reading)
         if text.string != state.displayed {
@@ -128,9 +133,10 @@ private final class PodFeedTextView: NSTextView {
 /// Both the view and owning workspace reject stale and duplicate decisions.
 final class PodApprovalView: NSStackView {
     private(set) var displayed: ApprovalRequest?
+    private var displayedTarget: PodTarget?
     private var current: PodSnapshot?
     private var localPending = false
-    private let decide: (ApprovalRequest, String) -> Void
+    private let decide: (ApprovalRequest, String) -> Bool
     private let heading = JourneyStyle.label("Approval required", size: 13, weight: .semibold)
     private let detail = NSTextView()
     private let scroll = NSScrollView()
@@ -140,9 +146,9 @@ final class PodApprovalView: NSStackView {
     private lazy var allow = JourneyButton("Allow Once", symbol: "checkmark") { [weak self] in self?.resolve("allow") }
     private lazy var deny = JourneyButton("Deny", symbol: "xmark") { [weak self] in self?.resolve("deny") }
     private lazy var next = JourneyButton("Review Next Request", symbol: "arrow.right") { [weak self] in
-        guard let self, let current else { return }; displayed = nil; update(current)
+        guard let self, let current else { return }; displayed = nil; update(current); focusDetails()
     }
-    init(decide: @escaping (ApprovalRequest, String) -> Void) {
+    init(decide: @escaping (ApprovalRequest, String) -> Bool) {
         self.decide = decide
         super.init(frame: .zero); orientation = .vertical; alignment = .leading; spacing = 4
         PodTextViewport.configure(detail, in: scroll)
@@ -168,34 +174,48 @@ final class PodApprovalView: NSStackView {
         }
         isHidden = false
         if displayed == nil {
-            displayed = request; localPending = false
+            displayed = request; displayedTarget = value.target; localPending = false
             heading.stringValue = "Approval required · \(request.tool)"
             heading.toolTip = heading.stringValue
             detail.string = Self.details(request); detail.scrollRangeToVisible(NSRange(location: 0, length: 0))
         }
-        let matches = displayed == request
+        let matches = displayed == request && displayedTarget == value.target
+        let project = (value.path as NSString).lastPathComponent
+        detail.setAccessibilityLabel("Full request details for \(project)")
+        allow.setAccessibilityLabel("Allow this operation once in \(project)")
+        deny.setAccessibilityLabel("Deny this operation in \(project)")
         if value.approvalError != nil && !value.decisionPending && (previous?.approvalError != value.approvalError || previous?.decisionPending == true) { localPending = false }
         let enabled = matches && value.canDecide && !value.decisionPending && !localPending
         allow.isEnabled = enabled; deny.isEnabled = enabled; next.isHidden = matches
         // A replacement has a single review action; disabled decisions cannot crowd it out.
         allow.isHidden = !matches; deny.isHidden = !matches
         message.stringValue = !matches ? "This request has changed. Review the next request before deciding." :
+            !value.connected ? (value.approvalError ?? "Disconnected. Reconnect before deciding; recorded details remain available.") :
+            value.status == "Stopping" ? "Stopping this agent. Decisions are unavailable." :
             value.decisionPending || localPending ? "Saving your decision…" :
             value.approvalError ?? (!value.canDecide ? "Decisions unavailable while disconnected or stopping." : "Allow Once applies only to this operation.")
         message.toolTip = message.stringValue
         updateDensity()
     }
     func setCompact(_ compact: Bool) { self.compact = compact; updateDensity() }
+    func focusDetails() {
+        guard !isHidden else { return }
+        window?.makeFirstResponder(detail)
+    }
     private func updateDensity() {
-        let routine = current.map { displayed == $0.approval && $0.canDecide && !$0.decisionPending && !localPending && $0.approvalError == nil } ?? false
+        let routine = current.map { displayed == $0.approval && displayedTarget == $0.target && $0.canDecide && !$0.decisionPending && !localPending && $0.approvalError == nil } ?? false
         // The button already says Allow Once; short windows spend that repeated help line on arguments.
         message.isHidden = compact && routine
         detailHeight.constant = compact ? (routine ? 72 : 52) : 88
         allow.toolTip = "Allow only the operation displayed above."
     }
     private func resolve(_ decision: String) {
-        guard let request = displayed, let current, current.approval == request, current.canDecide, !current.decisionPending, !localPending else { return }
-        localPending = true; update(current); decide(request, decision)
+        guard let request = displayed, let current, current.approval == request, displayedTarget == current.target, current.canDecide, !current.decisionPending, !localPending else { return }
+        localPending = true; update(current)
+        if !decide(request, decision) {
+            localPending = false
+            if let latest = self.current { update(latest) }
+        }
     }
     static func details(_ request: ApprovalRequest) -> String {
         "Arguments\n\(request.arguments.isEmpty ? "No arguments supplied." : request.arguments)\n\nReason\n\(request.reason.isEmpty ? "Review this operation before it runs." : request.reason)\n\nWorkspace\n\(request.scope)"

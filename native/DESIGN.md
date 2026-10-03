@@ -310,6 +310,46 @@ Containment [provenance](.impeccable/review/pods-containment-v1/provenance.json)
 
 The containment verdict leaves More, Reconnect and Checkpoints without GUI-click evidence; replacement-request behavior is source/unit reviewed. Physical VoiceOver, keyboard-only acceptance, increased contrast, provider execution, long-session resource growth, endurance and release readiness remain unestablished. This is a code-led macOS Operate refinement preserving the conversation-first AppKit identity, semantic colors, system typography and native controls, with no approved comp or raster product assets. No HTML/CSS detector ran. Every earlier review entry, scope and count above remains historical and unchanged.
 
+## Pods ergonomics and recovery pass — October 2026
+
+Pods reuses the workspace action palette and native menu routing: ⌘F searches the board, ⌘O opens its multi-folder picker, and ⇧⌘P offers loading, search and filters. ⌘J / ⇧⌘J cycle requests in both directions; ⌘5 also enters request review. Navigation focuses the complete selectable details, leaving approval buttons without a default Return action. Search supports unordered words across project, conversation and instruction text. Batch loading preserves board focus, prevents stacked sheets and reports unavailable folders together.
+
+The interaction choices follow [Apple’s keyboard guidance](https://developer.apple.com/design/human-interface-guidelines/keyboards/) and [focus and selection guidance](https://developer.apple.com/design/human-interface-guidelines/focus-and-selection/): keep standard commands contextual and put focus on the content being reviewed. The existing action palette supplies a familiar searchable command surface, consistent with the rest of the workspace. This pass preserves AppKit materials, typography, SF symbols, stable pod order and the current visual hierarchy.
+
+Card actions carry the displayed workspace context as well as its canonical path. Worker or conversation changes invalidate old controls; complete request equality also protects the shared approval sheet. Decisions retain separate attempt identities, ignore late replies, and distinguish rejection from an unknown transport outcome. Explicit Stop rejection restores retry; a slow stop points to the existing Conversation recovery controls. Selecting feed text pauses immediately, and empty or disconnected feeds describe their actual state.
+
+The [verification record](../build/macos-pods-qa/verification.json) returns **pass for the implemented and reviewed scope**: 196 native tests, 20 final focused tests, both packaged worker fixtures and the build/signature checks pass. The keyboard pass uses the actual macOS app; the native regression suite and isolated worker fixtures cover request replacement, pending/duplicate decisions, connection loss, targeted Stop, reader preservation and layout bounds. Wide, medium and minimum layouts were visually inspected together, then compact and minimum captures confirmed the final build. Provider execution, physical VoiceOver, minimum-supported-macOS testing and multi-day endurance are outside this pass. No raster product assets were added. Historical reviews above retain their original scope and counts.
+
+## Pods transport and memory follow-up — October 2026
+
+This Operate pass preserves the existing AppKit layout and navigation. Worker and
+account channels now share a bounded byte mailbox and one small decoded delivery
+batch. Bursts yield to the main queue, completed requests use one deadline timer
+per channel, and closing releases queued payloads and suppresses late callbacks.
+Account failure retires the old channel before notifying callers, so reconnecting
+from a failure callback cannot revive stale browser requests or close the new
+connection. Pods also invalidate their refresh timer on destruction.
+
+The retained activity model now stores only display fields, with both a 120-entry
+and 256 KiB serialized budget per run. UTF-8 limits cover pathological combining
+characters, batch reduction avoids repeated rebuilding, and coverage counts
+survive eviction. Recorded lifecycle fields prevent Completed from appearing
+while the final checkpoint is still saving. Existing Pause, selection, request
+review, Stop and reconnect affordances remain the user-facing workflow.
+
+The [verification record](../build/macos-pods-memory-qa/verification.json) returns
+**pass for the implemented and reviewed scope**: 215 native tests, 425 shared
+worker tests (one Linux-only case skipped on macOS), 40 Python tests with runtime
+integration on both macOS and an ARM64 Linux container, TypeScript checking,
+packaged lifecycle and containment fixtures, and macOS signature verification.
+Wide, medium and minimum captures were inspected in one batch; no visual repair
+was needed. Both Linux architectures were repackaged. The isolated native
+transport test drained 100,000 events in 20 bursts: process peak RSS reached
+24.5 MiB and increased by 64 KiB during the final 50,000 events. This measures the
+transport test process, not the complete app or provider workers. Multi-day
+endurance, live-provider memory, physical VoiceOver and minimum-macOS verification
+remain outside this pass. No product raster assets were added.
+
 ## Do's and Don'ts
 
 - **Do** keep conversation dominant and its unified composer available beside secondary context.
