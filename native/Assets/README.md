@@ -1,24 +1,26 @@
 # macOS brand assets
 
-The native app uses **Cloud and code**: an ivory three-lobed cloud with paired
-`< >` code apertures on a deep ultramarine tile. The cloud represents **HEAV3NS**;
-the familiar angle brackets represent **CODE**. One combined silhouette connects
-the icon to the app's name without a wordmark or small decorative details.
+The native app uses **Sovereign of Heavens and Code**: a serious, majestic
+celestial sovereign inspired by Hoyoverse aesthetic (Genshin / Honkai), crowned
+with glowing crystalline spires, rune-etched celestial code halo, and cosmic
+starlight indigo mantle. The character's solemn gaze and divine crown anchor
+**HEAV3NS-CODE** as an authoritative, elegant developer workspace.
 
-This replaces the previous folder/conversation and lime/cyan signal identities.
-Ultramarine `#2849bc` and ivory `#f7faff` define the flat companion assets. The generated Dock
-icon adds restrained dimensional shading. In-app controls retain semantic AppKit
+This replaces the previous cloud/code, folder/conversation, and signal identities.
+The dimensional Dock icon carries genuine alpha transparency and macOS continuous
+corner radius with a subtle crown spire accent. In-app controls retain semantic AppKit
 colors and SF Symbols; the identity does not override the user's accent color.
 
 | Asset | Purpose |
 | --- | --- |
 | `AppIcon.icns` | Dock, Finder, app switcher, and system application identity |
 | `AppIcon.iconset/` | Ten native representations: 16, 32, 128, 256, and 512 points, each at 1× and 2× |
-| `AppIcon-Master.png` | Original 1254 × 1254 generated master, including transparent outer padding |
-| `AppIcon.svg` | Flat vector icon companion, not a vector reconstruction of the dimensional master |
-| `BrandMark.svg` / `BrandMark.png` | Standalone ultramarine cloud/code mark; PNG is 512 × 512 with transparency |
+| `AppIcon-Master.png` | Original 1024 × 1024 generated sovereign master, with alpha transparency |
+| `AppIcon.svg` | Flat vector icon companion |
+| `BrandMark.svg` / `BrandMark.png` | Standalone mark; PNG is 512 × 512 with transparency |
 | `../Sources/Heav3nsCode/Resources/Brand/AppIcon.png` | 1024 × 1024 welcome and development-run icon |
 | `../Sources/Heav3nsCode/Resources/Brand/BrandMarkTemplate.pdf` | Resolution-independent monochrome template for AppKit tinting |
+| `Archive/Cloud-Code/` | Previous cloud/code master, vector companions, and provenance |
 | `Archive/Signal/` | Prior signal artwork and wallpaper studies; not part of the active app identity |
 | `Archive/Workspace-Conversation/` | Previous folder/conversation master, vector companions, and prompt |
 
