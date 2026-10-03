@@ -137,9 +137,7 @@ describe("Git through desktop and agent runtime", () => {
 		assert.equal(results[0].success, true, JSON.stringify(results[0].output))
 		return results[0].output as WorkingDiffResult
 	}
-	beforeEach(async () => {
-		root = await realpath(await mkdtemp(path.join(tmpdir(), "lumi-git-integration-")))
-		await git("init", "-qb", "main")
+	const startRuntime = async () => {
 		registry = new ValidatingToolRegistry(new Eyes(), new AnchoredHands(), new ProtocolEars())
 		registry.setExecutionAuthority("interactive")
 		const suite = new V4aPatchToolSuite(new V4aPatchSupervisor(new BroccoliV4aPatchSubstrate(), new DeterministicV4aPatch()))
@@ -170,12 +168,50 @@ describe("Git through desktop and agent runtime", () => {
 		)
 		transport = new DesktopRequestScheduler()
 		await bridge.start()
+	}
+	beforeEach(async () => {
+		root = await realpath(await mkdtemp(path.join(tmpdir(), "lumi-git-integration-")))
+		await git("init", "-qb", "main")
+		await startRuntime()
 	})
 	afterEach(async () => {
 		sinon.restore()
 		transport.close()
 		await bridge.stop()
 		await rm(root, { recursive: true, force: true })
+	})
+	it("runs the BroccoliGIT dirty-start/edit/checkpoint/restart/external-edit journey through the real host", async () => {
+		await write("tracked", "base\n"); await git("add", "."); await commit()
+		await write("tracked", "staged\n"); await git("add", "tracked")
+		await write("tracked", "pre-existing\n"); await write("untracked", "someone else's file\n")
+		let calls = 0, modelSawEvidence = false
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			calls++
+			if (calls > 1) modelSawEvidence = String(init?.body).includes("recorded") && String(init?.body).includes("first_observation") || String(init?.body).includes('\\"state\\":\\"returned\\"')
+			return Response.json({ choices: [{ message: calls === 1
+				? { content: "Make the requested edit", tool_calls: [{ id: "write", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: "tracked", content: "agent\n" }) } }] }
+				: { content: "Edit recorded." } }] })
+		})
+		const submitted = await request("task.submit", { text: "Edit tracked and retain evidence" })
+		const until = Date.now() + 10000
+		while ((await request("snapshot")).active) { assert.ok(Date.now() < until); await new Promise(resolve => setTimeout(resolve, 10)) }
+		const history = await request("history.read", { run: submitted.run.id })
+		assert.ok(history.run.broccoliHorizon)
+		assert.ok(history.run.broccoliCheckpoint)
+		assert.ok(modelSawEvidence)
+		assert.equal(await (await import("node:fs/promises")).readFile(path.join(root, "tracked"), "utf8"), "agent\n")
+		transport.close(); await bridge.stop()
+		await write("tracked", "external\n")
+		await startRuntime()
+		const packet = await request("broccoligit.read", { action: "resume", horizonId: history.run.broccoliHorizon })
+		assert.equal(packet.outcome, "ok")
+		assert.equal(packet.data.differences[0].evidence, "unattributed_difference")
+		assert.equal(packet.data.operations[0].state, "returned")
+		assert.ok(packet.data.preExisting.find((entry: any) => entry.path === "tracked" && entry.staged && entry.unstaged))
+		assert.ok(packet.data.preExisting.find((entry: any) => entry.untracked))
+		const comparison = await request("broccoligit.read", { action: "changes", request: { comparison: { kind: "before", operationId: packet.data.operations[0].id }, paths: ["tracked"], detail: "patch" } })
+		assert.match(comparison.data.text, /-pre-existing\n\+external/)
+		assert.equal(calls, 2, "reopening and reconciling must never replay the mutation")
 	})
 	it("preserves unborn, staged, working, deleted, renamed and unusual paths through framed requests and scheduled tools", async () => {
 		const old = " old\nname.txt ",

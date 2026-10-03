@@ -1,0 +1,241 @@
+{
+  "measuredAt": "2026-10-03T05:55:52.967Z",
+  "node": "v22.22.0",
+  "platform": "darwin",
+  "scope": "Twenty real Git observation cancellations; twenty deterministic cooperative skill-discovery cancellations. Drain includes underlying ownership settlement. No claim for tools that ignore cancellation.",
+  "gitSamples": [
+    {
+      "responseMs": 0.7005000000000337,
+      "drainedMs": 1.1943330000000287
+    },
+    {
+      "responseMs": 0.22450000000003456,
+      "drainedMs": 0.5020000000000664
+    },
+    {
+      "responseMs": 0.35229100000003655,
+      "drainedMs": 0.6493750000000773
+    },
+    {
+      "responseMs": 0.2993749999999409,
+      "drainedMs": 0.49175000000002456
+    },
+    {
+      "responseMs": 0.21079099999997197,
+      "drainedMs": 0.34770799999989777
+    },
+    {
+      "responseMs": 0.282291999999984,
+      "drainedMs": 0.6342079999999441
+    },
+    {
+      "responseMs": 0.2289579999999205,
+      "drainedMs": 0.3735829999999396
+    },
+    {
+      "responseMs": 0.2334169999999176,
+      "drainedMs": 0.44487499999991087
+    },
+    {
+      "responseMs": 0.5105829999999969,
+      "drainedMs": 0.9631669999999986
+    },
+    {
+      "responseMs": 0.2331250000000864,
+      "drainedMs": 0.3905000000000882
+    },
+    {
+      "responseMs": 0.17691600000000562,
+      "drainedMs": 0.3216659999999365
+    },
+    {
+      "responseMs": 0.21316699999999855,
+      "drainedMs": 0.3796670000000404
+    },
+    {
+      "responseMs": 0.2140830000000733,
+      "drainedMs": 0.37175000000002
+    },
+    {
+      "responseMs": 0.2477089999999862,
+      "drainedMs": 0.4073750000000018
+    },
+    {
+      "responseMs": 0.31045800000003965,
+      "drainedMs": 0.45150000000001
+    },
+    {
+      "responseMs": 0.17099999999993543,
+      "drainedMs": 0.31104199999992943
+    },
+    {
+      "responseMs": 0.15379199999995308,
+      "drainedMs": 0.2907920000000104
+    },
+    {
+      "responseMs": 0.1354159999999638,
+      "drainedMs": 0.25987499999996544
+    },
+    {
+      "responseMs": 0.15116699999998673,
+      "drainedMs": 0.2619999999999436
+    },
+    {
+      "responseMs": 0.21362499999997908,
+      "drainedMs": 0.3628329999999096
+    }
+  ],
+  "skillSamples": [
+    {
+      "drainedMs": 0.19120900000007168
+    },
+    {
+      "drainedMs": 0.057999999999992724
+    },
+    {
+      "drainedMs": 0.05283299999996416
+    },
+    {
+      "drainedMs": 0.04750000000001364
+    },
+    {
+      "drainedMs": 0.05116700000007768
+    },
+    {
+      "drainedMs": 0.043708999999921616
+    },
+    {
+      "drainedMs": 0.06929200000001856
+    },
+    {
+      "drainedMs": 0.07200000000000273
+    },
+    {
+      "drainedMs": 0.12270799999998871
+    },
+    {
+      "drainedMs": 0.10687499999994543
+    },
+    {
+      "drainedMs": 0.04862500000001546
+    },
+    {
+      "drainedMs": 0.04529200000001765
+    },
+    {
+      "drainedMs": 0.04383400000006077
+    },
+    {
+      "drainedMs": 0.04362500000002001
+    },
+    {
+      "drainedMs": 0.043042000000014013
+    },
+    {
+      "drainedMs": 0.04333299999996143
+    },
+    {
+      "drainedMs": 0.043000000000006366
+    },
+    {
+      "drainedMs": 0.042708000000061475
+    },
+    {
+      "drainedMs": 0.04291699999998855
+    },
+    {
+      "drainedMs": 0.04224999999996726
+    }
+  ],
+  "final": {
+    "bytesRead": 0,
+    "bytesHashed": 0,
+    "fullDiffs": 0,
+    "observations": 0,
+    "peakLive": 9966424,
+    "responseBytes": 1087,
+    "pages": 0,
+    "reuseBypasses": 0,
+    "nativeSlice": true,
+    "liveReserved": 0,
+    "active": 0,
+    "pagesRetained": 0,
+    "historyPagesRetained": 0,
+    "retainedPageBytes": 0,
+    "comparisons": {
+      "perTaskBytes": {},
+      "perKindBytes": {},
+      "averageEntryAgeMs": 0,
+      "largestEntries": [],
+      "hottestKeys": [],
+      "totalEntries": 0,
+      "totalBytes": 0,
+      "maxBytes": 262144,
+      "maxEntries": 4,
+      "hitCount": 0,
+      "missCount": 0,
+      "hitRatio": 0,
+      "evictionCount": 0,
+      "rejectedAdmissionCount": 0,
+      "rejectedUnsafeEntryCount": 0,
+      "staleInvalidationCount": 0,
+      "pressureTrimEvents": 0,
+      "emergencyTrimEvents": 0,
+      "durability": "memoryOnly"
+    },
+    "reuseDecisions": [],
+    "writing": 0,
+    "gaps": [],
+    "shared": {
+      "maxActive": 2,
+      "maxWaiters": 32,
+      "maxWaitersPerKey": 16,
+      "timeoutMs": 5000,
+      "activeOperations": 0,
+      "pendingKeys": 0,
+      "activeWaiters": 0,
+      "startedCalls": 20,
+      "sharedCalls": 0,
+      "timedOutCalls": 0,
+      "rejectedCalls": 0
+    },
+    "evidence": {
+      "charged": 3905,
+      "metadata": 619,
+      "records": 1,
+      "checkpoints": 0,
+      "exhausted": false,
+      "diskLimit": 134217728,
+      "globalCharged": 3905
+    },
+    "admission": {
+      "limitBytes": 16777216,
+      "metadataReservedBytes": 1577816,
+      "scratchReservedBytes": 0,
+      "availableBytes": 15199400,
+      "pending": 0
+    },
+    "global": {
+      "live": 0,
+      "active": 0,
+      "pending": 0,
+      "descriptors": 0,
+      "peakLive": 9966424,
+      "peakPending": 1
+    }
+  },
+  "skills": {
+    "maxActive": 8,
+    "maxWaiters": 256,
+    "maxWaitersPerKey": 64,
+    "timeoutMs": 5000,
+    "activeOperations": 0,
+    "pendingKeys": 0,
+    "activeWaiters": 0,
+    "startedCalls": 20,
+    "sharedCalls": 0,
+    "timedOutCalls": 0,
+    "rejectedCalls": 0,
+    "cachedWorkspaces": 0
+  }
+}

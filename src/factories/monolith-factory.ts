@@ -344,30 +344,30 @@ import { StreamingScrubberSnapshotManager } from "../sessions/extensions/streami
 import { BroccoliSubdirHintsSubstrate } from "../sessions/extensions/subdir_hints/broccoli-subdir-hints-substrate.js"
 import { SubdirHintsSnapshotManager } from "../sessions/extensions/subdir_hints/subdir-hints-snapshot-manager.js"
 import { BroccoliSubstrateStore } from "../sessions/extensions/substrate/broccoli-substrate-store.js"
-import { BroccoliTwoPhaseCommitCoordinator } from "../sessions/extensions/substrate/broccolidb-2pc-coordinator.js"
+import type { BroccoliTwoPhaseCommitCoordinator } from "../sessions/extensions/substrate/broccolidb-2pc-coordinator.js"
 import { BroccoliBTreeIndexEngine } from "../sessions/extensions/substrate/broccolidb-btree-index-engine.js"
 import { BroccoliBufferPoolManager } from "../sessions/extensions/substrate/broccolidb-buffer-pool-manager.js"
-import { BroccoliCdcStream } from "../sessions/extensions/substrate/broccolidb-cdc-stream.js"
-import { BroccoliConnectionPool } from "../sessions/extensions/substrate/broccolidb-connection-pool.js"
+import type { BroccoliCdcStream } from "../sessions/extensions/substrate/broccolidb-cdc-stream.js"
+import type { BroccoliConnectionPool } from "../sessions/extensions/substrate/broccolidb-connection-pool.js"
 import { BroccoliConsistentHashRing } from "../sessions/extensions/substrate/broccolidb-consistent-hash-ring.js"
 import { BroccoliDeadlockDetector } from "../sessions/extensions/substrate/broccolidb-deadlock-detector.js"
 import { BroccoliFencingMutexEngine } from "../sessions/extensions/substrate/broccolidb-fencing-mutex.js"
-import { BroccoliInvertedIndexEngine } from "../sessions/extensions/substrate/broccolidb-inverted-index-engine.js"
+import type { BroccoliInvertedIndexEngine } from "../sessions/extensions/substrate/broccolidb-inverted-index-engine.js"
 import { BroccoliDatabaseKernel } from "../sessions/extensions/substrate/broccolidb-kernel.js"
-import { BroccoliLockAuthority } from "../sessions/extensions/substrate/broccolidb-lock-authority.js"
+import type { BroccoliLockAuthority } from "../sessions/extensions/substrate/broccolidb-lock-authority.js"
 import { BroccoliLsmStore } from "../sessions/extensions/substrate/broccolidb-lsm-store.js"
 import { BroccoliMaterializedViewEngine } from "../sessions/extensions/substrate/broccolidb-materialized-view-engine.js"
-import { BroccoliMvccEngine } from "../sessions/extensions/substrate/broccolidb-mvcc-engine.js"
+import type { BroccoliMvccEngine } from "../sessions/extensions/substrate/broccolidb-mvcc-engine.js"
 import { BroccoliAdaptivePlanCache } from "../sessions/extensions/substrate/broccolidb-plan-cache.js"
-import { BroccoliQueryOptimizer } from "../sessions/extensions/substrate/broccolidb-query-optimizer.js"
+import type { BroccoliQueryOptimizer } from "../sessions/extensions/substrate/broccolidb-query-optimizer.js"
 import { BroccoliRaftConsensusEngine } from "../sessions/extensions/substrate/broccolidb-raft-consensus.js"
 import { BroccoliRollbackCoordinator } from "../sessions/extensions/substrate/broccolidb-rollback-coordinator.js"
 import { BroccoliSagaOrchestrator } from "../sessions/extensions/substrate/broccolidb-saga-orchestrator.js"
-import { BroccoliSparseIndexEngine } from "../sessions/extensions/substrate/broccolidb-sparse-index-engine.js"
+import type { BroccoliSparseIndexEngine } from "../sessions/extensions/substrate/broccolidb-sparse-index-engine.js"
 import { BroccoliTieredKvCache } from "../sessions/extensions/substrate/broccolidb-tiered-kv-cache.js"
 import { BroccoliTimeSeriesRollupEngine } from "../sessions/extensions/substrate/broccolidb-timeseries-rollup-engine.js"
 import { BroccoliVectorAnnEngine } from "../sessions/extensions/substrate/broccolidb-vector-ann-engine.js"
-import { BroccoliVectorEngine } from "../sessions/extensions/substrate/broccolidb-vector-engine.js"
+import type { BroccoliVectorEngine } from "../sessions/extensions/substrate/broccolidb-vector-engine.js"
 import { FileLockManager, LruCache } from "../sessions/extensions/substrate/file-lock.js"
 import { LockAuthorityEngine } from "../sessions/extensions/substrate/lock-authority.js"
 import { NativeMutationTransactionSubstrate } from "../sessions/extensions/substrate/native-mutation-substrate.js"
@@ -1336,15 +1336,15 @@ export class MonolithFactory {
 		const convergenceEngine = new ConvergenceEngineSubstrate()
 		const databaseKernel = options.databaseKernel ?? new BroccoliDatabaseKernel({ workspaceRoot: cwd })
 		if (databaseKernel.workspaceRoot !== cwd) throw new Error("Database kernel must belong to the selected workspace")
-		const broccoliConnectionPool = new BroccoliConnectionPool()
-		const broccoliLockAuthority = new BroccoliLockAuthority()
-		const broccoliQueryOptimizer = new BroccoliQueryOptimizer()
-		const broccoliMvccEngine = new BroccoliMvccEngine()
-		const broccoliSparseIndexEngine = new BroccoliSparseIndexEngine()
-		const broccoliCdcStream = new BroccoliCdcStream()
-		const broccoliVectorEngine = new BroccoliVectorEngine()
-		const broccoliInvertedIndexEngine = new BroccoliInvertedIndexEngine()
-		const broccoliTwoPhaseCommitCoordinator = new BroccoliTwoPhaseCommitCoordinator()
+		const broccoliConnectionPool = databaseKernel.connectionPool
+		const broccoliLockAuthority = databaseKernel.lockAuthority
+		const broccoliQueryOptimizer = databaseKernel.queryOptimizer
+		const broccoliMvccEngine = databaseKernel.mvcc
+		const broccoliSparseIndexEngine = databaseKernel.sparseIndex
+		const broccoliCdcStream = databaseKernel.cdc
+		const broccoliVectorEngine = databaseKernel.vectorEngine
+		const broccoliInvertedIndexEngine = databaseKernel.invertedIndex
+		const broccoliTwoPhaseCommitCoordinator = databaseKernel.twoPhaseCommit
 		const broccoliBufferPoolManager = databaseKernel.bufferPool
 		const broccoliLsmStore = databaseKernel.lsmStore
 		const broccoliRaftConsensusEngine = databaseKernel.raftConsensus

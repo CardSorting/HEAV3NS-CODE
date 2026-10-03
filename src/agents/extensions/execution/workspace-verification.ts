@@ -65,6 +65,8 @@ async function snapshot(workspace: string, signal?: AbortSignal): Promise<Snapsh
 			const before = await handle.stat()
 			if (!before.isFile() || before.size > LIMITS.fileBytes || bytes + before.size > LIMITS.bytes)
 				throw new Error("Source limit")
+			// Reserve before allocation: four concurrent reads share the same cap.
+			bytes += before.size
 			const buffer = Buffer.alloc(before.size + 1)
 			let length = 0
 			while (length < buffer.length) {
@@ -83,7 +85,6 @@ async function snapshot(workspace: string, signal?: AbortSignal): Promise<Snapsh
 				named.dev !== before.dev
 			)
 				throw new Error("Source changed while reading")
-			bytes += length
 			return buffer.subarray(0, length)
 		} finally {
 			await handle.close()
@@ -115,6 +116,20 @@ async function snapshot(workspace: string, signal?: AbortSignal): Promise<Snapsh
 			} catch (error) {
 				if ((error as NodeJS.ErrnoException).code !== "ENOENT") complete = false
 			}
+			const pending: string[] = []
+			const flush = async () => {
+				const names = pending.splice(0)
+				// Drain every started read before cancellation/failure escapes. Admit
+				// only four buffers, preserving directory order in the observation.
+				const results = await Promise.allSettled(names.map(read))
+				for (let i = 0; i < results.length; i++) {
+					const result = results[i]
+					if (result.status === "rejected") { signal?.throwIfAborted(); complete = false; continue }
+					const file = names[i], content = result.value
+					files.set(file, digest(content))
+					if (manifests.has(path.posix.basename(file))) metadata.set(file, content.toString("utf8"))
+				}
+			}
 			for await (const entry of await opendir(absolute)) {
 				signal?.throwIfAborted()
 				if (++entries > LIMITS.entries || Date.now() > deadline) {
@@ -130,11 +145,11 @@ async function snapshot(workspace: string, signal?: AbortSignal): Promise<Snapsh
 				}
 				if (entry.isDirectory()) directories.push(file)
 				else if (relevant(file)) {
-					const content = await read(file)
-					files.set(file, digest(content))
-					if (manifests.has(entry.name)) metadata.set(file, content.toString("utf8"))
+					pending.push(file)
+					if (pending.length === 4) await flush()
 				}
 			}
+			await flush()
 		} catch (error) {
 			signal?.throwIfAborted()
 			complete = false

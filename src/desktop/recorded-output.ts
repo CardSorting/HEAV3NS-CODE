@@ -47,7 +47,7 @@ export async function saveRecordedOutput(store: BlobStore, response: string, too
 	let pending = Buffer.alloc(CHUNK),
 		used = 0,
 		bytes = 0,
-		limited = false
+		limited = tools.some((tool) => !!tool && typeof tool === "object" && "outputLimited" in tool && tool.outputLimited === true)
 	const append = async (data: Buffer) => {
 		digest.update(data)
 		bytes += data.length

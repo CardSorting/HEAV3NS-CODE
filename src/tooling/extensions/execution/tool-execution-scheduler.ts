@@ -541,8 +541,11 @@ export class ToolExecutionScheduler {
 
 		// 5. Output Governance & Bounding
 		let finalOutput = rawResult
+		let outputLimited = false
 		if (enableGovernance && typeof rawResult === "string" && rawResult.length > 50_000) {
-			finalOutput = this.governor.governOutput(rawResult, call.name).outputText
+			const governed = this.governor.governOutput(rawResult, call.name)
+			finalOutput = governed.outputText
+			outputLimited = governed.wasTruncated
 		}
 
 		return {
@@ -550,6 +553,7 @@ export class ToolExecutionScheduler {
 			callId: call.id,
 			args: parsedArgs,
 			output: finalOutput,
+			...(outputLimited ? { outputLimited: true } : {}),
 			durationMs: elapsed,
 			success: isSuccess,
 			...(denied ? { denied: true } : {}),

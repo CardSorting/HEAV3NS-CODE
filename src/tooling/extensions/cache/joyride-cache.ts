@@ -31,7 +31,7 @@ export interface JoyRideMetadata extends JoyRideValidation {
 	cacheKind: JoyRideCacheKind
 	ttlMs: number
 	durability: "memoryOnly"
-	admissionReason: "validated_file_read"
+	admissionReason: "validated_file_read" | "validated_content_pair"
 }
 interface Entry {
 	serialized: string
@@ -244,8 +244,8 @@ export class JoyRideHotPathCache {
 			metadata.ttlMs <= 0 ||
 			metadata.ttlMs > 60_000 ||
 			metadata.durability !== "memoryOnly" ||
-			metadata.admissionReason !== "validated_file_read" ||
-			metadata.cacheKind !== "workspaceIndex"
+			!((metadata.admissionReason === "validated_file_read" && metadata.cacheKind === "workspaceIndex") ||
+				(metadata.admissionReason === "validated_content_pair" && metadata.cacheKind === "scratchArtifact"))
 		)
 			return reject("invalid_metadata")
 		const serialized = encodeJoyRideValue(value, this.options.maxEntryBytes)

@@ -1,0 +1,2427 @@
+{
+  "measuredAt": "2026-10-03T04:51:22.811Z",
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "Apple M1 Pro",
+    "ram": 17179869184,
+    "os": "25.5.0",
+    "node": "v22.22.0",
+    "git": "git version 2.48.1"
+  },
+  "baselineSha256": "b0dbe9991e5c76c4a0ffa9ee8033f24b4b0651753c5e7f507d20e18db106757c",
+  "afterBundleSha256": "1d82803e2ca4013a3832b39324d3fba26b1c2d7f7c5afba7c065362d2af7a943",
+  "sourceSha256": "6fbad856eae82a35d4102af295de10ef05cfba60051f2fd8d721678f1478af10",
+  "method": "Real macOS Git and storage. 52,000 tracked files plus one selected file. One cold, two warmup, nine steady observations. Current bytes are read and hashed on every before/current request; CAS verification and Git internal I/O are not in application byte counters. Before/after share the same OS-warm fixture; this is not a disk cache purge. time -l samples child high-water marks. RSS includes kernel and setup allocations; retained ownership is recorded separately.",
+  "samples": [
+    {
+      "label": "before_large_repo_single_path",
+      "cold": {
+        "ms": 109.93654199999946,
+        "subprocesses": 11,
+        "fullDiffs": 1,
+        "readBytes": 0,
+        "hashedBytes": 0,
+        "serializedBytes": 1499,
+        "rss": 122896384
+      },
+      "warmup": [
+        {
+          "ms": 104.27841700000135,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 122929152
+        },
+        {
+          "ms": 102.28237499999886,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 122945536
+        }
+      ],
+      "steady": [
+        {
+          "ms": 101.73929099999987,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 122994688
+        },
+        {
+          "ms": 104.64741700000013,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123109376
+        },
+        {
+          "ms": 105.8380419999994,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123142144
+        },
+        {
+          "ms": 106.7819580000014,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123191296
+        },
+        {
+          "ms": 104.79741699999977,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123731968
+        },
+        {
+          "ms": 110.26487499999894,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123830272
+        },
+        {
+          "ms": 103.13604200000009,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123879424
+        },
+        {
+          "ms": 108.41158299999915,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123912192
+        },
+        {
+          "ms": 106.56666699999914,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 123912192
+        }
+      ],
+      "p50": 105.8380419999994,
+      "p95": 110.26487499999894
+    },
+    {
+      "label": "before_before_current",
+      "cold": {
+        "ms": 109.97375000000102,
+        "subprocesses": 18,
+        "fullDiffs": 1,
+        "readBytes": 8,
+        "hashedBytes": 8,
+        "serializedBytes": 2020,
+        "rss": 124059648
+      },
+      "warmup": [
+        {
+          "ms": 105.72408300000097,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 124092416
+        },
+        {
+          "ms": 106.05349999999999,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 124190720
+        }
+      ],
+      "steady": [
+        {
+          "ms": 106.86029199999939,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125173760
+        },
+        {
+          "ms": 105.26445899999999,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125255680
+        },
+        {
+          "ms": 102.26620800000092,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125386752
+        },
+        {
+          "ms": 107.95945799999936,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125435904
+        },
+        {
+          "ms": 102.65191700000105,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125485056
+        },
+        {
+          "ms": 103.6346250000006,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 125517824
+        },
+        {
+          "ms": 103.82950000000164,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 126599168
+        },
+        {
+          "ms": 106.10908399999971,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 126631936
+        },
+        {
+          "ms": 105.30804200000057,
+          "subprocesses": 18,
+          "fullDiffs": 1,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2020,
+          "rss": 126697472
+        }
+      ],
+      "p50": 105.26445899999999,
+      "p95": 107.95945799999936
+    },
+    {
+      "label": "before_checkpoint_pair",
+      "cold": {
+        "ms": 28.65899999999965,
+        "subprocesses": 5,
+        "fullDiffs": 1,
+        "readBytes": 0,
+        "hashedBytes": 0,
+        "serializedBytes": 2144,
+        "rss": 126697472
+      },
+      "warmup": [
+        {
+          "ms": 29.102124999999432,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126730240
+        },
+        {
+          "ms": 28.50641699999869,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126730240
+        }
+      ],
+      "steady": [
+        {
+          "ms": 28.50433400000111,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126746624
+        },
+        {
+          "ms": 29.20891599999959,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126746624
+        },
+        {
+          "ms": 28.879375000000437,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126779392
+        },
+        {
+          "ms": 31.08404200000041,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126812160
+        },
+        {
+          "ms": 29.24212500000067,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126828544
+        },
+        {
+          "ms": 29.086457999999766,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 126861312
+        },
+        {
+          "ms": 29.62866600000052,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 127795200
+        },
+        {
+          "ms": 28.278207999999722,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 127827968
+        },
+        {
+          "ms": 29.175750000000335,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 2144,
+          "rss": 127860736
+        }
+      ],
+      "p50": 29.175750000000335,
+      "p95": 31.08404200000041
+    },
+    {
+      "label": "before_resume",
+      "cold": {
+        "ms": 145.00174999999945,
+        "subprocesses": 11,
+        "fullDiffs": 0,
+        "readBytes": 8,
+        "hashedBytes": 8,
+        "serializedBytes": 1830,
+        "rss": 127942656
+      },
+      "warmup": [
+        {
+          "ms": 147.4485420000001,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 127991808
+        },
+        {
+          "ms": 144.81429200000093,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128008192
+        }
+      ],
+      "steady": [
+        {
+          "ms": 169.27049999999872,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128040960
+        },
+        {
+          "ms": 145.0367090000018,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128073728
+        },
+        {
+          "ms": 144.5209160000013,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128122880
+        },
+        {
+          "ms": 142.7759590000005,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128155648
+        },
+        {
+          "ms": 147.39687500000036,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 128221184
+        },
+        {
+          "ms": 144.92095900000095,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 129073152
+        },
+        {
+          "ms": 140.99758400000064,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 129073152
+        },
+        {
+          "ms": 141.4633329999997,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 129122304
+        },
+        {
+          "ms": 141.8792080000003,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1830,
+          "rss": 129138688
+        }
+      ],
+      "p50": 144.5209160000013,
+      "p95": 169.27049999999872
+    },
+    {
+      "label": "after_large_repo_single_path",
+      "cold": {
+        "ms": 107.22687500000029,
+        "subprocesses": 11,
+        "fullDiffs": 1,
+        "readBytes": 0,
+        "hashedBytes": 0,
+        "serializedBytes": 1499,
+        "rss": 130547712
+      },
+      "warmup": [
+        {
+          "ms": 102.34212499999921,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130613248
+        },
+        {
+          "ms": 101.52720800000134,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130613248
+        }
+      ],
+      "steady": [
+        {
+          "ms": 103.5210420000003,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130646016
+        },
+        {
+          "ms": 104.56491599999936,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130727936
+        },
+        {
+          "ms": 100.9522909999996,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130727936
+        },
+        {
+          "ms": 102.15183300000172,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130777088
+        },
+        {
+          "ms": 103.9641249999986,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130842624
+        },
+        {
+          "ms": 106.04383299999972,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130924544
+        },
+        {
+          "ms": 101.50316699999894,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130957312
+        },
+        {
+          "ms": 101.00987499999974,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 130973696
+        },
+        {
+          "ms": 101.13562499999898,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1499,
+          "rss": 131907584
+        }
+      ],
+      "p50": 102.15183300000172,
+      "p95": 106.04383299999972
+    },
+    {
+      "label": "after_before_current",
+      "cold": {
+        "ms": 105.27312499999971,
+        "subprocesses": 18,
+        "fullDiffs": 1,
+        "readBytes": 8,
+        "hashedBytes": 8,
+        "serializedBytes": 1476,
+        "rss": 132038656
+      },
+      "warmup": [
+        {
+          "ms": 77.08245800000077,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132055040
+        },
+        {
+          "ms": 80.62670900000012,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132104192
+        }
+      ],
+      "steady": [
+        {
+          "ms": 74.91587499999878,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132136960
+        },
+        {
+          "ms": 75.32316600000195,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132202496
+        },
+        {
+          "ms": 74.76104100000157,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132235264
+        },
+        {
+          "ms": 74.27720799999952,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 132268032
+        },
+        {
+          "ms": 73.20233400000143,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 133382144
+        },
+        {
+          "ms": 76.97766599999886,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 133431296
+        },
+        {
+          "ms": 77.57120799999757,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 133447680
+        },
+        {
+          "ms": 78.61466600000131,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 133480448
+        },
+        {
+          "ms": 79.45641700000124,
+          "subprocesses": 13,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 1476,
+          "rss": 133562368
+        }
+      ],
+      "p50": 75.32316600000195,
+      "p95": 79.45641700000124
+    },
+    {
+      "label": "after_checkpoint_pair",
+      "cold": {
+        "ms": 30.406542000000627,
+        "subprocesses": 5,
+        "fullDiffs": 1,
+        "readBytes": 0,
+        "hashedBytes": 0,
+        "serializedBytes": 1600,
+        "rss": 133562368
+      },
+      "warmup": [
+        {
+          "ms": 1.0802499999990687,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 1.0372500000012224,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        }
+      ],
+      "steady": [
+        {
+          "ms": 0.7487089999995078,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 0.7178339999991294,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 0.7910000000010768,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 0.7426659999982803,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 0.7071249999971769,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133578752
+        },
+        {
+          "ms": 0.8454160000001139,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133595136
+        },
+        {
+          "ms": 0.6929159999999683,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133595136
+        },
+        {
+          "ms": 0.6769580000000133,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133595136
+        },
+        {
+          "ms": 0.651041000000987,
+          "subprocesses": 0,
+          "fullDiffs": 0,
+          "readBytes": 0,
+          "hashedBytes": 0,
+          "serializedBytes": 1600,
+          "rss": 133595136
+        }
+      ],
+      "p50": 0.7178339999991294,
+      "p95": 0.8454160000001139
+    },
+    {
+      "label": "after_resume",
+      "cold": {
+        "ms": 145.046792000001,
+        "subprocesses": 11,
+        "fullDiffs": 0,
+        "readBytes": 8,
+        "hashedBytes": 8,
+        "serializedBytes": 2087,
+        "rss": 106217472
+      },
+      "warmup": [
+        {
+          "ms": 144.6691249999967,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 107806720
+        },
+        {
+          "ms": 145.91212499999892,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 108298240
+        }
+      ],
+      "steady": [
+        {
+          "ms": 151.8484580000004,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 108806144
+        },
+        {
+          "ms": 150.13441699999748,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 98861056
+        },
+        {
+          "ms": 149.79399999999805,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 99909632
+        },
+        {
+          "ms": 150.0826670000024,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 99926016
+        },
+        {
+          "ms": 148.0799160000024,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 100155392
+        },
+        {
+          "ms": 149.02108399999997,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 100958208
+        },
+        {
+          "ms": 150.19433299999946,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 101695488
+        },
+        {
+          "ms": 148.89358300000094,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 101695488
+        },
+        {
+          "ms": 149.60216600000058,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 8,
+          "hashedBytes": 8,
+          "serializedBytes": 2087,
+          "rss": 101990400
+        }
+      ],
+      "p50": 149.79399999999805,
+      "p95": 151.8484580000004
+    },
+    {
+      "label": "before_resume_300_edits",
+      "cold": {
+        "ms": 221.40520800001104,
+        "subprocesses": 11,
+        "fullDiffs": 0,
+        "readBytes": 9,
+        "hashedBytes": 9,
+        "serializedBytes": 5921,
+        "rss": 122748928
+      },
+      "warmup": [
+        {
+          "ms": 159.84574999999313,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 122765312
+        },
+        {
+          "ms": 157.2447919999977,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 122814464
+        }
+      ],
+      "steady": [
+        {
+          "ms": 154.99583300000813,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 122847232
+        },
+        {
+          "ms": 163.6953749999957,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123027456
+        },
+        {
+          "ms": 160.37329200000386,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123027456
+        },
+        {
+          "ms": 161.29354199999943,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123027456
+        },
+        {
+          "ms": 162.95987500000047,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123027456
+        },
+        {
+          "ms": 159.13233399999444,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123060224
+        },
+        {
+          "ms": 157.01350000000093,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123060224
+        },
+        {
+          "ms": 158.40033299999777,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123060224
+        },
+        {
+          "ms": 157.21587500000896,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 5921,
+          "rss": 123060224
+        }
+      ],
+      "p50": 159.13233399999444,
+      "p95": 163.6953749999957
+    },
+    {
+      "label": "after_resume_300_edits",
+      "cold": {
+        "ms": 150.18383300000278,
+        "subprocesses": 11,
+        "fullDiffs": 0,
+        "readBytes": 9,
+        "hashedBytes": 9,
+        "serializedBytes": 2996,
+        "rss": 123060224
+      },
+      "warmup": [
+        {
+          "ms": 158.7855000000127,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 159.3351249999978,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        }
+      ],
+      "steady": [
+        {
+          "ms": 154.5094170000084,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 155.27079200001026,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 146.0966250000056,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 156.0555000000022,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 162.76720800000476,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 168.2953339999949,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 177.07058400000096,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123076608
+        },
+        {
+          "ms": 158.49324999999953,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123043840
+        },
+        {
+          "ms": 148.98179200000595,
+          "subprocesses": 11,
+          "fullDiffs": 0,
+          "readBytes": 9,
+          "hashedBytes": 9,
+          "serializedBytes": 2996,
+          "rss": 123043840
+        }
+      ],
+      "p50": 156.0555000000022,
+      "p95": 177.07058400000096
+    }
+  ],
+  "retention": [
+    {
+      "edit": 25,
+      "rss": 108216320,
+      "heapTotal": 27033600,
+      "heapUsed": 14893880,
+      "external": 3317688,
+      "arrayBuffers": 43667,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 380,
+        "bytesHashed": 380,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 14397448,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 616358,
+          "metadata": 30546,
+          "records": 34,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 616358
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14397448,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 50,
+      "rss": 116178944,
+      "heapTotal": 33849344,
+      "heapUsed": 15102096,
+      "external": 2699981,
+      "arrayBuffers": 43667,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 780,
+        "bytesHashed": 780,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 14580048,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1036033,
+          "metadata": 53371,
+          "records": 59,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1036033
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14580048,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 75,
+      "rss": 127090688,
+      "heapTotal": 50626560,
+      "heapUsed": 15182720,
+      "external": 3066274,
+      "arrayBuffers": 212620,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 1180,
+        "bytesHashed": 1180,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 14762648,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1455708,
+          "metadata": 76196,
+          "records": 84,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1455708
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14762648,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 100,
+      "rss": 130334720,
+      "heapTotal": 53772288,
+      "heapUsed": 15554816,
+      "external": 3735436,
+      "arrayBuffers": 859012,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 1580,
+        "bytesHashed": 1580,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 14945248,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1875383,
+          "metadata": 99021,
+          "records": 109,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1875383
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14945248,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 125,
+      "rss": 131072000,
+      "heapTotal": 54296576,
+      "heapUsed": 15739424,
+      "external": 3657002,
+      "arrayBuffers": 857593,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 2029,
+        "bytesHashed": 2029,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 15127848,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2295156,
+          "metadata": 121846,
+          "records": 134,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2295156
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15127848,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 150,
+      "rss": 122814464,
+      "heapTotal": 54296576,
+      "heapUsed": 15970360,
+      "external": 3580513,
+      "arrayBuffers": 655765,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 2479,
+        "bytesHashed": 2479,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 15310448,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2714931,
+          "metadata": 144671,
+          "records": 159,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2714931
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15310448,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 175,
+      "rss": 123174912,
+      "heapTotal": 54558720,
+      "heapUsed": 16168848,
+      "external": 3751341,
+      "arrayBuffers": 892849,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 2929,
+        "bytesHashed": 2929,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 15493048,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3134706,
+          "metadata": 167496,
+          "records": 184,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3134706
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15493048,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 200,
+      "rss": 123273216,
+      "heapTotal": 54034432,
+      "heapUsed": 16341496,
+      "external": 3449441,
+      "arrayBuffers": 693583,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 3379,
+        "bytesHashed": 3379,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 15675648,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3554481,
+          "metadata": 190321,
+          "records": 209,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3554481
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15675648,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 225,
+      "rss": 123600896,
+      "heapTotal": 55083008,
+      "heapUsed": 16509168,
+      "external": 3687133,
+      "arrayBuffers": 924150,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 3829,
+        "bytesHashed": 3829,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 15858248,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3974256,
+          "metadata": 213146,
+          "records": 234,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3974256
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15858248,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 250,
+      "rss": 122257408,
+      "heapTotal": 54558720,
+      "heapUsed": 16699352,
+      "external": 3474864,
+      "arrayBuffers": 647183,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 4279,
+        "bytesHashed": 4279,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 16040848,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4394031,
+          "metadata": 235971,
+          "records": 259,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4394031
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16040848,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 275,
+      "rss": 122667008,
+      "heapTotal": 55345152,
+      "heapUsed": 16905960,
+      "external": 3687133,
+      "arrayBuffers": 901536,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 4729,
+        "bytesHashed": 4729,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 16223448,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4813806,
+          "metadata": 258796,
+          "records": 284,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4813806
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16223448,
+          "peakPending": 1
+        }
+      }
+    },
+    {
+      "edit": 300,
+      "rss": 122748928,
+      "heapTotal": 54820864,
+      "heapUsed": 17078784,
+      "external": 3468716,
+      "arrayBuffers": 760448,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 18825216,
+      "diagnostics": {
+        "bytesRead": 5179,
+        "bytesHashed": 5179,
+        "fullDiffs": 0,
+        "observations": 0,
+        "peakLive": 16406048,
+        "responseBytes": 1204,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 0,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 5233581,
+          "metadata": 281621,
+          "records": 309,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 5233581
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16406048,
+          "peakPending": 1
+        }
+      }
+    }
+  ],
+  "scaling": [
+    {
+      "changedPaths": 52001,
+      "ms": 337.65899999999965,
+      "outputBytes": 32780,
+      "coverage": "partial",
+      "totalExact": true,
+      "reasons": [
+        "NARROW_PATH_SCOPE"
+      ],
+      "diagnostics": {
+        "bytesRead": 5287,
+        "bytesHashed": 5287,
+        "fullDiffs": 0,
+        "observations": 1,
+        "peakLive": 16406048,
+        "responseBytes": 69936,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 5237840,
+          "metadata": 281621,
+          "records": 309,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 5237840
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16406048,
+          "peakPending": 1
+        }
+      },
+      "memory": {
+        "rss": 133513216,
+        "heapTotal": 56918016,
+        "heapUsed": 16655296,
+        "external": 2586510,
+        "arrayBuffers": 46486,
+        "fdCount": 23,
+        "gitActive": 0,
+        "gitChildPeakBytes": 39747584
+      }
+    },
+    {
+      "scenario": "1024 known targets after 300 edits; honest admission degradation",
+      "attempted": 1024,
+      "captured": 96,
+      "uncaptured": 928,
+      "cancellations": 20,
+      "diagnostics": {
+        "bytesRead": 7247,
+        "bytesHashed": 7247,
+        "fullDiffs": 0,
+        "observations": 2,
+        "peakLive": 16746440,
+        "responseBytes": 82157,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 1,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 0,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [],
+        "writing": 0,
+        "gaps": [
+          "OWNED_MEMORY_CAPACITY"
+        ],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 22,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 6132520,
+          "metadata": 334817,
+          "records": 312,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 6132520
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16746440,
+          "peakPending": 1
+        }
+      },
+      "memory": {
+        "rss": 140886016,
+        "heapTotal": 59277312,
+        "heapUsed": 21037432,
+        "external": 2860879,
+        "arrayBuffers": 325057,
+        "fdCount": 23,
+        "gitActive": 0,
+        "gitChildPeakBytes": 39747584
+      }
+    }
+  ],
+  "final": {
+    "memory": {
+      "rss": 141819904,
+      "heapTotal": 59277312,
+      "heapUsed": 21409832,
+      "external": 3095097,
+      "arrayBuffers": 559275,
+      "fdCount": 23,
+      "gitActive": 0,
+      "gitChildPeakBytes": 39747584
+    },
+    "diagnostics": {
+      "bytesRead": 7247,
+      "bytesHashed": 7247,
+      "fullDiffs": 0,
+      "observations": 2,
+      "peakLive": 16746440,
+      "responseBytes": 82157,
+      "pages": 0,
+      "reuseBypasses": 0,
+      "nativeSlice": true,
+      "liveReserved": 0,
+      "active": 0,
+      "pagesRetained": 0,
+      "historyPagesRetained": 0,
+      "retainedPageBytes": 0,
+      "comparisons": {
+        "perTaskBytes": {},
+        "perKindBytes": {},
+        "averageEntryAgeMs": 0,
+        "largestEntries": [],
+        "hottestKeys": [],
+        "totalEntries": 0,
+        "totalBytes": 0,
+        "maxBytes": 262144,
+        "maxEntries": 4,
+        "hitCount": 0,
+        "missCount": 0,
+        "hitRatio": 0,
+        "evictionCount": 0,
+        "rejectedAdmissionCount": 0,
+        "rejectedUnsafeEntryCount": 0,
+        "staleInvalidationCount": 0,
+        "pressureTrimEvents": 0,
+        "emergencyTrimEvents": 0,
+        "durability": "memoryOnly"
+      },
+      "reuseDecisions": [],
+      "writing": 0,
+      "gaps": [
+        "OWNED_MEMORY_CAPACITY"
+      ],
+      "shared": {
+        "maxActive": 2,
+        "maxWaiters": 32,
+        "maxWaitersPerKey": 16,
+        "timeoutMs": 5000,
+        "activeOperations": 0,
+        "pendingKeys": 0,
+        "activeWaiters": 0,
+        "startedCalls": 22,
+        "sharedCalls": 0,
+        "timedOutCalls": 0,
+        "rejectedCalls": 0
+      },
+      "evidence": {
+        "charged": 6136848,
+        "metadata": 334840,
+        "records": 312,
+        "checkpoints": 4,
+        "exhausted": false,
+        "diskLimit": 134217728,
+        "globalCharged": 6136848
+      },
+      "global": {
+        "live": 0,
+        "active": 0,
+        "pending": 0,
+        "descriptors": 0,
+        "peakLive": 16746440,
+        "peakPending": 1
+      }
+    }
+  }
+}

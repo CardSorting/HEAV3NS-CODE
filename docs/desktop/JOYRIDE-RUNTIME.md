@@ -1,5 +1,7 @@
 # JoyRide runtime integration
 
+Latest verification: [runtime throughput and ownership pass](RUNTIME-THROUGHPUT.md). Skills share only eligible pending full loads; abandoned discovery is cancelled without publishing metadata. The parent and registry share one task-owned output governor, separately bounded from JoyRide, and release it on completion, failure, cancellation, and close. No historical result grants current authority.
+
 JoyRide now owns reuse of eligible file-tool results inside actual queued agent
 turns. The factory's existing cache instance is passed to the tool registry;
 `AgentEngine` opens its task scope when execution starts and releases it in
@@ -105,9 +107,7 @@ entries. Heap pressure is sampled every 32 cache get/set operations against 80%
 of V8's heap limit. `trimToBudget` and `emergencyTrim` provide explicit release.
 This is not an operating-system memory-pressure notification service.
 
-Only the `workspaceIndex` kind with `memoryOnly` durability and validated-file
-admission is currently accepted. Broader kind names remain in the type surface
-but are rejected at admission. No scratch files or disk fallback are created.
+The tool adapter admits `workspaceIndex` with `validated_file_read`. BroccoliGIT also admits `scratchArtifact` with `validated_content_pair` after verified retained reads and fresh raw-byte validation. Both require `memoryOnly` durability and the existing ownership/fingerprint/TTL contract; mismatched kind/reason pairs are rejected. The BroccoliGIT instance has a separate, accounted 256 KiB / four-entry cap and releases it with the horizon. Existing disabled/degraded/scratch-off controls apply. JoyRide itself creates no scratch files or disk fallback; the safe Git adapter owns temporary comparison files. See [BroccoliGIT](BROCCOLIGIT.md) and the [maturity evidence](RUNTIME-MATURITY.md).
 
 Speculative `view_file` reads require an active autonomous task, its opaque owner
 token captured before scheduling, and a valid file proof before execution. They

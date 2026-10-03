@@ -519,7 +519,7 @@ export interface IBroccoliDatabaseKernel {
   listCheckpoints(): readonly TimelineCheckpointRecord[];
   health(): Promise<DbHealthReport>;
   storeBlob(content: Buffer | string): Promise<string>;
-  readBlob(hash: string): Promise<Buffer | null>;
+  readBlob(hash: string, maxBytes?: number): Promise<Buffer | null>;
   auditBlobs(): Promise<{ checked: number; verified: number; failed: number; failures: readonly { hash: string; error: string }[]; failuresLimited: boolean }>;
   gc(): Promise<number>;
 }
@@ -1171,5 +1171,4 @@ export interface IBroccoliMaterializedViewEngine {
   getViewRow(viewName: string, groupKey: string): MaterializedViewRow | undefined;
   listViews(): readonly string[];
 }
-
 

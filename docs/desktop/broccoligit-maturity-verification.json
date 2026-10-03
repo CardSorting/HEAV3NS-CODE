@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-03T05:17:42.146669+00:00",
+  "target": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "Apple M1 Pro",
+    "ram": 17179869184,
+    "os": "25.5.0",
+    "node": "v22.22.0",
+    "git": "git version 2.48.1"
+  },
+  "baseGitHead": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+  "workingTree": "Preserved pre-existing uncommitted v0.1 implementation; no commit or reset performed",
+  "runtimeBundleSha256": "bdb1da71dd4fb461ee12a0d8bbd4273379657d21c84ce4ccfbbc634d33a72591",
+  "nativeBinarySha256": "2554c3c042a4c61dae72cbf75fa3cd03fbd98935bfb20f180a87670dcf9ac8fe",
+  "sourceHashes": {
+    "src/desktop/broccoligit/contracts.ts": "e0debe700c14b433529ddf2bfcaef3bdfd6ee5cfc1439bc9427e0668846676f0",
+    "src/desktop/broccoligit/content.ts": "4f59f4aeb4db59ffa7def1ac1e67206c02946cc2340b6bb860479fa80d86bcaa",
+    "src/desktop/broccoligit/evidence-store.ts": "7bb3334ade8d49c2667218a62c011b70b3cfd574bd0cfeb939c87165387edb7d",
+    "src/desktop/broccoligit/git-reader.ts": "8f9135d6069fcc4d90bb322c09834d0c4f42be0939dc379e18595288de22b2f8",
+    "src/desktop/broccoligit/service.ts": "6fbad856eae82a35d4102af295de10ef05cfba60051f2fd8d721678f1478af10",
+    "src/desktop/worker.ts": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962",
+    "src/desktop/protocol.ts": "bc3e6546fd94fdc3e2e686cd6f8fb5671bcb60d1075c7e0958cbee46c16cbb1c",
+    "src/desktop/run-insights.ts": "ccb67f046376df56712a112640ae301c80577748beb1ad677eee2a1de6ea3ec1",
+    "src/factories/monolith-factory.ts": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7",
+    "src/tooling/extensions/cache/joyride-cache.ts": "f17959db070fe9cacf55fcef22e243ea4e59fd0a62143922863896fcad916b19",
+    "native/Sources/Heav3nsCode/RuntimeClient.swift": "177b0941656da65ee32b17d8fdc7ca538df81840343ffbbb61f799b737dc5e1c",
+    "native/Sources/Heav3nsCode/BroccoliGitAdmission.swift": "3e3d3ddcf3bd41b7fe96a65a97f6fa3914c79d9cb1c0356e3760bcdfe06af8a0",
+    "native/Sources/Heav3nsCode/WorkspaceWindow.swift": "0a9998d65358a1a5da023764179ecb4832f9332cd699cc5bf278a9152f2803c8",
+    "native/Tests/Heav3nsCodeTests/RuntimeClientTests.swift": "0dede7abd7e21b93bd40c55537adde2fcd56c60b23c9846effeefc3a74353871",
+    "scripts/benchmark-desktop.mjs": "6f068bb2ea43d48d16f333d159900a908cad9b0412a0c3cb7470453e322ed9d1"
+  },
+  "counting": "Suites overlap; do not add counts as unique tests",
+  "checks": [
+    {
+      "name": "macOS desktop TypeScript suite",
+      "status": "passed",
+      "passed": 448,
+      "failed": 0,
+      "pending": 1,
+      "pendingReason": "Linux-only undecodable filename case",
+      "log": "build/broccoligit-desktop.log",
+      "logSha256": "efd3bcf1e2ed74bf7bfd55dda2d829557676569a0745ca3972fb1c47ef061a77"
+    },
+    {
+      "name": "BroccoliGIT focused",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "overlap": "Included in full desktop suite",
+      "log": "build/broccoligit-maturity-focused.log",
+      "logSha256": "1c15eeac0fbeecb5219dbd4d66fedb4f92dd44cf2c3dbda20cc1536723435bf8"
+    },
+    {
+      "name": "engine queue scheduler Git selection",
+      "status": "passed",
+      "passed": 63,
+      "failed": 0,
+      "log": "build/broccoligit-maturity-engine.log",
+      "logSha256": "8416090c6cb67984056c38a66e41c03756c03097764dfbc15f130a7922c54d39"
+    },
+    {
+      "name": "tool recovery",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "log": "build/broccoligit-maturity-recovery.log",
+      "logSha256": "1f60b9638932e19406916292900ecda69ca68bfa1cf80cd6d43185752bab6428"
+    },
+    {
+      "name": "native macOS suite",
+      "status": "passed",
+      "passed": 220,
+      "failed": 0,
+      "skipped": 0,
+      "log": "build/broccoligit-native-tests.log",
+      "logSha256": "b3e74ae0c089925e85fa6ffcd3e8d0518eb009625e3a7e61cceedb0c44c35f2e"
+    },
+    {
+      "name": "main and worker TypeScript checks",
+      "status": "passed",
+      "log": "build/broccoligit-maturity-types.log",
+      "logSha256": "56b10e479f7d84c093e9531026bd6cfaead852bb41f344a13717b8ae8950049d"
+    },
+    {
+      "name": "scoped lint",
+      "status": "passed",
+      "files": 21,
+      "log": "build/broccoligit-maturity-scoped-lint.log",
+      "logSha256": "a38b6455940c467eac47a9ab0ea7fa385d365d60403e10fe2598ddaea9340285"
+    },
+    {
+      "name": "full repository lint",
+      "status": "failed_unrelated",
+      "errors": 2,
+      "locations": [
+        "src/core/api/providers/__tests__/openrouter-native.test.ts:87",
+        "src/core/storage/StateManager.ts:2"
+      ],
+      "log": "build/broccoligit-maturity-full-lint.log",
+      "logSha256": "0632f9586e8fff0336d9be43d1cd1087d1823ae461ddba0e14f748f3f90ed1cc"
+    },
+    {
+      "name": "proto lint and handler/task lifecycle boundaries",
+      "status": "passed"
+    },
+    {
+      "name": "production build and macOS package",
+      "status": "passed",
+      "signature": "ad-hoc Hardened Runtime; deep strict verification passed",
+      "developerID": "not_performed",
+      "notarization": "not_performed",
+      "log": "build/broccoligit-macos-build.log",
+      "logSha256": "40418d3d60defe1b4a5d3ef2c246c7d2420ee39976ca01c7baced39bf84d00f3"
+    },
+    {
+      "name": "packaged Git protocol",
+      "status": "passed",
+      "requests": 6,
+      "durableShutdownReceipt": true,
+      "log": "build/broccoligit-git-package.log",
+      "logSha256": "64f46fa7a0285e726975ca087c2309d91147d69d80dcb90700bfe76e5a2ca211"
+    },
+    {
+      "name": "packaged reference journey and soak",
+      "status": "passed",
+      "cycles": 100,
+      "reopens": 20,
+      "sharedHelperIdentityAssertions": 9,
+      "replayedMutations": 0,
+      "artifact": "docs/desktop/broccoligit-maturity-packaged-soak.json"
+    },
+    {
+      "name": "regression soak",
+      "status": "passed",
+      "cycles": 100,
+      "reopens": 20,
+      "changedPaths": [
+        24000,
+        48000
+      ],
+      "artifact": "docs/desktop/broccoligit-maturity-regression-soak.json"
+    },
+    {
+      "name": "large repository and bounded degradation",
+      "status": "passed",
+      "trackedFixtureFiles": 52001,
+      "repeatedEdits": 300,
+      "additionalKnownTargets": 1024,
+      "additionalCapturedTargets": 96,
+      "additionalDeclinedTargets": 928,
+      "cancellationCycles": 20,
+      "artifact": "docs/desktop/broccoligit-maturity-benchmarks.json"
+    },
+    {
+      "name": "native Run Details navigation and copy",
+      "status": "passed",
+      "providerExecution": false,
+      "visualVerification": [
+        "wide and narrow screenshots",
+        "full accessibility text"
+      ],
+      "fixture": "build/desktop-run-insights-1791003393328",
+      "normalQuit": {
+        "code": 0,
+        "signal": null
+      },
+      "reconciledReservationBytes": 4096,
+      "note": "Copy and navigation reviewed before the final focus-only closing guard; final package covered by the complete native suite and four-workspace fixture."
+    },
+    {
+      "name": "native four-workspace idle and close",
+      "status": "passed",
+      "windows": 4,
+      "workers": 4,
+      "samples": 5,
+      "samplingSeconds": 60.05402995800001,
+      "remainingWorkers": 0,
+      "exitCode": 0,
+      "retainedReservationBytesPerWorkspace": 4096,
+      "artifact": "docs/desktop/broccoligit-maturity-native-idle.json"
+    },
+    {
+      "name": "subsystem manifest",
+      "status": "passed",
+      "entries": 20,
+      "classifications": {
+        "active": 15,
+        "partial": 2,
+        "legacy": 1,
+        "compatibility": 2,
+        "orphaned": 0,
+        "unknown": 0
+      }
+    },
+    {
+      "name": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "failedAttempts": [
+    {
+      "scope": "native suite during package replacement",
+      "failedAssertions": 3,
+      "failedTests": 2,
+      "resolution": "Unchanged serialized rerun passed; overlap is suspected rather than proven cause",
+      "log": "build/broccoligit-maturity-native-overlap-failed.log"
+    },
+    {
+      "scope": "shutdown receipt regression before fix",
+      "failedTests": 1,
+      "resolution": "Skip post-cancellation snapshot while closing",
+      "log": "build/broccoligit-maturity-close-regression-before.log"
+    },
+    {
+      "scope": "closing-window focus regression before fix",
+      "failedTests": 1,
+      "resolution": "Skip focus-triggered snapshot while closing",
+      "log": "build/broccoligit-maturity-close-focus-before.log"
+    },
+    {
+      "scope": "native wording harness",
+      "resolution": "Probe preview is 240 characters; full accessibility text verified separately; final navigation fixture passed"
+    },
+    {
+      "scope": "initial sandbox-denied host operations",
+      "resolution": "Rerun with authorized host access"
+    },
+    {
+      "scope": "optional standalone CLI memory sample",
+      "resolution": "CLI exited before sampling; fixture records unavailable and continues native measurement. No standalone memory comparison claimed."
+    }
+  ],
+  "limits": [
+    "Post-GC heap increase of approximately 5.8 MB remains unattributed in single-process factory-reopen fixture",
+    "No universal memory safety, all-workload performance, or multi-hour idle guarantee",
+    "Raw working-file byte counters exclude native Git and CAS internal I/O; timing includes validation",
+    "Shared kernel archive consumers are outside proven aggregate physical disk bounds",
+    "No live provider execution, Developer ID signing, notarization, or Linux application work",
+    "No automatic relocation, rebind, mutation replay, or new garbage collector"
+  ],
+  "report": "docs/desktop/RUNTIME-MATURITY.md",
+  "status": "implemented_and_verified_with_documented_limits_and_two_unrelated_lint_errors",
+  "artifacts": {
+    "docs/desktop/broccoligit-maturity-native-idle.json": "24d2442443a1486b24ae9eda05298c5046354a10125cc7bd516756227472f16c",
+    "docs/desktop/broccoligit-maturity-packaged-soak.json": "c27e3869e2ee178621b6f7b4e4682ba16cd555e078115525cd80a4c468405e60",
+    "docs/desktop/broccoligit-maturity-regression-soak.json": "4a817ae77ac6d497005c3ae9abd87ab33481b445c1e1b54a2763abec93b99847",
+    "docs/desktop/broccoligit-maturity-benchmarks.json": "ed57e64f009f100e88971e42402abae9f950d0a15e107dd1f3eec50bfcd8b550",
+    "docs/desktop/runtime-subsystems.json": "5cac72a95efc1b87c273fc0afab23be42da57e96612f10e3b3fd1bf49b8e46b9"
+  }
+}

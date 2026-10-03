@@ -1,0 +1,502 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T06:05:12.821655+00:00",
+  "status": "verified_with_documented_limits",
+  "report": "RUNTIME-THROUGHPUT.md",
+  "scope": "Current deep runtime pass; earlier v0.1/maturity changes were already present and remain uncommitted. No total unique-test count is inferred by adding suites/fixtures.",
+  "baseline": {
+    "sourceBase": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+    "workingTreeAlreadyModified": true,
+    "preservedBundle": "build/runtime-throughput-before.mjs",
+    "bundleSha256": "bdb1da71dd4fb461ee12a0d8bbd4273379657d21c84ce4ccfbbc634d33a72591",
+    "desktopPassed": 448,
+    "desktopSkipped": 1
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "machine": "MacBookPro18,1 / Apple M1 Pro",
+    "ramBytes": 17179869184,
+    "macOS": "26.5.1 / 25F80",
+    "darwin": "25.5.0",
+    "git": "2.48.1",
+    "packagedNode": "22.22.0",
+    "sourceTestHostNode": "26.8.1",
+    "skillTimingInterpreter": "Not separately recorded in raw skill samples; source fixture on this Mac. No interpreter-specific timing claim."
+  },
+  "package": {
+    "path": "build/HEAV3NS-CODE.app",
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "ddb9bb111f5c45a8f0ad5bd0cfdbbb4ba50e0ca1b72d7aac24df480d3de81bff",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "dbb20045886ca3f33b4655020f04d89bf87e1bfb7d662fe53e8cd5705418f00f"
+    },
+    "signature": "ad-hoc Hardened Runtime",
+    "developerIdVerified": false,
+    "notarizationVerified": false
+  },
+  "sourceAndFixtureHashes": {
+    "src/agents/extensions/execution/agent-engine.ts": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2",
+    "src/agents/extensions/execution/workspace-verification.ts": "8feb51745e27fd79e83b163b4be55351bee6b98e906f30e3d29f89fae39890db",
+    "src/core/context/instructions/user-instructions/skillRuntime.ts": "76bb51f3364ad1258ac0648735a2b4464d8dcdd55d3cfa0203f3aa7e06fea70e",
+    "src/core/context/instructions/user-instructions/skills.ts": "9d58e5c291d7b54743e8a1e5398e3623e7d788e067a7b518520e7a21e6fd5d5c",
+    "src/core/utilities/bounded-file-read.ts": "6e7ce9982bcab6e9b578a3d26ab864351a9300bf6169aadc757c533c80ec56a7",
+    "src/core/contracts/tooling.contracts.ts": "aac63a943a07a2e3ec2ffb11672038b3186745c9f5bda5a3629a13a4586e5c4d",
+    "src/desktop/recorded-output.ts": "6e22ebb1e36ada78b3f20ee9732e793eaec2e634ca444fb7e249b88e02e0ed00",
+    "src/tooling/extensions/execution/tool-execution-scheduler.ts": "ec6bdc639d93014f21fe730cce90a3f94cab1eb96d0605e963b992ed5f182d47",
+    "src/tooling/extensions/execution/tool-output-governor.ts": "bebb9e33201ba448a9b923893603a2e0186d2d8607b97599d7372ebe4a98be52",
+    "src/tooling/extensions/registry/tool-registry.ts": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f",
+    "src/desktop/broccoligit/service.ts": "807709a18f76963f689e7b96f20ce0f59905349734e56cfbf07a60d679107571",
+    "src/desktop/broccoligit/operation-scope.ts": "236e4d1320a074434e1f98012fec3327f3ee56c8f11dbbdcb33e7493fe99651f",
+    "src/desktop/__tests__/skill-throughput.test.ts": "7b91845e46bfba909cc50cae8d03a91492fd44b232d9e90a01e843514a818567",
+    "src/desktop/__tests__/tool-output-bounds.test.ts": "85962a42265fcefd8f721569492cba43f5c016348ec21188af09b8731416bad6",
+    "src/desktop/__tests__/broccoligit-operation-scope.test.ts": "790b6a25fe0ebe3c822ccb2c7b1fc2690a85af27b4d3c8c25f1445b33a2249fb",
+    "src/desktop/__tests__/blob-storage.test.ts": "b1f02bc01f7724e0a8f6314504204142275f1d9271a73721aed5244d29873f11",
+    "src/desktop/__tests__/joyride-runtime.test.ts": "67bc72efd6e67e8b359a9541dab736257f92f06d0cee7d82dc78483f50cdae79",
+    "scripts/benchmark-runtime-cancellation.ts": "8aa031d2a5adea7865ca4beb8a40e4418a6d44f04414576ac77063b8d417ad90",
+    "scripts/benchmark-runtime-skills.ts": "59215ab0eae4b00bd8e3d12b8e421d2ce4cebf8e488665e81c929a073ed75406",
+    "scripts/verify-runtime-interruption.ts": "b98dbb90174fddf1bedd18a2f195d995f73caae12fd4eab3a50ce545aee67a19",
+    "scripts/benchmark-broccoligit-maturity.ts": "ec3283256e41d539f9f1124a997732d50f4859c7d25f130f32d1e9afc40a239b",
+    "scripts/benchmark-runtime-parent.mjs": "ac93cd09199ffa3dcb3dcb5b3501c5fc5456b01e3283b6df69c8d583e3c50065",
+    "scripts/diagnose-runtime-ownership.mjs": "95c654a72db4f082d468fdebe9e358ed6d2019f7530fefb683d92388cfb3a4b9",
+    "scripts/runtime-subsystems.mjs": "e9970bb021ad977a80c72260093e53c15cb6619218a9ad2fe4a54b3eb40a83b0"
+  },
+  "manifestSha256": "10a06ca2e921dda4aed7dfc9c1a756f43895f7a4508194a2bfe7fdb81a121c9a",
+  "checks": [
+    {
+      "name": "full-desktop",
+      "reproduce": "npm run desktop:test",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-desktop.log",
+        "bytes": 42998,
+        "sha256": "8a9c06016c0ad62768fd1c67dc30bf937f156178e2d9a2fe0951dbe4a8940c63"
+      },
+      "passed": 459,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Existing Linux-only platform test on macOS"
+    },
+    {
+      "name": "native-macos",
+      "reproduce": "npm run desktop:test:native",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-native.log",
+        "bytes": 64776,
+        "sha256": "5b7459a8b8fc3985bdbd434f958aff6ea51bdb1e8f0ac2d05bcfe2e79356a816"
+      },
+      "passed": 220,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "engine-scheduler-recovery-skills",
+      "reproduce": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json node --import tsx --import ./src/test/register-vscode-mock.mjs node_modules/mocha/bin/mocha.js --no-config --require ./src/test/requires.cjs --timeout 30000 --exit src/agents/extensions/execution/__tests__/workspaceVerification.test.ts src/agents/extensions/execution/__tests__/agentEngineAutonomy.test.ts src/agents/extensions/execution/__tests__/broccoliRuntimeQueue.test.ts src/tooling/extensions/execution/__tests__/toolExecutionScheduler.test.ts src/tooling/extensions/execution/__tests__/toolResilienceSupervisor.test.ts src/core/context/instructions/user-instructions/__tests__/skills.test.ts",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-engine-skills.log",
+        "bytes": 8750,
+        "sha256": "bfeca849693c6ae748c047013151f40b18305fd3bec86edd3c5bdc34b08485bf"
+      },
+      "passed": 100,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "typescript-main",
+      "reproduce": "npx tsc --noEmit --incremental",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "typescript-worker",
+      "reproduce": "npx tsc --noEmit -p tsconfig.worker.json",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-worker-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "scoped-lint",
+      "reproduce": "npx biome lint --diagnostic-level=error src/agents/extensions/execution/agent-engine.ts src/agents/extensions/execution/workspace-verification.ts src/core/context/instructions/user-instructions/skillRuntime.ts src/core/context/instructions/user-instructions/skills.ts src/core/utilities/bounded-file-read.ts src/core/contracts/tooling.contracts.ts src/desktop/recorded-output.ts src/tooling/extensions/execution/tool-execution-scheduler.ts src/tooling/extensions/execution/tool-output-governor.ts src/tooling/extensions/registry/tool-registry.ts src/desktop/broccoligit/service.ts src/desktop/broccoligit/operation-scope.ts src/desktop/__tests__/skill-throughput.test.ts src/desktop/__tests__/tool-output-bounds.test.ts src/desktop/__tests__/broccoligit-operation-scope.test.ts src/desktop/__tests__/blob-storage.test.ts src/desktop/__tests__/joyride-runtime.test.ts scripts/benchmark-runtime-cancellation.ts scripts/benchmark-runtime-skills.ts scripts/verify-runtime-interruption.ts scripts/benchmark-broccoligit-maturity.ts scripts/benchmark-runtime-parent.mjs scripts/diagnose-runtime-ownership.mjs scripts/runtime-subsystems.mjs",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-lint.log",
+        "bytes": 45,
+        "sha256": "1548666311731be71cb8815ab9ed5683f49343d31801cbaa645518916b06e5de"
+      },
+      "files": 24
+    },
+    {
+      "name": "repository-biome",
+      "reproduce": "npx biome lint --diagnostic-level=error",
+      "status": "failed_pre_existing",
+      "log": {
+        "path": "build/runtime-throughput-repo-lint.log",
+        "bytes": 2153,
+        "sha256": "a3edbb5de265faaacf5d31d18890b87693213eab6830c3320e22a3d3d79689ee"
+      },
+      "files": 2765,
+      "errors": 2,
+      "findings": [
+        {
+          "file": "src/core/api/providers/__tests__/openrouter-native.test.ts",
+          "line": 87,
+          "rule": "noUnsafeOptionalChaining"
+        },
+        {
+          "file": "src/core/storage/StateManager.ts",
+          "line": 2,
+          "rule": "noUnusedImports"
+        }
+      ]
+    },
+    {
+      "name": "production-macos-package",
+      "reproduce": "npm run desktop:build:macos",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-package-build.log",
+        "bytes": 980,
+        "sha256": "c767a3931e1fe4fa50e81cb63fc66e5a511f3ae50507b8146f48f0346300a943"
+      },
+      "signature": "ad-hoc Hardened Runtime"
+    },
+    {
+      "name": "package-signature",
+      "reproduce": "codesign --verify --deep --strict build/HEAV3NS-CODE.app",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-signature.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "subsystem-manifest",
+      "reproduce": "node scripts/runtime-subsystems.mjs --check",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-manifest.log",
+        "bytes": 52,
+        "sha256": "374a62b3840f78d7976b2ea117cd9cd694fc13b2740b807f4c0defd2299dd126"
+      },
+      "entries": 22
+    },
+    {
+      "name": "diff-whitespace",
+      "reproduce": "git diff --check",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-diff-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "packaged-reference-journey",
+      "reproduce": "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node scripts/verify-broccoligit-package.mjs build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-broccoli-package.log",
+        "bytes": 1875,
+        "sha256": "2da0e0293ed135d80dbf2aef866698d35336902a386fdce951b7efc512f3177d"
+      },
+      "evidence": "runtime-packaged-journey.json"
+    },
+    {
+      "name": "packaged-git-protocol",
+      "reproduce": "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node scripts/verify-git-package.mjs build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-git-package.log",
+        "bytes": 202,
+        "sha256": "64f46fa7a0285e726975ca087c2309d91147d69d80dcb90700bfe76e5a2ca211"
+      },
+      "requests": 6,
+      "maxFrameBytes": 196364
+    },
+    {
+      "name": "interruption-and-reopen",
+      "reproduce": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json build/HEAV3NS-CODE.app/Contents/Resources/runtime/node --import tsx --import ./src/test/register-vscode-mock.mjs scripts/verify-runtime-interruption.ts",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-interruption.log",
+        "bytes": 13,
+        "sha256": "1ec149739a7bc468e018eaaa0e50e5303183450c3540c74c3619bc10b2e4a835"
+      },
+      "passed": 8,
+      "failed": 0,
+      "evidence": "runtime-interruption-verification.json",
+      "scope": "Production source runtime in actual SIGKILL/reopen processes with deterministic barriers; no provider or GUI kill"
+    },
+    {
+      "name": "cancellation",
+      "reproduce": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json build/HEAV3NS-CODE.app/Contents/Resources/runtime/node --import tsx --import ./src/test/register-vscode-mock.mjs scripts/benchmark-runtime-cancellation.ts",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-cancellation.log",
+        "bytes": 23,
+        "sha256": "567e5b99fa88fdd320517d0c6ac31d1043630488ef51afb1dd8f72c34994f9c3"
+      },
+      "gitCases": 20,
+      "skillCases": 20,
+      "evidence": "runtime-cancellation-benchmarks.json"
+    },
+    {
+      "name": "ownership-soak",
+      "reproduce": "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node --expose-gc scripts/diagnose-runtime-ownership.mjs build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js docs/desktop/runtime-ownership-after.json --verify",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-ownership-final.log",
+        "bytes": 304,
+        "sha256": "f3d5e74fff9723ea280015f469417cb8e380ea06ea725b44986a089499ffa3a8"
+      },
+      "tasks": 300,
+      "reopens": 60,
+      "workspaces": 3,
+      "closedOwnersRemaining": 0,
+      "evidence": "runtime-ownership-after.json"
+    },
+    {
+      "name": "git-scaling-and-admission",
+      "reproduce": "TSX_TSCONFIG_PATH=./tsconfig.unit-test.json build/HEAV3NS-CODE.app/Contents/Resources/runtime/node --import tsx --import ./src/test/register-vscode-mock.mjs scripts/benchmark-broccoligit-maturity.ts build/runtime-throughput-before.mjs build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js docs/desktop/runtime-broccoligit-stress.json",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-broccoligit-stress.log",
+        "bytes": 5519,
+        "sha256": "b9e1fe7b45540fbcf908c9f17d98d7df0a39278dcad2f10fb8407d8fad7e782d"
+      },
+      "changedPaths": 52001,
+      "edits": 300,
+      "knownTargets": 1024,
+      "cancellations": 20,
+      "evidence": "runtime-broccoligit-stress.json"
+    },
+    {
+      "name": "native-workspace-idle-and-close",
+      "reproduce": "node scripts/benchmark-desktop.mjs --review",
+      "status": "passed",
+      "log": {
+        "path": "build/runtime-throughput-native-idle.log",
+        "bytes": 9880,
+        "sha256": "32dee41857c0801f65b2841281a392524929aa405a85141d5c4345abd0fd8b7e"
+      },
+      "windows": 4,
+      "idleSeconds": 60,
+      "workersAfterNormalQuit": 0,
+      "evidence": "runtime-throughput-native-idle.json"
+    }
+  ],
+  "measurements": {
+    "parent": {
+      "before": {
+        "coldFirstProviderMs": 473.31095900000014,
+        "warmCount": 11,
+        "warm": {
+          "firstProvider": {
+            "p50Ms": 368.2160840000006,
+            "p95Ms": 390.92045899999994
+          },
+          "firstTool": {
+            "p50Ms": 368.6750840000004,
+            "p95Ms": 391.390625
+          },
+          "queueAdmission": {
+            "p50Ms": 11.98666699999967,
+            "p95Ms": 17.85387499999979
+          },
+          "verificationWait": {
+            "p50Ms": 330.07387500000004,
+            "p95Ms": 352.64850000000024
+          },
+          "totalTurn": {
+            "p50Ms": 713.2950000000001,
+            "p95Ms": 798.1696249999995
+          }
+        },
+        "largeOutputRetainedResultBytes": 16001463
+      },
+      "after": {
+        "coldFirstProviderMs": 271.7215410000001,
+        "warmCount": 11,
+        "warm": {
+          "firstProvider": {
+            "p50Ms": 202.04762500000015,
+            "p95Ms": 213.88633300000015
+          },
+          "firstTool": {
+            "p50Ms": 202.393916,
+            "p95Ms": 214.59691700000008
+          },
+          "queueAdmission": {
+            "p50Ms": 11.777250000000095,
+            "p95Ms": 15.794084000000112
+          },
+          "verificationWait": {
+            "p50Ms": 170.16508299999987,
+            "p95Ms": 174.85329099999944
+          },
+          "totalTurn": {
+            "p50Ms": 402.3934999999997,
+            "p95Ms": 420.43695800000023
+          }
+        },
+        "largeOutputRetainedResultBytes": 3166
+      }
+    },
+    "skillDiscoveryBytes": {
+      "before": 17284416,
+      "after": 262144,
+      "catalogModelBytesBeforeAndAfter": 5928,
+      "fullInstructionBytesBeforeAndAfter": 269999,
+      "concurrentConsumers": 8,
+      "fullReadsPerActivationGroupBeforeAndAfter": 1
+    },
+    "memory": {
+      "baselineClosedEvidenceAndKernelOwnersAt300": {
+        "evidence": 60,
+        "kernel": 60
+      },
+      "afterClosedOwnersAtEveryClose": 0,
+      "closedHeapBytesAt100": 66340512,
+      "closedHeapBytesAt300": 66736088,
+      "residualHeapGrowthBytes100To300": 395576,
+      "residualFullyAttributed": false,
+      "ownershipSoakPeakReservationBytes": 16261280,
+      "stressPeakReservationBytes": 16746440,
+      "nativeReservationLimitBytes": 16777216,
+      "stressGitChildPeakBytes": 39813120
+    },
+    "interruption": {
+      "cases": 8,
+      "replayedMutatingRegistryCalls": 0
+    },
+    "nativeTransportBurst": {
+      "events": 100000,
+      "rssHighWaterAtInitial50000And100000Bytes": [
+        217104384,
+        217104384,
+        217104384
+      ]
+    }
+  },
+  "rawEvidence": [
+    {
+      "path": "runtime-parent-before.json",
+      "bytes": 25827,
+      "sha256": "0109347ab1f6558f8d04592ae9c08f06559e4c1de69b7e565f99deecdd1f02c8"
+    },
+    {
+      "path": "runtime-parent-after.json",
+      "bytes": 24764,
+      "sha256": "15e4c3dfa804587fbe262a189ee660ef1b8fae05b2a00e0211cabe1616862d8c"
+    },
+    {
+      "path": "runtime-skills-before.json",
+      "bytes": 1932,
+      "sha256": "ce0f951f19cae96211655e1758bc7dc3e6f483f9ea42f481a09ab2164df1ba2f"
+    },
+    {
+      "path": "runtime-skills-after.json",
+      "bytes": 1889,
+      "sha256": "eebb2a9c9f2519bd65cc7f40895ce670a475636e8cf404e210d83b52ac7ca8bc"
+    },
+    {
+      "path": "runtime-ownership-before.json",
+      "bytes": 512475,
+      "sha256": "9095d63ebc4eb7d2d1c5fafdcdb423a38d213c2aee29474589bb0aa0138288ed"
+    },
+    {
+      "path": "runtime-ownership-after.json",
+      "bytes": 514179,
+      "sha256": "cadfd2a02be9266037bacf68aa46042d8809dd3347b32ae17fee01f9f413b01b"
+    },
+    {
+      "path": "runtime-retainer-paths.json",
+      "bytes": 3151,
+      "sha256": "cd16e3bf9124004abf0854e04e0603db6c3ec126f4ae154dfcfae24afd26a3d8"
+    },
+    {
+      "path": "runtime-diagnostic-control.json",
+      "bytes": 127,
+      "sha256": "70ca3bea27b87e152e0eb331e70ee587f33cd16b82ed5d2146d6b5d48f50f14c"
+    },
+    {
+      "path": "runtime-broccoligit-stress.json",
+      "bytes": 66051,
+      "sha256": "708ce29d6e8e7d7d3ac390a61e980d61ace99b705aa779cfd4fcc8b489026aad"
+    },
+    {
+      "path": "runtime-cancellation-benchmarks.json",
+      "bytes": 5327,
+      "sha256": "7c5fcc275a32b643e81c0a9eeee9eaab2e32ea3f2cab4de0b544b77fc5469f78"
+    },
+    {
+      "path": "runtime-interruption-verification.json",
+      "bytes": 3029,
+      "sha256": "b6bc2e5ca356fc548cc9d9c87ef2ef79ae89963097dd6fa8ee4f20eae19f020e"
+    },
+    {
+      "path": "runtime-packaged-journey.json",
+      "bytes": 2488,
+      "sha256": "126554c88be65950985913b8b515cf0a3b4073c8e278db5f6f65260c1e360974"
+    },
+    {
+      "path": "runtime-throughput-native-idle.json",
+      "bytes": 9921,
+      "sha256": "3d4206bfa12323c913df7d5eba7e2ece563c87dcc571eb17fd6addadd783ec8a"
+    }
+  ],
+  "reproducersResolved": [
+    "Last skill discovery consumer cancelled but work could publish late metadata",
+    "Parent spill IDs referenced a different store than retrieval",
+    "Long lines and large structured results escaped useful output bounds",
+    "Closed evidence/kernel owners retained through settled composite signal reason stack",
+    "Intermediate structured JSON cap broke existing bounded Git envelope; final 256 KiB shape-preserving path passes regression"
+  ],
+  "notRun": [
+    {
+      "name": "Developer ID signing and notarization",
+      "reason": "Development package uses ad-hoc signing"
+    },
+    {
+      "name": "Live model/network throughput",
+      "reason": "Deterministic provider isolates runtime critical path without inference variability or spend"
+    },
+    {
+      "name": "Linux release",
+      "reason": "macOS-only product scope"
+    },
+    {
+      "name": "Overnight GUI soak",
+      "reason": "Recorded GUI idle fixture is 60 seconds; extended task/close soak is packaged runtime without GUI"
+    }
+  ],
+  "remainingUncertainty": [
+    "395576 post-warm-up heap bytes are not fully attributed despite all probed closed owners collecting",
+    "300-edit Git resume p50 is about 7 percent slower in a shared-host run; no causal speedup/regression attribution",
+    "BroccoliGIT reservation is not all process memory; native Git/shared storage/Swift/producer allocations remain distinct",
+    "Structured serialization is bounded for ordinary tool values, not hostile getters/custom toJSON execution",
+    "Huge installed-skill catalog enumeration and total multi-round transcript compaction are not redesigned",
+    "Fixture-only allocation sampling and RSS high-water observations do not prove universal memory safety"
+  ],
+  "rejectedIdeas": [
+    "More scheduler workers",
+    "Persistent whole-workspace index",
+    "Lossy required skill summaries",
+    "Unlimited spill archive",
+    "Authoritative completion before durability",
+    "Mutation retries after uncertain outcome",
+    "Larger 16 MiB admission limit",
+    "Runtime upgrade instead of fixing local ownership",
+    "New global state machine/process/transport architecture without a measured blocker"
+  ]
+}

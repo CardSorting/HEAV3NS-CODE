@@ -148,7 +148,7 @@ export class BroccoliCASStorageService {
 		return this.operation(async () => {
 			const hash = BroccoliCASStorageService.computeSha256(raw)
 			const file = (await this.blobPath(hash, true))!
-			if (await this.readInternal(hash)) {
+			if (await this.readInternal(hash, raw.length)) {
 				// A newly published reference must survive a concurrent, age-based sweep.
 				await fs.utimes(file, new Date(), new Date())
 				const handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -166,16 +166,17 @@ export class BroccoliCASStorageService {
 				if (packed.length <= raw.length * 0.9) payload = Buffer.concat([MAGIC_BROTLI, packed])
 			}
 			await this.publish(file, payload)
-			if (!(await this.readInternal(hash))) throw new Error("BLOB_MISSING: content disappeared during publication")
+			if (!(await this.readInternal(hash, raw.length))) throw new Error("BLOB_MISSING: content disappeared during publication")
 			return hash
 		}).finally(() => {
 			this.admittedBytes -= size
 		})
 	}
-	async read(hash: string): Promise<Buffer | null> {
-		return this.operation(() => this.readInternal(hash))
+	async read(hash: string, maxBytes = CAS_MAX_BYTES): Promise<Buffer | null> {
+		if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > CAS_MAX_BYTES) throw new Error("BLOB_LIMIT: invalid read budget")
+		return this.operation(() => this.readInternal(hash, maxBytes))
 	}
-	private async readInternal(hash: string): Promise<Buffer | null> {
+	private async readInternal(hash: string, maxBytes = CAS_MAX_BYTES): Promise<Buffer | null> {
 		const file = await this.blobPath(hash)
 		if (!file) return null
 		let handle: Awaited<ReturnType<typeof fs.open>>
@@ -189,8 +190,8 @@ export class BroccoliCASStorageService {
 		try {
 			const before = await handle.stat()
 			if (!before.isFile()) throw new Error("STORE_ISOLATION: a blob must be a regular file")
-			if (before.size > CAS_MAX_BYTES + MAGIC_RAW.length)
-				throw new Error("BLOB_LIMIT: stored content exceeds the 64 MiB read limit")
+			if (before.size > maxBytes + MAGIC_RAW.length)
+				throw new Error("BLOB_LIMIT: stored content exceeds the caller's read limit")
 			const buffer = Buffer.alloc(before.size + 1)
 			let length = 0
 			while (length < buffer.length) {
@@ -211,13 +212,15 @@ export class BroccoliCASStorageService {
 		let raw: Buffer
 		try {
 			// Legacy raw content may itself start with either magic prefix.
-			if (BroccoliCASStorageService.computeSha256(stored) === hash) return stored
+			if (stored.length <= maxBytes && BroccoliCASStorageService.computeSha256(stored) === hash) return stored
 			if (stored.subarray(0, MAGIC_BROTLI.length).equals(MAGIC_BROTLI))
-				raw = await decompress(stored.subarray(MAGIC_BROTLI.length), { maxOutputLength: CAS_MAX_BYTES })
+				raw = await decompress(stored.subarray(MAGIC_BROTLI.length), { maxOutputLength: Math.max(1, maxBytes) })
 			else if (stored.subarray(0, MAGIC_RAW.length).equals(MAGIC_RAW)) raw = stored.subarray(MAGIC_RAW.length)
 			else throw new Error("Unknown blob encoding or damaged raw content")
+			if (raw.length > maxBytes) throw Object.assign(new Error("BLOB_LIMIT: decoded content exceeds the caller's read limit"), { code: "ERR_BUFFER_TOO_LARGE" })
 			if (BroccoliCASStorageService.computeSha256(raw) !== hash) throw new Error("SHA-256 mismatch")
 		} catch (cause) {
+			if (maxBytes < CAS_MAX_BYTES && (cause as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") throw new Error("BLOB_LIMIT: decoded content exceeds the caller's read limit")
 			// Preserve captured evidence and the original. Inspection must not delete or
 			// silently replace damaged content, including when evidence publication fails.
 			try {

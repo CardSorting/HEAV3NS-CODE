@@ -19,7 +19,7 @@ type SkillsCacheEntry = {
 }
 
 const skillsCache = new Map<string, SkillsCacheEntry>()
-type PendingDiscovery = { promise: Promise<SkillMetadata[]>; refresh: boolean; waiters: number }
+type PendingDiscovery = { promise: Promise<SkillMetadata[]>; refresh: boolean; waiters: number; controller: AbortController; key: string; settled: boolean }
 const pendingDiscovery = new Map<string, PendingDiscovery>()
 const scans = new BoundedSingleFlight<SkillMetadata[]>("Skill discovery", {
 	maxActive: MAX_DISCOVERY_SCANS,
@@ -75,6 +75,10 @@ async function waitForDiscovery(entry: PendingDiscovery, signal?: AbortSignal, s
 	} finally {
 		entry.waiters--
 		discoveryWaiters--
+		if (!entry.waiters && !entry.settled) {
+			if (pendingDiscovery.get(entry.key) === entry) pendingDiscovery.delete(entry.key)
+			entry.controller.abort(signal?.reason ?? new DOMException("Skill discovery has no remaining consumers", "AbortError"))
+		}
 	}
 }
 
@@ -126,11 +130,12 @@ export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false,
 
 	if (discoveryWaiters >= MAX_DISCOVERY_WAITERS || scans.getStats().activeOperations >= MAX_DISCOVERY_SCANS)
 		rejectDiscoveryCapacity()
-	const entry: PendingDiscovery = { promise: Promise.resolve([] as SkillMetadata[]), refresh: forceRefresh, waiters: 0 }
+	const entry: PendingDiscovery = { promise: Promise.resolve([] as SkillMetadata[]), refresh: forceRefresh, waiters: 0,
+		controller: new AbortController(), key, settled: false }
 	// Identity, rather than completion order, owns publication. Invalidated scans
 	// may finish for their original caller but cannot overwrite a newer catalog.
 	entry.promise = scans
-		.run(randomUUID(), (scanSignal) => skillDiscoveryRuntime.discover(cwd, true, scanSignal))
+		.run(randomUUID(), (scanSignal) => skillDiscoveryRuntime.discover(cwd, true, scanSignal), entry.controller.signal)
 		.then((skills) => {
 			const resolved = copySkills(getAvailableSkills(skills))
 			if (pendingDiscovery.get(key) === entry) {
@@ -141,6 +146,7 @@ export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false,
 			return resolved
 		})
 		.finally(() => {
+			entry.settled = true
 			if (pendingDiscovery.get(key) === entry) pendingDiscovery.delete(key)
 		})
 	pendingDiscovery.set(key, entry)

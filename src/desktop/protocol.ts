@@ -59,6 +59,7 @@ export const requestSchema = z
 			"files.read",
 			"changes.read",
 			"changes.list",
+			"broccoligit.read",
 			"repository.initialize",
 			"input.select",
 			"shutdown",

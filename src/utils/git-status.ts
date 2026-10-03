@@ -23,7 +23,7 @@ export class GitStatusReader {
 	private total = 0
 	private branch = ""
 	private head: string | null = null
-	constructor(private readonly prefix: string) {}
+	constructor(private readonly prefix: string, private readonly limits = { entries: 500, bytes: 128 * 1024 }) {}
 	write(chunk: Buffer) {
 		const input = this.pending.length ? Buffer.concat([this.pending, chunk]) : chunk
 		let start = 0
@@ -78,12 +78,12 @@ export class GitStatusReader {
 		this.total++
 		const size = Buffer.byteLength(JSON.stringify(entry)) + 1
 		if (entry.conflicted) {
-			while (this.normal.length && (this.normal.length + this.conflicts.length >= 500 || this.bytes + size > 128 * 1024)) {
+			while (this.normal.length && (this.normal.length + this.conflicts.length >= this.limits.entries || this.bytes + size > this.limits.bytes)) {
 				this.bytes -= Buffer.byteLength(JSON.stringify(this.normal.pop())) + 1
 				this.limited = true
 			}
 		}
-		if (this.normal.length + this.conflicts.length >= 500 || this.bytes + size > 128 * 1024) {
+		if (this.normal.length + this.conflicts.length >= this.limits.entries || this.bytes + size > this.limits.bytes) {
 			this.limited = true
 			return
 		}
@@ -106,8 +106,8 @@ export class GitStatusReader {
 	}
 }
 
-export async function readGitStatus(context: GitInspectionContext) {
-	const reader = new GitStatusReader(context.prefix)
+export async function readGitStatus(context: GitInspectionContext, options?: { paths?: readonly string[]; entries: number; bytes: number; noRenames?: boolean }) {
+	const reader = new GitStatusReader(context.prefix, options)
 	try {
 		await context.run(
 			[
@@ -118,8 +118,9 @@ export async function readGitStatus(context: GitInspectionContext) {
 				"-z",
 				"--untracked-files=all",
 				"--ignore-submodules=dirty",
+				...(options?.noRenames ? ["--no-renames"] : []),
 				"--",
-				".",
+				...(options?.paths?.length ? options.paths.map(file => `:(literal)${file}`) : ["."]),
 				":(exclude).broccolidb",
 			],
 			16 * 1024 * 1024,

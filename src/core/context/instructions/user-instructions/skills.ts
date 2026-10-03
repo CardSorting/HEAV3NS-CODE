@@ -20,7 +20,7 @@ import { parseYamlFrontmatter } from "./frontmatter"
 import { ROADMAP_SKILL_EXECUTION_DIGEST } from "./roadmapSkillDigest"
 import { SKILL_OPERATION_TIMEOUT_MS } from "./skillOperation"
 
-const pendingSkillContent = new BoundedSingleFlight<string>("Skill loading", {
+const pendingSkillContent = new BoundedSingleFlight<string | null>("Skill loading", {
 	maxActive: 16,
 	maxWaiters: 256,
 	maxWaitersPerKey: 64,
@@ -32,8 +32,8 @@ export const getSkillContentReadMetrics = () => pendingSkillContent.getStats()
 export const skillsRuntime = {
 	readdir: (dirPath: string) => fs.readdir(dirPath),
 	stat: (filePath: string) => fs.stat(filePath),
-	readFile: (filePath: string, encoding: BufferEncoding, signal?: AbortSignal) =>
-		readBoundedFile(filePath, MAX_SKILL_FILE_SIZE_BYTES, signal, { followSymlinks: true, encoding }),
+	readFile: (filePath: string, encoding: BufferEncoding, signal?: AbortSignal, prefixBytes?: number) =>
+		readBoundedFile(filePath, MAX_SKILL_FILE_SIZE_BYTES, signal, { followSymlinks: true, encoding, prefixBytes }),
 }
 
 const GOLDEN_CARTRIDGE_SKILL_DESCRIPTION =
@@ -194,8 +194,12 @@ async function loadSkillMetadataWithDiagnostic(
 		}
 
 		signal?.throwIfAborted()
-		const fileContent = await skillsRuntime.readFile(skillMdPath, "utf-8", signal)
-		const parseResult = parseYamlFrontmatter(fileContent)
+		// Discovery needs frontmatter, not every instruction body. Large headers
+		// fall back to the same bounded complete read; activation always validates
+		// the complete current file, including binary corruption in its body.
+		let parseResult = parseYamlFrontmatter(await skillsRuntime.readFile(skillMdPath, "utf-8", signal, 4096))
+		if (parseResult.parseError?.includes("Unclosed YAML"))
+			parseResult = parseYamlFrontmatter(await skillsRuntime.readFile(skillMdPath, "utf-8", signal))
 
 		if (parseResult.parseError) {
 			const isBinary = parseResult.parseError.includes("Binary or null-byte")
@@ -392,7 +396,11 @@ export async function getSkillContent(
 	const signal = options.signal
 	signal?.throwIfAborted()
 	const trimmedName = skillName.trim()
-	const skill = availableSkills.map(snapshotSkillMetadata).find((s) => s?.name.toLowerCase() === trimmedName.toLowerCase())
+	let skill: SkillMetadata | undefined
+	for (const candidate of availableSkills) {
+		const snapshot = snapshotSkillMetadata(candidate)
+		if (snapshot?.name.toLowerCase() === trimmedName.toLowerCase()) { skill = snapshot; break }
+	}
 	if (!skill) return null
 
 	const loadMode = options.mode ?? "digest"
@@ -406,35 +414,32 @@ export async function getSkillContent(
 	}
 
 	try {
-		const fileContent = await pendingSkillContent.run(
+		const instructions = await pendingSkillContent.run(
 			JSON.stringify([skill.path, skill.name, skill.source]),
 			async (signal) => {
 				const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
 				signal.throwIfAborted()
-				return skillsRuntime.readFile(readPath, "utf-8", signal)
+				const fileContent = await skillsRuntime.readFile(readPath, "utf-8", signal)
+				signal.throwIfAborted()
+				if (Buffer.byteLength(fileContent, "utf-8") > MAX_SKILL_FILE_SIZE_BYTES) {
+					Logger.warn(`Skill instructions exceed the 512KB limit for ${skill.name}`)
+					return null
+				}
+				const parsed = parseYamlFrontmatter(fileContent)
+				if (parsed.parseError || !parsed.body.trim()) {
+					Logger.warn(`Invalid skill instructions for ${skill.name}: ${parsed.parseError ?? "empty body"}`)
+					return null
+				}
+				return parsed.body.trim()
 			},
 			signal,
 		)
 		signal?.throwIfAborted()
-		if (fileContent.includes("\0")) {
-			Logger.warn(`Corrupt binary content detected when loading skill instructions for ${skill.name}`)
-			return null
-		}
-		// Catalog metadata can outlive the file it describes. Revalidate at the
-		// instruction boundary instead of injecting a corrupt or oversized edit.
-		if (Buffer.byteLength(fileContent, "utf-8") > MAX_SKILL_FILE_SIZE_BYTES) {
-			Logger.warn(`Skill instructions exceed the 512KB limit for ${skill.name}`)
-			return null
-		}
-		const parsed = parseYamlFrontmatter(fileContent)
-		if (parsed.parseError || !parsed.body.trim()) {
-			Logger.warn(`Invalid skill instructions for ${skill.name}: ${parsed.parseError ?? "empty body"}`)
-			return null
-		}
+		if (instructions === null) return null
 
 		return {
 			...skill,
-			instructions: parsed.body.trim(),
+			instructions,
 		}
 	} catch (error) {
 		signal?.throwIfAborted()

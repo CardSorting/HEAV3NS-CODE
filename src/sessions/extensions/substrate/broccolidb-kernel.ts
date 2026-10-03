@@ -276,8 +276,8 @@ export class BroccoliDatabaseKernel implements IBroccoliDatabaseKernel {
   /**
    * Reads raw decompressed content from CAS by hash.
    */
-  async readBlob(hash: string): Promise<Buffer | null> {
-    return this.cas.read(hash);
+  async readBlob(hash: string, maxBytes?: number): Promise<Buffer | null> {
+    return this.cas.read(hash, maxBytes);
   }
 
   async auditBlobs() { return this.cas.audit(); }

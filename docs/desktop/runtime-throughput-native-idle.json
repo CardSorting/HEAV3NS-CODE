@@ -1,0 +1,367 @@
+{
+  "build": "release; no debugger; ad-hoc Hardened Runtime",
+  "hardware": [
+    "MacBookPro18,1",
+    "17179869184",
+    "Apple M1 Pro"
+  ],
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+  "windows": 4,
+  "workers": 4,
+  "warmupSeconds": 5,
+  "samplingSeconds": 60.027981375,
+  "start": {
+    "sampledAt": 1791006571,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 14276,
+        "footprintBytes": 154141752,
+        "residentBytes": 95895552,
+        "userTicks": 69369718,
+        "systemTicks": 6978223
+      },
+      {
+        "pid": 14661,
+        "footprintBytes": 143111056,
+        "residentBytes": 43859968,
+        "userTicks": 19329930,
+        "systemTicks": 1480697
+      },
+      {
+        "pid": 14760,
+        "footprintBytes": 143143944,
+        "residentBytes": 43876352,
+        "userTicks": 19688103,
+        "systemTicks": 1561824
+      },
+      {
+        "pid": 14844,
+        "footprintBytes": 145208256,
+        "residentBytes": 43925504,
+        "userTicks": 19883097,
+        "systemTicks": 1632380
+      },
+      {
+        "pid": 14950,
+        "footprintBytes": 136491896,
+        "residentBytes": 46776320,
+        "userTicks": 20185407,
+        "systemTicks": 1723745
+      }
+    ],
+    "aggregateFootprintBytes": 722096904
+  },
+  "end": {
+    "sampledAt": 1791006632,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 14276,
+        "footprintBytes": 153568288,
+        "residentBytes": 95240192,
+        "userTicks": 71692714,
+        "systemTicks": 7727660
+      },
+      {
+        "pid": 14661,
+        "footprintBytes": 112388320,
+        "residentBytes": 45465600,
+        "userTicks": 21725495,
+        "systemTicks": 2534098
+      },
+      {
+        "pid": 14760,
+        "footprintBytes": 111864272,
+        "residentBytes": 46940160,
+        "userTicks": 22148829,
+        "systemTicks": 2810042
+      },
+      {
+        "pid": 14844,
+        "footprintBytes": 113780864,
+        "residentBytes": 45989888,
+        "userTicks": 22271488,
+        "systemTicks": 2622230
+      },
+      {
+        "pid": 14950,
+        "footprintBytes": 111306856,
+        "residentBytes": 47382528,
+        "userTicks": 22526732,
+        "systemTicks": 2587396
+      }
+    ],
+    "aggregateFootprintBytes": 602908600
+  },
+  "observations": [
+    {
+      "sampledAt": 1791006571,
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "processes": [
+        {
+          "pid": 14276,
+          "footprintBytes": 154141752,
+          "residentBytes": 95895552,
+          "userTicks": 69369718,
+          "systemTicks": 6978223
+        },
+        {
+          "pid": 14661,
+          "footprintBytes": 143111056,
+          "residentBytes": 43859968,
+          "userTicks": 19329930,
+          "systemTicks": 1480697
+        },
+        {
+          "pid": 14760,
+          "footprintBytes": 143143944,
+          "residentBytes": 43876352,
+          "userTicks": 19688103,
+          "systemTicks": 1561824
+        },
+        {
+          "pid": 14844,
+          "footprintBytes": 145208256,
+          "residentBytes": 43925504,
+          "userTicks": 19883097,
+          "systemTicks": 1632380
+        },
+        {
+          "pid": 14950,
+          "footprintBytes": 136491896,
+          "residentBytes": 46776320,
+          "userTicks": 20185407,
+          "systemTicks": 1723745
+        }
+      ],
+      "aggregateFootprintBytes": 722096904
+    },
+    {
+      "sampledAt": 1791006587,
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "processes": [
+        {
+          "pid": 14276,
+          "footprintBytes": 154403896,
+          "residentBytes": 118538240,
+          "userTicks": 71663228,
+          "systemTicks": 7620923
+        },
+        {
+          "pid": 14661,
+          "footprintBytes": 133067664,
+          "residentBytes": 45416448,
+          "userTicks": 19332723,
+          "systemTicks": 1497169
+        },
+        {
+          "pid": 14760,
+          "footprintBytes": 143160328,
+          "residentBytes": 45367296,
+          "userTicks": 19690679,
+          "systemTicks": 1575112
+        },
+        {
+          "pid": 14844,
+          "footprintBytes": 133264320,
+          "residentBytes": 45416448,
+          "userTicks": 19885724,
+          "systemTicks": 1653480
+        },
+        {
+          "pid": 14950,
+          "footprintBytes": 136491896,
+          "residentBytes": 45678592,
+          "userTicks": 20188167,
+          "systemTicks": 1743507
+        }
+      ],
+      "aggregateFootprintBytes": 700388104
+    },
+    {
+      "sampledAt": 1791006602,
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "processes": [
+        {
+          "pid": 14276,
+          "footprintBytes": 153601056,
+          "residentBytes": 94044160,
+          "userTicks": 71673260,
+          "systemTicks": 7659525
+        },
+        {
+          "pid": 14661,
+          "footprintBytes": 112355552,
+          "residentBytes": 87113728,
+          "userTicks": 21725126,
+          "systemTicks": 2532468
+        },
+        {
+          "pid": 14760,
+          "footprintBytes": 111831504,
+          "residentBytes": 87146496,
+          "userTicks": 22148364,
+          "systemTicks": 2808262
+        },
+        {
+          "pid": 14844,
+          "footprintBytes": 113748096,
+          "residentBytes": 88555520,
+          "userTicks": 22271120,
+          "systemTicks": 2620596
+        },
+        {
+          "pid": 14950,
+          "footprintBytes": 111274088,
+          "residentBytes": 87326720,
+          "userTicks": 22526329,
+          "systemTicks": 2585959
+        }
+      ],
+      "aggregateFootprintBytes": 602810296
+    },
+    {
+      "sampledAt": 1791006617,
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "processes": [
+        {
+          "pid": 14276,
+          "footprintBytes": 153601056,
+          "residentBytes": 91176960,
+          "userTicks": 71674540,
+          "systemTicks": 7665125
+        },
+        {
+          "pid": 14661,
+          "footprintBytes": 112355552,
+          "residentBytes": 84000768,
+          "userTicks": 21725339,
+          "systemTicks": 2533131
+        },
+        {
+          "pid": 14760,
+          "footprintBytes": 111831504,
+          "residentBytes": 84017152,
+          "userTicks": 22148645,
+          "systemTicks": 2809251
+        },
+        {
+          "pid": 14844,
+          "footprintBytes": 113748096,
+          "residentBytes": 87277568,
+          "userTicks": 22271330,
+          "systemTicks": 2621395
+        },
+        {
+          "pid": 14950,
+          "footprintBytes": 111274088,
+          "residentBytes": 85983232,
+          "userTicks": 22526329,
+          "systemTicks": 2585959
+        }
+      ],
+      "aggregateFootprintBytes": 602810296
+    },
+    {
+      "sampledAt": 1791006632,
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "processes": [
+        {
+          "pid": 14276,
+          "footprintBytes": 153568288,
+          "residentBytes": 95240192,
+          "userTicks": 71692714,
+          "systemTicks": 7727660
+        },
+        {
+          "pid": 14661,
+          "footprintBytes": 112388320,
+          "residentBytes": 45465600,
+          "userTicks": 21725495,
+          "systemTicks": 2534098
+        },
+        {
+          "pid": 14760,
+          "footprintBytes": 111864272,
+          "residentBytes": 46940160,
+          "userTicks": 22148829,
+          "systemTicks": 2810042
+        },
+        {
+          "pid": 14844,
+          "footprintBytes": 113780864,
+          "residentBytes": 45989888,
+          "userTicks": 22271488,
+          "systemTicks": 2622230
+        },
+        {
+          "pid": 14950,
+          "footprintBytes": 111306856,
+          "residentBytes": 47382528,
+          "userTicks": 22526732,
+          "systemTicks": 2587396
+        }
+      ],
+      "aggregateFootprintBytes": 602908600
+    }
+  ],
+  "initialDescriptors": {
+    "14276": 23,
+    "14661": 14,
+    "14760": 14,
+    "14844": 14,
+    "14950": 14
+  },
+  "finalDescriptors": {
+    "14276": 23,
+    "14661": 14,
+    "14760": 14,
+    "14844": 14,
+    "14950": 14
+  },
+  "cpuPercentOfOneCore": 1.167064065712138,
+  "note": "Summed process footprints are not unique physical RAM. No fixture tools running. This is not a 30-minute soak.",
+  "memoryPressure": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 45%",
+  "swap": "vm.swapusage: total = 7168.00M  used = 6444.69M  free = 723.31M  (encrypted)",
+  "standaloneCLI": {
+    "sampledAt": 1791006552,
+    "machTimebaseNumer": 125,
+    "machTimebaseDenom": 3,
+    "processes": [
+      {
+        "pid": 12961,
+        "footprintBytes": 187298512,
+        "residentBytes": 232898560,
+        "userTicks": 18548234,
+        "systemTicks": 1247613
+      }
+    ],
+    "aggregateFootprintBytes": 187298512
+  },
+  "versionPair": {
+    "sourceBase": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+    "workingTreeModified": true,
+    "sha256": {
+      "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "dbb20045886ca3f33b4655020f04d89bf87e1bfb7d662fe53e8cd5705418f00f",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "ddb9bb111f5c45a8f0ad5bd0cfdbbb4ba50e0ca1b72d7aac24df480d3de81bff",
+      "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+      "scripts/benchmark-desktop.mjs": "6f068bb2ea43d48d16f333d159900a908cad9b0412a0c3cb7470453e322ed9d1"
+    }
+  },
+  "cleanup": {
+    "remainingWorkers": [],
+    "guiExit": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "scopeNote": "Actual four-window native app, 60 seconds idle, normal Cmd-Q. Separate diagnostic/stress processes also ran on this Mac; footprint differences from earlier runs are not attributed to this change."
+}

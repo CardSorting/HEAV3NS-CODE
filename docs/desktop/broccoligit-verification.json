@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T04:16:17.672Z",
+  "baselineRevision": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+  "status": "reference_journey_passed_with_documented_limits",
+  "checks": {
+    "desktop": {
+      "passed": 441,
+      "pending": 1,
+      "pendingReason": "Linux undecodable filename test is not applicable on macOS"
+    },
+    "native": {
+      "passed": 216,
+      "failed": 0
+    },
+    "focused": {
+      "passed": 45
+    },
+    "affectedEngineAndGit": {
+      "passed": 92
+    },
+    "mainTypes": "passed",
+    "workerTypes": "passed",
+    "scopedLint": {
+      "passed": true,
+      "files": 23
+    },
+    "fullLint": {
+      "passed": false,
+      "unrelatedErrors": [
+        "src/core/api/providers/__tests__/openrouter-native.test.ts:87 noUnsafeOptionalChaining",
+        "src/core/storage/StateManager.ts:2 noUnusedImports"
+      ]
+    },
+    "protoLint": "passed",
+    "handlerImports": "passed",
+    "taskLifecycleBoundary": "passed",
+    "productionBuild": "passed",
+    "macOSBuild": "passed",
+    "signature": "ad-hoc development, verified; no Developer ID/notarization"
+  },
+  "packagedJourney": {
+    "completedAt": "2026-10-03T04:11:58.389Z",
+    "status": "passed",
+    "scope": "Real packaged factory, persistent engine queue, approved registry file write, safe Git, evidence checkpoint and restart. Synthetic slash instruction; no provider request or GUI interaction.",
+    "bundleSha256": "9a185192e3bd08b8d7b3327da87f3f51db3d56556203a7e54c459a5106b901e2",
+    "platform": "darwin",
+    "node": "v22.22.0",
+    "dirtyStart": true,
+    "stagedAndUnstagedPreserved": true,
+    "rawBeforeImage": true,
+    "checkpointDurable": true,
+    "externalEditReconciled": true,
+    "replayedMutations": 0,
+    "live": {
+      "bytesRead": 9,
+      "bytesHashed": 9,
+      "fullDiffs": 0,
+      "observations": 0,
+      "peakLive": 12605024,
+      "responseBytes": 2190,
+      "pages": 0,
+      "nativeSlice": true,
+      "liveReserved": 0,
+      "active": 0,
+      "pagesRetained": 0,
+      "writing": 0,
+      "gaps": [],
+      "shared": {
+        "maxActive": 2,
+        "maxWaiters": 32,
+        "maxWaitersPerKey": 16,
+        "timeoutMs": 5000,
+        "activeOperations": 0,
+        "pendingKeys": 0,
+        "activeWaiters": 0,
+        "startedCalls": 0,
+        "sharedCalls": 0,
+        "timedOutCalls": 0,
+        "rejectedCalls": 0
+      },
+      "evidence": {
+        "charged": 43975,
+        "metadata": 2764,
+        "records": 3,
+        "checkpoints": 1,
+        "exhausted": false,
+        "diskLimit": 134217728,
+        "globalCharged": 43975
+      },
+      "global": {
+        "live": 0,
+        "active": 0,
+        "pending": 0,
+        "descriptors": 0,
+        "peakLive": 12605024,
+        "peakPending": 1
+      }
+    }
+  },
+  "packagedGitProtocol": {
+    "platform": "darwin",
+    "node": "v22.22.0",
+    "runtime": "/Users/bozoegg/Desktop/LUMI-NEW/build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js",
+    "requests": 6,
+    "maxFrameBytes": 196364,
+    "status": "passed"
+  },
+  "benchmark": {
+    "measuredAt": "2026-10-03T04:13:08.081Z",
+    "sourceHashes": {
+      "contracts": "8ba7b350fa8ef56b224fa04fd4aa4953ad1df04f420b2d22c3182a86008a1d9d",
+      "content": "4f59f4aeb4db59ffa7def1ac1e67206c02946cc2340b6bb860479fa80d86bcaa",
+      "evidence-store": "c778ad447458b568f8a30f5c4e2879539a45850109cc27ada31779dbbf47b9f3",
+      "git-reader": "76efdbb6e83a35a144c453ba73f99226a8f32d7036322b27fd450b301bb9d547",
+      "service": "7efb6f1c059408f65529bd13881a32a5d6a1298dbfae6a11fa7c93a6455972ab"
+    },
+    "rawResults": "broccoligit-benchmarks.json",
+    "cycles": 100,
+    "openCloseCycles": 20,
+    "peakOwnedReservationBytes": 14688912,
+    "physicalFixtureBytes": 896229,
+    "parentPeakRssKiB": 170784,
+    "gitChildPeakBytes": 9027584,
+    "remainingGitProcesses": 0
+  },
+  "limits": [
+    "Four persistent distinct workspace history reservations; further workspaces use existing Git without BroccoliGIT history",
+    "Retained eligible text is capped at 256 KiB per file; raw reads at 2 MiB",
+    "Total physical disk ceiling across independent whole-kernel archives is not established",
+    "No incremental patch-generation reduction over the existing retained pager; additional validation latency is measured",
+    "Source byte counters exclude native Git and CAS internal I/O",
+    "No live provider, GUI walkthrough, Linux release or exhaustive memory-safety claim"
+  ]
+}

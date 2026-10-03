@@ -1,0 +1,141 @@
+{
+  "targets": 2,
+  "paths": [
+    [
+      {
+        "from": "synthetic:",
+        "edge": "2",
+        "type": "shortcut",
+        "to": "object:global"
+      },
+      {
+        "from": "object:global",
+        "edge": "AbortController",
+        "type": "property",
+        "to": "closure:AbortController"
+      },
+      {
+        "from": "closure:AbortController",
+        "edge": "context",
+        "type": "internal",
+        "to": "object:system / Context"
+      },
+      {
+        "from": "object:system / Context",
+        "edge": "previous",
+        "type": "internal",
+        "to": "object:system / Context"
+      },
+      {
+        "from": "object:system / Context",
+        "edge": "gcPersistentSignals",
+        "type": "context",
+        "to": "object:Set"
+      },
+      {
+        "from": "object:Set",
+        "edge": "table",
+        "type": "internal",
+        "to": "array:"
+      },
+      {
+        "from": "array:",
+        "edge": "243",
+        "type": "internal",
+        "to": "object:AbortSignal"
+      },
+      {
+        "from": "object:AbortSignal",
+        "edge": "<symbol kReason>",
+        "type": "property",
+        "to": "object:Error"
+      },
+      {
+        "from": "object:Error",
+        "edge": "<symbol>",
+        "type": "property",
+        "to": "array:"
+      },
+      {
+        "from": "array:",
+        "edge": "2",
+        "type": "internal",
+        "to": "hidden:system / CallSiteInfo"
+      },
+      {
+        "from": "hidden:system / CallSiteInfo",
+        "edge": "2",
+        "type": "hidden",
+        "to": "object:Yj"
+      }
+    ],
+    [
+      {
+        "from": "synthetic:",
+        "edge": "2",
+        "type": "shortcut",
+        "to": "object:global"
+      },
+      {
+        "from": "object:global",
+        "edge": "AbortController",
+        "type": "property",
+        "to": "closure:AbortController"
+      },
+      {
+        "from": "closure:AbortController",
+        "edge": "context",
+        "type": "internal",
+        "to": "object:system / Context"
+      },
+      {
+        "from": "object:system / Context",
+        "edge": "previous",
+        "type": "internal",
+        "to": "object:system / Context"
+      },
+      {
+        "from": "object:system / Context",
+        "edge": "gcPersistentSignals",
+        "type": "context",
+        "to": "object:Set"
+      },
+      {
+        "from": "object:Set",
+        "edge": "table",
+        "type": "internal",
+        "to": "array:"
+      },
+      {
+        "from": "array:",
+        "edge": "221",
+        "type": "internal",
+        "to": "object:AbortSignal"
+      },
+      {
+        "from": "object:AbortSignal",
+        "edge": "<symbol kReason>",
+        "type": "property",
+        "to": "object:Error"
+      },
+      {
+        "from": "object:Error",
+        "edge": "<symbol>",
+        "type": "property",
+        "to": "array:"
+      },
+      {
+        "from": "array:",
+        "edge": "2",
+        "type": "internal",
+        "to": "hidden:system / CallSiteInfo"
+      },
+      {
+        "from": "hidden:system / CallSiteInfo",
+        "edge": "2",
+        "type": "hidden",
+        "to": "object:Yj"
+      }
+    ]
+  ]
+}

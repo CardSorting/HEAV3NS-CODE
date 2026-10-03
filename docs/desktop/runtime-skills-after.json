@@ -1,0 +1,103 @@
+{
+  "samples": [
+    {
+      "ms": 5.46162500000014,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 6.876541999999972,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 4.685084000000188,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 4.10004200000003,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 3.997292000000016,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 4.272707999999966,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 7.242167000000109,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 6.412583000000041,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 4.95616700000005,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 6.570875000000115,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 5.523749999999836,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 3.5357500000000073,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 3.704083999999966,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 3.9839999999999236,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 3.6124159999999392,
+      "bytes": 262144,
+      "reads": 64,
+      "count": 65
+    }
+  ],
+  "activation": {
+    "ms": 1.2505419999999958,
+    "reads": 1,
+    "bytes": 270069,
+    "consumers": 8,
+    "instructionBytes": 269999
+  },
+  "catalogModelBytes": 5928,
+  "fixture": "64 real SKILL.md files, 255KB required instructions each; eight equivalent activations; first discovery warm-up excluded"
+}

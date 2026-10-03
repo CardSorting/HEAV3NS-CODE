@@ -1,0 +1,767 @@
+{
+  "schemaVersion": 1,
+  "scope": "Actual signed macOS app, four real packaged workers, no provider requests or fixture tools, five samples after initial warm-up. Repeat uses the same fixture workspaces. No multi-hour or all-workload memory claim.",
+  "beforeFocusCloseFix": {
+    "evidence": {
+      "build": "release; no debugger; ad-hoc Hardened Runtime",
+      "hardware": [
+        "MacBookPro18,1",
+        "17179869184",
+        "Apple M1 Pro"
+      ],
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+      "windows": 4,
+      "workers": 4,
+      "warmupSeconds": 5,
+      "samplingSeconds": 60.039917084,
+      "start": {
+        "sampledAt": 1791004139,
+        "machTimebaseNumer": 125,
+        "machTimebaseDenom": 3,
+        "processes": [
+          {
+            "pid": 7922,
+            "footprintBytes": 156632096,
+            "residentBytes": 214024192,
+            "userTicks": 66716528,
+            "systemTicks": 5236889
+          },
+          {
+            "pid": 7925,
+            "footprintBytes": 142816336,
+            "residentBytes": 185925632,
+            "userTicks": 19081127,
+            "systemTicks": 1484271
+          },
+          {
+            "pid": 7926,
+            "footprintBytes": 142373872,
+            "residentBytes": 190136320,
+            "userTicks": 19127962,
+            "systemTicks": 1545879
+          },
+          {
+            "pid": 7928,
+            "footprintBytes": 133493816,
+            "residentBytes": 178438144,
+            "userTicks": 19449369,
+            "systemTicks": 1560316
+          },
+          {
+            "pid": 7930,
+            "footprintBytes": 142390256,
+            "residentBytes": 182009856,
+            "userTicks": 19527915,
+            "systemTicks": 1685353
+          }
+        ],
+        "aggregateFootprintBytes": 717706376
+      },
+      "end": {
+        "sampledAt": 1791004199,
+        "machTimebaseNumer": 125,
+        "machTimebaseDenom": 3,
+        "processes": [
+          {
+            "pid": 7922,
+            "footprintBytes": 153551904,
+            "residentBytes": 93552640,
+            "userTicks": 66835949,
+            "systemTicks": 5398582
+          },
+          {
+            "pid": 7925,
+            "footprintBytes": 110487944,
+            "residentBytes": 79740928,
+            "userTicks": 22386825,
+            "systemTicks": 3984086
+          },
+          {
+            "pid": 7926,
+            "footprintBytes": 109439200,
+            "residentBytes": 81133568,
+            "userTicks": 22026817,
+            "systemTicks": 2906276
+          },
+          {
+            "pid": 7928,
+            "footprintBytes": 112863552,
+            "residentBytes": 83771392,
+            "userTicks": 22108453,
+            "systemTicks": 3095103
+          },
+          {
+            "pid": 7930,
+            "footprintBytes": 109537552,
+            "residentBytes": 82886656,
+            "userTicks": 22587813,
+            "systemTicks": 2956557
+          }
+        ],
+        "aggregateFootprintBytes": 595880152
+      },
+      "observations": [
+        {
+          "sampledAt": 1791004139,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 7922,
+              "footprintBytes": 156632096,
+              "residentBytes": 214024192,
+              "userTicks": 66716528,
+              "systemTicks": 5236889
+            },
+            {
+              "pid": 7925,
+              "footprintBytes": 142816336,
+              "residentBytes": 185925632,
+              "userTicks": 19081127,
+              "systemTicks": 1484271
+            },
+            {
+              "pid": 7926,
+              "footprintBytes": 142373872,
+              "residentBytes": 190136320,
+              "userTicks": 19127962,
+              "systemTicks": 1545879
+            },
+            {
+              "pid": 7928,
+              "footprintBytes": 133493816,
+              "residentBytes": 178438144,
+              "userTicks": 19449369,
+              "systemTicks": 1560316
+            },
+            {
+              "pid": 7930,
+              "footprintBytes": 142390256,
+              "residentBytes": 182009856,
+              "userTicks": 19527915,
+              "systemTicks": 1685353
+            }
+          ],
+          "aggregateFootprintBytes": 717706376
+        },
+        {
+          "sampledAt": 1791004154,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 7922,
+              "footprintBytes": 156632096,
+              "residentBytes": 141672448,
+              "userTicks": 66812381,
+              "systemTicks": 5329088
+            },
+            {
+              "pid": 7925,
+              "footprintBytes": 142816336,
+              "residentBytes": 45842432,
+              "userTicks": 19087071,
+              "systemTicks": 1495309
+            },
+            {
+              "pid": 7926,
+              "footprintBytes": 142373872,
+              "residentBytes": 45826048,
+              "userTicks": 19133793,
+              "systemTicks": 1574588
+            },
+            {
+              "pid": 7928,
+              "footprintBytes": 133510200,
+              "residentBytes": 63750144,
+              "userTicks": 19451829,
+              "systemTicks": 1567723
+            },
+            {
+              "pid": 7930,
+              "footprintBytes": 142390256,
+              "residentBytes": 135725056,
+              "userTicks": 19532245,
+              "systemTicks": 1692186
+            }
+          ],
+          "aggregateFootprintBytes": 717722760
+        },
+        {
+          "sampledAt": 1791004169,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 7922,
+              "footprintBytes": 153551904,
+              "residentBytes": 135217152,
+              "userTicks": 66817938,
+              "systemTicks": 5332644
+            },
+            {
+              "pid": 7925,
+              "footprintBytes": 142816336,
+              "residentBytes": 45662208,
+              "userTicks": 19089882,
+              "systemTicks": 1495820
+            },
+            {
+              "pid": 7926,
+              "footprintBytes": 142373872,
+              "residentBytes": 45580288,
+              "userTicks": 19136425,
+              "systemTicks": 1574886
+            },
+            {
+              "pid": 7928,
+              "footprintBytes": 133510200,
+              "residentBytes": 45842432,
+              "userTicks": 19456707,
+              "systemTicks": 1570702
+            },
+            {
+              "pid": 7930,
+              "footprintBytes": 132346864,
+              "residentBytes": 45547520,
+              "userTicks": 19537510,
+              "systemTicks": 1695224
+            }
+          ],
+          "aggregateFootprintBytes": 704599176
+        },
+        {
+          "sampledAt": 1791004184,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 7922,
+              "footprintBytes": 153551904,
+              "residentBytes": 129433600,
+              "userTicks": 66817938,
+              "systemTicks": 5332644
+            },
+            {
+              "pid": 7925,
+              "footprintBytes": 122153352,
+              "residentBytes": 80658432,
+              "userTicks": 22386359,
+              "systemTicks": 3980621
+            },
+            {
+              "pid": 7926,
+              "footprintBytes": 121432288,
+              "residentBytes": 81969152,
+              "userTicks": 22026376,
+              "systemTicks": 2904317
+            },
+            {
+              "pid": 7928,
+              "footprintBytes": 112863552,
+              "residentBytes": 84410368,
+              "userTicks": 22107645,
+              "systemTicks": 3092894
+            },
+            {
+              "pid": 7930,
+              "footprintBytes": 111831312,
+              "residentBytes": 82919424,
+              "userTicks": 22586883,
+              "systemTicks": 2954092
+            }
+          ],
+          "aggregateFootprintBytes": 621832408
+        },
+        {
+          "sampledAt": 1791004199,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 7922,
+              "footprintBytes": 153551904,
+              "residentBytes": 93552640,
+              "userTicks": 66835949,
+              "systemTicks": 5398582
+            },
+            {
+              "pid": 7925,
+              "footprintBytes": 110487944,
+              "residentBytes": 79740928,
+              "userTicks": 22386825,
+              "systemTicks": 3984086
+            },
+            {
+              "pid": 7926,
+              "footprintBytes": 109439200,
+              "residentBytes": 81133568,
+              "userTicks": 22026817,
+              "systemTicks": 2906276
+            },
+            {
+              "pid": 7928,
+              "footprintBytes": 112863552,
+              "residentBytes": 83771392,
+              "userTicks": 22108453,
+              "systemTicks": 3095103
+            },
+            {
+              "pid": 7930,
+              "footprintBytes": 109537552,
+              "residentBytes": 82886656,
+              "userTicks": 22587813,
+              "systemTicks": 2956557
+            }
+          ],
+          "aggregateFootprintBytes": 595880152
+        }
+      ],
+      "initialDescriptors": {
+        "7922": 23,
+        "7925": 14,
+        "7926": 14,
+        "7928": 14,
+        "7930": 14
+      },
+      "finalDescriptors": {
+        "7922": 23,
+        "7925": 14,
+        "7926": 14,
+        "7928": 14,
+        "7930": 14
+      },
+      "cpuPercentOfOneCore": 1.309604573403944,
+      "note": "Summed process footprints are not unique physical RAM. No fixture tools running. This is not a 30-minute soak.",
+      "memoryPressure": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 48%",
+      "swap": "vm.swapusage: total = 7168.00M  used = 6468.69M  free = 699.31M  (encrypted)",
+      "standaloneCLI": {
+        "sampledAt": 1791004127,
+        "machTimebaseNumer": 125,
+        "machTimebaseDenom": 3,
+        "processes": [
+          {
+            "pid": 7886,
+            "footprintBytes": 186004224,
+            "residentBytes": 232652800,
+            "userTicks": 18227493,
+            "systemTicks": 2530133
+          }
+        ],
+        "aggregateFootprintBytes": 186004224
+      },
+      "versionPair": {
+        "sourceBase": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+        "workingTreeModified": true,
+        "sha256": {
+          "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "320cab448ae1fe22b83e567c9de4fac37ebf08e1ddd48b7429c04275384f3151",
+          "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "bdb1da71dd4fb461ee12a0d8bbd4273379657d21c84ce4ccfbbc634d33a72591",
+          "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+          "scripts/benchmark-desktop.mjs": "92b6bef876c0ff22b57bafb26bd6e2f658645ee7a3c5438397d7814604603f03"
+        }
+      }
+    },
+    "cleanup": {
+      "remainingWorkers": [],
+      "guiExit": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    "reservations": [
+      {
+        "workspace": 1,
+        "chargedBytes": 134217728
+      },
+      {
+        "workspace": 2,
+        "chargedBytes": 134217728
+      },
+      {
+        "workspace": 3,
+        "chargedBytes": 4096
+      },
+      {
+        "workspace": 4,
+        "chargedBytes": 4096
+      }
+    ],
+    "note": "Before suppression of focus refresh during multi-window close: two reservations remain conservative despite clean app exit."
+  },
+  "final": {
+    "evidence": {
+      "build": "release; no debugger; ad-hoc Hardened Runtime",
+      "hardware": [
+        "MacBookPro18,1",
+        "17179869184",
+        "Apple M1 Pro"
+      ],
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.1\nBuildVersion:\t\t25F80",
+      "windows": 4,
+      "workers": 4,
+      "warmupSeconds": 5,
+      "samplingSeconds": 60.05402995800001,
+      "start": {
+        "sampledAt": 1791004477,
+        "machTimebaseNumer": 125,
+        "machTimebaseDenom": 3,
+        "processes": [
+          {
+            "pid": 10408,
+            "footprintBytes": 158204984,
+            "residentBytes": 216973312,
+            "userTicks": 62679079,
+            "systemTicks": 4923507
+          },
+          {
+            "pid": 10411,
+            "footprintBytes": 199914504,
+            "residentBytes": 194920448,
+            "userTicks": 18908955,
+            "systemTicks": 1436503
+          },
+          {
+            "pid": 10412,
+            "footprintBytes": 199078584,
+            "residentBytes": 194183168,
+            "userTicks": 19084282,
+            "systemTicks": 1415213
+          },
+          {
+            "pid": 10418,
+            "footprintBytes": 199357328,
+            "residentBytes": 203866112,
+            "userTicks": 19376293,
+            "systemTicks": 1451644
+          },
+          {
+            "pid": 10422,
+            "footprintBytes": 200340344,
+            "residentBytes": 224100352,
+            "userTicks": 19294478,
+            "systemTicks": 1580257
+          }
+        ],
+        "aggregateFootprintBytes": 956895744
+      },
+      "end": {
+        "sampledAt": 1791004538,
+        "machTimebaseNumer": 125,
+        "machTimebaseDenom": 3,
+        "processes": [
+          {
+            "pid": 10408,
+            "footprintBytes": 158221368,
+            "residentBytes": 204537856,
+            "userTicks": 65825426,
+            "systemTicks": 5357707
+          },
+          {
+            "pid": 10411,
+            "footprintBytes": 179234848,
+            "residentBytes": 186400768,
+            "userTicks": 21761556,
+            "systemTicks": 1962946
+          },
+          {
+            "pid": 10412,
+            "footprintBytes": 178513880,
+            "residentBytes": 184549376,
+            "userTicks": 21735215,
+            "systemTicks": 1833415
+          },
+          {
+            "pid": 10418,
+            "footprintBytes": 178612256,
+            "residentBytes": 178978816,
+            "userTicks": 21917608,
+            "systemTicks": 1858103
+          },
+          {
+            "pid": 10422,
+            "footprintBytes": 168257736,
+            "residentBytes": 179273728,
+            "userTicks": 22560405,
+            "systemTicks": 1997427
+          }
+        ],
+        "aggregateFootprintBytes": 862840088
+      },
+      "observations": [
+        {
+          "sampledAt": 1791004477,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 10408,
+              "footprintBytes": 158204984,
+              "residentBytes": 216973312,
+              "userTicks": 62679079,
+              "systemTicks": 4923507
+            },
+            {
+              "pid": 10411,
+              "footprintBytes": 199914504,
+              "residentBytes": 194920448,
+              "userTicks": 18908955,
+              "systemTicks": 1436503
+            },
+            {
+              "pid": 10412,
+              "footprintBytes": 199078584,
+              "residentBytes": 194183168,
+              "userTicks": 19084282,
+              "systemTicks": 1415213
+            },
+            {
+              "pid": 10418,
+              "footprintBytes": 199357328,
+              "residentBytes": 203866112,
+              "userTicks": 19376293,
+              "systemTicks": 1451644
+            },
+            {
+              "pid": 10422,
+              "footprintBytes": 200340344,
+              "residentBytes": 224100352,
+              "userTicks": 19294478,
+              "systemTicks": 1580257
+            }
+          ],
+          "aggregateFootprintBytes": 956895744
+        },
+        {
+          "sampledAt": 1791004492,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 10408,
+              "footprintBytes": 158368824,
+              "residentBytes": 211189760,
+              "userTicks": 65743483,
+              "systemTicks": 5312175
+            },
+            {
+              "pid": 10411,
+              "footprintBytes": 199914504,
+              "residentBytes": 194740224,
+              "userTicks": 18915661,
+              "systemTicks": 1438075
+            },
+            {
+              "pid": 10412,
+              "footprintBytes": 199078584,
+              "residentBytes": 194052096,
+              "userTicks": 19090486,
+              "systemTicks": 1416733
+            },
+            {
+              "pid": 10418,
+              "footprintBytes": 199357328,
+              "residentBytes": 189169664,
+              "userTicks": 19380330,
+              "systemTicks": 1452660
+            },
+            {
+              "pid": 10422,
+              "footprintBytes": 200340344,
+              "residentBytes": 185745408,
+              "userTicks": 19297547,
+              "systemTicks": 1581168
+            }
+          ],
+          "aggregateFootprintBytes": 957059584
+        },
+        {
+          "sampledAt": 1791004507,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 10408,
+              "footprintBytes": 158352440,
+              "residentBytes": 211124224,
+              "userTicks": 65801681,
+              "systemTicks": 5329292
+            },
+            {
+              "pid": 10411,
+              "footprintBytes": 199914504,
+              "residentBytes": 194740224,
+              "userTicks": 18918045,
+              "systemTicks": 1438288
+            },
+            {
+              "pid": 10412,
+              "footprintBytes": 199078584,
+              "residentBytes": 194052096,
+              "userTicks": 19091622,
+              "systemTicks": 1416967
+            },
+            {
+              "pid": 10418,
+              "footprintBytes": 199357328,
+              "residentBytes": 189169664,
+              "userTicks": 19385842,
+              "systemTicks": 1453783
+            },
+            {
+              "pid": 10422,
+              "footprintBytes": 200340344,
+              "residentBytes": 185761792,
+              "userTicks": 19301187,
+              "systemTicks": 1583101
+            }
+          ],
+          "aggregateFootprintBytes": 957043200
+        },
+        {
+          "sampledAt": 1791004523,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 10408,
+              "footprintBytes": 158204984,
+              "residentBytes": 210960384,
+              "userTicks": 65805599,
+              "systemTicks": 5336526
+            },
+            {
+              "pid": 10411,
+              "footprintBytes": 179234848,
+              "residentBytes": 187924480,
+              "userTicks": 21760614,
+              "systemTicks": 1959996
+            },
+            {
+              "pid": 10412,
+              "footprintBytes": 178513880,
+              "residentBytes": 186810368,
+              "userTicks": 21734910,
+              "systemTicks": 1833037
+            },
+            {
+              "pid": 10418,
+              "footprintBytes": 178612256,
+              "residentBytes": 182173696,
+              "userTicks": 21916997,
+              "systemTicks": 1857679
+            },
+            {
+              "pid": 10422,
+              "footprintBytes": 168257736,
+              "residentBytes": 182468608,
+              "userTicks": 22559785,
+              "systemTicks": 1996997
+            }
+          ],
+          "aggregateFootprintBytes": 862823704
+        },
+        {
+          "sampledAt": 1791004538,
+          "machTimebaseNumer": 125,
+          "machTimebaseDenom": 3,
+          "processes": [
+            {
+              "pid": 10408,
+              "footprintBytes": 158221368,
+              "residentBytes": 204537856,
+              "userTicks": 65825426,
+              "systemTicks": 5357707
+            },
+            {
+              "pid": 10411,
+              "footprintBytes": 179234848,
+              "residentBytes": 186400768,
+              "userTicks": 21761556,
+              "systemTicks": 1962946
+            },
+            {
+              "pid": 10412,
+              "footprintBytes": 178513880,
+              "residentBytes": 184549376,
+              "userTicks": 21735215,
+              "systemTicks": 1833415
+            },
+            {
+              "pid": 10418,
+              "footprintBytes": 178612256,
+              "residentBytes": 178978816,
+              "userTicks": 21917608,
+              "systemTicks": 1858103
+            },
+            {
+              "pid": 10422,
+              "footprintBytes": 168257736,
+              "residentBytes": 179273728,
+              "userTicks": 22560405,
+              "systemTicks": 1997427
+            }
+          ],
+          "aggregateFootprintBytes": 862840088
+        }
+      ],
+      "initialDescriptors": {
+        "10408": 23,
+        "10411": 14,
+        "10412": 14,
+        "10418": 14,
+        "10422": 14
+      },
+      "finalDescriptors": {
+        "10408": 23,
+        "10411": 14,
+        "10412": 14,
+        "10418": 14,
+        "10422": 14
+      },
+      "cpuPercentOfOneCore": 1.1558755931707958,
+      "note": "Summed process footprints are not unique physical RAM. No fixture tools running. This is not a 30-minute soak.",
+      "memoryPressure": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 52%",
+      "swap": "vm.swapusage: total = 7168.00M  used = 6468.69M  free = 699.31M  (encrypted)",
+      "standaloneCLI": {
+        "status": "exited_before_sample",
+        "exitCode": 1
+      },
+      "versionPair": {
+        "sourceBase": "646cf46c8785d5ff264d7a9d8d40cbf0991a3fc2",
+        "workingTreeModified": true,
+        "sha256": {
+          "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE": "2554c3c042a4c61dae72cbf75fa3cd03fbd98935bfb20f180a87670dcf9ac8fe",
+          "build/HEAV3NS-CODE.app/Contents/Resources/runtime/dist/index.js": "bdb1da71dd4fb461ee12a0d8bbd4273379657d21c84ce4ccfbbc634d33a72591",
+          "build/HEAV3NS-CODE.app/Contents/Resources/runtime/node": "15e43f594d5fa9318d8a1766d914edf17b04a92cbc7b3d88688d52836d1669f7",
+          "scripts/benchmark-desktop.mjs": "6f068bb2ea43d48d16f333d159900a908cad9b0412a0c3cb7470453e322ed9d1"
+        }
+      }
+    },
+    "cleanup": {
+      "remainingWorkers": [],
+      "guiExit": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    "reservations": [
+      {
+        "workspace": 1,
+        "chargedBytes": 4096
+      },
+      {
+        "workspace": 2,
+        "chargedBytes": 4096
+      },
+      {
+        "workspace": 3,
+        "chargedBytes": 4096
+      },
+      {
+        "workspace": 4,
+        "chargedBytes": 4096
+      }
+    ],
+    "status": "passed"
+  }
+}

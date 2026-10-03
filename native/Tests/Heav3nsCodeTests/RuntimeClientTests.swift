@@ -926,6 +926,43 @@ final class RuntimeClientTests: XCTestCase {
         }
         workspace.attach(); wait(for: [checked], timeout: 3)
     }
+    func testClosingWorkspaceWaitsForShutdownReceiptWithoutRefreshingStoppedWorker() throws {
+        _ = NSApplication.shared
+        let client = try peer("""
+        if (request.method === 'hello') reply(request,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['workspace-stop']});
+        if (request.method === 'snapshot') {
+          if (globalThis.stopping) send({kind:'response',id:request.id,error:{message:'SHUTTING_DOWN'}});
+          else reply(request,{workspace:'ws',session:'session',runtime:'runtime',seq:0,runs:[]});
+        }
+        if (request.method === 'files.list') reply(request,{entries:[]});
+        if (request.method === 'task.cancelAll') reply(request,{requested:true});
+        if (request.method === 'shutdown') {
+          globalThis.stopping = true;
+          setTimeout(() => {
+            require('node:fs').writeFileSync('shutdown-receipt', 'durable');
+            reply(request,{stopped:true,broccoliRetention:{chargedBytes:0,durable:true}});
+          }, 100);
+        }
+        """, timeout: 2)
+        let workspace = WorkspaceWindow(folder: directory, runtimeClient: client, draftStore: WorkspaceDraftStore(folder: directory, root: directory.appendingPathComponent("drafts")))
+        defer { client.onEvent = nil; client.onConnection = nil; client.forceStop(); workspace.window?.close() }
+        let closed = expectation(description: "workspace waits for durable shutdown")
+        workspace.onClosed = { closed.fulfill() }
+        let connection = client.onConnection
+        var requested = false
+        client.onConnection = { value in
+            connection?(value)
+            guard client.isReady, !requested else { return }; requested = true
+            workspace.stopAndClose()
+            // Closing another window can make this still-closing workspace key.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+                workspace.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification))
+            }
+        }
+        workspace.attach(); wait(for: [closed], timeout: 3)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("shutdown-receipt").path))
+        XCTAssertEqual(client.pendingRequestCount, 0)
+    }
     func testWorkspaceStopIncludesUnseenQueuedWorkAndWaitsForAcknowledgment() throws {
         _ = NSApplication.shared
         let behavior = """

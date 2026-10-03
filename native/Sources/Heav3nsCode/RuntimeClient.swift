@@ -30,6 +30,8 @@ final class RuntimeClient {
     private var reader: ControlFrameReader?
     private var exitStatus: Int32?
     private var exitNotified = false
+    private var historyReservation: BroccoliGitAdmission.Reservation?
+    private var historyCharge: Int?
     private var deadlineTimer: DispatchSourceTimer?
     private struct Pending {
         let method: String
@@ -83,6 +85,12 @@ final class RuntimeClient {
         child.executableURL = node; child.arguments = [cli.path, "--desktop-worker"]
         child.currentDirectoryURL = folder
         child.environment = environment.merging(["NO_COLOR": "1", "TERM": "dumb"]) { _, new in new }
+        // Test peers do not own repository evidence or consume durable slots.
+        if cliOverride == nil && environment["BROCCOLIGIT_MODE"] != "disabled" {
+            historyReservation = BroccoliGitAdmission.reserve(folder)
+            child.environment?["BROCCOLIGIT_ADMISSION"] = historyReservation != nil ? "macos-v1" : "unavailable"
+            child.environment?["BROCCOLIGIT_DISK_BUDGET"] = historyReservation.map { String($0.bytes) }
+        }
         child.standardInput = input; child.standardOutput = output; child.standardError = diagnostic
         let reader = reader
         output.fileHandleForReading.readabilityHandler = { [weak reader] handle in reader?.read(handle) }
@@ -138,7 +146,13 @@ final class RuntimeClient {
                 case .failure(let error): self.fail(error.localizedDescription)
                 }
             }
-        } catch { fail("Could not start LUMI: \(error.localizedDescription)") }
+        } catch {
+            if process == nil, let reservation = historyReservation {
+                BroccoliGitAdmission.finish(reservation, chargedBytes: nil, cleanExit: false)
+                historyReservation = nil
+            }
+            fail("Could not start LUMI: \(error.localizedDescription)")
+        }
     }
     func request(_ method: String, params: [String: Any] = [:], id: String = UUID().uuidString, completion: @escaping (Result<[String: Any], Error>) -> Void = { _ in }) {
         let control = Self.controls.contains(method)
@@ -331,6 +345,10 @@ final class RuntimeClient {
     }
     private func notifyExitIfClosed() {
         guard closed, exitStatus != nil, !exitNotified else { return }
+        if let reservation = historyReservation {
+            BroccoliGitAdmission.finish(reservation, chargedBytes: historyCharge, cleanExit: exitStatus == 0)
+            historyReservation = nil
+        }
         exitNotified = true; onExit?()
     }
     func closeInput() {
@@ -348,7 +366,16 @@ final class RuntimeClient {
         try? input.fileHandleForWriting.close()
     }
     func shutdown() {
-        request("shutdown") { [weak self] _ in self?.closeInput() }
+        request("shutdown") { [weak self] result in
+            guard let self else { return }
+            if case .success(let response) = result, response["stopped"] as? Bool == true,
+               let retention = response["broccoliRetention"] as? [String: Any],
+               let charge = retention["chargedBytes"] as? NSNumber, CFGetTypeID(charge) != CFBooleanGetTypeID(),
+               charge.doubleValue == Double(charge.intValue), retention["durable"] as? Bool == true {
+                self.historyCharge = charge.intValue
+            }
+            self.closeInput()
+        }
     }
     func forceStop() {
         if let child = process, child.isRunning { kill(child.processIdentifier, SIGKILL) }

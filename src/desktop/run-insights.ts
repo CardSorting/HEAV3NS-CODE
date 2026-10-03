@@ -13,6 +13,8 @@ export interface InspectableRun {
 	activityCount?: number
 	outputLimited?: boolean
 	checkpointError?: string
+	repositoryContinuity?: { externalChanges: boolean; unresolved: boolean; rebindRequired: boolean }
+	broccoliEvidenceOutcome?: { outcome: string; reasons: string[] }
 }
 
 export function explainRun(run: InspectableRun) {
@@ -33,7 +35,8 @@ export function explainRun(run: InspectableRun) {
 		completed: "Instruction finished. Review the project checks below.",
 		failed: "This instruction ended before it could be completed.",
 		cancelled: "This instruction was stopped. Existing changes may still be present.",
-		interrupted: "Saved work is preserved; it has not been replayed.",
+		interrupted:
+			"This action may have completed before the session stopped. It has not been replayed; review the current result before repeating it.",
 		timed_out: "This instruction reached its time limit. Existing changes may still be present.",
 	}
 	const reasons: Record<string, string> = {
@@ -77,6 +80,19 @@ export function explainRun(run: InspectableRun) {
 	const warnings: string[] = []
 	if (run.outputLimited) warnings.push("Recorded output is incomplete because it reached the storage limit.")
 	if (run.checkpointError) warnings.push("A project checkpoint could not be saved. Checkpoint coverage is incomplete.")
+	if (run.repositoryContinuity?.externalChanges)
+		warnings.push("Some files differ from the last recorded work. Review Changes before continuing.")
+	if (run.repositoryContinuity?.unresolved && run.state !== "interrupted")
+		warnings.push("An earlier action has an uncertain result. Review its activity and current files before repeating it.")
+	if (run.repositoryContinuity?.rebindRequired)
+		warnings.push(
+			"The repository’s branch or working state changed. Start a new instruction to establish a fresh starting point.",
+		)
+	const evidence = run.broccoliEvidenceOutcome
+	if (evidence?.reasons.some((reason) => /NOT_RETAINED|CONTENT_UNAVAILABLE/.test(reason)))
+		warnings.push("An earlier file version is no longer available for comparison.")
+	else if (evidence && (evidence.outcome !== "ok" || evidence.reasons.includes("PARTIAL_CHECKPOINT")))
+		warnings.push("Some change history could not be saved. Current files can still be inspected in Changes.")
 	return {
 		outcome: outcomes[run.state] ?? "The runtime state is not recognized by this version.",
 		checks,

@@ -1367,6 +1367,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 switch result {
                 case .success:
                     self.stopAcknowledged = true
+                    // Shutdown owns the final receipt and process exit. A view
+                    // refresh against its closed scheduler can disconnect the
+                    // transport before that durable receipt arrives.
+                    if self.closing { self.updateStatus(); return }
                     source.requestSnapshot(afterPending: true) { [weak self] in
                         guard let self, self.client === source, self.cancellationToken == token else { return }
                         self.updateStatus(); self.finishStopAndSend()
@@ -1955,7 +1959,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         resizeAnchor = nil
     }
     func windowDidResize(_ notification: Notification) { adapt(); modelPicker?.syncPresentation(recenter: true) }
-    func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady { client.requestSnapshot() } }
+    func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady && !closing { client.requestSnapshot() } }
     func windowDidChangeOcclusionState(_ notification: Notification) { if needsRebuild && window?.occlusionState.contains(.visible) == true { rebuildRows() }; updateElapsedTimer(); updateWalkthroughVisibility() }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard prepareToClose() else { return false }

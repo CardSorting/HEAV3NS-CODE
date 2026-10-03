@@ -73,6 +73,8 @@ export interface EngineProgressEvent {
 }
 
 export interface EngineTickInput {
+	/** Host-produced repository evidence, treated as reference data by the model. */
+	changeEvidence?: string;
   prompt: string;
   /** Host-owned opt-in: validate changed code and return diagnostics to this turn. */
   verifyWorkspace?: boolean;
@@ -133,6 +135,7 @@ export interface EngineTickResult {
 }
 
 export interface IAgentEngine {
+	setBroccoliGit?(service: import("../../desktop/broccoligit/service.js").BroccoliGit): void;
   tick(input: EngineTickInput): Promise<EngineTickResult>;
   /** Stop admission and settle active work before the host closes shared storage. */
   close?(): Promise<void>;

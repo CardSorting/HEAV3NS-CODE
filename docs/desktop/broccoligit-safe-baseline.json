@@ -1,0 +1,341 @@
+{
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v26.8.1",
+  "git": "git version 2.48.1",
+  "rounds": 7,
+  "warmup": 2,
+  "results": [
+    {
+      "fixture": "small",
+      "files": 64,
+      "changed": 2,
+      "operation": "status",
+      "concurrent": 1,
+      "medianMs": 20.2,
+      "p95Ms": 22.43,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 20.84495899999999,
+        "processes": 5,
+        "bytes": 799,
+        "entries": 2,
+        "limited": false
+      },
+      "maxRssKiB": 51376
+    },
+    {
+      "fixture": "small",
+      "files": 64,
+      "changed": 2,
+      "operation": "diff",
+      "concurrent": 1,
+      "medianMs": 17.44,
+      "p95Ms": 19.41,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 17.134000000000015,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 51696
+    },
+    {
+      "fixture": "small",
+      "files": 64,
+      "changed": 2,
+      "operation": "concurrent-status",
+      "concurrent": 8,
+      "medianMs": 19.75,
+      "p95Ms": 22.95,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 20.886082999999985,
+        "processes": 5,
+        "bytes": 799,
+        "entries": 2,
+        "limited": false
+      },
+      "maxRssKiB": 50576
+    },
+    {
+      "fixture": "small",
+      "files": 64,
+      "changed": 2,
+      "operation": "concurrent-diff",
+      "concurrent": 8,
+      "medianMs": 17.57,
+      "p95Ms": 19.52,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 19.516708000000023,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 53584
+    },
+    {
+      "fixture": "large-small-change",
+      "files": 20000,
+      "changed": 2,
+      "operation": "status",
+      "concurrent": 1,
+      "medianMs": 62.23,
+      "p95Ms": 63.31,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 61.066374999999994,
+        "processes": 5,
+        "bytes": 799,
+        "entries": 2,
+        "limited": false
+      },
+      "maxRssKiB": 51200
+    },
+    {
+      "fixture": "large-small-change",
+      "files": 20000,
+      "changed": 2,
+      "operation": "diff",
+      "concurrent": 1,
+      "medianMs": 19.89,
+      "p95Ms": 21.62,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 18.89212500000002,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 51424
+    },
+    {
+      "fixture": "large-small-change",
+      "files": 20000,
+      "changed": 2,
+      "operation": "concurrent-status",
+      "concurrent": 8,
+      "medianMs": 62.37,
+      "p95Ms": 62.58,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 59.483167000000094,
+        "processes": 5,
+        "bytes": 799,
+        "entries": 2,
+        "limited": false
+      },
+      "maxRssKiB": 50800
+    },
+    {
+      "fixture": "large-small-change",
+      "files": 20000,
+      "changed": 2,
+      "operation": "concurrent-diff",
+      "concurrent": 8,
+      "medianMs": 19.64,
+      "p95Ms": 20.48,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 19.494207999999986,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 53808
+    },
+    {
+      "fixture": "large-change",
+      "files": 20000,
+      "changed": 18000,
+      "operation": "status",
+      "concurrent": 1,
+      "medianMs": 156.42,
+      "p95Ms": 176.44,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 153.79449999999997,
+        "processes": 5,
+        "bytes": 131130,
+        "entries": 476,
+        "limited": true
+      },
+      "maxRssKiB": 69152
+    },
+    {
+      "fixture": "large-change",
+      "files": 20000,
+      "changed": 18000,
+      "operation": "diff",
+      "concurrent": 1,
+      "medianMs": 19.61,
+      "p95Ms": 20.99,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 20.990125000000006,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 51328
+    },
+    {
+      "fixture": "large-change",
+      "files": 20000,
+      "changed": 18000,
+      "operation": "full-diff",
+      "concurrent": 1,
+      "medianMs": 946.6,
+      "p95Ms": 971.25,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 968.9871660000008,
+        "processes": 5,
+        "bytes": 33527,
+        "limited": true
+      },
+      "maxRssKiB": 68256
+    },
+    {
+      "fixture": "large-change",
+      "files": 20000,
+      "changed": 18000,
+      "operation": "concurrent-status",
+      "concurrent": 8,
+      "medianMs": 154.91,
+      "p95Ms": 156.25,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 153.068125,
+        "processes": 5,
+        "bytes": 131130,
+        "entries": 476,
+        "limited": true
+      },
+      "maxRssKiB": 69040
+    },
+    {
+      "fixture": "large-change",
+      "files": 20000,
+      "changed": 18000,
+      "operation": "concurrent-diff",
+      "concurrent": 8,
+      "medianMs": 19.35,
+      "p95Ms": 21.04,
+      "processesPerRound": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "result": {
+        "ms": 21.04208299999999,
+        "processes": 5,
+        "bytes": 692,
+        "limited": false
+      },
+      "maxRssKiB": 53776
+    }
+  ]
+}

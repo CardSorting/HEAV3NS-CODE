@@ -1,0 +1,2960 @@
+{
+  "completedAt": "2026-10-03T04:55:51.233Z",
+  "status": "passed",
+  "scope": "Real packaged factory, persistent engine queue, approved registry file write, safe Git, evidence checkpoint and restart. Synthetic slash instruction; no provider request or GUI interaction.",
+  "bundleSha256": "bdb1da71dd4fb461ee12a0d8bbd4273379657d21c84ce4ccfbbc634d33a72591",
+  "platform": "darwin",
+  "node": "v22.22.0",
+  "dirtyStart": true,
+  "stagedAndUnstagedPreserved": true,
+  "rawBeforeImage": true,
+  "checkpointDurable": true,
+  "sharedKernelHelpers": 9,
+  "progressiveHistoryTool": true,
+  "validatedComparisonReuse": true,
+  "externalEditReconciled": true,
+  "replayedMutations": 0,
+  "soak": [
+    {
+      "cycle": 5,
+      "reopen": 1,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 253198336,
+        "heapTotal": 106708992,
+        "heapUsed": 67855472,
+        "external": 3883244,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 332,
+        "bytesHashed": 332,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14281032,
+        "responseBytes": 26536,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "3fa636c8589f6b165977eaa56045067731cd7a8aab01ea3440442eeaacb5487b",
+            "reason": "miss",
+            "at": 1791003310456.9863
+          },
+          {
+            "key": "3fa636c8589f6b165977eaa56045067731cd7a8aab01ea3440442eeaacb5487b",
+            "reason": "admitted",
+            "at": 1791003310481.2246
+          },
+          {
+            "key": "7869db25381b7d7db7b68a3daff5e9d9dd4a4d650073d883ca068e1800005f33",
+            "reason": "miss",
+            "at": 1791003310846.197
+          },
+          {
+            "key": "7869db25381b7d7db7b68a3daff5e9d9dd4a4d650073d883ca068e1800005f33",
+            "reason": "admitted",
+            "at": 1791003310870.8643
+          },
+          {
+            "key": "b5e131a8610ef750ef94cedd80a29b55b5d97b07d52041975c00374c704cd226",
+            "reason": "miss",
+            "at": 1791003311245.9058
+          },
+          {
+            "key": "b5e131a8610ef750ef94cedd80a29b55b5d97b07d52041975c00374c704cd226",
+            "reason": "admitted",
+            "at": 1791003311270.2488
+          },
+          {
+            "key": "0d3aff3a356379c4f1d8554fa9d41ee8965e8e5b32a826303f680fd48adc63ef",
+            "reason": "miss",
+            "at": 1791003311697.5146
+          },
+          {
+            "key": "0d3aff3a356379c4f1d8554fa9d41ee8965e8e5b32a826303f680fd48adc63ef",
+            "reason": "admitted",
+            "at": 1791003311720.8667
+          },
+          {
+            "key": "0613407ca8e5f930381a4b23e68b9447650c267e4703822466107bdd94980812",
+            "reason": "miss",
+            "at": 1791003312083.036
+          },
+          {
+            "key": "0613407ca8e5f930381a4b23e68b9447650c267e4703822466107bdd94980812",
+            "reason": "admitted",
+            "at": 1791003312106.5813
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 241255,
+          "metadata": 16633,
+          "records": 18,
+          "checkpoints": 6,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 241255
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14281032,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 10,
+      "reopen": 2,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 270827520,
+        "heapTotal": 107233280,
+        "heapUsed": 68576328,
+        "external": 3883284,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 340,
+        "bytesHashed": 340,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14391992,
+        "responseBytes": 26545,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "ae61a9c08aeb61015a657569307457f8feed668601903065b58029aaea6bf0af",
+            "reason": "miss",
+            "at": 1791003312554.281
+          },
+          {
+            "key": "ae61a9c08aeb61015a657569307457f8feed668601903065b58029aaea6bf0af",
+            "reason": "admitted",
+            "at": 1791003312579.9724
+          },
+          {
+            "key": "6acc648cab258b406c5858103e3a6030373eb7ac415e469625c75f66616fe05a",
+            "reason": "miss",
+            "at": 1791003312939.0352
+          },
+          {
+            "key": "6acc648cab258b406c5858103e3a6030373eb7ac415e469625c75f66616fe05a",
+            "reason": "admitted",
+            "at": 1791003312962.8442
+          },
+          {
+            "key": "7f79850c9789faeb62d6733c5f86b554555a8a49916222fe1f5ef2573a7ecae9",
+            "reason": "miss",
+            "at": 1791003313323.507
+          },
+          {
+            "key": "7f79850c9789faeb62d6733c5f86b554555a8a49916222fe1f5ef2573a7ecae9",
+            "reason": "admitted",
+            "at": 1791003313347.6123
+          },
+          {
+            "key": "8f2deabb2b2af9034f0fb2302bcdb05f2dc7f5d788e9c06ac672a97106297d10",
+            "reason": "miss",
+            "at": 1791003313705.43
+          },
+          {
+            "key": "8f2deabb2b2af9034f0fb2302bcdb05f2dc7f5d788e9c06ac672a97106297d10",
+            "reason": "admitted",
+            "at": 1791003313729.5073
+          },
+          {
+            "key": "da5e6eb0293130d6a56dac59caa6f70ce6af0b04f2a51f23365205cccfc8c02a",
+            "reason": "miss",
+            "at": 1791003314094.1157
+          },
+          {
+            "key": "da5e6eb0293130d6a56dac59caa6f70ce6af0b04f2a51f23365205cccfc8c02a",
+            "reason": "admitted",
+            "at": 1791003314121.4897
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 438565,
+          "metadata": 30503,
+          "records": 33,
+          "checkpoints": 11,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 438565
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14391992,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 15,
+      "reopen": 3,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 271384576,
+        "heapTotal": 107757568,
+        "heapUsed": 69092392,
+        "external": 3883284,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 359,
+        "bytesHashed": 359,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14503032,
+        "responseBytes": 26559,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "8890b7b743dac99bdff80292ee8867d62a8f318b6e1799a3752e92df69eb2bd2",
+            "reason": "miss",
+            "at": 1791003314574.795
+          },
+          {
+            "key": "8890b7b743dac99bdff80292ee8867d62a8f318b6e1799a3752e92df69eb2bd2",
+            "reason": "admitted",
+            "at": 1791003314599.7212
+          },
+          {
+            "key": "0f2a0ef980f66b3164329bac905319abfa7cf35163b7a36d9b9e0220c454c155",
+            "reason": "miss",
+            "at": 1791003314955.777
+          },
+          {
+            "key": "0f2a0ef980f66b3164329bac905319abfa7cf35163b7a36d9b9e0220c454c155",
+            "reason": "admitted",
+            "at": 1791003314995.9888
+          },
+          {
+            "key": "cfb55974bee6041e7bbd03db6eca3d38bfca4ae9a08748a28cdafb9be810f0ee",
+            "reason": "miss",
+            "at": 1791003315369.0266
+          },
+          {
+            "key": "cfb55974bee6041e7bbd03db6eca3d38bfca4ae9a08748a28cdafb9be810f0ee",
+            "reason": "admitted",
+            "at": 1791003315394.0188
+          },
+          {
+            "key": "0bd32d4db3f9ed969ba5f72355f68a558bf2e2ab58f108296eeeaea82e89dcb6",
+            "reason": "miss",
+            "at": 1791003315762.927
+          },
+          {
+            "key": "0bd32d4db3f9ed969ba5f72355f68a558bf2e2ab58f108296eeeaea82e89dcb6",
+            "reason": "admitted",
+            "at": 1791003315787.3818
+          },
+          {
+            "key": "3bfbc941c437f9d66ba630ce459032908c9fbf2180f1bdb15824e52cd076ac5b",
+            "reason": "miss",
+            "at": 1791003316146.4639
+          },
+          {
+            "key": "3bfbc941c437f9d66ba630ce459032908c9fbf2180f1bdb15824e52cd076ac5b",
+            "reason": "admitted",
+            "at": 1791003316172.6045
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 635972,
+          "metadata": 44383,
+          "records": 48,
+          "checkpoints": 16,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 635972
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14503032,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 20,
+      "reopen": 4,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 272187392,
+        "heapTotal": 108019712,
+        "heapUsed": 69419808,
+        "external": 3883284,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14614072,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "48cab6a6e646b195be78567e100732927c2c7d68a76f387feb14bbaa051af951",
+            "reason": "miss",
+            "at": 1791003316629.4866
+          },
+          {
+            "key": "48cab6a6e646b195be78567e100732927c2c7d68a76f387feb14bbaa051af951",
+            "reason": "admitted",
+            "at": 1791003316654.7065
+          },
+          {
+            "key": "6ea08bbc36e59d54398665da6b3741269a545d67f44f2117af59f084b52aadd8",
+            "reason": "miss",
+            "at": 1791003317037.0073
+          },
+          {
+            "key": "6ea08bbc36e59d54398665da6b3741269a545d67f44f2117af59f084b52aadd8",
+            "reason": "admitted",
+            "at": 1791003317063.8262
+          },
+          {
+            "key": "8832aa41920d37f4b37bb286cae63bbe7467015dfd34ea3c0a254ca859d4a046",
+            "reason": "miss",
+            "at": 1791003317437.475
+          },
+          {
+            "key": "8832aa41920d37f4b37bb286cae63bbe7467015dfd34ea3c0a254ca859d4a046",
+            "reason": "admitted",
+            "at": 1791003317461.1868
+          },
+          {
+            "key": "8f2c534e751b6a21a8922b47b1d2a2aeaf826f425b58ca1094d3712e9ae62d4e",
+            "reason": "miss",
+            "at": 1791003317822.2651
+          },
+          {
+            "key": "8f2c534e751b6a21a8922b47b1d2a2aeaf826f425b58ca1094d3712e9ae62d4e",
+            "reason": "admitted",
+            "at": 1791003317845.5342
+          },
+          {
+            "key": "dfbe9cda44dab3f724b8b456e945afa559ee65b69724add0b1b7629190406565",
+            "reason": "miss",
+            "at": 1791003318221.9883
+          },
+          {
+            "key": "dfbe9cda44dab3f724b8b456e945afa559ee65b69724add0b1b7629190406565",
+            "reason": "admitted",
+            "at": 1791003318247.9575
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 833382,
+          "metadata": 58263,
+          "records": 63,
+          "checkpoints": 21,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 833382
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14614072,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 25,
+      "reopen": 5,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 272515072,
+        "heapTotal": 108281856,
+        "heapUsed": 69845176,
+        "external": 3883284,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14725112,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "a9ab599a7cb6a9f857a9a881ec74bfd9a960465360b1eaa751a153242a55d549",
+            "reason": "miss",
+            "at": 1791003318700.949
+          },
+          {
+            "key": "a9ab599a7cb6a9f857a9a881ec74bfd9a960465360b1eaa751a153242a55d549",
+            "reason": "admitted",
+            "at": 1791003318724.0024
+          },
+          {
+            "key": "8fa0c0499cbfeb086cf57a25c4d1b880b4a08114d9a1e8f2868093190b4bbffc",
+            "reason": "miss",
+            "at": 1791003319080.3865
+          },
+          {
+            "key": "8fa0c0499cbfeb086cf57a25c4d1b880b4a08114d9a1e8f2868093190b4bbffc",
+            "reason": "admitted",
+            "at": 1791003319105.4092
+          },
+          {
+            "key": "8d180352880090b1f2cd83aa85c58d49d3c8f5bd5209b0da3efd3936fdc8016a",
+            "reason": "miss",
+            "at": 1791003319464.007
+          },
+          {
+            "key": "8d180352880090b1f2cd83aa85c58d49d3c8f5bd5209b0da3efd3936fdc8016a",
+            "reason": "admitted",
+            "at": 1791003319486.614
+          },
+          {
+            "key": "3917a52fee5bddd147fdb1ecf702f3935dd2ca3dac74da4c3224e21089043ece",
+            "reason": "miss",
+            "at": 1791003319846.8247
+          },
+          {
+            "key": "3917a52fee5bddd147fdb1ecf702f3935dd2ca3dac74da4c3224e21089043ece",
+            "reason": "admitted",
+            "at": 1791003319871.3293
+          },
+          {
+            "key": "39c49b6da68691d2a98a0ef353c05129a9479bcd0efc7c7e88ca09202987aaf1",
+            "reason": "miss",
+            "at": 1791003320231.3062
+          },
+          {
+            "key": "39c49b6da68691d2a98a0ef353c05129a9479bcd0efc7c7e88ca09202987aaf1",
+            "reason": "admitted",
+            "at": 1791003320262.3982
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1030792,
+          "metadata": 72143,
+          "records": 78,
+          "checkpoints": 26,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1030792
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14725112,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 30,
+      "reopen": 6,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 271335424,
+        "heapTotal": 106758144,
+        "heapUsed": 66492120,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14836152,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "849efe532d74df2067a30d39a4cc945c0cbead3e4fbc7274221e6f69f19ad5e7",
+            "reason": "miss",
+            "at": 1791003320788.5786
+          },
+          {
+            "key": "849efe532d74df2067a30d39a4cc945c0cbead3e4fbc7274221e6f69f19ad5e7",
+            "reason": "admitted",
+            "at": 1791003320811.868
+          },
+          {
+            "key": "96102b573fc4a3643164b0ba1bc6ed4e4afa3e929705182eeda580008800466d",
+            "reason": "miss",
+            "at": 1791003321172.4058
+          },
+          {
+            "key": "96102b573fc4a3643164b0ba1bc6ed4e4afa3e929705182eeda580008800466d",
+            "reason": "admitted",
+            "at": 1791003321195.8865
+          },
+          {
+            "key": "82a46fdaffcf16272dcb9a443e31f28a63e1c83d529365d73fa76b1bd9590321",
+            "reason": "miss",
+            "at": 1791003321570.2769
+          },
+          {
+            "key": "82a46fdaffcf16272dcb9a443e31f28a63e1c83d529365d73fa76b1bd9590321",
+            "reason": "admitted",
+            "at": 1791003321595.8308
+          },
+          {
+            "key": "a655f7d311ddd03cb496e46337b362872568d90bcb7f4376c5299fc4b8fd7394",
+            "reason": "miss",
+            "at": 1791003321959.116
+          },
+          {
+            "key": "a655f7d311ddd03cb496e46337b362872568d90bcb7f4376c5299fc4b8fd7394",
+            "reason": "admitted",
+            "at": 1791003321988.9766
+          },
+          {
+            "key": "b48343135c4135dd9985c3667360780393b1dd710cbe94e768ceaf2bec822c10",
+            "reason": "miss",
+            "at": 1791003322354.6062
+          },
+          {
+            "key": "b48343135c4135dd9985c3667360780393b1dd710cbe94e768ceaf2bec822c10",
+            "reason": "admitted",
+            "at": 1791003322381.7505
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1228202,
+          "metadata": 86023,
+          "records": 93,
+          "checkpoints": 31,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1228202
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14836152,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 35,
+      "reopen": 7,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 271433728,
+        "heapTotal": 107020288,
+        "heapUsed": 66883936,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14947192,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "d13426cb6f17eef2a0450f9be070bc26598c7c89a93f897f3636dd97a687b7e0",
+            "reason": "miss",
+            "at": 1791003322882.755
+          },
+          {
+            "key": "d13426cb6f17eef2a0450f9be070bc26598c7c89a93f897f3636dd97a687b7e0",
+            "reason": "admitted",
+            "at": 1791003322906.5764
+          },
+          {
+            "key": "6984e8dfcafc2e0384923e70d5268589f1e087b37174daf1d1b9720852200930",
+            "reason": "miss",
+            "at": 1791003323291.7393
+          },
+          {
+            "key": "6984e8dfcafc2e0384923e70d5268589f1e087b37174daf1d1b9720852200930",
+            "reason": "admitted",
+            "at": 1791003323322.5835
+          },
+          {
+            "key": "c3e30ced4ea6930c5a983969f49d9b210b5f96a64a782bca65814d10f37b81ae",
+            "reason": "miss",
+            "at": 1791003323738.6577
+          },
+          {
+            "key": "c3e30ced4ea6930c5a983969f49d9b210b5f96a64a782bca65814d10f37b81ae",
+            "reason": "admitted",
+            "at": 1791003323763.92
+          },
+          {
+            "key": "694042a98ed7779341795422528d8754e840de7a35d444555c8e3cbbc14a33ff",
+            "reason": "miss",
+            "at": 1791003324128.2812
+          },
+          {
+            "key": "694042a98ed7779341795422528d8754e840de7a35d444555c8e3cbbc14a33ff",
+            "reason": "admitted",
+            "at": 1791003324154.9587
+          },
+          {
+            "key": "96b919fdfb4537cb5a6964b76d71c80db64449745d9467ad58263f56b17056e5",
+            "reason": "miss",
+            "at": 1791003324505.9487
+          },
+          {
+            "key": "96b919fdfb4537cb5a6964b76d71c80db64449745d9467ad58263f56b17056e5",
+            "reason": "admitted",
+            "at": 1791003324529.7197
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1425612,
+          "metadata": 99903,
+          "records": 108,
+          "checkpoints": 36,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1425612
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14947192,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 40,
+      "reopen": 8,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 271663104,
+        "heapTotal": 108068864,
+        "heapUsed": 67389296,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15058232,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "7e9068392cb63967f9e14da49d7f74967177d59b80a27b86eaca6761f3461370",
+            "reason": "miss",
+            "at": 1791003325035.0461
+          },
+          {
+            "key": "7e9068392cb63967f9e14da49d7f74967177d59b80a27b86eaca6761f3461370",
+            "reason": "admitted",
+            "at": 1791003325062.0398
+          },
+          {
+            "key": "9048e5801f2f8f5e9f3c11c858d6860a18525dbe9a162aabbd486dbee611f438",
+            "reason": "miss",
+            "at": 1791003325427.8425
+          },
+          {
+            "key": "9048e5801f2f8f5e9f3c11c858d6860a18525dbe9a162aabbd486dbee611f438",
+            "reason": "admitted",
+            "at": 1791003325451.5498
+          },
+          {
+            "key": "1d5c1add038ccd225a6d9e6fa295555418fb84fadf6e55680743a084e549997c",
+            "reason": "miss",
+            "at": 1791003325803.1218
+          },
+          {
+            "key": "1d5c1add038ccd225a6d9e6fa295555418fb84fadf6e55680743a084e549997c",
+            "reason": "admitted",
+            "at": 1791003325829.9448
+          },
+          {
+            "key": "e86cd44c5309d70048c7f2048a941edac08f50f12e8b97d0ee4b874808bef1b5",
+            "reason": "miss",
+            "at": 1791003326192.443
+          },
+          {
+            "key": "e86cd44c5309d70048c7f2048a941edac08f50f12e8b97d0ee4b874808bef1b5",
+            "reason": "admitted",
+            "at": 1791003326219.5137
+          },
+          {
+            "key": "5a922f16e37eae0a1e7d5ae6cdbfbeab05bd234a2792670e498ea3d46ff36577",
+            "reason": "miss",
+            "at": 1791003326588.5486
+          },
+          {
+            "key": "5a922f16e37eae0a1e7d5ae6cdbfbeab05bd234a2792670e498ea3d46ff36577",
+            "reason": "admitted",
+            "at": 1791003326612.4585
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1623022,
+          "metadata": 113783,
+          "records": 123,
+          "checkpoints": 41,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1623022
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15058232,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 45,
+      "reopen": 9,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 272252928,
+        "heapTotal": 109117440,
+        "heapUsed": 68380672,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15169272,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "0954920af4a85aaaa1c2fe125951270013853bf4050209e0aa072112bf240a76",
+            "reason": "miss",
+            "at": 1791003327155.4968
+          },
+          {
+            "key": "0954920af4a85aaaa1c2fe125951270013853bf4050209e0aa072112bf240a76",
+            "reason": "admitted",
+            "at": 1791003327185.2146
+          },
+          {
+            "key": "81b42be2413ce8ab38882b0412bcaadf97505b9901a317b0b1ff16ead6051d96",
+            "reason": "miss",
+            "at": 1791003327546.2507
+          },
+          {
+            "key": "81b42be2413ce8ab38882b0412bcaadf97505b9901a317b0b1ff16ead6051d96",
+            "reason": "admitted",
+            "at": 1791003327570.4736
+          },
+          {
+            "key": "7050c37eff245b77b14489253dd33b81b1f614e0b9324e04e40914645a833f6f",
+            "reason": "miss",
+            "at": 1791003327937.987
+          },
+          {
+            "key": "7050c37eff245b77b14489253dd33b81b1f614e0b9324e04e40914645a833f6f",
+            "reason": "admitted",
+            "at": 1791003327965.3787
+          },
+          {
+            "key": "8340fc9073e780256cd235f47f4cbbf76baab9bd0d691456b248d4d5bfb8c8b3",
+            "reason": "miss",
+            "at": 1791003328324.3635
+          },
+          {
+            "key": "8340fc9073e780256cd235f47f4cbbf76baab9bd0d691456b248d4d5bfb8c8b3",
+            "reason": "admitted",
+            "at": 1791003328348.3604
+          },
+          {
+            "key": "03662f75af9dba222ff9aaff69adfdb000f56f40e5b51c82af2450d05389d55a",
+            "reason": "miss",
+            "at": 1791003328705.7854
+          },
+          {
+            "key": "03662f75af9dba222ff9aaff69adfdb000f56f40e5b51c82af2450d05389d55a",
+            "reason": "admitted",
+            "at": 1791003328729.6306
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1820432,
+          "metadata": 127663,
+          "records": 138,
+          "checkpoints": 46,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1820432
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15169272,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 50,
+      "reopen": 10,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 273219584,
+        "heapTotal": 109117440,
+        "heapUsed": 68754928,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15280312,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "e7982eb2f0f1fd671ffcf854a89206a0ef37cd090ddb1b00288ab7b778a87edc",
+            "reason": "miss",
+            "at": 1791003329235.9084
+          },
+          {
+            "key": "e7982eb2f0f1fd671ffcf854a89206a0ef37cd090ddb1b00288ab7b778a87edc",
+            "reason": "admitted",
+            "at": 1791003329258.857
+          },
+          {
+            "key": "e1661e9fc19196b72d936ef4a56f3d67a1bcb2d389d6213e6e716e8a8b5de6c2",
+            "reason": "miss",
+            "at": 1791003329607.3333
+          },
+          {
+            "key": "e1661e9fc19196b72d936ef4a56f3d67a1bcb2d389d6213e6e716e8a8b5de6c2",
+            "reason": "admitted",
+            "at": 1791003329630.901
+          },
+          {
+            "key": "5d2ce3357ee46e4bf42cd537176dd7615ac65d93701ac8a01f433167982509b7",
+            "reason": "miss",
+            "at": 1791003329997.311
+          },
+          {
+            "key": "5d2ce3357ee46e4bf42cd537176dd7615ac65d93701ac8a01f433167982509b7",
+            "reason": "admitted",
+            "at": 1791003330021.755
+          },
+          {
+            "key": "049931f473ccd7c757db8ac8c7542053790de1217bf0c4bec787566f859fe588",
+            "reason": "miss",
+            "at": 1791003330389.3657
+          },
+          {
+            "key": "049931f473ccd7c757db8ac8c7542053790de1217bf0c4bec787566f859fe588",
+            "reason": "admitted",
+            "at": 1791003330414.3254
+          },
+          {
+            "key": "8f64b2defa1d5fccd80af5de7972e73339537738082215cc8ba257145a168077",
+            "reason": "miss",
+            "at": 1791003330774.9285
+          },
+          {
+            "key": "8f64b2defa1d5fccd80af5de7972e73339537738082215cc8ba257145a168077",
+            "reason": "admitted",
+            "at": 1791003330800.2837
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2017842,
+          "metadata": 141543,
+          "records": 153,
+          "checkpoints": 51,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2017842
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15280312,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 55,
+      "reopen": 11,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 274284544,
+        "heapTotal": 109379584,
+        "heapUsed": 69166656,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15391352,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "4570bbd901180d9b07b153abc97dad1c085feccda23b5a05ff3e376da280670b",
+            "reason": "miss",
+            "at": 1791003331312.4075
+          },
+          {
+            "key": "4570bbd901180d9b07b153abc97dad1c085feccda23b5a05ff3e376da280670b",
+            "reason": "admitted",
+            "at": 1791003331336.7234
+          },
+          {
+            "key": "60aa7ef796f52bbf249728b6d16e68107d544a16700d1f0934cbe1db68298860",
+            "reason": "miss",
+            "at": 1791003331698.163
+          },
+          {
+            "key": "60aa7ef796f52bbf249728b6d16e68107d544a16700d1f0934cbe1db68298860",
+            "reason": "admitted",
+            "at": 1791003331721.597
+          },
+          {
+            "key": "e8c22a13627ba64dcdaec5247424cb1f160f7b9075057ebea79867636bfafb0b",
+            "reason": "miss",
+            "at": 1791003332105.568
+          },
+          {
+            "key": "e8c22a13627ba64dcdaec5247424cb1f160f7b9075057ebea79867636bfafb0b",
+            "reason": "admitted",
+            "at": 1791003332131.3086
+          },
+          {
+            "key": "f802547002616db82fc1d6163ec2ab55cfc5884b90d3994c173fdb54a841f1cf",
+            "reason": "miss",
+            "at": 1791003332498.1309
+          },
+          {
+            "key": "f802547002616db82fc1d6163ec2ab55cfc5884b90d3994c173fdb54a841f1cf",
+            "reason": "admitted",
+            "at": 1791003332546.1323
+          },
+          {
+            "key": "df3a2d1d518eb36f49f75a15ef9ad4527d4511e19b8ebe8b41d561c7b2363533",
+            "reason": "miss",
+            "at": 1791003332903.7776
+          },
+          {
+            "key": "df3a2d1d518eb36f49f75a15ef9ad4527d4511e19b8ebe8b41d561c7b2363533",
+            "reason": "admitted",
+            "at": 1791003332925.535
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2215252,
+          "metadata": 155423,
+          "records": 168,
+          "checkpoints": 56,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2215252
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15391352,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 60,
+      "reopen": 12,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 275087360,
+        "heapTotal": 109379584,
+        "heapUsed": 69541552,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15502392,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "987fa0bdd0a57944d033147bd8d429d477ed54f2f7a5cac78ea9a3066f5a58cf",
+            "reason": "miss",
+            "at": 1791003333422.491
+          },
+          {
+            "key": "987fa0bdd0a57944d033147bd8d429d477ed54f2f7a5cac78ea9a3066f5a58cf",
+            "reason": "admitted",
+            "at": 1791003333446.7646
+          },
+          {
+            "key": "f0196810b52d6e8bd91f0195d4586a8c4970f69a99576343e876736c01b0aea5",
+            "reason": "miss",
+            "at": 1791003333810.8496
+          },
+          {
+            "key": "f0196810b52d6e8bd91f0195d4586a8c4970f69a99576343e876736c01b0aea5",
+            "reason": "admitted",
+            "at": 1791003333839.489
+          },
+          {
+            "key": "6a4972d14ab68fde331e7e9b19df0818daf7ccbc8e8fe417d0fda6f2839ad6fc",
+            "reason": "miss",
+            "at": 1791003334204.3108
+          },
+          {
+            "key": "6a4972d14ab68fde331e7e9b19df0818daf7ccbc8e8fe417d0fda6f2839ad6fc",
+            "reason": "admitted",
+            "at": 1791003334227.261
+          },
+          {
+            "key": "d35201d488a8a512a51759f3399f36fb2ab9984782d902f3af7c7f1f7f07b882",
+            "reason": "miss",
+            "at": 1791003334581.7048
+          },
+          {
+            "key": "d35201d488a8a512a51759f3399f36fb2ab9984782d902f3af7c7f1f7f07b882",
+            "reason": "admitted",
+            "at": 1791003334604.9028
+          },
+          {
+            "key": "851a99d8b25c7079b560e4bd5491f73fa5ff5d73f5adf8433c8287a82d4d4a34",
+            "reason": "miss",
+            "at": 1791003334949.3086
+          },
+          {
+            "key": "851a99d8b25c7079b560e4bd5491f73fa5ff5d73f5adf8433c8287a82d4d4a34",
+            "reason": "admitted",
+            "at": 1791003334972.4995
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2412662,
+          "metadata": 169303,
+          "records": 183,
+          "checkpoints": 61,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2412662
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15502392,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 65,
+      "reopen": 13,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 275906560,
+        "heapTotal": 109903872,
+        "heapUsed": 70022096,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15613432,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "cd787adde59322c3ce7457a2a2fe4dddd7034b8d2c652eae1a419ff3e27b8cbc",
+            "reason": "miss",
+            "at": 1791003335497.7002
+          },
+          {
+            "key": "cd787adde59322c3ce7457a2a2fe4dddd7034b8d2c652eae1a419ff3e27b8cbc",
+            "reason": "admitted",
+            "at": 1791003335522.201
+          },
+          {
+            "key": "e198c8aeb7171d7fa90f2afabfa42833e60858c396135fca8a73002acd4ef933",
+            "reason": "miss",
+            "at": 1791003335905.653
+          },
+          {
+            "key": "e198c8aeb7171d7fa90f2afabfa42833e60858c396135fca8a73002acd4ef933",
+            "reason": "admitted",
+            "at": 1791003335930.1536
+          },
+          {
+            "key": "c5cfda45b0c82a3a1df75c701ef8489148c62107d640f7c680c78ff9bfa5c93c",
+            "reason": "miss",
+            "at": 1791003336282.0918
+          },
+          {
+            "key": "c5cfda45b0c82a3a1df75c701ef8489148c62107d640f7c680c78ff9bfa5c93c",
+            "reason": "admitted",
+            "at": 1791003336305.4458
+          },
+          {
+            "key": "55bee01b5275d39cee4cf8b7f5d8d3ac9354fec5d73b64666bb15b454c47fe2f",
+            "reason": "miss",
+            "at": 1791003336642.7156
+          },
+          {
+            "key": "55bee01b5275d39cee4cf8b7f5d8d3ac9354fec5d73b64666bb15b454c47fe2f",
+            "reason": "admitted",
+            "at": 1791003336665.5447
+          },
+          {
+            "key": "7b43f11ac5daffff9c153d11749398cd042bc1b6ffea54782e9a28cc4c3f115d",
+            "reason": "miss",
+            "at": 1791003337016.5513
+          },
+          {
+            "key": "7b43f11ac5daffff9c153d11749398cd042bc1b6ffea54782e9a28cc4c3f115d",
+            "reason": "admitted",
+            "at": 1791003337040.851
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2610072,
+          "metadata": 183183,
+          "records": 198,
+          "checkpoints": 66,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2610072
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15613432,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 70,
+      "reopen": 14,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 232652800,
+        "heapTotal": 110428160,
+        "heapUsed": 70438376,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15724472,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "3795c71730d108f24490b3d6110b0b8c510499e91c81b9be1df012981617d741",
+            "reason": "miss",
+            "at": 1791003337532.011
+          },
+          {
+            "key": "3795c71730d108f24490b3d6110b0b8c510499e91c81b9be1df012981617d741",
+            "reason": "admitted",
+            "at": 1791003337558.7107
+          },
+          {
+            "key": "b942dad39b59c0ad0412141ff9538ee0cf64b7de405707d99ad76dc404dba18d",
+            "reason": "miss",
+            "at": 1791003337909.744
+          },
+          {
+            "key": "b942dad39b59c0ad0412141ff9538ee0cf64b7de405707d99ad76dc404dba18d",
+            "reason": "admitted",
+            "at": 1791003337931.4595
+          },
+          {
+            "key": "3245b230bb4a5ca488ec9e69222b8b16331c81169288d3962e84a641c0db225c",
+            "reason": "miss",
+            "at": 1791003338285.5513
+          },
+          {
+            "key": "3245b230bb4a5ca488ec9e69222b8b16331c81169288d3962e84a641c0db225c",
+            "reason": "admitted",
+            "at": 1791003338308.9302
+          },
+          {
+            "key": "da61903612214309ca313808363d913614b2c7998105f784324e2fc5e775bdc6",
+            "reason": "miss",
+            "at": 1791003338683.8938
+          },
+          {
+            "key": "da61903612214309ca313808363d913614b2c7998105f784324e2fc5e775bdc6",
+            "reason": "admitted",
+            "at": 1791003338706.6055
+          },
+          {
+            "key": "b30dee28abe91635778e4c66197051263ecf137ca6d107e10b9517a886800f7b",
+            "reason": "miss",
+            "at": 1791003339044.1558
+          },
+          {
+            "key": "b30dee28abe91635778e4c66197051263ecf137ca6d107e10b9517a886800f7b",
+            "reason": "admitted",
+            "at": 1791003339066.4343
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2807482,
+          "metadata": 197063,
+          "records": 213,
+          "checkpoints": 71,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2807482
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15724472,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 75,
+      "reopen": 15,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 233111552,
+        "heapTotal": 110428160,
+        "heapUsed": 70966128,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15835512,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "fcbf1a1d7b2cb3cab89788f4abdecdd99ead1f0eefc7b6b07f5c6954578f06fc",
+            "reason": "miss",
+            "at": 1791003339555.6377
+          },
+          {
+            "key": "fcbf1a1d7b2cb3cab89788f4abdecdd99ead1f0eefc7b6b07f5c6954578f06fc",
+            "reason": "admitted",
+            "at": 1791003339579.4736
+          },
+          {
+            "key": "e2021444754be67d6e7684ba80f98afff8b4bce57fe301e59cb98fad3fc2ea0b",
+            "reason": "miss",
+            "at": 1791003339929.2942
+          },
+          {
+            "key": "e2021444754be67d6e7684ba80f98afff8b4bce57fe301e59cb98fad3fc2ea0b",
+            "reason": "admitted",
+            "at": 1791003339952.463
+          },
+          {
+            "key": "4ea69b8b038b0164b97c5fe38672abb3f08c9a3ee8922ec087a55736264f6d02",
+            "reason": "miss",
+            "at": 1791003340313.2559
+          },
+          {
+            "key": "4ea69b8b038b0164b97c5fe38672abb3f08c9a3ee8922ec087a55736264f6d02",
+            "reason": "admitted",
+            "at": 1791003340335.8555
+          },
+          {
+            "key": "47cfbf9a6c39564d2553f5e0e3ee6a4d69501084ea6c19559004362b2dba26a5",
+            "reason": "miss",
+            "at": 1791003340686.9124
+          },
+          {
+            "key": "47cfbf9a6c39564d2553f5e0e3ee6a4d69501084ea6c19559004362b2dba26a5",
+            "reason": "admitted",
+            "at": 1791003340713.245
+          },
+          {
+            "key": "023549ec50cbe6a6e90bcb0de7ec86fae5182cc54831f1ad2c0028902af18078",
+            "reason": "miss",
+            "at": 1791003341062.4563
+          },
+          {
+            "key": "023549ec50cbe6a6e90bcb0de7ec86fae5182cc54831f1ad2c0028902af18078",
+            "reason": "admitted",
+            "at": 1791003341084.872
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3004892,
+          "metadata": 210943,
+          "records": 228,
+          "checkpoints": 76,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3004892
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15835512,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 80,
+      "reopen": 16,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 233177088,
+        "heapTotal": 110952448,
+        "heapUsed": 71424176,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 15946552,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "bb12d94762c7ee14d0a04cce430d5a549fc8dddab422f43602b09c358ffd9200",
+            "reason": "miss",
+            "at": 1791003341589.4077
+          },
+          {
+            "key": "bb12d94762c7ee14d0a04cce430d5a549fc8dddab422f43602b09c358ffd9200",
+            "reason": "admitted",
+            "at": 1791003341613.0256
+          },
+          {
+            "key": "78faeaba02845546365eac5e5dfe920da61e2adefaca5e7b83bc188ccbb3b2c6",
+            "reason": "miss",
+            "at": 1791003341965.0532
+          },
+          {
+            "key": "78faeaba02845546365eac5e5dfe920da61e2adefaca5e7b83bc188ccbb3b2c6",
+            "reason": "admitted",
+            "at": 1791003341991.3574
+          },
+          {
+            "key": "c69c7e093d2167340c9be483c452010b957ad594038b1cb3994659a2961049e6",
+            "reason": "miss",
+            "at": 1791003342340.736
+          },
+          {
+            "key": "c69c7e093d2167340c9be483c452010b957ad594038b1cb3994659a2961049e6",
+            "reason": "admitted",
+            "at": 1791003342363.895
+          },
+          {
+            "key": "f3932e6185a8c6d0c078ba6494b5786e6e895216d0aa18898e893a03c55a6e9b",
+            "reason": "miss",
+            "at": 1791003342729.722
+          },
+          {
+            "key": "f3932e6185a8c6d0c078ba6494b5786e6e895216d0aa18898e893a03c55a6e9b",
+            "reason": "admitted",
+            "at": 1791003342753.0935
+          },
+          {
+            "key": "7a5531e71830483673ab2f33316f4943fdb35612090b2370b07ce5d1e60afcdd",
+            "reason": "miss",
+            "at": 1791003343093.7896
+          },
+          {
+            "key": "7a5531e71830483673ab2f33316f4943fdb35612090b2370b07ce5d1e60afcdd",
+            "reason": "admitted",
+            "at": 1791003343116.3247
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3202302,
+          "metadata": 224823,
+          "records": 243,
+          "checkpoints": 81,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3202302
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 15946552,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 85,
+      "reopen": 17,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 234176512,
+        "heapTotal": 111738880,
+        "heapUsed": 72001928,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 16057592,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "f92b2f5adf69440975b7ec6735cdfca1504dc076f37d41d879d5c463ad33f6f6",
+            "reason": "miss",
+            "at": 1791003343610.7576
+          },
+          {
+            "key": "f92b2f5adf69440975b7ec6735cdfca1504dc076f37d41d879d5c463ad33f6f6",
+            "reason": "admitted",
+            "at": 1791003343634.4263
+          },
+          {
+            "key": "e0db255714ff0d53855e745c40c6bd105c0b89397b2ad3fbdf35ae6f710e50ba",
+            "reason": "miss",
+            "at": 1791003343974.6675
+          },
+          {
+            "key": "e0db255714ff0d53855e745c40c6bd105c0b89397b2ad3fbdf35ae6f710e50ba",
+            "reason": "admitted",
+            "at": 1791003343998.876
+          },
+          {
+            "key": "0460b695994fc8e2d229b2825e450653c13fac9ebbf1fe004c45a5e403c3e0e9",
+            "reason": "miss",
+            "at": 1791003344351.028
+          },
+          {
+            "key": "0460b695994fc8e2d229b2825e450653c13fac9ebbf1fe004c45a5e403c3e0e9",
+            "reason": "admitted",
+            "at": 1791003344374.2573
+          },
+          {
+            "key": "b3c4820ecbc1d159626338c694f00a3aa9a2d718610da78c449239737d10b183",
+            "reason": "miss",
+            "at": 1791003344711.879
+          },
+          {
+            "key": "b3c4820ecbc1d159626338c694f00a3aa9a2d718610da78c449239737d10b183",
+            "reason": "admitted",
+            "at": 1791003344735.5403
+          },
+          {
+            "key": "ff4179abfbcd667348af43f9caa933f9b52e83977f86fd58bba4cf44d4e4026a",
+            "reason": "miss",
+            "at": 1791003345079.5383
+          },
+          {
+            "key": "ff4179abfbcd667348af43f9caa933f9b52e83977f86fd58bba4cf44d4e4026a",
+            "reason": "admitted",
+            "at": 1791003345103.859
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3399712,
+          "metadata": 238703,
+          "records": 258,
+          "checkpoints": 86,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3399712
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16057592,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 90,
+      "reopen": 18,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 234504192,
+        "heapTotal": 111738880,
+        "heapUsed": 72482208,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 16168632,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "83b4c549f4080e7c15884368ec26f57571de8dca722007d37dde8d135e26718b",
+            "reason": "miss",
+            "at": 1791003345595.8167
+          },
+          {
+            "key": "83b4c549f4080e7c15884368ec26f57571de8dca722007d37dde8d135e26718b",
+            "reason": "admitted",
+            "at": 1791003345616.7612
+          },
+          {
+            "key": "375272f1720fe0611ac0d1a23771b825e4267e5e11fbe97bd44ae086e26d85b0",
+            "reason": "miss",
+            "at": 1791003345979.5112
+          },
+          {
+            "key": "375272f1720fe0611ac0d1a23771b825e4267e5e11fbe97bd44ae086e26d85b0",
+            "reason": "admitted",
+            "at": 1791003346003.0825
+          },
+          {
+            "key": "6e7a2609519f97488f68a73347e913eb2d26b6822ee1f8c31ea44a6e49416326",
+            "reason": "miss",
+            "at": 1791003346371.0908
+          },
+          {
+            "key": "6e7a2609519f97488f68a73347e913eb2d26b6822ee1f8c31ea44a6e49416326",
+            "reason": "admitted",
+            "at": 1791003346396.845
+          },
+          {
+            "key": "ee5fc1adeb90c8221ed800e3c220b36da54aeed428e5e4ae01776155cac1da4d",
+            "reason": "miss",
+            "at": 1791003346741.0334
+          },
+          {
+            "key": "ee5fc1adeb90c8221ed800e3c220b36da54aeed428e5e4ae01776155cac1da4d",
+            "reason": "admitted",
+            "at": 1791003346769.49
+          },
+          {
+            "key": "61ab51de8607591042cd6cab00c3699af3bb289a6375591a71b3cf64165079e0",
+            "reason": "miss",
+            "at": 1791003347127.0544
+          },
+          {
+            "key": "61ab51de8607591042cd6cab00c3699af3bb289a6375591a71b3cf64165079e0",
+            "reason": "admitted",
+            "at": 1791003347150.968
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3597122,
+          "metadata": 252583,
+          "records": 273,
+          "checkpoints": 91,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3597122
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16168632,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 95,
+      "reopen": 19,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 235241472,
+        "heapTotal": 112525312,
+        "heapUsed": 73121968,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 16279672,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "015895ef414913e46f73d923b0598a1039c9c98b72d5d4294eb03b5854d18cea",
+            "reason": "miss",
+            "at": 1791003347673.2576
+          },
+          {
+            "key": "015895ef414913e46f73d923b0598a1039c9c98b72d5d4294eb03b5854d18cea",
+            "reason": "admitted",
+            "at": 1791003347696.669
+          },
+          {
+            "key": "829065ffac3c62b2ff32d592e97c74cee5b3a0f1b84aabdfd25e65639057d1de",
+            "reason": "miss",
+            "at": 1791003348034.7703
+          },
+          {
+            "key": "829065ffac3c62b2ff32d592e97c74cee5b3a0f1b84aabdfd25e65639057d1de",
+            "reason": "admitted",
+            "at": 1791003348059.2207
+          },
+          {
+            "key": "3b8552f34477c3dfc269d289bbc2bd50cf8462e1b3b8d4372faefec80aa163a4",
+            "reason": "miss",
+            "at": 1791003348396.45
+          },
+          {
+            "key": "3b8552f34477c3dfc269d289bbc2bd50cf8462e1b3b8d4372faefec80aa163a4",
+            "reason": "admitted",
+            "at": 1791003348419.2075
+          },
+          {
+            "key": "f305fd875456ca366c251832b98d93eda33e1e4c36eb1cdd929cd505b42e4772",
+            "reason": "miss",
+            "at": 1791003348749.0002
+          },
+          {
+            "key": "f305fd875456ca366c251832b98d93eda33e1e4c36eb1cdd929cd505b42e4772",
+            "reason": "admitted",
+            "at": 1791003348771.4377
+          },
+          {
+            "key": "899a12c03b7877dd3aca45ce5520e1b73336c40217c0783ae40797c5799a4dad",
+            "reason": "miss",
+            "at": 1791003349108.2854
+          },
+          {
+            "key": "899a12c03b7877dd3aca45ce5520e1b73336c40217c0783ae40797c5799a4dad",
+            "reason": "admitted",
+            "at": 1791003349132.6665
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3794532,
+          "metadata": 266463,
+          "records": 288,
+          "checkpoints": 96,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3794532
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16279672,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    },
+    {
+      "cycle": 100,
+      "reopen": 20,
+      "closedOwnersReleased": true,
+      "memory": {
+        "rss": 235765760,
+        "heapTotal": 112787456,
+        "heapUsed": 73649864,
+        "external": 3876781,
+        "arrayBuffers": 76701
+      },
+      "diagnostics": {
+        "bytesRead": 360,
+        "bytesHashed": 360,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 16390712,
+        "responseBytes": 26560,
+        "pages": 0,
+        "reuseBypasses": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "historyPagesRetained": 0,
+        "retainedPageBytes": 0,
+        "comparisons": {
+          "perTaskBytes": {},
+          "perKindBytes": {},
+          "averageEntryAgeMs": 0,
+          "largestEntries": [],
+          "hottestKeys": [],
+          "totalEntries": 0,
+          "totalBytes": 0,
+          "maxBytes": 262144,
+          "maxEntries": 4,
+          "hitCount": 0,
+          "missCount": 5,
+          "hitRatio": 0,
+          "evictionCount": 0,
+          "rejectedAdmissionCount": 0,
+          "rejectedUnsafeEntryCount": 0,
+          "staleInvalidationCount": 0,
+          "pressureTrimEvents": 0,
+          "emergencyTrimEvents": 0,
+          "durability": "memoryOnly"
+        },
+        "reuseDecisions": [
+          {
+            "key": "0fb4954938219f17381228e22d6f6dd863bd173f2861d97311206652ba8aabb6",
+            "reason": "miss",
+            "at": 1791003349609.7515
+          },
+          {
+            "key": "0fb4954938219f17381228e22d6f6dd863bd173f2861d97311206652ba8aabb6",
+            "reason": "admitted",
+            "at": 1791003349632.8196
+          },
+          {
+            "key": "2f59dc153415e0f1e9dee5e63dab87a6dcf86c27cf4f4d715b05d671ff94e4e3",
+            "reason": "miss",
+            "at": 1791003349982.1716
+          },
+          {
+            "key": "2f59dc153415e0f1e9dee5e63dab87a6dcf86c27cf4f4d715b05d671ff94e4e3",
+            "reason": "admitted",
+            "at": 1791003350004.8713
+          },
+          {
+            "key": "2df76717e2b0e4eca0937b72effc87ce5fa9abc5cd6331ec28fe6645679facd8",
+            "reason": "miss",
+            "at": 1791003350347.2073
+          },
+          {
+            "key": "2df76717e2b0e4eca0937b72effc87ce5fa9abc5cd6331ec28fe6645679facd8",
+            "reason": "admitted",
+            "at": 1791003350369.7847
+          },
+          {
+            "key": "3f52481190f1e47fbc7d0c5c30b5647e40e081a1bcffdaa9d6c4839653a6daef",
+            "reason": "miss",
+            "at": 1791003350704.215
+          },
+          {
+            "key": "3f52481190f1e47fbc7d0c5c30b5647e40e081a1bcffdaa9d6c4839653a6daef",
+            "reason": "admitted",
+            "at": 1791003350731.3013
+          },
+          {
+            "key": "543c939f4be0ebf0792efe5a00775def76b17234caddd3695b93224102cb177e",
+            "reason": "miss",
+            "at": 1791003351066.4956
+          },
+          {
+            "key": "543c939f4be0ebf0792efe5a00775def76b17234caddd3695b93224102cb177e",
+            "reason": "admitted",
+            "at": 1791003351087.9004
+          }
+        ],
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3991942,
+          "metadata": 280343,
+          "records": 303,
+          "checkpoints": 101,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3991942
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 16390712,
+          "peakPending": 1
+        }
+      },
+      "activeResources": {},
+      "listeners": {
+        "SIGINT": 0,
+        "SIGTERM": 0,
+        "exit": 0,
+        "warning": 1,
+        "uncaughtException": 0
+      }
+    }
+  ],
+  "live": {
+    "bytesRead": 360,
+    "bytesHashed": 360,
+    "fullDiffs": 5,
+    "observations": 5,
+    "peakLive": 16390712,
+    "responseBytes": 26560,
+    "pages": 0,
+    "reuseBypasses": 0,
+    "nativeSlice": true,
+    "liveReserved": 0,
+    "active": 0,
+    "pagesRetained": 0,
+    "historyPagesRetained": 0,
+    "retainedPageBytes": 0,
+    "comparisons": {
+      "perTaskBytes": {},
+      "perKindBytes": {},
+      "averageEntryAgeMs": 0,
+      "largestEntries": [],
+      "hottestKeys": [],
+      "totalEntries": 0,
+      "totalBytes": 0,
+      "maxBytes": 262144,
+      "maxEntries": 4,
+      "hitCount": 0,
+      "missCount": 5,
+      "hitRatio": 0,
+      "evictionCount": 0,
+      "rejectedAdmissionCount": 0,
+      "rejectedUnsafeEntryCount": 0,
+      "staleInvalidationCount": 0,
+      "pressureTrimEvents": 0,
+      "emergencyTrimEvents": 0,
+      "durability": "memoryOnly"
+    },
+    "reuseDecisions": [
+      {
+        "key": "0fb4954938219f17381228e22d6f6dd863bd173f2861d97311206652ba8aabb6",
+        "reason": "miss",
+        "at": 1791003349609.7515
+      },
+      {
+        "key": "0fb4954938219f17381228e22d6f6dd863bd173f2861d97311206652ba8aabb6",
+        "reason": "admitted",
+        "at": 1791003349632.8196
+      },
+      {
+        "key": "2f59dc153415e0f1e9dee5e63dab87a6dcf86c27cf4f4d715b05d671ff94e4e3",
+        "reason": "miss",
+        "at": 1791003349982.1716
+      },
+      {
+        "key": "2f59dc153415e0f1e9dee5e63dab87a6dcf86c27cf4f4d715b05d671ff94e4e3",
+        "reason": "admitted",
+        "at": 1791003350004.8713
+      },
+      {
+        "key": "2df76717e2b0e4eca0937b72effc87ce5fa9abc5cd6331ec28fe6645679facd8",
+        "reason": "miss",
+        "at": 1791003350347.2073
+      },
+      {
+        "key": "2df76717e2b0e4eca0937b72effc87ce5fa9abc5cd6331ec28fe6645679facd8",
+        "reason": "admitted",
+        "at": 1791003350369.7847
+      },
+      {
+        "key": "3f52481190f1e47fbc7d0c5c30b5647e40e081a1bcffdaa9d6c4839653a6daef",
+        "reason": "miss",
+        "at": 1791003350704.215
+      },
+      {
+        "key": "3f52481190f1e47fbc7d0c5c30b5647e40e081a1bcffdaa9d6c4839653a6daef",
+        "reason": "admitted",
+        "at": 1791003350731.3013
+      },
+      {
+        "key": "543c939f4be0ebf0792efe5a00775def76b17234caddd3695b93224102cb177e",
+        "reason": "miss",
+        "at": 1791003351066.4956
+      },
+      {
+        "key": "543c939f4be0ebf0792efe5a00775def76b17234caddd3695b93224102cb177e",
+        "reason": "admitted",
+        "at": 1791003351087.9004
+      }
+    ],
+    "writing": 0,
+    "gaps": [],
+    "shared": {
+      "maxActive": 2,
+      "maxWaiters": 32,
+      "maxWaitersPerKey": 16,
+      "timeoutMs": 5000,
+      "activeOperations": 0,
+      "pendingKeys": 0,
+      "activeWaiters": 0,
+      "startedCalls": 5,
+      "sharedCalls": 0,
+      "timedOutCalls": 0,
+      "rejectedCalls": 0
+    },
+    "evidence": {
+      "charged": 3991942,
+      "metadata": 280343,
+      "records": 303,
+      "checkpoints": 101,
+      "exhausted": false,
+      "diskLimit": 134217728,
+      "globalCharged": 3991942
+    },
+    "global": {
+      "live": 0,
+      "active": 0,
+      "pending": 0,
+      "descriptors": 0,
+      "peakLive": 16390712,
+      "peakPending": 1
+    }
+  }
+}

@@ -507,6 +507,44 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     for (const tool of this.listTools()) this.nativeRecoveryTools.set(tool.name, tool.execute);
   }
 
+  private broccoliGit?: import("../../../desktop/broccoligit/service.js").BroccoliGit;
+  setBroccoliGit(service: import("../../../desktop/broccoligit/service.js").BroccoliGit): void {
+    this.broccoliGit = service;
+    const access = (options?: ToolExecutionOptions) => ({ ...options, checkExecutionScope: options?.checkExecutionScope ?? (() => { throw new Error("Missing current host authority"); }) });
+    this.registerTool({
+      name: "broccoligit_changes",
+      description: "Inspect bounded repository evidence. Request an explicit comparison (inventory, staged, unstaged, net, before with operationId, or checkpoints with from/to); select literal paths before requesting a patch. Read continuation cursors from the same retained observation. Untracked content is separate; historical evidence is not authorization or exclusive authorship.",
+      parameters: {
+        comparison: { type: "object", required: false, description: "Typed comparison: {kind: inventory|staged|unstaged|net|before|checkpoints, operationId?, from?, to?}" },
+        paths: { type: "array", required: false, description: "At most 32 exact paths", items: { type: "string" } },
+        detail: { type: "string", required: false, description: "summary or patch" },
+        observationId: { type: "string", required: false, description: "Retained observation for continuation" },
+        cursor: { type: "string", required: false, description: "Exact returned continuation cursor" },
+      },
+      execute: (args, _cwd, options) => typeof args.observationId === "string" && typeof args.cursor === "string"
+        ? service.getDiffPage(args.observationId, args.cursor, access(options))
+        : service.getChanges(args as unknown as import("../../../desktop/broccoligit/contracts.js").ChangeRequest, access(options)),
+    });
+    this.registerTool({
+      name: "broccoligit_history",
+      description: "Retrieve recorded operations or checkpoints for the current task, newest first. Use an id for retained before/after evidence references, a path to narrow history, or the exact returned cursor to continue one observation. This does not replay actions or establish current file state.",
+      parameters: {
+        kind: { type: "string", required: true, description: "operations, checkpoints, or baseline (starting dirty-path inventory)" },
+        id: { type: "string", required: false, description: "Exact operation or checkpoint id for detailed evidence" },
+        path: { type: "string", required: false, description: "Exact path to narrow history" },
+        observationId: { type: "string", required: false, description: "Retained observation from continuation" },
+        cursor: { type: "string", required: false, description: "Exact returned continuation cursor" },
+      },
+      execute: (args, _cwd, options) => service.getHistory(args as unknown as import("../../../desktop/broccoligit/contracts.js").HistoryRequest, access(options)),
+    });
+    this.registerTool({
+      name: "broccoligit_checkpoint",
+      description: "Record a bounded milestone for the active task. Select up to 32 files; defaults to recorded operation paths. This records evidence, does not commit/stash/restore files, and is not a passing test result.",
+      parameters: { paths: { type: "array", required: false, description: "Exact selected paths", items: { type: "string" } } },
+      isMutating: true,
+      execute: (args, _cwd, options) => service.checkpoint(Array.isArray(args.paths) ? args.paths as string[] : [], access(options)),
+    });
+  }
   readonly cache: ToolExecutionCache;
   readonly governor: ToolOutputGovernor;
   readonly healer: ToolErrorAutoHealer;
@@ -897,10 +935,19 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
     const mutating = tool.isMutating || ["run_command", "env_execute_command", "env_switch_backend"].includes(canonicalName);
     if (mutating) this.prefetcher.clear();
     const finishMutation = mutating ? this.cache.beginMutation() : undefined;
+	const evidence = mutating && !canonicalName.startsWith("broccoligit_") ? this.broccoliGit : undefined;
+	const supportedWrite = ["write_file", "replace_file_content", "multi_replace_file_content", "delete_file"].includes(canonicalName) && this.nativeRecoveryTools.get(canonicalName) === tool.execute;
+	let observed: Awaited<ReturnType<NonNullable<typeof evidence>["beforeMutation"]>>;
+	let evidenceStarted = false;
+	let outcome: "returned" | "failed" | "threw" | "interrupted" = "interrupted";
 
     const startTime = Date.now();
     try {
+	  if (evidence) { observed = await evidence.beforeMutation(canonicalName, supportedWrite && typeof preparedArgs.path === "string" ? [path.resolve(cwd, preparedArgs.path)] : undefined, { ...options, checkExecutionScope: requireCurrentPolicy }, options?.requireBeforeImage); evidenceStarted = true; }
+	  else if (options?.requireBeforeImage && mutating) throw new Error("BROCCOLIGIT_REQUIRED_BEFORE_IMAGE: evidence recording is unavailable");
+	  requireCurrentPolicy();
       const result = await super.executeTool(canonicalName, preparedArgs, cwd, options);
+	  outcome = result && typeof result === "object" && "success" in result && result.success === false ? "failed" : "returned";
       options?.signal?.throwIfAborted();
       if (nativeCachedRead) requireCurrentPolicy();
       const elapsed = Date.now() - startTime;
@@ -929,6 +976,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
       return result;
     } catch (err) {
+	  if (outcome !== "returned") outcome = options?.signal?.aborted ? "interrupted" : "threw";
       requireCurrentPolicy();
       // In-turn resilience self-healing
       if (mayRecoverExecution) {
@@ -955,6 +1003,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
       this.telemetryLedger.recordSample(canonicalName, elapsed, false);
       throw err;
     } finally {
+	  if (evidence && evidenceStarted) await evidence.afterMutation(observed, outcome, { ...options, checkExecutionScope: requireCurrentPolicy });
       finishMutation?.();
     }
   }
@@ -1539,11 +1588,12 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
 
     this.registerTool({
       name: "retrieve_spill_content",
-      description: "Random-access retrieval of full or sliced tool output from the in-memory spill vault (Spill Vault)",
+      description: "Read a bounded page of retained tool output. References expire at task completion or when capacity is reclaimed; follow continuation for another page.",
       parameters: {
         spillId: { type: "string", required: true, description: "The reference spill ID (e.g. 'spill_abcdef123456')" },
         startLine: { type: "number", required: false, description: "1-indexed starting line number (optional)" },
         endLine: { type: "number", required: false, description: "1-indexed ending line number (optional)" },
+        characterOffset: { type: "number", required: false, description: "Offset within startLine, from the previous page's continuation (optional)" },
       },
       execute: async (args) => {
         const spillId = String(args.spillId || "").trim();
@@ -1552,21 +1602,18 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         const startLine = typeof args.startLine === "number" ? args.startLine : 1;
         const endLine = typeof args.endLine === "number" ? args.endLine : undefined;
 
-        const slice = this.governor.retrieveSpillSlice(spillId, startLine, endLine);
+        const slice = this.governor.retrieveSpillSlice(spillId, startLine, endLine, typeof args.characterOffset === "number" ? args.characterOffset : 0);
         if (!slice) {
           return {
             found: false,
-            error: `Spill reference '${spillId}' not found or expired from vault.`,
+            error: "This earlier output is no longer retained. Request a smaller result from the original read tool; review uncertain actions before repeating them.",
           };
         }
 
         return {
           found: true,
           spillId,
-          totalLines: slice.totalLines,
-          startLine: slice.startLine,
-          endLine: slice.endLine,
-          content: slice.content,
+          ...slice,
         };
       },
     });

@@ -1,14 +1,19 @@
 import assert from "node:assert/strict"
 import sinon from "sinon"
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { diskRuntime } from "../../core/storage/disk.js"
 import {
 	getResolvedSkillsForCwd,
 	getSkillsCacheMetrics,
+	getSkillDiscoveryMetrics,
 	invalidateSkillsCache,
 	resetSkillsCacheMetrics,
 	skillDiscoveryRuntime,
 } from "../../core/context/instructions/user-instructions/skillRuntime.js"
 import type { SkillMetadata } from "../../shared/skills.js"
-import { getSkillContent, skillsRuntime } from "../../core/context/instructions/user-instructions/skills.js"
+import { discoverSkillsWithDiagnostics, getSkillContent, skillsRuntime } from "../../core/context/instructions/user-instructions/skills.js"
 import { SkillsIngestor } from "../../tooling/extensions/registry/skills-ingestor.js"
 import { SKILL_OPERATION_TIMEOUT_MS } from "../../core/context/instructions/user-instructions/skillOperation.js"
 
@@ -28,6 +33,26 @@ describe("skill discovery throughput", () => {
 	afterEach(() => {
 		invalidateSkillsCache()
 		sinon.restore()
+	})
+	it("discovers metadata from a bounded prefix but loads and validates all required instructions", async () => {
+		const root = await mkdtemp(path.join(tmpdir(), "skill-prefix-"))
+		const directory = path.join(root, "qa")
+		await mkdir(directory)
+		sinon.stub(diskRuntime, "getSkillsDirectoriesForScan").returns([{ path: root, source: "project" }])
+		const read = sinon.spy(skillsRuntime, "readFile")
+		const body = "Required instruction.\n".repeat(10_000)
+		try {
+			await writeFile(path.join(directory, "SKILL.md"), "---\nname: qa\ndescription: QA\n---\n" + body)
+			const metadata = (await discoverSkillsWithDiagnostics(root)).skills
+			assert.equal(read.firstCall.args[3], 4096)
+			assert.equal((await getSkillContent("qa", metadata, { mode: "full" }))?.instructions, body.trim())
+			await writeFile(path.join(directory, "SKILL.md"), "---\nname: qa\ndescription: QA\n---\n" + body + "\0")
+			assert.equal(await getSkillContent("qa", metadata, { mode: "full" }), null, "corruption beyond the metadata prefix is rejected at activation")
+			read.resetHistory()
+			await writeFile(path.join(directory, "SKILL.md"), "---\nname: qa\ndescription: " + "x".repeat(6000) + "\n---\nFull instructions")
+			assert.equal((await discoverSkillsWithDiagnostics(root)).skills.find((s) => s.name === "qa")?.description.length, 6000)
+			assert.equal(read.callCount, 2, "large frontmatter falls back to the bounded full reader")
+		} finally { await rm(root, { recursive: true, force: true }) }
 	})
 	it("shares one discovery across concurrent callers without sharing mutable results", async () => {
 		const pending = deferred()
@@ -54,6 +79,22 @@ describe("skill discovery throughput", () => {
 		assert.equal(discover.firstCall.args[2]?.aborted, false)
 		pending.resolve([skill("qa")])
 		assert.equal((await survivor)[0].name, "qa")
+	})
+	it("aborts discovery when its last consumer leaves and never publishes the abandoned catalog", async () => {
+		const pending = deferred()
+		const discover = sinon.stub(skillDiscoveryRuntime, "discover").returns(pending.promise)
+		const controller = new AbortController()
+		const stopped = getResolvedSkillsForCwd("/workspace", false, controller.signal)
+		const rejected = assert.rejects(stopped, /stop scan/)
+		while (!discover.called) await Promise.resolve()
+		controller.abort(new Error("stop scan"))
+		await rejected
+		assert.equal(discover.firstCall.args[2]?.aborted, true)
+		assert.equal(getSkillDiscoveryMetrics().activeWaiters, 0)
+		pending.resolve([skill("abandoned")])
+		await new Promise((resolve) => setImmediate(resolve))
+		assert.equal(getSkillDiscoveryMetrics().cachedWorkspaces, 0)
+		assert.equal(getSkillDiscoveryMetrics().activeOperations, 0)
 	})
 	it("expires a stuck scan, admits a fresh scan, and discards a late catalog", async () => {
 		const clock = sinon.useFakeTimers()

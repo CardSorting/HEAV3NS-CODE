@@ -8,6 +8,7 @@ const inspectionMethods = new Set([
 	"files.read",
 	"changes.list",
 	"changes.read",
+	"broccoligit.read",
 	"artifact.read",
 	"history.read",
 	"history.list",

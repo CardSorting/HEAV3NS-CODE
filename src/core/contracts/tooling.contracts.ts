@@ -104,6 +104,8 @@ export interface ToolDefinition {
 }
 
 export interface ToolExecutionRecord {
+  /** The retained/model-facing output is a bounded preview, not complete evidence. */
+  readonly outputLimited?: boolean;
   readonly denied?: boolean;
   readonly name: string;
   readonly toolName?: string;
@@ -162,6 +164,8 @@ export interface ResourceConflictAssessment {
 }
 
 export interface ToolExecutionOptions {
+	/** Host opt-in: refuse a supported write unless its before-image is durable. */
+	readonly requireBeforeImage?: boolean;
   /** Internal background read: must be bounded, task-scoped, and never prompt. */
   readonly speculative?: boolean;
   /** Opaque owner captured before background scheduling; never a task name supplied by a model. */

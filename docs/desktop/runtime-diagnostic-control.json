@@ -1,0 +1,7 @@
+{
+  "scope": "No runtime loaded; isolate descriptor sampling ownership",
+  "before": [],
+  "after": [
+    "FSReqPromise"
+  ]
+}

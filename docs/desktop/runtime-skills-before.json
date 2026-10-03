@@ -1,0 +1,103 @@
+{
+  "samples": [
+    {
+      "ms": 18.555499999999938,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 17.157333000000108,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 17.290333000000146,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 20.832292000000052,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 15.94462499999986,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 15.512874999999894,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 15.015457999999853,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 16.690833999999995,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 15.258041999999932,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 16.980957999999873,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 16.081457999999884,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 16.563499999999976,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 15.716083000000026,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 16.208624999999984,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    },
+    {
+      "ms": 14.922624999999925,
+      "bytes": 17284416,
+      "reads": 64,
+      "count": 65
+    }
+  ],
+  "activation": {
+    "ms": 2.398250000000189,
+    "reads": 1,
+    "bytes": 270069,
+    "consumers": 8,
+    "instructionBytes": 269999
+  },
+  "catalogModelBytes": 5928,
+  "fixture": "64 real SKILL.md files, 255KB required instructions each; eight equivalent activations; first discovery warm-up excluded"
+}

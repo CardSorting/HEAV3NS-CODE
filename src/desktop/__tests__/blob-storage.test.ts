@@ -63,6 +63,14 @@ describe("shared blob storage", () => {
 			await second.stop()
 		}
 	})
+	it("bounds stored and decoded reads to a consumer budget without damaging retained content", async () => {
+		for (const bytes of [randomBytes(8192), Buffer.from("repeat".repeat(2000))]) {
+			const hash = await store.store(bytes)
+			await assert.rejects(store.read(hash, 1024), /BLOB_LIMIT/)
+			assert.deepEqual(await store.read(hash), bytes)
+		}
+		assert.equal((await store.getStats()).corruptCount, 0)
+	})
 	it("does not mistake stale cache entries or corrupt dedup hits for valid storage", async () => {
 		const hash = await store.store("original")
 		await rm(file(hash))
@@ -234,6 +242,11 @@ describe("recorded output storage", () => {
 		const result = await saveRecordedOutput(db, "kept", [{ content: "x".repeat(CAS_MAX_BYTES) }])
 		assert.equal(result.limited, true)
 		assert.match((await readRecordedOutput(db, result, 0)).text, /Evidence is incomplete/)
+	})
+	it("keeps partial tool output visible in the persisted run manifest", async () => {
+		const result = await saveRecordedOutput(db, "Completed", [{ name: "view_file", outputLimited: true, output: "Partial preview" }])
+		assert.equal(result.limited, true)
+		assert.equal((await readRecordedOutput(db, result, 0)).truncated, true)
 	})
 	it("never falls back to another copy when a referenced chunk is missing or corrupt", async () => {
 		const manifest = await saveRecordedOutput(db, "original", [])

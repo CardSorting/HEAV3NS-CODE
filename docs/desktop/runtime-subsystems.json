@@ -1,0 +1,1072 @@
+{
+  "schemaVersion": 1,
+  "scope": "Actual macOS desktop chain; classifications are not global deletion permission",
+  "generator": "scripts/runtime-subsystems.mjs",
+  "classifications": [
+    "active",
+    "partial",
+    "legacy",
+    "compatibility",
+    "orphaned",
+    "unknown"
+  ],
+  "orphanedFinding": "No whole exported subsystem proven safe to delete. Nine duplicate helper instances were consolidated in the maturity pass. This pass removes the duplicate parent output store and unused automatic table renderer, and unifies four observation deadline scopes. Public compatibility facades remain separate consumers.",
+  "subsystems": [
+    {
+      "id": "desktop-host",
+      "name": "macOS workspace host",
+      "purpose": "Window and worker lifetime; one canonical folder per workspace window",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "native/Sources/Heav3nsCode/App.swift",
+        "line": 200,
+        "symbol": "WorkspaceWindow(folder: canonical)",
+        "sha256": "6d763a1c9ade459b37eb1d9ead649397c24ea9832688d2267ebccfc5f8ef25f1"
+      },
+      "instantiationPath": [
+        {
+          "file": "native/Sources/Heav3nsCode/App.swift",
+          "line": 200,
+          "symbol": "WorkspaceWindow(folder: canonical)",
+          "sha256": "6d763a1c9ade459b37eb1d9ead649397c24ea9832688d2267ebccfc5f8ef25f1"
+        },
+        {
+          "file": "native/Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "line": 1980,
+          "symbol": "client.shutdown()",
+          "sha256": "0a9998d65358a1a5da023764179ecb4832f9332cd699cc5bf278a9152f2803c8"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "native/Sources/Heav3nsCode/WorkspaceWindow.swift",
+          "line": 1980,
+          "symbol": "client.shutdown()",
+          "sha256": "0a9998d65358a1a5da023764179ecb4832f9332cd699cc5bf278a9152f2803c8"
+        }
+      ],
+      "persistentState": "Recent projects and drafts; native preferences",
+      "lifecycleOwner": "AppKit application / WorkspaceWindow",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative for windows and child-process lifetime; not tool execution"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "desktop-transport",
+      "name": "Desktop transport",
+      "purpose": "Bounded framed requests and reserved control capacity",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "native/Sources/Heav3nsCode/RuntimeClient.swift",
+        "line": 85,
+        "symbol": "--desktop-worker",
+        "sha256": "177b0941656da65ee32b17d8fdc7ca538df81840343ffbbb61f799b737dc5e1c"
+      },
+      "instantiationPath": [
+        {
+          "file": "native/Sources/Heav3nsCode/RuntimeClient.swift",
+          "line": 85,
+          "symbol": "--desktop-worker",
+          "sha256": "177b0941656da65ee32b17d8fdc7ca538df81840343ffbbb61f799b737dc5e1c"
+        },
+        {
+          "file": "src/desktop/request-scheduler.ts",
+          "line": 47,
+          "symbol": "class DesktopRequestScheduler",
+          "sha256": "a2e09fe3fae21870015c0a4d8cd3d8cb82f4d3f2d099e7b99db06e2fd1e4d94b"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/desktop/request-scheduler.ts",
+          "line": 47,
+          "symbol": "class DesktopRequestScheduler",
+          "sha256": "a2e09fe3fae21870015c0a4d8cd3d8cb82f4d3f2d099e7b99db06e2fd1e4d94b"
+        }
+      ],
+      "persistentState": "None; pending frames and callbacks are process-local",
+      "lifecycleOwner": "RuntimeClient / runDesktopWorker",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative framing/admission; host policy grants execution authority"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "workspace-owner",
+      "name": "Workspace ownership",
+      "purpose": "Exclusive local worker and recovery of stale ownership",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/worker.ts",
+        "line": 2125,
+        "symbol": "await acquireWorkspace",
+        "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 2125,
+          "symbol": "await acquireWorkspace",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        },
+        {
+          "file": "src/desktop/workspace-owner.ts",
+          "line": 12,
+          "symbol": "acquireWorkspace",
+          "sha256": "bddc2ae61b9f380cf09c3c6ecaa0b12ff43e8d0fafd4e950052d174fcc2c6b2d"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/desktop/workspace-owner.ts",
+          "line": 12,
+          "symbol": "acquireWorkspace",
+          "sha256": "bddc2ae61b9f380cf09c3c6ecaa0b12ff43e8d0fafd4e950052d174fcc2c6b2d"
+        }
+      ],
+      "persistentState": "Host owner lock / canonical workspace identity",
+      "lifecycleOwner": "runDesktopWorker",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative local workspace ownership; no distributed lock"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "desktop-session",
+      "name": "DesktopSession",
+      "purpose": "Durable instructions, conversations, approvals, cancellation and continuation",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/worker.ts",
+        "line": 2231,
+        "symbol": "new DesktopSession",
+        "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 2231,
+          "symbol": "new DesktopSession",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        },
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 1651,
+          "symbol": "private async pump()",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 1651,
+          "symbol": "private async pump()",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "persistentState": "desktop.* tables and recorded output",
+      "lifecycleOwner": "runDesktopWorker",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative desktop task lifecycle and current conversation"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "agent-engine",
+      "name": "AgentEngine",
+      "purpose": "Provider/tool loop and task-local runtime scope",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 2282,
+        "symbol": "new AgentEngine",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 2282,
+          "symbol": "new AgentEngine",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 271,
+          "symbol": "this.requestQueue.run",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 271,
+          "symbol": "this.requestQueue.run",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "persistentState": "Session messages, queue outcomes; hot task state",
+      "lifecycleOwner": "LumiMonolith / DesktopSession",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative agent turn execution; no replay after uncertain interruption"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "broccoli-queue",
+      "name": "BroccoliQueue runtime adapter",
+      "purpose": "Durable single-attempt turn admission with bounded local callbacks",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 2281,
+        "symbol": "new BroccoliRuntimeQueue",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 2281,
+          "symbol": "new BroccoliRuntimeQueue",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/agents/extensions/execution/broccoli-runtime-queue.ts",
+          "line": 207,
+          "symbol": "{ attempts: 1 }",
+          "sha256": "17d1cc1c26cc7e0d47c90a179963c046aa84d958706a986d5e7284f3213f3c5c"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/agents/extensions/execution/broccoli-runtime-queue.ts",
+          "line": 207,
+          "symbol": "{ attempts: 1 }",
+          "sha256": "17d1cc1c26cc7e0d47c90a179963c046aa84d958706a986d5e7284f3213f3c5c"
+        }
+      ],
+      "persistentState": "Namespaced queue tables in the shared kernel",
+      "lifecycleOwner": "AgentEngine",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative turn schedule; stale callbacks are cancelled on restart"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "tool-scheduler",
+      "name": "ToolExecutionScheduler",
+      "purpose": "Dependency ordering, mutation conflicts and bounded tool scheduling",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/tooling/extensions/registry/tool-registry.ts",
+        "line": 498,
+        "symbol": "new ToolExecutionScheduler",
+        "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 498,
+          "symbol": "new ToolExecutionScheduler",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        },
+        {
+          "file": "src/tooling/extensions/execution/tool-execution-scheduler.ts",
+          "line": 55,
+          "symbol": "class ToolExecutionScheduler",
+          "sha256": "ec6bdc639d93014f21fe730cce90a3f94cab1eb96d0605e963b992ed5f182d47"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/execution/tool-execution-scheduler.ts",
+          "line": 55,
+          "symbol": "class ToolExecutionScheduler",
+          "sha256": "ec6bdc639d93014f21fe730cce90a3f94cab1eb96d0605e963b992ed5f182d47"
+        }
+      ],
+      "persistentState": "Hot calls, dependency state, task cache",
+      "lifecycleOwner": "AgentEngine / ValidatingToolRegistry",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative scheduling; registry independently rechecks policy"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "skills",
+      "name": "Skill discovery and activation",
+      "purpose": "Metadata discovery, pending-only content sharing and full required instructions on demand",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/tooling/extensions/registry/tool-registry.ts",
+        "line": 357,
+        "symbol": "new SkillsIngestor(eyes)",
+        "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 357,
+          "symbol": "new SkillsIngestor(eyes)",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        },
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 1283,
+          "symbol": "skillsIngestor.discoverSkills",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 1283,
+          "symbol": "skillsIngestor.discoverSkills",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "persistentState": "Short-lived metadata only; no retained instruction-body cache",
+      "lifecycleOwner": "AgentEngine task cancellation and workspace close; bounded global discovery admission",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Metadata is not execution authority; registry checks every use_skill action"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "tool-output",
+      "name": "Bounded tool output",
+      "purpose": "One parent/registry output owner, bounded previews and paged ephemeral retrieval",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/tooling/extensions/registry/tool-registry.ts",
+        "line": 450,
+        "symbol": "this.governor = new ToolOutputGovernor()",
+        "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 450,
+          "symbol": "this.governor = new ToolOutputGovernor()",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        },
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 238,
+          "symbol": "governor: toolRegistry.governor",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/agents/extensions/execution/agent-engine.ts",
+          "line": 238,
+          "symbol": "governor: toolRegistry.governor",
+          "sha256": "a0a7815651cd85cecd584b4e9efb34e45dbf7db24edfbc3ffa2d2d0480a665a2"
+        }
+      ],
+      "persistentState": "At most 2 MiB conservative spill ownership per task; history separately records partial results",
+      "lifecycleOwner": "AgentEngine turn finally/close",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Presentation evidence only; references expire and never authorize actions"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "tool-authority",
+      "name": "Guarded tool execution",
+      "purpose": "Schema validation, approval and policy checks immediately around execution",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 2164,
+        "symbol": "new ValidatingToolRegistry",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 2164,
+          "symbol": "new ValidatingToolRegistry",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 746,
+          "symbol": "const requireCurrentPolicy",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 746,
+          "symbol": "const requireCurrentPolicy",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "persistentState": "Approval records in host; transient execution options",
+      "lifecycleOwner": "DesktopSession policy / task scope",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative approved tool boundary; saved history never grants authority"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "tool-recovery",
+      "name": "Tool recovery",
+      "purpose": "Bounded supported read/argument repair; preserve uncertain mutation effects",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/tooling/extensions/registry/tool-registry.ts",
+        "line": 466,
+        "symbol": "new ToolResilienceSupervisor",
+        "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 466,
+          "symbol": "new ToolResilienceSupervisor",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        },
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 800,
+          "symbol": "attemptAutoRecovery",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 800,
+          "symbol": "attemptAutoRecovery",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "persistentState": "Bounded recent recovery diagnostics",
+      "lifecycleOwner": "ValidatingToolRegistry",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Consumes real execution results; does not establish exactly-once side effects"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "git",
+      "name": "Hardened Git inspection",
+      "purpose": "Literal scoped repository reads, parsing, no repository-controlled execution",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/inspection.ts",
+        "line": 8,
+        "symbol": "withGitInspection",
+        "sha256": "40f169f88a300b6f72bb8d3e83f779c78c3da8fb12cf0c64cea07919d9241779"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/inspection.ts",
+          "line": 8,
+          "symbol": "withGitInspection",
+          "sha256": "40f169f88a300b6f72bb8d3e83f779c78c3da8fb12cf0c64cea07919d9241779"
+        },
+        {
+          "file": "src/utils/git-inspection.ts",
+          "line": 271,
+          "symbol": "export async function withGitInspection",
+          "sha256": "8176ca3e5f50e3762b64255c0e453619765e43ab440f8ca68120dabd20749035"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/utils/git-inspection.ts",
+          "line": 271,
+          "symbol": "export async function withGitInspection",
+          "sha256": "8176ca3e5f50e3762b64255c0e453619765e43ab440f8ca68120dabd20749035"
+        }
+      ],
+      "persistentState": "One bounded hot diff observation; no durable cache",
+      "lifecycleOwner": "WorkspaceInspection / task request",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Git is authoritative for current repository state"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "broccoligit",
+      "name": "BroccoliGIT",
+      "purpose": "Sparse operation evidence and bounded comparisons across task restarts",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/worker.ts",
+        "line": 254,
+        "symbol": "new BroccoliGit",
+        "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 254,
+          "symbol": "new BroccoliGit",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        },
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 946,
+          "symbol": "evidence.beforeMutation",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 946,
+          "symbol": "evidence.beforeMutation",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "persistentState": "broccoligit.evidence.v1 and admission record; shared CAS blobs",
+      "lifecycleOwner": "DesktopSession",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative only for recorded observations and coverage; cannot execute mutations"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "broccolidb",
+      "name": "BroccoliDB kernel",
+      "purpose": "Tables, WAL durability, verified CAS and explicit database checkpoints",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/worker.ts",
+        "line": 2172,
+        "symbol": "new BroccoliDatabaseKernel",
+        "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 2172,
+          "symbol": "new BroccoliDatabaseKernel",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        },
+        {
+          "file": "src/sessions/extensions/substrate/broccolidb-kernel.ts",
+          "line": 149,
+          "symbol": "await this.replayWal()",
+          "sha256": "8a6e969509b91a8d9eba44cdb06ac33497f046460e833c96a6917f3814e3aad7"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/sessions/extensions/substrate/broccolidb-kernel.ts",
+          "line": 149,
+          "symbol": "await this.replayWal()",
+          "sha256": "8a6e969509b91a8d9eba44cdb06ac33497f046460e833c96a6917f3814e3aad7"
+        }
+      ],
+      "persistentState": ".broccolidb WAL, base/archived checkpoints and CAS",
+      "lifecycleOwner": "DesktopSession shared kernel",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative persistence; table/WAL/CAS path, not named distributed helpers"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "database-helpers",
+      "name": "Database helper engines",
+      "purpose": "Compatibility and diagnostics for optional storage experiments",
+      "classification": "compatibility",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/sessions/extensions/substrate/broccolidb-kernel.ts",
+        "line": 104,
+        "symbol": "this.connectionPool =",
+        "sha256": "8a6e969509b91a8d9eba44cdb06ac33497f046460e833c96a6917f3814e3aad7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/sessions/extensions/substrate/broccolidb-kernel.ts",
+          "line": 104,
+          "symbol": "this.connectionPool =",
+          "sha256": "8a6e969509b91a8d9eba44cdb06ac33497f046460e833c96a6917f3814e3aad7"
+        },
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1339,
+          "symbol": "const broccoliConnectionPool = databaseKernel.connectionPool",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1339,
+          "symbol": "const broccoliConnectionPool = databaseKernel.connectionPool",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        }
+      ],
+      "persistentState": "Mostly process-local helper state",
+      "lifecycleOwner": "BroccoliDatabaseKernel / factory aliases",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "limited or separate consumers; not inferred from construction",
+        "authoritative": "Not on authoritative table/WAL/CAS write path; construction is not integration"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "joyride",
+      "name": "Runtime JoyRide",
+      "purpose": "Validated bounded task-local file reads, immutable content-pair comparisons and pending-only sharing",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 1330,
+        "symbol": "new JoyRideHotPathCache",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1330,
+          "symbol": "new JoyRideHotPathCache",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 858,
+          "symbol": "this.cache.lookup",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/registry/tool-registry.ts",
+          "line": 858,
+          "symbol": "this.cache.lookup",
+          "sha256": "4eb506188c57b8159d3b57941ca9599cc706c5ce941bcb406c2e3d5679e8587f"
+        }
+      ],
+      "persistentState": "Memory-only cache and bounded reason ring",
+      "lifecycleOwner": "ToolExecutionCache and BroccoliGIT / task lifecycle",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Reuse only after validation and per-consumer authorization; no command-result cache"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "older-joyride",
+      "name": "Earlier core JoyRide",
+      "purpose": "Older host Task integration",
+      "classification": "legacy",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/core/task/index.ts",
+        "line": 40,
+        "symbol": "@core/joyride",
+        "sha256": "240365076696dc6e1ed36584dc5d70aaec7604087e3253951e9d7ac7ee3e98e2"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/core/task/index.ts",
+          "line": 40,
+          "symbol": "@core/joyride",
+          "sha256": "240365076696dc6e1ed36584dc5d70aaec7604087e3253951e9d7ac7ee3e98e2"
+        },
+        {
+          "file": "src/core/joyride/index.ts",
+          "line": 7,
+          "symbol": "export",
+          "sha256": "1c62dd13ad900d5522121242ecbc1bce022992ce12923a8fea5695ff9782c5da"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/core/joyride/index.ts",
+          "line": 7,
+          "symbol": "export",
+          "sha256": "1c62dd13ad900d5522121242ecbc1bce022992ce12923a8fea5695ff9782c5da"
+        }
+      ],
+      "persistentState": "Separate host/session contracts",
+      "lifecycleOwner": "Earlier core Task host",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "limited or separate consumers; not inferred from construction",
+        "authoritative": "Not the desktop AgentEngine cache; retained for its separate consumers"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "spider",
+      "name": "Spider code checks",
+      "purpose": "Bounded saved-code syntax/import observations",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 2257,
+        "symbol": "spiderCheckTool(broccoliSpiderAuditEngine.policyCheck)",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 2257,
+          "symbol": "spiderCheckTool(broccoliSpiderAuditEngine.policyCheck)",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 2236,
+          "symbol": "engine!.broccoliSpiderAuditEngine.policyCheck.check",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 2236,
+          "symbol": "engine!.broccoliSpiderAuditEngine.policyCheck.check",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "persistentState": "Bounded observation only",
+      "lifecycleOwner": "Workspace request / guarded spider_check tool",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative for returned check scope; not project type/test success"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "spider-compatibility",
+      "name": "Older Spider audit facade",
+      "purpose": "Regex audit and file-existence compatibility methods",
+      "classification": "partial",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 1366,
+        "symbol": "new BroccoliSpiderAuditEngine",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1366,
+          "symbol": "new BroccoliSpiderAuditEngine",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/agents/extensions/intelligence/broccolidb-spider-audit.ts",
+          "line": 115,
+          "symbol": "runFullAudit",
+          "sha256": "cfb0a35f5b78b6946c52b603f779ec4c323718924da44cde537422e26a2d2ba4"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/agents/extensions/intelligence/broccolidb-spider-audit.ts",
+          "line": 115,
+          "symbol": "runFullAudit",
+          "sha256": "cfb0a35f5b78b6946c52b603f779ec4c323718924da44cde537422e26a2d2ba4"
+        }
+      ],
+      "persistentState": "None",
+      "lifecycleOwner": "Factory public compatibility facade",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "limited or separate consumers; not inferred from construction",
+        "authoritative": "policyCheck is consumed; older runFullAudit is not the desktop code-check path"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "project-checkpoints",
+      "name": "Reviewed project checkpoints",
+      "purpose": "Existing before/after project-file capture and reviewed restore",
+      "classification": "active",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/desktop/worker.ts",
+        "line": 257,
+        "symbol": "new WorkspaceCheckpoints",
+        "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 257,
+          "symbol": "new WorkspaceCheckpoints",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        },
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 1801,
+          "symbol": "private async restoreCheckpoint",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/desktop/worker.ts",
+          "line": 1801,
+          "symbol": "private async restoreCheckpoint",
+          "sha256": "57e16267ae0f974397d1d59f673d1475b175ff0c42ca0b1151372a2760708962"
+        }
+      ],
+      "persistentState": "Existing separate Git checkpoint store and desktop checkpoint metadata",
+      "lifecycleOwner": "DesktopSession",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "production call site verified; runtime checks listed below",
+        "authoritative": "Authoritative reviewed project restore; separate from BroccoliGIT evidence"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "checkpoint-tools",
+      "name": "Checkpoint kernel tools",
+      "purpose": "Separately callable compatibility checkpoint feature",
+      "classification": "partial",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 1775,
+        "symbol": "new CheckpointKernelToolSuite",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1775,
+          "symbol": "new CheckpointKernelToolSuite",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/tooling/extensions/checkpoint/checkpoint-kernel-tool-suite.ts",
+          "line": 377,
+          "symbol": "this.supervisor.checkpoint",
+          "sha256": "7bf6be4a4f5daeaaa19d92c73bfa8b18278e57c17ead54381ff6bacbc2a6e782"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/tooling/extensions/checkpoint/checkpoint-kernel-tool-suite.ts",
+          "line": 377,
+          "symbol": "this.supervisor.checkpoint",
+          "sha256": "7bf6be4a4f5daeaaa19d92c73bfa8b18278e57c17ead54381ff6bacbc2a6e782"
+        }
+      ],
+      "persistentState": "Separate checkpoint substrate/CAS",
+      "lifecycleOwner": "Registered tools / optional gateway",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "limited or separate consumers; not inferred from construction",
+        "authoritative": "Reachable tool feature; not the desktop Checkpoints surface or BroccoliGIT"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    },
+    {
+      "id": "historical-orchestrators",
+      "name": "Exported experimental orchestrators",
+      "purpose": "Earlier query-loop, rollback and retention facades",
+      "classification": "compatibility",
+      "platformRelevance": "macOS desktop; shared libraries may have other consumers",
+      "productionEntryPoint": {
+        "file": "src/factories/monolith-factory.ts",
+        "line": 1389,
+        "symbol": "new BroccoliQueryLoopOrchestrator",
+        "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+      },
+      "instantiationPath": [
+        {
+          "file": "src/factories/monolith-factory.ts",
+          "line": 1389,
+          "symbol": "new BroccoliQueryLoopOrchestrator",
+          "sha256": "219e20a6cfca52732c680e2be9ad781886688e7e81f4cacae5958de65c795ee7"
+        },
+        {
+          "file": "src/index.ts",
+          "line": 661,
+          "symbol": "export { BroccoliQueryLoopOrchestrator",
+          "sha256": "abc7b3fd646ee125a98c17f8ab4e73d800b7c5925bbff689741574a75f180a9f"
+        }
+      ],
+      "primaryConsumers": [
+        {
+          "file": "src/index.ts",
+          "line": 661,
+          "symbol": "export { BroccoliQueryLoopOrchestrator",
+          "sha256": "abc7b3fd646ee125a98c17f8ab4e73d800b7c5925bbff689741574a75f180a9f"
+        }
+      ],
+      "persistentState": "Component-specific; not the live persistence policy",
+      "lifecycleOwner": "Public factory/SDK facade",
+      "activation": {
+        "exists": true,
+        "instantiated": true,
+        "reachable": true,
+        "activelyConsumed": "limited or separate consumers; not inferred from construction",
+        "authoritative": "No desktop execution consumer established; do not reconnect based on naming"
+      },
+      "lastVerificationEvidence": {
+        "method": "source-located call sites with content hashes",
+        "runtimeEvidence": "runtime-throughput-verification.json; check status before treating an entry as dynamically exercised"
+      }
+    }
+  ]
+}

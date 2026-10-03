@@ -291,9 +291,14 @@ describe("JoyRide native tool integration", () => {
 			new SessionMemoryStore(),
 			router,
 		)
+		assert.equal(engine.scheduler.governor, registry.governor, "parent references must be retrievable through the registry")
 		for (const outcome of ["complete", "failure", "cancelled"]) {
 			const controller = new AbortController()
 			router.handleSlashCommand = async () => {
+				const preview = engine.scheduler.governor.governOutput("retained output\n".repeat(5000))
+				const page = await registry.executeTool("retrieve_spill_content", { spillId: preview.spillId }, folder) as { found: boolean; partial: boolean }
+				assert.equal(page.found, true)
+				assert.equal(page.partial, true)
 				assert.equal(registry.cache.getStats().activeTask, true)
 				await registry.executeTool("view_file", { path: "sample.txt" }, folder)
 				await registry.executeTool("view_file", { path: "sample.txt" }, folder)
@@ -312,6 +317,7 @@ describe("JoyRide native tool integration", () => {
 			}
 			assert.equal(registry.cache.size, 0)
 			assert.equal(registry.cache.getStats().activeTask, false)
+			assert.equal(registry.governor.getStats().retainedBytes, 0)
 		}
 		await engine.close()
 		assert.equal(registry.cache.size, 0)

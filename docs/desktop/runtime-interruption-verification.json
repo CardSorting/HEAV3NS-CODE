@@ -1,0 +1,134 @@
+{
+  "completedAt": "2026-10-03T05:55:53.948Z",
+  "platform": "darwin",
+  "node": "v22.22.0",
+  "scope": "Eight SIGKILL/reopen cases through production source runtime, actual guarded writes, durable queue/kernel, BroccoliGIT and DesktopSession history. Deterministic barriers; no provider call or GUI kill.",
+  "results": [
+    {
+      "stage": "before-capture",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "before-capture",
+        "operations": [],
+        "unresolved": 0,
+        "checkpoints": 1,
+        "content": "unchanged",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "during-tool",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "during-tool",
+        "operations": [
+          "intent"
+        ],
+        "unresolved": 1,
+        "checkpoints": 1,
+        "content": "unchanged",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "after-write",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "after-write",
+        "operations": [
+          "intent"
+        ],
+        "unresolved": 1,
+        "checkpoints": 1,
+        "content": "approved",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "outcome-publication",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "outcome-publication",
+        "operations": [
+          "intent"
+        ],
+        "unresolved": 1,
+        "checkpoints": 1,
+        "content": "approved",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "checkpoint-publication",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "checkpoint-publication",
+        "operations": [
+          "returned"
+        ],
+        "unresolved": 0,
+        "checkpoints": 1,
+        "content": "approved",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "git-inspection",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "git-inspection",
+        "operations": [],
+        "unresolved": 0,
+        "checkpoints": 1,
+        "content": "unchanged",
+        "replayedMutations": 0,
+        "remainingGitChildren": 0
+      }
+    },
+    {
+      "stage": "skill-load",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "skill-load",
+        "operations": [],
+        "unresolved": 0,
+        "checkpoints": 1,
+        "content": "unchanged",
+        "replayedMutations": 0
+      }
+    },
+    {
+      "stage": "history-publication",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "recovered": {
+        "stage": "history-publication",
+        "state": "interrupted",
+        "replayedMutations": 0
+      }
+    }
+  ]
+}

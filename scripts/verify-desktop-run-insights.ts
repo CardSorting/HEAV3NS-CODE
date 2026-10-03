@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert"
 import { spawn } from "node:child_process"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { WorkspaceCheckpoints } from "../src/desktop/checkpoints.js"
 import { saveRecordedOutput } from "../src/desktop/recorded-output.js"
@@ -10,7 +10,7 @@ import { BroccoliDatabaseKernel } from "../src/sessions/extensions/substrate/bro
 // Synthetic records, real packaged worker and native navigation. No provider
 // task, restore, or project command is submitted by this fixture.
 async function main() {
-	const output = path.join(process.cwd(), "build", `desktop-run-insights-${Date.now()}`)
+	const output = process.env.HEAV3NS_FIXTURE_OUTPUT ?? path.join(process.cwd(), "build", `desktop-run-insights-${Date.now()}`)
 	const workspace = path.join(output, "Recorded work fixture")
 	await mkdir(workspace, { recursive: true })
 	await writeFile(path.join(workspace, "fixture.txt"), "Synthetic evidence for native inspection.\n")
@@ -65,6 +65,8 @@ async function main() {
 						revision: "fixture-revision",
 						scope: "workspace",
 					},
+					repositoryContinuity: { externalChanges: true, unresolved: true, rebindRequired: false },
+					broccoliEvidenceOutcome: { outcome: "unavailable", reasons: ["BEFORE_OR_CHECKPOINT_BYTES_NOT_RETAINED"] },
 					activityCount: 150,
 					outputLimited: true,
 					checkpointError: "Synthetic disk-full failure while saving the final checkpoint.",
@@ -98,9 +100,11 @@ async function main() {
 		"related:checkpoint",
 		"checkpoint-close",
 		"output",
+		"run-output",
 	]
 	const plan = path.join(output, "plan.json")
 	await writeFile(plan, JSON.stringify({ output, draftRoot: path.join(output, "drafts"), navigationPass: true, steps }))
+	for (const file of await readdir(output)) if (/^ui-.*\.(json|png)$/.test(file)) await rm(path.join(output, file))
 	const child = spawn(
 		path.join(process.cwd(), "build/HEAV3NS-CODE.app/Contents/MacOS/HEAV3NS-CODE"),
 		["--workspace", workspace, "--integration-probe", plan],
@@ -113,8 +117,8 @@ async function main() {
 	child.stderr.on("data", (value) => {
 		diagnostic = (diagnostic + String(value)).slice(-16000)
 	})
-	const exited = new Promise<void>((resolve, reject) => {
-		child.on("exit", () => resolve())
+	const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
+		child.on("exit", (code, signal) => resolve({ code, signal }))
 		child.on("error", reject)
 	})
 	try {
@@ -160,9 +164,13 @@ async function main() {
 			),
 		)
 		console.log(output)
+		if (process.argv.includes("--review")) await new Promise<void>(resolve => {
+			const timer = setTimeout(resolve, 60000)
+			void exited.then(() => { clearTimeout(timer); resolve() })
+		})
 	} finally {
 		child.kill("SIGTERM")
-		await exited
+		await writeFile(path.join(output, "cleanup.json"), JSON.stringify(await exited))
 		await writeFile(path.join(output, "diagnostic.txt"), diagnostic)
 	}
 }

@@ -29,6 +29,7 @@ import type { ConfirmationRequest, ConfirmationResponse } from "../tooling/exten
 import { DeterministicSecretRedactor } from "../tooling/extensions/redaction/deterministic-secret-redactor.js"
 import { readGitStatus } from "../utils/git-status.js"
 import { ACTIVITY_LIMIT, projectActivity, reduceActivity } from "./activity.js"
+import { BroccoliGit, changeRequest, formatOrientation, historyRequest } from "./broccoligit/service.js"
 import { CHECKPOINT_SCOPE, WorkspaceCheckpoints } from "./checkpoints.js"
 import { ContextHistory, contextHistoryInput } from "./context-history.js"
 import { prepareConversationContext } from "./context-recovery.js"
@@ -133,6 +134,9 @@ const projectRun = (run: Run) => ({
 	checkpointBefore: run.checkpointBefore,
 	checkpointAfter: run.checkpointAfter,
 	checkpointError: run.checkpointError,
+	broccoliHorizon: run.broccoliHorizon,
+	broccoliCheckpoint: run.broccoliCheckpoint,
+	broccoliEvidenceOutcome: run.broccoliEvidenceOutcome,
 })
 
 const readGitBaseline = async (workspace: string, signal: AbortSignal): Promise<string> => {
@@ -211,6 +215,9 @@ export class DesktopSession {
 	private healingTimer?: ReturnType<typeof setTimeout>
 	private readonly contextHistory = new ContextHistory()
 	private inspection: WorkspaceInspection
+	private readonly broccoliGit?: BroccoliGit
+	private historyRetention?: { chargedBytes: number; durable: true }
+	retentionAfterClose() { return this.historyRetention }
 	private submissions: Promise<unknown> = Promise.resolve()
 	private queueMutations = 0
 	private revision = 0
@@ -243,6 +250,10 @@ export class DesktopSession {
 		this.lifecycle = lifecycle
 		this.readBaseline = readBaseline
 		this.inspection = new WorkspaceInspection(workspace.path)
+		if (engine.setBroccoliGit && process.env.BROCCOLIGIT_ADMISSION !== "unavailable" && process.env.BROCCOLIGIT_MODE !== "disabled") {
+			this.broccoliGit = new BroccoliGit(workspace.path, database)
+			engine.setBroccoliGit(this.broccoliGit)
+		}
 		this.checkpointFiles = new WorkspaceCheckpoints(workspace.path)
 		this.project = new ProjectRunner(workspace.path, () => this.projectExited())
 		this.runs = database.getTable<Run>("desktop.runs.v1")
@@ -1501,6 +1512,8 @@ export class DesktopSession {
 						workspaceVerification: run.workspaceVerification as EngineTickResult["workspaceVerification"],
 						outputLimited: run.outputLimited === true,
 						checkpointError: typeof run.checkpointError === "string" ? run.checkpointError : undefined,
+						repositoryContinuity: run.repositoryContinuity as Parameters<typeof explainRun>[0]["repositoryContinuity"],
+						broccoliEvidenceOutcome: run.broccoliEvidenceOutcome as Parameters<typeof explainRun>[0]["broccoliEvidenceOutcome"],
 					}),
 					storedEvidence: verifyRuntimeRecord(run, this.session),
 					related,
@@ -1590,6 +1603,26 @@ export class DesktopSession {
 					.parse(request.params)
 				return this.inspection.readDiff(p.path, p.staged, p.offset, p.revision)
 			}
+			case "broccoligit.read": {
+				if (!this.broccoliGit) return { schemaVersion: 1, workspaceId: this.workspace.id, worktreeId: "", horizonId: "", observationId: randomUUID(), observedAt: Date.now(), comparison: { kind: "inventory" }, scope: { kind: "workspace" }, outcome: "disabled", coverage: "unknown", consistency: "unvalidated", exclusions: ["historical_evidence"], data: null, continuation: null, reasons: ["HISTORY_CAPACITY_OR_MODE_DISABLED", "USE_EXISTING_CHANGES_TOOLS_FOR_CURRENT_GIT"] }
+				const conversation = this.conversation
+				const access = { checkExecutionScope: () => { if (this.closing || conversation !== this.conversation) throw new Error("Repository evidence authority changed") } }
+				const p = z.discriminatedUnion("action", [
+					z.object({ action: z.literal("changes"), request: changeRequest }).strict(),
+					z.object({ action: z.literal("history"), request: historyRequest }).strict(),
+					z.object({ action: z.literal("page"), observationId: z.string().max(80), cursor: z.string().max(128) }).strict(),
+					z.object({ action: z.literal("resume"), horizonId: z.string().max(80) }).strict(),
+					z.object({ action: z.literal("diagnostics") }).strict(),
+				]).parse(request.params)
+				if (p.action === "diagnostics") return this.broccoliGit.diagnostics()
+				if (p.action === "history") return this.broccoliGit.getHistory(p.request, access)
+				if (p.action === "page") return this.broccoliGit.getDiffPage(p.observationId, p.cursor, access)
+				if (p.action === "resume") {
+					if (this.active || this.queue.length) throw new Error("WORK_PENDING: the active task owns repository continuity")
+					return this.broccoliGit.resumeHorizon(p.horizonId, access)
+				}
+				return this.broccoliGit.getChanges(p.request, access)
+			}
 			case "input.select": {
 				z.object({ surface: z.literal("native") })
 					.strict()
@@ -1598,7 +1631,7 @@ export class DesktopSession {
 			}
 			case "shutdown":
 				await this.stop()
-				return { stopped: true }
+				return { stopped: true, broccoliRetention: this.retentionAfterClose() }
 		}
 	}
 	private kick() {
@@ -1637,6 +1670,7 @@ export class DesktopSession {
 			run.startedAt = Date.now()
 			await this.commit(run, "run.state")
 			let executionStarted = false
+			const evidenceAuthority = { signal: controller.signal, checkExecutionScope: () => { if (this.closing || this.active?.id !== run.id) throw new Error("Task authority ended") } }
 			try {
 				controller.signal.throwIfAborted()
 				if (this.lifecycle?.readContext) {
@@ -1644,12 +1678,37 @@ export class DesktopSession {
 					run.checkpointBefore = checkpoint.id
 					await this.commit(run, "run.progress")
 				}
-				run.baseline = await this.readBaseline(this.workspace.path, controller.signal)
+				let changeEvidence: string | undefined = this.engine.setBroccoliGit && !this.broccoliGit ? JSON.stringify({ outcome: "disabled", reasons: ["HISTORY_CAPACITY_OR_MODE_DISABLED"], note: "Current Git tools remain available; retained historical comparisons are unavailable in this worker." }) : undefined
+				if (this.broccoliGit) {
+					const prior = run.continuation ? this.runs.get(run.continuation.run)?.broccoliHorizon : undefined
+					const packet = typeof prior === "string"
+						? await this.broccoliGit.resumeHorizon(prior, evidenceAuthority, run.id)
+						: await this.broccoliGit.beginHorizon(run.id, evidenceAuthority)
+					run.broccoliHorizon = packet.horizonId || undefined
+					if (packet.data && "differences" in packet.data) run.repositoryContinuity = {
+						externalChanges: packet.data.differences.some((entry) => entry.evidence === "unattributed_difference"),
+						unresolved: packet.data.counts.unresolved > 0, rebindRequired: packet.data.requiresRebind,
+					}
+					if (this.readBaseline === readGitBaseline && packet.data && "entries" in packet.data) {
+						const observed = packet.data
+						run.baseline = shortText([
+							"Branch: " + (observed.anchor.branch ?? "Detached HEAD") + "; HEAD: " + (observed.anchor.head?.oid ?? "unborn"),
+							...(observed.limited ? ["Partial change list; omitted changes are not clean evidence."] : []),
+							"Submodule worktree contents excluded.",
+							...observed.entries.map(entry => entry.status + " " + JSON.stringify(entry.path)),
+						].join("\n"), 24_000, "\n[Partial change list; omitted changes are not clean evidence.]")
+					}
+					changeEvidence = formatOrientation(packet)
+					run.broccoliEvidence = changeEvidence
+					await this.commit(run, "run.progress")
+				}
+				run.baseline ??= await this.readBaseline(this.workspace.path, controller.signal)
 				// Stop may arrive during Git preflight. Never hand an already-aborted
 				// instruction to the engine or wait for an abort event that has passed.
 				controller.signal.throwIfAborted()
 				executionStarted = true
 				const result = await this.engine.tick({
+					changeEvidence,
 					prompt: run.text,
 					verifyWorkspace: true,
 					workspaceCheckScope: run.continuation || run.projectRepair ? "workspace" : "changes",
@@ -1689,6 +1748,14 @@ export class DesktopSession {
 				}
 			}
 			clearTimeout(repairTimer)
+			if (this.broccoliGit) {
+				// A cancelled task may still publish already-observed metadata. Fresh
+				// file capture retains the task's cancellation/authority boundary.
+				const checkpoint = await this.broccoliGit.checkpoint([], evidenceAuthority)
+				run.broccoliCheckpoint = checkpoint.data?.id
+				run.broccoliEvidenceOutcome = { outcome: checkpoint.outcome, reasons: checkpoint.reasons }
+				await this.broccoliGit.closeHorizon({ checkExecutionScope: () => {} })
+			}
 			// Agent commands can mutate Git and files. Retire prior inspection
 			// observations before another task starts or the UI requests new pages.
 			this.inspection.clear()
@@ -2026,7 +2093,10 @@ export class DesktopSession {
 			failure ??= error
 		}
 		try {
+			await this.broccoliGit?.dispose()
+			const chargedBytes = this.broccoliGit?.diagnostics().evidence.charged
 			await this.database.stop()
+			if (!failure && chargedBytes !== undefined) this.historyRetention = { chargedBytes, durable: true }
 		} catch (error) {
 			failure ??= error
 		}
@@ -2247,7 +2317,7 @@ export async function runDesktopWorker(): Promise<void> {
 								if (request.workspace !== bridge!.workspace.id || request.session !== bridge!.session)
 									throw new Error("IDENTITY_MISMATCH: shutdown must address the attached workspace and session")
 								await shutdown()
-								return { stopped: true }
+								return { stopped: true, broccoliRetention: bridge?.retentionAfterClose() }
 							}
 							return bridge!.request(request)
 						})

@@ -1,0 +1,6981 @@
+{
+  "measuredAt": "2026-10-03T04:13:08.081Z",
+  "machine": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "Apple M1 Pro",
+    "logicalCPUs": 10,
+    "ramBytes": 17179869184,
+    "os": "25.5.0",
+    "node": "v22.22.0",
+    "git": "git version 2.48.1"
+  },
+  "baselineSha256": "b80eb4c818e3b2a2d6f4387279f09aa950ab5a865d7ad230f9fb42bb61ad8dc0",
+  "sourceHashes": {
+    "contracts": "8ba7b350fa8ef56b224fa04fd4aa4953ad1df04f420b2d22c3182a86008a1d9d",
+    "content": "4f59f4aeb4db59ffa7def1ac1e67206c02946cc2340b6bb860479fa80d86bcaa",
+    "evidence-store": "c778ad447458b568f8a30f5c4e2879539a45850109cc27ada31779dbbf47b9f3",
+    "git-reader": "76efdbb6e83a35a144c453ba73f99226a8f32d7036322b27fd450b301bb9d547",
+    "service": "7efb6f1c059408f65529bd13881a32a5d6a1298dbfae6a11fa7c93a6455972ab"
+  },
+  "measurement": "Cold is the first local observation, not an OS cache purge. Two warmups; seven steady samples. Timing includes validation, serialization and cleanup. Git RSS is per-child high-water. Parent RSS includes the existing Broccoli kernel.",
+  "retainedFixtureBytes": 896229,
+  "samples": [
+    {
+      "label": "safe_current_status",
+      "cold": {
+        "ms": 27.85270799999995,
+        "subprocesses": 5,
+        "fullDiffs": 0,
+        "serializedBytes": 369,
+        "parentRss": 107298816,
+        "gitChildPeak": 8257536
+      },
+      "warmup": [
+        {
+          "ms": 24.198417000000063,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 107544576,
+          "gitChildPeak": 8290304
+        },
+        {
+          "ms": 26.871250000000032,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 108232704,
+          "gitChildPeak": 8306688
+        }
+      ],
+      "steady": [
+        {
+          "ms": 25.332583,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 108937216,
+          "gitChildPeak": 8306688
+        },
+        {
+          "ms": 24.548000000000002,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 109608960,
+          "gitChildPeak": 8339456
+        },
+        {
+          "ms": 23.91991699999994,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 110297088,
+          "gitChildPeak": 8339456
+        },
+        {
+          "ms": 25.593792000000008,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 110657536,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 24.6243750000001,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 110673920,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 24.771458000000052,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 110739456,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 25.272291999999993,
+          "subprocesses": 5,
+          "fullDiffs": 0,
+          "serializedBytes": 369,
+          "parentRss": 110821376,
+          "gitChildPeak": 8355840
+        }
+      ],
+      "p50": 24.771458000000052,
+      "p95": 25.593792000000008
+    },
+    {
+      "label": "broccoligit_current_status",
+      "cold": {
+        "ms": 42.86762500000009,
+        "subprocesses": 6,
+        "fullDiffs": 0,
+        "serializedBytes": 1222,
+        "parentRss": 111804416,
+        "gitChildPeak": 8355840
+      },
+      "warmup": [
+        {
+          "ms": 34.016208000000006,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 112672768,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 36.85683299999994,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 113491968,
+          "gitChildPeak": 8355840
+        }
+      ],
+      "steady": [
+        {
+          "ms": 33.767875000000004,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114278400,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 34.947791999999936,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114769920,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 35.78750000000002,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114786304,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 34.300500000000056,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114786304,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 33.35091699999987,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114802688,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 37.58199999999988,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114917376,
+          "gitChildPeak": 8355840
+        },
+        {
+          "ms": 33.57133399999998,
+          "subprocesses": 6,
+          "fullDiffs": 0,
+          "serializedBytes": 1222,
+          "parentRss": 114933760,
+          "gitChildPeak": 8355840
+        }
+      ],
+      "p50": 34.300500000000056,
+      "p95": 37.58199999999988
+    },
+    {
+      "label": "safe_single_selected_diff",
+      "cold": {
+        "ms": 25.345250000000078,
+        "subprocesses": 5,
+        "fullDiffs": 1,
+        "serializedBytes": 35429,
+        "parentRss": 114933760,
+        "gitChildPeak": 8962048
+      },
+      "warmup": [
+        {
+          "ms": 25.37850000000003,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 114950144,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 25.33725000000004,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115097600,
+          "gitChildPeak": 8962048
+        }
+      ],
+      "steady": [
+        {
+          "ms": 26.89687499999991,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115097600,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 26.399124999999913,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115097600,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 25.38783400000011,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115097600,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 25.67750000000001,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115097600,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 24.56816600000002,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115130368,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 25.042374999999993,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115163136,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 26.769999999999982,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 35429,
+          "parentRss": 115212288,
+          "gitChildPeak": 8962048
+        }
+      ],
+      "p50": 25.67750000000001,
+      "p95": 26.89687499999991
+    },
+    {
+      "label": "broccoligit_single_selected_diff",
+      "cold": {
+        "ms": 92.003917,
+        "subprocesses": 11,
+        "fullDiffs": 1,
+        "serializedBytes": 14725,
+        "parentRss": 116146176,
+        "gitChildPeak": 8962048
+      },
+      "warmup": [
+        {
+          "ms": 92.33808399999998,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 116195328,
+          "gitChildPeak": 8962048
+        },
+        {
+          "ms": 90.91758299999992,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 116457472,
+          "gitChildPeak": 9011200
+        }
+      ],
+      "steady": [
+        {
+          "ms": 90.69095799999991,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 116572160,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 92.67266699999982,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 116817920,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 87.33608400000003,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 117293056,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 89.05229099999997,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 117522432,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 83.14412500000026,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 117669888,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 86.02525000000014,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 117850112,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 97.91845799999965,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 14725,
+          "parentRss": 118112256,
+          "gitChildPeak": 9011200
+        }
+      ],
+      "p50": 89.05229099999997,
+      "p95": 97.91845799999965
+    },
+    {
+      "label": "safe_eight_equivalent_reads",
+      "cold": {
+        "ms": 28.988875000000007,
+        "subprocesses": 5,
+        "fullDiffs": 1,
+        "serializedBytes": 283441,
+        "parentRss": 119439360,
+        "gitChildPeak": 9011200
+      },
+      "warmup": [
+        {
+          "ms": 33.325832999999875,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 121847808,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 31.495792000000165,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 122552320,
+          "gitChildPeak": 9011200
+        }
+      ],
+      "steady": [
+        {
+          "ms": 28.726709000000028,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 123125760,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 28.058665999999903,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 123731968,
+          "gitChildPeak": 9011200
+        },
+        {
+          "ms": 48.81495799999993,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 124502016,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 31.882916999999907,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 126304256,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 31.473583999999846,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 124878848,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 29.81829199999993,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 125779968,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 28.4484580000003,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 283441,
+          "parentRss": 126533632,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "p50": 29.81829199999993,
+      "p95": 48.81495799999993
+    },
+    {
+      "label": "broccoligit_eight_equivalent_reads",
+      "cold": {
+        "ms": 91.7062920000003,
+        "subprocesses": 11,
+        "fullDiffs": 1,
+        "serializedBytes": 117809,
+        "parentRss": 126664704,
+        "gitChildPeak": 9027584
+      },
+      "warmup": [
+        {
+          "ms": 89.2197500000002,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 126730240,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 91.14645900000005,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 126353408,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "steady": [
+        {
+          "ms": 91.71675000000005,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 126418944,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 92.33174999999983,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 126517248,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 89.83187499999985,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 126566400,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 91.03633300000001,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 127254528,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 93.29670799999985,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 128663552,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 94.3478339999997,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 130072576,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 103.64491700000008,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 117809,
+          "parentRss": 131481600,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "p50": 92.33174999999983,
+      "p95": 103.64491700000008,
+      "diagnostics": {
+        "bytesRead": 0,
+        "bytesHashed": 0,
+        "fullDiffs": 20,
+        "observations": 30,
+        "peakLive": 12582912,
+        "responseBytes": 307924,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 1,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 30,
+          "sharedCalls": 70,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4271,
+          "metadata": 741,
+          "records": 1,
+          "checkpoints": 0,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4271
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12582912,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "label": "safe_four_fresh_inspections",
+      "cold": {
+        "ms": 119.98958300000004,
+        "subprocesses": 20,
+        "fullDiffs": 4,
+        "serializedBytes": 141721,
+        "parentRss": 135151616,
+        "gitChildPeak": 9027584
+      },
+      "warmup": [
+        {
+          "ms": 124.35325000000012,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 136216576,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 103.02412499999991,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 136986624,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "steady": [
+        {
+          "ms": 104.9123340000001,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 140345344,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 100.63579200000004,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 144654336,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 102.74887499999977,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 146587648,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 104.8302079999994,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 147652608,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 102.05937500000073,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 148881408,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 98.60262499999953,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 150159360,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 100.06775000000016,
+          "subprocesses": 20,
+          "fullDiffs": 4,
+          "serializedBytes": 141721,
+          "parentRss": 151404544,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "p50": 102.05937500000073,
+      "p95": 104.9123340000001
+    },
+    {
+      "label": "safe_retained_four_pages",
+      "cold": {
+        "ms": 29.170624999999745,
+        "subprocesses": 5,
+        "fullDiffs": 1,
+        "serializedBytes": 89783,
+        "parentRss": 150945792,
+        "gitChildPeak": 9027584
+      },
+      "warmup": [
+        {
+          "ms": 27.154999999999745,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 151175168,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 25.936666999999943,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 151470080,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "steady": [
+        {
+          "ms": 25.988375000000815,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 151977984,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 25.347125000000233,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 152190976,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 28.76691699999992,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 152584192,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 25.434124999999767,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 153174016,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 25.266458000000057,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 153567232,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 28.022124999999505,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 153976832,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 25.488292,
+          "subprocesses": 5,
+          "fullDiffs": 1,
+          "serializedBytes": 89783,
+          "parentRss": 154370048,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "p50": 25.488292,
+      "p95": 28.76691699999992
+    },
+    {
+      "label": "broccoligit_retained_four_pages",
+      "cold": {
+        "ms": 88.96137500000077,
+        "subprocesses": 11,
+        "fullDiffs": 1,
+        "serializedBytes": 58689,
+        "parentRss": 154451968,
+        "gitChildPeak": 9027584
+      },
+      "warmup": [
+        {
+          "ms": 90.95441599999958,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 154550272,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 95.65395799999988,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 154796032,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "steady": [
+        {
+          "ms": 91.8061659999994,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 154959872,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 93.21479099999942,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152797184,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 93.75054100000034,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152797184,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 96.51708299999973,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152813568,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 88.27070800000001,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152813568,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 92.22383399999944,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152813568,
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 88.78208300000006,
+          "subprocesses": 11,
+          "fullDiffs": 1,
+          "serializedBytes": 58689,
+          "parentRss": 152813568,
+          "gitChildPeak": 9027584
+        }
+      ],
+      "p50": 92.22383399999944,
+      "p95": 96.51708299999973
+    }
+  ],
+  "soak": [
+    {
+      "cycle": 0,
+      "ms": 452.96979199999987,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 154075136,
+        "heapTotal": 49840128,
+        "heapUsed": 13711576,
+        "external": 4099018,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 76913,
+        "bytesHashed": 76913,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 12602136,
+        "responseBytes": 102786,
+        "pages": 6,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 277759,
+          "metadata": 3378,
+          "records": 4,
+          "checkpoints": 1,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 277759
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12602136,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 1,
+      "ms": 448.88025000000016,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 154173440,
+        "heapTotal": 49577984,
+        "heapUsed": 13723936,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 76945,
+        "bytesHashed": 76945,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 12623200,
+        "responseBytes": 107599,
+        "pages": 6,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 316309,
+          "metadata": 6011,
+          "records": 7,
+          "checkpoints": 2,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 316309
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12623200,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 2,
+      "ms": 431.20287499999995,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 154206208,
+        "heapTotal": 49840128,
+        "heapUsed": 13803816,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 76977,
+        "bytesHashed": 76977,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 12644264,
+        "responseBytes": 112412,
+        "pages": 6,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 354859,
+          "metadata": 8644,
+          "records": 10,
+          "checkpoints": 3,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 354859
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12644264,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 3,
+      "ms": 429.2317089999997,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 154271744,
+        "heapTotal": 50102272,
+        "heapUsed": 13820392,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 77009,
+        "bytesHashed": 77009,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 12665328,
+        "responseBytes": 117225,
+        "pages": 6,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 393409,
+          "metadata": 11277,
+          "records": 13,
+          "checkpoints": 4,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 393409
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12665328,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 4,
+      "ms": 421.82487500000025,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 154320896,
+        "heapTotal": 49840128,
+        "heapUsed": 13863736,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 77041,
+        "bytesHashed": 77041,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 12686392,
+        "responseBytes": 122038,
+        "pages": 6,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 431959,
+          "metadata": 13910,
+          "records": 16,
+          "checkpoints": 5,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 431959
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12686392,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 5,
+      "ms": 448.0725829999992,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 147210240,
+        "heapTotal": 50364416,
+        "heapUsed": 13907072,
+        "external": 2822390,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 32,
+        "bytesHashed": 32,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 12707456,
+        "responseBytes": 4813,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 470509,
+          "metadata": 16543,
+          "records": 19,
+          "checkpoints": 6,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 470509
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12707456,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 6,
+      "ms": 461.57154100000116,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 147275776,
+        "heapTotal": 50102272,
+        "heapUsed": 13930120,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 64,
+        "bytesHashed": 64,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 12728520,
+        "responseBytes": 9626,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 509059,
+          "metadata": 19176,
+          "records": 22,
+          "checkpoints": 7,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 509059
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12728520,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 7,
+      "ms": 471.61433300000135,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146243584,
+        "heapTotal": 50364416,
+        "heapUsed": 13977520,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 96,
+        "bytesHashed": 96,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 12749584,
+        "responseBytes": 14439,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 547609,
+          "metadata": 21809,
+          "records": 25,
+          "checkpoints": 8,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 547609
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12749584,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 8,
+      "ms": 480.786250000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146292736,
+        "heapTotal": 50888704,
+        "heapUsed": 14026808,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 128,
+        "bytesHashed": 128,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 12770648,
+        "responseBytes": 19252,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 586159,
+          "metadata": 24442,
+          "records": 28,
+          "checkpoints": 9,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 586159
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12770648,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 9,
+      "ms": 439.86833300000035,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146309120,
+        "heapTotal": 50626560,
+        "heapUsed": 14078040,
+        "external": 2769805,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 160,
+        "bytesHashed": 160,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 12791712,
+        "responseBytes": 24065,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 624709,
+          "metadata": 27075,
+          "records": 31,
+          "checkpoints": 10,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 624709
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12791712,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 10,
+      "ms": 432.600375,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146358272,
+        "heapTotal": 50888704,
+        "heapUsed": 14160864,
+        "external": 2866648,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 35,
+        "bytesHashed": 35,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 12812792,
+        "responseBytes": 4814,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 663276,
+          "metadata": 29710,
+          "records": 34,
+          "checkpoints": 11,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 663276
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12812792,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 11,
+      "ms": 452.5122080000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146374656,
+        "heapTotal": 51150848,
+        "heapUsed": 14179672,
+        "external": 2778007,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 71,
+        "bytesHashed": 71,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 12833872,
+        "responseBytes": 9629,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 701846,
+          "metadata": 32345,
+          "records": 37,
+          "checkpoints": 12,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 701846
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12833872,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 12,
+      "ms": 458.2036250000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146423808,
+        "heapTotal": 50888704,
+        "heapUsed": 14214744,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 107,
+        "bytesHashed": 107,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 12854952,
+        "responseBytes": 14444,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 740416,
+          "metadata": 34980,
+          "records": 40,
+          "checkpoints": 13,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 740416
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12854952,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 13,
+      "ms": 483.85200000000077,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146423808,
+        "heapTotal": 51150848,
+        "heapUsed": 14216864,
+        "external": 2769815,
+        "arrayBuffers": 44183
+      },
+      "diagnostics": {
+        "bytesRead": 143,
+        "bytesHashed": 143,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 12876032,
+        "responseBytes": 19259,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 778986,
+          "metadata": 37615,
+          "records": 43,
+          "checkpoints": 14,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 778986
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12876032,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 14,
+      "ms": 450.9159159999999,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146423808,
+        "heapTotal": 50888704,
+        "heapUsed": 14249888,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 179,
+        "bytesHashed": 179,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 12897112,
+        "responseBytes": 24074,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 817556,
+          "metadata": 40250,
+          "records": 46,
+          "checkpoints": 15,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 817556
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12897112,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 15,
+      "ms": 433.59679099999994,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146440192,
+        "heapTotal": 51150848,
+        "heapUsed": 14337032,
+        "external": 2910992,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 12918192,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 856126,
+          "metadata": 42885,
+          "records": 49,
+          "checkpoints": 16,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 856126
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12918192,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 16,
+      "ms": 445.315290999999,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146456576,
+        "heapTotal": 51412992,
+        "heapUsed": 14369672,
+        "external": 2778007,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 12939272,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 894696,
+          "metadata": 45520,
+          "records": 52,
+          "checkpoints": 17,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 894696
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12939272,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 17,
+      "ms": 436.1668750000008,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146472960,
+        "heapTotal": 51675136,
+        "heapUsed": 14401032,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 12960352,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 933266,
+          "metadata": 48155,
+          "records": 55,
+          "checkpoints": 18,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 933266
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12960352,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 18,
+      "ms": 456.0427920000002,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146505728,
+        "heapTotal": 51412992,
+        "heapUsed": 14417776,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 12981432,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 971836,
+          "metadata": 50790,
+          "records": 58,
+          "checkpoints": 19,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 971836
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 12981432,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 19,
+      "ms": 492.5307920000014,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146571264,
+        "heapTotal": 51675136,
+        "heapUsed": 14455824,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13002512,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1010406,
+          "metadata": 53425,
+          "records": 61,
+          "checkpoints": 20,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1010406
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13002512,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 20,
+      "ms": 425.2158339999987,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146636800,
+        "heapTotal": 51412992,
+        "heapUsed": 14565656,
+        "external": 2955335,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13023592,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1048976,
+          "metadata": 56060,
+          "records": 64,
+          "checkpoints": 21,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1048976
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13023592,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 21,
+      "ms": 445.1100000000006,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146669568,
+        "heapTotal": 51675136,
+        "heapUsed": 14581632,
+        "external": 2778007,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13044672,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1087546,
+          "metadata": 58695,
+          "records": 67,
+          "checkpoints": 22,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1087546
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13044672,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 22,
+      "ms": 437.686334,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146669568,
+        "heapTotal": 51937280,
+        "heapUsed": 14627616,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13065752,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1126116,
+          "metadata": 61330,
+          "records": 70,
+          "checkpoints": 23,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1126116
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13065752,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 23,
+      "ms": 453.41262500000084,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146669568,
+        "heapTotal": 51675136,
+        "heapUsed": 14616008,
+        "external": 2769815,
+        "arrayBuffers": 46383
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13086832,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1164686,
+          "metadata": 63965,
+          "records": 73,
+          "checkpoints": 24,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1164686
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13086832,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 24,
+      "ms": 447.4213329999984,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146735104,
+        "heapTotal": 52199424,
+        "heapUsed": 14661472,
+        "external": 2769815,
+        "arrayBuffers": 44527
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13107912,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1203256,
+          "metadata": 66600,
+          "records": 76,
+          "checkpoints": 25,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1203256
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13107912,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 25,
+      "ms": 432.3094579999997,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146751488,
+        "heapTotal": 51937280,
+        "heapUsed": 14784160,
+        "external": 2999720,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13128992,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1241826,
+          "metadata": 69235,
+          "records": 79,
+          "checkpoints": 26,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1241826
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13128992,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 26,
+      "ms": 442.2056249999987,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146784256,
+        "heapTotal": 52199424,
+        "heapUsed": 14801776,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13150072,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1280396,
+          "metadata": 71870,
+          "records": 82,
+          "checkpoints": 27,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1280396
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13150072,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 27,
+      "ms": 436.1020419999986,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146800640,
+        "heapTotal": 52461568,
+        "heapUsed": 14815032,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13171152,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1318966,
+          "metadata": 74505,
+          "records": 85,
+          "checkpoints": 28,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1318966
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13171152,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 28,
+      "ms": 441.1841659999991,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146800640,
+        "heapTotal": 52199424,
+        "heapUsed": 14844360,
+        "external": 2769815,
+        "arrayBuffers": 48443
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13192232,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1357536,
+          "metadata": 77140,
+          "records": 88,
+          "checkpoints": 29,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1357536
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13192232,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 29,
+      "ms": 449.3314590000009,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 146833408,
+        "heapTotal": 52461568,
+        "heapUsed": 14870968,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13213312,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1396106,
+          "metadata": 79775,
+          "records": 91,
+          "checkpoints": 30,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1396106
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13213312,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 30,
+      "ms": 461.1282080000019,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 145588224,
+        "heapTotal": 52199424,
+        "heapUsed": 15062496,
+        "external": 3044105,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13234392,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1434676,
+          "metadata": 82410,
+          "records": 94,
+          "checkpoints": 31,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1434676
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13234392,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 31,
+      "ms": 526.6246250000004,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 130138112,
+        "heapTotal": 52461568,
+        "heapUsed": 15071472,
+        "external": 2769815,
+        "arrayBuffers": 47581
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13255472,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1473246,
+          "metadata": 85045,
+          "records": 97,
+          "checkpoints": 32,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1473246
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13255472,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 32,
+      "ms": 476.6080409999995,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 125304832,
+        "heapTotal": 52723712,
+        "heapUsed": 15125712,
+        "external": 2769815,
+        "arrayBuffers": 46383
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13276552,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1511816,
+          "metadata": 87680,
+          "records": 100,
+          "checkpoints": 33,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1511816
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13276552,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 33,
+      "ms": 464.73129100000006,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123453440,
+        "heapTotal": 52461568,
+        "heapUsed": 15109840,
+        "external": 2778007,
+        "arrayBuffers": 68340
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13297632,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1550386,
+          "metadata": 90315,
+          "records": 103,
+          "checkpoints": 34,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1550386
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13297632,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 34,
+      "ms": 438.4571670000005,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123453440,
+        "heapTotal": 52723712,
+        "heapUsed": 15177712,
+        "external": 2769815,
+        "arrayBuffers": 74006
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13318712,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1588956,
+          "metadata": 92950,
+          "records": 106,
+          "checkpoints": 35,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1588956
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13318712,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 35,
+      "ms": 446.3118340000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121683968,
+        "heapTotal": 52461568,
+        "heapUsed": 15364000,
+        "external": 3088510,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13339792,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1627526,
+          "metadata": 95585,
+          "records": 109,
+          "checkpoints": 36,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1627526
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13339792,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 36,
+      "ms": 462.3501249999972,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118980608,
+        "heapTotal": 52723712,
+        "heapUsed": 15379216,
+        "external": 2769815,
+        "arrayBuffers": 64148
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13360872,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1666096,
+          "metadata": 98220,
+          "records": 112,
+          "checkpoints": 37,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1666096
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13360872,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 37,
+      "ms": 446.54949999999735,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118964224,
+        "heapTotal": 52985856,
+        "heapUsed": 15401792,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13381952,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1704666,
+          "metadata": 100855,
+          "records": 115,
+          "checkpoints": 38,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1704666
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13381952,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 38,
+      "ms": 537.6568750000006,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118800384,
+        "heapTotal": 52723712,
+        "heapUsed": 15413936,
+        "external": 2769815,
+        "arrayBuffers": 53764
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13403032,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1743236,
+          "metadata": 103490,
+          "records": 118,
+          "checkpoints": 39,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1743236
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13403032,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 39,
+      "ms": 454.28808299999946,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118833152,
+        "heapTotal": 52985856,
+        "heapUsed": 15457120,
+        "external": 2778007,
+        "arrayBuffers": 52364
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13424112,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1781806,
+          "metadata": 106125,
+          "records": 121,
+          "checkpoints": 40,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1781806
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13424112,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 40,
+      "ms": 538.2724589999998,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118489088,
+        "heapTotal": 53248000,
+        "heapUsed": 15650944,
+        "external": 3132960,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13445192,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1820376,
+          "metadata": 108760,
+          "records": 124,
+          "checkpoints": 41,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1820376
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13445192,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 41,
+      "ms": 442.44279200000165,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118603776,
+        "heapTotal": 52723712,
+        "heapUsed": 15632944,
+        "external": 2769815,
+        "arrayBuffers": 75187
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13466272,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1858946,
+          "metadata": 111395,
+          "records": 127,
+          "checkpoints": 42,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1858946
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13466272,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 42,
+      "ms": 440.2409170000028,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118636544,
+        "heapTotal": 52985856,
+        "heapUsed": 15665960,
+        "external": 2769815,
+        "arrayBuffers": 61804
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13487352,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1897516,
+          "metadata": 114030,
+          "records": 130,
+          "checkpoints": 43,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1897516
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13487352,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 43,
+      "ms": 456.69608399999925,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118669312,
+        "heapTotal": 53248000,
+        "heapUsed": 15702240,
+        "external": 2769815,
+        "arrayBuffers": 53164
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13508432,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1936086,
+          "metadata": 116665,
+          "records": 133,
+          "checkpoints": 44,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1936086
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13508432,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 44,
+      "ms": 438.557249999998,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118734848,
+        "heapTotal": 52985856,
+        "heapUsed": 15718296,
+        "external": 2769815,
+        "arrayBuffers": 58731
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13529512,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 1974656,
+          "metadata": 119300,
+          "records": 136,
+          "checkpoints": 45,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 1974656
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13529512,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 45,
+      "ms": 469.4015419999996,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118865920,
+        "heapTotal": 53248000,
+        "heapUsed": 15931744,
+        "external": 3177435,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13550592,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2013226,
+          "metadata": 121935,
+          "records": 139,
+          "checkpoints": 46,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2013226
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13550592,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 46,
+      "ms": 443.69091599999956,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118915072,
+        "heapTotal": 53510144,
+        "heapUsed": 15957552,
+        "external": 2778007,
+        "arrayBuffers": 69940
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13571672,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2051796,
+          "metadata": 124570,
+          "records": 142,
+          "checkpoints": 47,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2051796
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13571672,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 47,
+      "ms": 434.4809580000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118915072,
+        "heapTotal": 53772288,
+        "heapUsed": 15956672,
+        "external": 2769815,
+        "arrayBuffers": 56495
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13592752,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2090366,
+          "metadata": 127205,
+          "records": 145,
+          "checkpoints": 48,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2090366
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13592752,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 48,
+      "ms": 440.4011250000003,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118931456,
+        "heapTotal": 53510144,
+        "heapUsed": 15970888,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13613832,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2128936,
+          "metadata": 129840,
+          "records": 148,
+          "checkpoints": 49,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2128936
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13613832,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 49,
+      "ms": 446.76970900000015,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 118947840,
+        "heapTotal": 53772288,
+        "heapUsed": 16003416,
+        "external": 2778007,
+        "arrayBuffers": 54020
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13634912,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2167506,
+          "metadata": 132475,
+          "records": 151,
+          "checkpoints": 50,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2167506
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13634912,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 50,
+      "ms": 443.3928330000017,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119193600,
+        "heapTotal": 53510144,
+        "heapUsed": 16227112,
+        "external": 3221910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13655992,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2206076,
+          "metadata": 135110,
+          "records": 154,
+          "checkpoints": 51,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2206076
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13655992,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 51,
+      "ms": 481.93633399999817,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119341056,
+        "heapTotal": 53772288,
+        "heapUsed": 16256632,
+        "external": 2769815,
+        "arrayBuffers": 58331
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13677072,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2244646,
+          "metadata": 137745,
+          "records": 157,
+          "checkpoints": 52,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2244646
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13677072,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 52,
+      "ms": 468.474083000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119357440,
+        "heapTotal": 54034432,
+        "heapUsed": 16270960,
+        "external": 2769815,
+        "arrayBuffers": 60404
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13698152,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2283216,
+          "metadata": 140380,
+          "records": 160,
+          "checkpoints": 53,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2283216
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13698152,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 53,
+      "ms": 446.304666,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119472128,
+        "heapTotal": 54034432,
+        "heapUsed": 16281624,
+        "external": 2769815,
+        "arrayBuffers": 60404
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13719232,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2321786,
+          "metadata": 143015,
+          "records": 163,
+          "checkpoints": 54,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2321786
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13719232,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 54,
+      "ms": 467.2435829999995,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119504896,
+        "heapTotal": 54296576,
+        "heapUsed": 16323640,
+        "external": 2778007,
+        "arrayBuffers": 69540
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13740312,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2360356,
+          "metadata": 145650,
+          "records": 166,
+          "checkpoints": 55,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2360356
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13740312,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 55,
+      "ms": 445.06566699999894,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119685120,
+        "heapTotal": 54034432,
+        "heapUsed": 16548400,
+        "external": 3266385,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13761392,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2398926,
+          "metadata": 148285,
+          "records": 169,
+          "checkpoints": 56,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2398926
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13761392,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 56,
+      "ms": 455.3274999999994,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119685120,
+        "heapTotal": 54296576,
+        "heapUsed": 16544656,
+        "external": 2769815,
+        "arrayBuffers": 75787
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13782472,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2437496,
+          "metadata": 150920,
+          "records": 172,
+          "checkpoints": 57,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2437496
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13782472,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 57,
+      "ms": 451.3546669999996,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119685120,
+        "heapTotal": 54558720,
+        "heapUsed": 16565448,
+        "external": 2769815,
+        "arrayBuffers": 47643
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13803552,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2476066,
+          "metadata": 153555,
+          "records": 175,
+          "checkpoints": 58,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2476066
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13803552,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 58,
+      "ms": 454.8531670000011,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119717888,
+        "heapTotal": 54034432,
+        "heapUsed": 16595112,
+        "external": 2769815,
+        "arrayBuffers": 62348
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13824632,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2514636,
+          "metadata": 156190,
+          "records": 178,
+          "checkpoints": 59,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2514636
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13824632,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 59,
+      "ms": 432.30225000000064,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 119717888,
+        "heapTotal": 54296576,
+        "heapUsed": 16623848,
+        "external": 2769815,
+        "arrayBuffers": 74159
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13845712,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2553206,
+          "metadata": 158825,
+          "records": 181,
+          "checkpoints": 60,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2553206
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13845712,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 60,
+      "ms": 472.9899579999983,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120455168,
+        "heapTotal": 54558720,
+        "heapUsed": 16903544,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13866792,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2591776,
+          "metadata": 161460,
+          "records": 184,
+          "checkpoints": 61,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2591776
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13866792,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 61,
+      "ms": 432.4407500000016,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120504320,
+        "heapTotal": 54296576,
+        "heapUsed": 16888232,
+        "external": 2769815,
+        "arrayBuffers": 62004
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13887872,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2630346,
+          "metadata": 164095,
+          "records": 187,
+          "checkpoints": 62,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2630346
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13887872,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 62,
+      "ms": 435.69600000000355,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120504320,
+        "heapTotal": 54558720,
+        "heapUsed": 16906080,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 13908952,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2668916,
+          "metadata": 166730,
+          "records": 190,
+          "checkpoints": 63,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2668916
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13908952,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 63,
+      "ms": 448.5423330000049,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120504320,
+        "heapTotal": 54820864,
+        "heapUsed": 16917504,
+        "external": 2769815,
+        "arrayBuffers": 63004
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 13930032,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2707486,
+          "metadata": 169365,
+          "records": 193,
+          "checkpoints": 64,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2707486
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13930032,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 64,
+      "ms": 464.09762500000215,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120602624,
+        "heapTotal": 54558720,
+        "heapUsed": 16961560,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 13951112,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2746056,
+          "metadata": 172000,
+          "records": 196,
+          "checkpoints": 65,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2746056
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13951112,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 65,
+      "ms": 459.23020800000086,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120799232,
+        "heapTotal": 54820864,
+        "heapUsed": 17240096,
+        "external": 3308102,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 13972192,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2784626,
+          "metadata": 174635,
+          "records": 199,
+          "checkpoints": 66,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2784626
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13972192,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 66,
+      "ms": 529.101791000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120881152,
+        "heapTotal": 54558720,
+        "heapUsed": 17232568,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 13993272,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2823196,
+          "metadata": 177270,
+          "records": 202,
+          "checkpoints": 67,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2823196
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 13993272,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 67,
+      "ms": 442.7739589999983,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120913920,
+        "heapTotal": 54820864,
+        "heapUsed": 17265528,
+        "external": 2769815,
+        "arrayBuffers": 62404
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14014352,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2861766,
+          "metadata": 179905,
+          "records": 205,
+          "checkpoints": 68,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2861766
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14014352,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 68,
+      "ms": 450.6287919999959,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 120995840,
+        "heapTotal": 55083008,
+        "heapUsed": 17296648,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14035432,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2900336,
+          "metadata": 182540,
+          "records": 208,
+          "checkpoints": 69,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2900336
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14035432,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 69,
+      "ms": 443.56787500000064,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121044992,
+        "heapTotal": 54820864,
+        "heapUsed": 17299320,
+        "external": 2778007,
+        "arrayBuffers": 68996
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14056512,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2938906,
+          "metadata": 185175,
+          "records": 211,
+          "checkpoints": 70,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2938906
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14056512,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 70,
+      "ms": 447.1389590000035,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121274368,
+        "heapTotal": 55083008,
+        "heapUsed": 17600736,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14077592,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 2977476,
+          "metadata": 187810,
+          "records": 214,
+          "checkpoints": 71,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 2977476
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14077592,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 71,
+      "ms": 479.3382500000007,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121290752,
+        "heapTotal": 55345152,
+        "heapUsed": 17563624,
+        "external": 2769815,
+        "arrayBuffers": 114716
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14098672,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3016046,
+          "metadata": 190445,
+          "records": 217,
+          "checkpoints": 72,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3016046
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14098672,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 72,
+      "ms": 451.08262499999546,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121307136,
+        "heapTotal": 55607296,
+        "heapUsed": 17591744,
+        "external": 2769815,
+        "arrayBuffers": 52164
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14119752,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3054616,
+          "metadata": 193080,
+          "records": 220,
+          "checkpoints": 73,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3054616
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14119752,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 73,
+      "ms": 445.80608299999585,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121405440,
+        "heapTotal": 55345152,
+        "heapUsed": 17605480,
+        "external": 2769815,
+        "arrayBuffers": 99854
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14140832,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3093186,
+          "metadata": 195715,
+          "records": 223,
+          "checkpoints": 74,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3093186
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14140832,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 74,
+      "ms": 454.281167000001,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121421824,
+        "heapTotal": 55607296,
+        "heapUsed": 17646648,
+        "external": 2769815,
+        "arrayBuffers": 60204
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14161912,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3131756,
+          "metadata": 198350,
+          "records": 226,
+          "checkpoints": 75,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3131756
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14161912,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 75,
+      "ms": 451.4133339999971,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121765888,
+        "heapTotal": 55345152,
+        "heapUsed": 17970960,
+        "external": 3308102,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14182992,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3170326,
+          "metadata": 200985,
+          "records": 229,
+          "checkpoints": 76,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3170326
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14182992,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 76,
+      "ms": 454.1399170000004,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121765888,
+        "heapTotal": 55607296,
+        "heapUsed": 17994536,
+        "external": 2769815,
+        "arrayBuffers": 65814
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14204072,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3208896,
+          "metadata": 203620,
+          "records": 232,
+          "checkpoints": 77,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3208896
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14204072,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 77,
+      "ms": 479.17708400000265,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121798656,
+        "heapTotal": 55345152,
+        "heapUsed": 17999528,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14225152,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3247466,
+          "metadata": 206255,
+          "records": 235,
+          "checkpoints": 78,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3247466
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14225152,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 78,
+      "ms": 439.4361250000002,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121864192,
+        "heapTotal": 55607296,
+        "heapUsed": 18007816,
+        "external": 2778007,
+        "arrayBuffers": 54164
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14246232,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3286036,
+          "metadata": 208890,
+          "records": 238,
+          "checkpoints": 79,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3286036
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14246232,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 79,
+      "ms": 449.92054199999984,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 121864192,
+        "heapTotal": 55869440,
+        "heapUsed": 18039816,
+        "external": 2769815,
+        "arrayBuffers": 111609
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14267312,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3324606,
+          "metadata": 211525,
+          "records": 241,
+          "checkpoints": 80,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3324606
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14267312,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 80,
+      "ms": 451.512917,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122142720,
+        "heapTotal": 55869440,
+        "heapUsed": 18356200,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14288392,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3363176,
+          "metadata": 214160,
+          "records": 244,
+          "checkpoints": 81,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3363176
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14288392,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 81,
+      "ms": 451.2482499999969,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122175488,
+        "heapTotal": 56131584,
+        "heapUsed": 18359048,
+        "external": 2769815,
+        "arrayBuffers": 59587
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14309472,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3401746,
+          "metadata": 216795,
+          "records": 247,
+          "checkpoints": 82,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3401746
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14309472,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 82,
+      "ms": 466.9627910000054,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122224640,
+        "heapTotal": 55869440,
+        "heapUsed": 18393544,
+        "external": 2769815,
+        "arrayBuffers": 117376
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14330552,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3440316,
+          "metadata": 219430,
+          "records": 250,
+          "checkpoints": 83,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3440316
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14330552,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 83,
+      "ms": 444.0385419999948,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122241024,
+        "heapTotal": 56131584,
+        "heapUsed": 18376880,
+        "external": 2769815,
+        "arrayBuffers": 54164
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14351632,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3478886,
+          "metadata": 222065,
+          "records": 253,
+          "checkpoints": 84,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3478886
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14351632,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 84,
+      "ms": 447.7156249999971,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122257408,
+        "heapTotal": 56393728,
+        "heapUsed": 18415728,
+        "external": 2769815,
+        "arrayBuffers": 108889
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14372712,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3517456,
+          "metadata": 224700,
+          "records": 256,
+          "checkpoints": 85,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3517456
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14372712,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 85,
+      "ms": 440.17558299999655,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122716160,
+        "heapTotal": 56131584,
+        "heapUsed": 18795040,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14393792,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3556026,
+          "metadata": 227335,
+          "records": 259,
+          "checkpoints": 86,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3556026
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14393792,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 86,
+      "ms": 427.75304199999664,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122748928,
+        "heapTotal": 56393728,
+        "heapUsed": 18791792,
+        "external": 2769815,
+        "arrayBuffers": 61748
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14414872,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3594596,
+          "metadata": 229970,
+          "records": 262,
+          "checkpoints": 87,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3594596
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14414872,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 87,
+      "ms": 492.2501670000056,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122748928,
+        "heapTotal": 56655872,
+        "heapUsed": 18795064,
+        "external": 2778007,
+        "arrayBuffers": 89662
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14435952,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3633166,
+          "metadata": 232605,
+          "records": 265,
+          "checkpoints": 88,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3633166
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14435952,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 88,
+      "ms": 462.2034580000036,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122847232,
+        "heapTotal": 56393728,
+        "heapUsed": 18835440,
+        "external": 2769815,
+        "arrayBuffers": 50513
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14457032,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3671736,
+          "metadata": 235240,
+          "records": 268,
+          "checkpoints": 89,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3671736
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14457032,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 89,
+      "ms": 485.7967080000017,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 122880000,
+        "heapTotal": 56655872,
+        "heapUsed": 18840640,
+        "external": 2769815,
+        "arrayBuffers": 93628
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14478112,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3710306,
+          "metadata": 237875,
+          "records": 271,
+          "checkpoints": 90,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3710306
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14478112,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 90,
+      "ms": 443.29008299999987,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123092992,
+        "heapTotal": 56393728,
+        "heapUsed": 19185200,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14499192,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3748876,
+          "metadata": 240510,
+          "records": 274,
+          "checkpoints": 91,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3748876
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14499192,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 91,
+      "ms": 441.61983400000463,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123109376,
+        "heapTotal": 56655872,
+        "heapUsed": 19183392,
+        "external": 2769815,
+        "arrayBuffers": 59131
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14520272,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3787446,
+          "metadata": 243145,
+          "records": 277,
+          "checkpoints": 92,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3787446
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14520272,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 92,
+      "ms": 441.1677500000005,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123109376,
+        "heapTotal": 56918016,
+        "heapUsed": 19211368,
+        "external": 2769815,
+        "arrayBuffers": 53964
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14541352,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3826016,
+          "metadata": 245780,
+          "records": 280,
+          "checkpoints": 93,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3826016
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14541352,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 93,
+      "ms": 442.8474580000038,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123256832,
+        "heapTotal": 57180160,
+        "heapUsed": 19235888,
+        "external": 2769815,
+        "arrayBuffers": 116376
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14562432,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3864586,
+          "metadata": 248415,
+          "records": 283,
+          "checkpoints": 94,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3864586
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14562432,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 94,
+      "ms": 449.3590419999964,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123371520,
+        "heapTotal": 56918016,
+        "heapUsed": 19256872,
+        "external": 2778007,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14583512,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3903156,
+          "metadata": 251050,
+          "records": 286,
+          "checkpoints": 95,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3903156
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14583512,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 95,
+      "ms": 458.28958299999795,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123518976,
+        "heapTotal": 56655872,
+        "heapUsed": 19635224,
+        "external": 3299910,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 36,
+        "bytesHashed": 36,
+        "fullDiffs": 1,
+        "observations": 1,
+        "peakLive": 14604592,
+        "responseBytes": 4815,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 1,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3941726,
+          "metadata": 253685,
+          "records": 289,
+          "checkpoints": 96,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3941726
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14604592,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 96,
+      "ms": 466.2206660000011,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123535360,
+        "heapTotal": 56918016,
+        "heapUsed": 19636920,
+        "external": 2769815,
+        "arrayBuffers": 63148
+      },
+      "diagnostics": {
+        "bytesRead": 72,
+        "bytesHashed": 72,
+        "fullDiffs": 2,
+        "observations": 2,
+        "peakLive": 14625672,
+        "responseBytes": 9630,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 2,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 3980296,
+          "metadata": 256320,
+          "records": 292,
+          "checkpoints": 97,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 3980296
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14625672,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 97,
+      "ms": 497.44220899999345,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123551744,
+        "heapTotal": 57180160,
+        "heapUsed": 19646552,
+        "external": 2769815,
+        "arrayBuffers": 35335
+      },
+      "diagnostics": {
+        "bytesRead": 108,
+        "bytesHashed": 108,
+        "fullDiffs": 3,
+        "observations": 3,
+        "peakLive": 14646752,
+        "responseBytes": 14445,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 3,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4018866,
+          "metadata": 258955,
+          "records": 295,
+          "checkpoints": 98,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4018866
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14646752,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 98,
+      "ms": 454.29349999999977,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123568128,
+        "heapTotal": 56918016,
+        "heapUsed": 19653016,
+        "external": 2769815,
+        "arrayBuffers": 81470
+      },
+      "diagnostics": {
+        "bytesRead": 144,
+        "bytesHashed": 144,
+        "fullDiffs": 4,
+        "observations": 4,
+        "peakLive": 14667832,
+        "responseBytes": 19260,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 4,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4057436,
+          "metadata": 261590,
+          "records": 298,
+          "checkpoints": 99,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4057436
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14667832,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "cycle": 99,
+      "ms": 450.09599999999773,
+      "subprocesses": 63,
+      "memory": {
+        "rss": 123617280,
+        "heapTotal": 57180160,
+        "heapUsed": 19683816,
+        "external": 2769815,
+        "arrayBuffers": 53364
+      },
+      "diagnostics": {
+        "bytesRead": 180,
+        "bytesHashed": 180,
+        "fullDiffs": 5,
+        "observations": 5,
+        "peakLive": 14688912,
+        "responseBytes": 24075,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 5,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 4096006,
+          "metadata": 264225,
+          "records": 301,
+          "checkpoints": 100,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4096006
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14688912,
+          "peakPending": 8
+        }
+      }
+    }
+  ],
+  "sizes": [
+    {
+      "changedPaths": 24000,
+      "rows": [
+        {
+          "ms": 373.90674999999464,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 155254784,
+            "heapTotal": 59801600,
+            "heapUsed": 28544936,
+            "external": 11074817,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 369.34591699999874,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 161579008,
+            "heapTotal": 59801600,
+            "heapUsed": 19362064,
+            "external": 2560783,
+            "arrayBuffers": 37377
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 389.1096660000039,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 165838848,
+            "heapTotal": 62160896,
+            "heapUsed": 29594544,
+            "external": 13042878,
+            "arrayBuffers": 10523674
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 365.8087080000041,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 169558016,
+            "heapTotal": 59277312,
+            "heapUsed": 19229568,
+            "external": 2629244,
+            "arrayBuffers": 111105
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 381.8964580000029,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 170213376,
+            "heapTotal": 59277312,
+            "heapUsed": 21768016,
+            "external": 6845828,
+            "arrayBuffers": 4327689
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 361.36449999999604,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 173932544,
+            "heapTotal": 59277312,
+            "heapUsed": 27066432,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 361.89816599999904,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174440448,
+            "heapTotal": 58753024,
+            "heapUsed": 19212272,
+            "external": 2563708,
+            "arrayBuffers": 45569
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 367.49445800000103,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174473216,
+            "heapTotal": 58490880,
+            "heapUsed": 21764296,
+            "external": 6845828,
+            "arrayBuffers": 4327689
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 363.74804199999926,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174473216,
+            "heapTotal": 60063744,
+            "heapUsed": 27062888,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 381.8010409999988,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174522368,
+            "heapTotal": 59015168,
+            "heapUsed": 19230152,
+            "external": 2629244,
+            "arrayBuffers": 111105
+          },
+          "gitChildPeak": 9027584
+        }
+      ],
+      "diagnostics": {
+        "bytesRead": 0,
+        "bytesHashed": 0,
+        "fullDiffs": 0,
+        "observations": 10,
+        "peakLive": 8388608,
+        "responseBytes": 499920,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 10,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 0,
+          "metadata": 0,
+          "records": 0,
+          "checkpoints": 0,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4096006
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14688912,
+          "peakPending": 8
+        }
+      }
+    },
+    {
+      "changedPaths": 48000,
+      "rows": [
+        {
+          "ms": 666.8652920000022,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174522368,
+            "heapTotal": 60063744,
+            "heapUsed": 27469048,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 640.6620000000039,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174669824,
+            "heapTotal": 58228736,
+            "heapUsed": 19137440,
+            "external": 2555516,
+            "arrayBuffers": 37377
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 637.8968750000058,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174686208,
+            "heapTotal": 60588032,
+            "heapUsed": 27095880,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 642.9878749999989,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174833664,
+            "heapTotal": 61374464,
+            "heapUsed": 32423840,
+            "external": 15293886,
+            "arrayBuffers": 12775747
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 652.2181669999991,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174850048,
+            "heapTotal": 60325888,
+            "heapUsed": 27096704,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 641.5983330000017,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174850048,
+            "heapTotal": 62423040,
+            "heapUsed": 34921784,
+            "external": 17273873,
+            "arrayBuffers": 14755734
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 645.6880410000012,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174866432,
+            "heapTotal": 59539456,
+            "heapUsed": 27102560,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 639.1307080000042,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174866432,
+            "heapTotal": 60850176,
+            "heapUsed": 32419744,
+            "external": 15285694,
+            "arrayBuffers": 12767555
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 653.5844169999982,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174882816,
+            "heapTotal": 60588032,
+            "heapUsed": 27093448,
+            "external": 11069550,
+            "arrayBuffers": 8551411
+          },
+          "gitChildPeak": 9027584
+        },
+        {
+          "ms": 640.9149170000019,
+          "subprocesses": 6,
+          "serializedBytes": 49992,
+          "entries": 59,
+          "totalExact": false,
+          "parentMemory": {
+            "rss": 174882816,
+            "heapTotal": 58753024,
+            "heapUsed": 19234760,
+            "external": 2555516,
+            "arrayBuffers": 37377
+          },
+          "gitChildPeak": 9027584
+        }
+      ],
+      "diagnostics": {
+        "bytesRead": 0,
+        "bytesHashed": 0,
+        "fullDiffs": 0,
+        "observations": 10,
+        "peakLive": 8388608,
+        "responseBytes": 499920,
+        "pages": 0,
+        "nativeSlice": true,
+        "liveReserved": 0,
+        "active": 0,
+        "pagesRetained": 0,
+        "writing": 0,
+        "gaps": [],
+        "shared": {
+          "maxActive": 2,
+          "maxWaiters": 32,
+          "maxWaitersPerKey": 16,
+          "timeoutMs": 5000,
+          "activeOperations": 0,
+          "pendingKeys": 0,
+          "activeWaiters": 0,
+          "startedCalls": 10,
+          "sharedCalls": 0,
+          "timedOutCalls": 0,
+          "rejectedCalls": 0
+        },
+        "evidence": {
+          "charged": 0,
+          "metadata": 0,
+          "records": 0,
+          "checkpoints": 0,
+          "exhausted": false,
+          "diskLimit": 134217728,
+          "globalCharged": 4096006
+        },
+        "global": {
+          "live": 0,
+          "active": 0,
+          "pending": 0,
+          "descriptors": 0,
+          "peakLive": 14688912,
+          "peakPending": 8
+        }
+      }
+    }
+  ],
+  "subprocesses": 7216,
+  "fullDiffs": 200,
+  "parentPeakRssKiB": 170784,
+  "gitChildPeakBytes": 9027584,
+  "peakGitConcurrency": 4,
+  "remainingGitProcesses": 0
+}

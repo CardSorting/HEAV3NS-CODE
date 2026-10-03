@@ -34,7 +34,10 @@ export function gitFailure(error: unknown): Error {
 		.slice(0, 2000)
 	let code = "GIT_FAILED",
 		message = "Git could not read this project. Review the details, then reload Changes."
-	if (failure.code === "ENOENT") {
+	if (/unknown option.*no-lazy-fetch/i.test(detail)) {
+		code = "GIT_UNSUPPORTED_BOUNDARY"
+		message = "This Git cannot enforce the required no-lazy-fetch inspection boundary. Upgrade Git before inspecting."
+	} else if (failure.code === "ENOENT") {
 		code = "GIT_UNAVAILABLE"
 		message = "Git could not start. Check that the project folder exists and Git is installed, then reconnect."
 	} else if (/dubious ownership|unsafe repository/i.test(detail)) {
@@ -236,6 +239,8 @@ export async function repositoryPrefix(root: string): Promise<string> {
 
 export interface GitInspectionContext {
 	readonly prefix: string
+	/** Git-resolved identity, before the temporary configuration view is installed. */
+	readonly identity?: { worktree: string; gitDirectory: string; commonDirectory: string }
 	run(args: string[], maxBytes?: number, onStdout?: (chunk: Buffer) => void): Promise<{ stdout: Buffer; stderr: Buffer }>
 }
 
@@ -284,7 +289,7 @@ export async function withGitInspection<T>(
 	try {
 		const metadata = async (args: string[]) => {
 			checkExecutionScope?.()
-			return decodeGitText((await execGit(root, [...gitOptions, ...args], 256 * 1024, 5000, scoped)).stdout)
+			return decodeGitText((await execGit(root, ["--no-lazy-fetch", ...gitOptions, ...args], 256 * 1024, 5000, scoped)).stdout)
 		}
 		// These commands read metadata only; they do not run content filters.
 		const [gitDir, commonDir, top, config] = await Promise.all([
@@ -337,10 +342,11 @@ export async function withGitInspection<T>(
 		}
 		const result = await read({
 			prefix: relative ? relative.split(path.sep).join("/") + "/" : "",
+			identity: { worktree, gitDirectory: directory, commonDirectory: common },
 			run: (args, maxBytes = 1024 * 1024, onStdout) => {
 				scoped.throwIfAborted()
 				checkExecutionScope?.()
-				return execGit(root, [...gitOptions, ...args], maxBytes, 5000, scoped, { env, onStdout })
+				return execGit(root, ["--no-lazy-fetch", ...gitOptions, ...args], maxBytes, 5000, scoped, { env, onStdout })
 			},
 		})
 		scoped.throwIfAborted()

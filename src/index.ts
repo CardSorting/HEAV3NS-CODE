@@ -3772,6 +3772,7 @@ export {
 } from "./tui/components/verification-evidence-dashboard-modal.js"
 export { WalletDashboardModal, type WalletDashboardViewMode } from "./tui/components/wallet-dashboard-modal.js"
 export * as Tui from "./tui/tui-facade.js"
+export { BroccoliGit } from "./desktop/broccoligit/service.js"
 
 /**
  * Deterministic Game Engine Monolith Composition Root.
@@ -4908,6 +4909,10 @@ export class LumiMonolith implements IAgentEngine {
 	}
 
 	/** Primary Game Engine Frame Step (Tick Loop) */
+	setBroccoliGit(service: import("./desktop/broccoligit/service.js").BroccoliGit): void {
+		this.agentEngine.setBroccoliGit(service)
+	}
+
 	async tick(input: EngineTickInput): Promise<EngineTickResult> {
 		return this.agentEngine.tick(input, (execute) =>
 			this.telemetryTracer.startSpan(`tick-frame-${this.sessionContext.turnCount + 1}`, async (span) => {

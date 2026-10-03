@@ -6,9 +6,11 @@ export async function readBoundedFile(
 	file: string,
 	maxBytes: number,
 	signal?: AbortSignal,
-	options: { followSymlinks?: boolean; encoding?: BufferEncoding } = {},
+	options: { followSymlinks?: boolean; encoding?: BufferEncoding; prefixBytes?: number } = {},
 ): Promise<string> {
 	if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 1024 * 1024) throw new Error("Invalid read budget")
+	if (options.prefixBytes !== undefined && (!Number.isSafeInteger(options.prefixBytes) || options.prefixBytes < 1 || options.prefixBytes > maxBytes))
+		throw new Error("Invalid prefix budget")
 	signal?.throwIfAborted()
 	const handle = await open(
 		file,
@@ -17,7 +19,8 @@ export async function readBoundedFile(
 	try {
 		const before = await handle.stat({ bigint: true })
 		if (!before.isFile() || before.size > BigInt(maxBytes)) throw new Error("Read exceeds regular-file budget")
-		const buffer = Buffer.allocUnsafe(Math.min(Number(before.size) + 1, maxBytes + 1))
+		const expected = Math.min(Number(before.size), options.prefixBytes ?? maxBytes)
+		const buffer = Buffer.allocUnsafe(options.prefixBytes === undefined ? expected + 1 : expected)
 		let offset = 0
 		while (offset < buffer.length) {
 			signal?.throwIfAborted()
@@ -29,7 +32,7 @@ export async function readBoundedFile(
 		const after = await handle.stat({ bigint: true })
 		if (
 			offset > maxBytes ||
-			BigInt(offset) !== before.size ||
+			offset !== expected ||
 			before.size !== after.size ||
 			before.mtimeNs !== after.mtimeNs ||
 			before.ctimeNs !== after.ctimeNs

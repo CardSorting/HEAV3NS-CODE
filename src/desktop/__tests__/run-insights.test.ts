@@ -53,10 +53,23 @@ describe("recorded run explanations", () => {
 			}),
 		)
 		assert.match(insight.outcome, /has not been replayed/)
+		assert.match(insight.outcome, /before repeating/)
 		assert.match(insight.nextStep, /latest instruction/)
 		assert.match(insight.checks, /permission/)
 		assert.match(explainRun(run({ state: "awaiting_approval" })).nextStep, /review the pending operation/)
 		assert.match(explainRun(run({ state: "cancelling" })).outcome, /not yet confirmed/)
 		assert.match(explainRun(run({ state: "future-state" })).outcome, /not recognized/)
+	})
+	it("translates repository evidence into bounded, actionable existing run warnings", () => {
+		const insight = explainRun(
+			run({
+				repositoryContinuity: { externalChanges: true, unresolved: true, rebindRequired: true },
+				broccoliEvidenceOutcome: { outcome: "unavailable", reasons: ["BEFORE_OR_CHECKPOINT_BYTES_NOT_RETAINED"] },
+			}),
+		)
+		assert.equal(insight.warnings.length, 4)
+		assert.match(insight.warnings.join(" "), /Review Changes/)
+		assert.match(insight.warnings.join(" "), /earlier file version/)
+		assert.doesNotMatch(insight.warnings.join(" "), /Broccoli|rebind|CAS|authority/i)
 	})
 })

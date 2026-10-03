@@ -1,191 +1,128 @@
-/**
- * tool-output-governor.ts
- *
- * Content-Aware Output Bounding, Markdown Table Formatting, and Spillover Management.
- * Protects LLM context window from massive tool outputs while preserving essential head,
- * tail, stack traces, and structured representations.
- */
-
-import * as crypto from "node:crypto";
+import { createHash } from "node:crypto"
 
 export interface BoundedOutputResult {
-  readonly outputText: string;
-  readonly originalLength: number;
-  readonly boundedLength: number;
-  readonly wasTruncated: boolean;
-  readonly omittedLines?: number;
-  readonly spillId?: string;
+	readonly outputText: string
+	readonly originalLength: number
+	readonly boundedLength: number
+	readonly wasTruncated: boolean
+	readonly omittedLines?: number
+	readonly spillId?: string
 }
-
 export interface OutputGovernorOptions {
-  readonly maxCharacters?: number;
-  readonly maxLines?: number;
-  readonly headLines?: number;
-  readonly tailLines?: number;
-  readonly enableSpillVault?: boolean;
+	readonly maxCharacters?: number
+	readonly maxLines?: number
+	readonly headLines?: number
+	readonly tailLines?: number
+	readonly enableSpillVault?: boolean
+}
+const MAX_SPILL_BYTES = 2 * 1024 * 1024
+const MAX_ENTRY_BYTES = 512 * 1024
+const MAX_SPILLS = 16
+const PAGE_CHARACTERS = 16_000
+const PAGE_LINES = 200
+const bounded = (value: number | undefined, fallback: number, min: number, max: number) =>
+	Math.max(min, Math.min(max, Number.isFinite(value) ? Math.floor(value!) : fallback))
+function lineCount(text: string): number {
+	let count = 1, offset = -1
+	while ((offset = text.indexOf("\n", offset + 1)) !== -1) count++
+	return count
 }
 
+/** One task owns the parent and nested schedulers' bounded, ephemeral output. */
 export class ToolOutputGovernor {
-  private readonly defaultMaxChars: number;
-  private readonly defaultMaxLines: number;
-  private readonly defaultHeadLines: number;
-  private readonly defaultTailLines: number;
-  private readonly spillVault = new Map<string, { content: string; createdAt: number }>();
+	private readonly spillVault = new Map<string, { content: string; bytes: number }>()
+	private retainedBytes = 0
+	private declined = 0
+	constructor(private readonly defaults: OutputGovernorOptions = {}) {}
 
-  constructor(options: OutputGovernorOptions = {}) {
-    this.defaultMaxChars = options.maxCharacters ?? 40_000;
-    this.defaultMaxLines = options.maxLines ?? 60;
-    this.defaultHeadLines = options.headLines ?? 30;
-    this.defaultTailLines = options.tailLines ?? 20;
-  }
+	getStats() {
+		return { entries: this.spillVault.size, retainedBytes: this.retainedBytes, maxBytes: MAX_SPILL_BYTES,
+			maxEntryBytes: MAX_ENTRY_BYTES, declined: this.declined }
+	}
+	clear(): void { this.spillVault.clear(); this.retainedBytes = 0 }
 
-  /**
-   * Transforms raw tool output into an optimized, bounded representation.
-   */
-  public governOutput(
-    rawOutput: unknown,
-    toolName = "tool",
-    options: OutputGovernorOptions = {}
-  ): BoundedOutputResult {
-    const maxChars = options.maxCharacters ?? this.defaultMaxChars;
-    const maxLines = options.maxLines ?? this.defaultMaxLines;
-    const headLinesCount = options.headLines ?? this.defaultHeadLines;
-    const tailLinesCount = options.tailLines ?? this.defaultTailLines;
+	governOutput(rawOutput: unknown, _toolName = "tool", options: OutputGovernorOptions = {}): BoundedOutputResult {
+		const policy = { ...this.defaults, ...options }
+		const maxChars = bounded(policy.maxCharacters, 40_000, 256, 40_000)
+		const maxLines = bounded(policy.maxLines, 60, 3, 200)
+		const headLines = bounded(policy.headLines, 30, 1, maxLines - 2)
+		const tailLines = bounded(policy.tailLines, 20, 1, maxLines - headLines - 1)
+		let text: string
+		if (typeof rawOutput === "string") text = rawOutput
+		else {
+			// Bound serialization before allocating a giant JSON string. Structured
+			// outputs retain their keys; table rendering must not silently drop rows.
+			let characters = 0, nodes = 0
+			try {
+				text = JSON.stringify(rawOutput, (key, value) => {
+					characters += key.length + (typeof value === "string" ? value.length : 8)
+					if (++nodes > 10_000 || characters * 2 > MAX_ENTRY_BYTES) throw new Error("Output serialization budget")
+					return value
+				}) ?? ""
+			} catch {
+				this.declined++
+				const outputText = JSON.stringify({ partial: true, notice: "This output exceeds the bounded serialization budget or cannot be serialized. Full output was not retained. Request selected paths, fewer results, or a smaller range." })
+				return { outputText, originalLength: 0, boundedLength: outputText.length, wasTruncated: true }
+			}
+		}
+		const originalLength = text.length
+		// Preserve bounded machine-readable envelopes, including Git's coverage,
+		// truncation and continuation fields. A second text truncation would break
+		// their JSON contract and could hide an existing partial-result warning.
+		if (typeof rawOutput !== "string" && Buffer.byteLength(text) <= 256 * 1024)
+			return { outputText: text, originalLength, boundedLength: originalLength, wasTruncated: false }
+		const lines = lineCount(text)
+		if (originalLength <= maxChars && lines <= maxLines)
+			return { outputText: text, originalLength, boundedLength: originalLength, wasTruncated: false }
 
-    let stringOutput = "";
-    if (typeof rawOutput === "string") {
-      stringOutput = rawOutput;
-    } else if (rawOutput === null || rawOutput === undefined) {
-      stringOutput = "";
-    } else if (typeof rawOutput === "object") {
-      // If tabular array of objects, format as markdown table
-      if (Array.isArray(rawOutput) && rawOutput.length > 0 && typeof rawOutput[0] === "object" && rawOutput[0] !== null) {
-        stringOutput = this.formatAsMarkdownTable(rawOutput);
-      } else {
-        stringOutput = JSON.stringify(rawOutput, null, 2);
-      }
-    } else {
-      stringOutput = String(rawOutput);
-    }
+		let spillId: string | undefined
+		// Conservative UTF-16 ownership plus entry metadata; no hash or copy for
+		// rejected content. Retrieval never grants authority outside this task.
+		const bytes = text.length * 2 + 256
+		if (policy.enableSpillVault !== false && bytes <= MAX_ENTRY_BYTES) {
+			spillId = `spill_${createHash("sha256").update(text).digest("hex").slice(0, 16)}`
+			if (!this.spillVault.has(spillId)) {
+				while (this.retainedBytes + bytes > MAX_SPILL_BYTES || this.spillVault.size >= MAX_SPILLS) {
+					const oldest = this.spillVault.keys().next().value!
+					this.retainedBytes -= this.spillVault.get(oldest)!.bytes
+					this.spillVault.delete(oldest)
+				}
+				this.spillVault.set(spillId, { content: text, bytes })
+				this.retainedBytes += bytes
+			}
+		} else this.declined++
+		const notice = `\n[Partial output: content omitted. ${spillId ? `Read bounded pages with retrieve_spill_content, spillId=${spillId}. Expires when this task ends or capacity is reclaimed.` : "Full output was not retained; request a narrower range."}]\n`
+		const available = maxChars - notice.length
+		let head = text.slice(0, Math.floor(available * 0.6))
+		let tail = text.slice(-Math.floor(available * 0.4))
+		// Split only output-sized slices, not the raw result.
+		head = head.split("\n").slice(0, headLines).join("\n")
+		tail = tail.split("\n").slice(-tailLines).join("\n")
+		const preview = head + notice + tail
+		const outputText = typeof rawOutput === "string" ? preview : JSON.stringify({ partial: true, preview, spillId })
+		return { outputText, originalLength, boundedLength: outputText.length, wasTruncated: true,
+			omittedLines: Math.max(0, lines - lineCount(head) - lineCount(tail)), spillId }
+	}
 
-    const originalLength = stringOutput.length;
-    const lines = stringOutput.split("\n");
+	getSpillContent(spillId: string): string | null { return this.spillVault.get(spillId)?.content ?? null }
 
-    if (originalLength <= maxChars && lines.length <= maxLines) {
-      return {
-        outputText: stringOutput,
-        originalLength,
-        boundedLength: originalLength,
-        wasTruncated: false,
-      };
-    }
-
-    // Generate spill ID if saving to in-memory spill vault
-    const spillId = `spill_${crypto.createHash("sha256").update(stringOutput).digest("hex").slice(0, 12)}`;
-    this.spillVault.set(spillId, { content: stringOutput, createdAt: Date.now() });
-
-    // Clean up old spill vault entries (> 100 entries)
-    if (this.spillVault.size > 100) {
-      const oldestKey = this.spillVault.keys().next().value;
-      if (oldestKey) this.spillVault.delete(oldestKey);
-    }
-
-    let boundedText = "";
-    let omittedLines = 0;
-
-    if (lines.length > maxLines) {
-      const head = lines.slice(0, headLinesCount);
-      const tail = lines.slice(-tailLinesCount);
-      omittedLines = lines.length - (headLinesCount + tailLinesCount);
-
-      const notice = `\n... [${omittedLines.toLocaleString()} lines / ${(originalLength - 1000).toLocaleString()} chars omitted for context efficiency · Reference ID: ${spillId}] ...\n`;
-      boundedText = [...head, notice, ...tail].join("\n");
-    } else {
-      const headChars = Math.floor(maxChars * 0.6);
-      const tailChars = Math.floor(maxChars * 0.35);
-      const omittedChars = originalLength - (headChars + tailChars);
-
-      const head = stringOutput.slice(0, headChars);
-      const tail = stringOutput.slice(-tailChars);
-      boundedText = `${head}\n\n... [${omittedChars.toLocaleString()} characters omitted · Reference ID: ${spillId}] ...\n\n${tail}`;
-    }
-
-    return {
-      outputText: boundedText,
-      originalLength,
-      boundedLength: boundedText.length,
-      wasTruncated: true,
-      omittedLines: omittedLines > 0 ? omittedLines : undefined,
-      spillId,
-    };
-  }
-
-  /**
-   * Formats an array of objects into a clean Markdown table.
-   */
-  public formatAsMarkdownTable(items: Array<Record<string, unknown>>): string {
-    if (!items || items.length === 0) return "[]";
-
-    // Gather unique keys from first few items
-    const keysSet = new Set<string>();
-    for (const item of items.slice(0, 50)) {
-      if (item && typeof item === "object") {
-        for (const k of Object.keys(item)) {
-          keysSet.add(k);
-        }
-      }
-    }
-
-    const headers = Array.from(keysSet).slice(0, 8); // Max 8 columns
-    if (headers.length === 0) return JSON.stringify(items, null, 2);
-
-    const headerRow = `| ${headers.join(" | ")} |`;
-    const separatorRow = `| ${headers.map(() => "---").join(" | ")} |`;
-
-    const rows = items.slice(0, 100).map((item) => {
-      const cols = headers.map((h) => {
-        const val = item[h];
-        if (val === null || val === undefined) return "";
-        if (typeof val === "object") return JSON.stringify(val).replace(/\|/g, "\\|");
-        return String(val).replace(/\|/g, "\\|").replace(/\n/g, " ");
-      });
-      return `| ${cols.join(" | ")} |`;
-    });
-
-    return [headerRow, separatorRow, ...rows].join("\n");
-  }
-
-  /**
-   * Retrieves full un-truncated content from spill vault by spill ID.
-   */
-  public getSpillContent(spillId: string): string | null {
-    const entry = this.spillVault.get(spillId);
-    return entry ? entry.content : null;
-  }
-
-  /**
-   * Retrieves a specific line range slice from spilled content by spill ID.
-   */
-  public retrieveSpillSlice(
-    spillId: string,
-    startLine = 1,
-    endLine?: number
-  ): { content: string; totalLines: number; startLine: number; endLine: number } | null {
-    const raw = this.getSpillContent(spillId);
-    if (!raw) return null;
-
-    const lines = raw.split("\n");
-    const totalLines = lines.length;
-    const s = Math.max(1, Math.min(startLine, totalLines));
-    const e = Math.min(endLine ?? totalLines, totalLines);
-
-    const sliceLines = lines.slice(s - 1, e);
-    return {
-      content: sliceLines.join("\n"),
-      totalLines,
-      startLine: s,
-      endLine: e,
-    };
-  }
+	retrieveSpillSlice(spillId: string, startLine = 1, endLine?: number, characterOffset = 0) {
+		const raw = this.getSpillContent(spillId)
+		if (raw === null) return null
+		const totalLines = lineCount(raw)
+		const start = bounded(startLine, 1, 1, totalLines)
+		const end = bounded(endLine, start + PAGE_LINES - 1, start, Math.min(totalLines, start + PAGE_LINES - 1))
+		let offset = 0
+		for (let line = 1; line < start; line++) offset = raw.indexOf("\n", offset) + 1
+		const lineEnd = raw.indexOf("\n", offset)
+		const column = bounded(characterOffset, 0, 0, (lineEnd < 0 ? raw.length : lineEnd) - offset)
+		offset += column
+		let stop = offset, line = start, nextColumn = column
+		while (stop < raw.length && stop - offset < PAGE_CHARACTERS && line <= end) {
+			if (raw[stop++] === "\n") { line++; nextColumn = 0 } else nextColumn++
+		}
+		return { content: raw.slice(offset, stop), totalLines, startLine: start, endLine: Math.min(line, totalLines),
+			characterOffset: column, partial: stop < raw.length,
+			continuation: stop < raw.length ? { startLine: line, characterOffset: nextColumn } : null }
+	}
 }
-
