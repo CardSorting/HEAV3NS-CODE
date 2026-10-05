@@ -35,10 +35,9 @@ final class AccountClient {
     private func start() throws {
         if process?.isRunning == true { return }
         guard process == nil else { throw BridgeError.message("The account service is reconnecting. Try again shortly.") }
-        let resource = Bundle.main.resourceURL ?? Bundle.main.bundleURL
         let env = ProcessInfo.processInfo.environment
-        let node = nodeOverride ?? env["HEAV3NS_NODE"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/node")
-        let cli = cliOverride ?? env["HEAV3NS_CLI"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/dist/index.js")
+        let node = EngineManager.shared.resolveNode(override: nodeOverride, environment: env)
+        let cli = EngineManager.shared.resolveCLI(override: cliOverride, environment: env)
         guard FileManager.default.isExecutableFile(atPath: node.path), FileManager.default.fileExists(atPath: cli.path) else { throw BridgeError.message("The bundled account service is missing. Rebuild or reinstall the app.") }
         let child = Process(), writer = Pipe(), reader = Pipe()
         generation = UUID(); let generation = generation

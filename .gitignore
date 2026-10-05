@@ -22,6 +22,7 @@ private/
 # Cryptographic Keys, Certificates & SSH Keys
 *.pem
 *.key
+.sparkle_private_key*
 *.pkcs12
 *.pfx
 *.p12

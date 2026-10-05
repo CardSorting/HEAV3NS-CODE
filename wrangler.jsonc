@@ -1,31 +1,39 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "lumi-edge-worker",
-  "main": "src/worker.ts",
-  "compatibility_date": "2026-09-04",
-  "compatibility_flags": ["nodejs_compat"],
-  "account_id": "33f8b2564698c222880cbad3e42decad",
-  "workers_dev": true,
-  "vars": {
-    "ENVIRONMENT": "production",
-    "DEFAULT_UPSTREAM_URL": "https://api.openai.com/v1/chat/completions",
-    "CORS_ALLOWED_ORIGIN": ""
-  },
-  "kv_namespaces": [
-    {
-      "binding": "TOKEN_POOL_KV",
-      "id": "4dcb6b86fc2d41ba95a96844f7a87efa"
-    }
-  ],
-  "observability": {
-    "enabled": true,
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1
-    },
-    "traces": {
-      "enabled": true,
-      "head_sampling_rate": 0.01
-    }
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "lumi-edge-worker",
+	"main": "src/worker.ts",
+	"compatibility_date": "2026-09-04",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"account_id": "33f8b2564698c222880cbad3e42decad",
+	"workers_dev": true,
+	"vars": {
+		"ENVIRONMENT": "production",
+		"DEFAULT_UPSTREAM_URL": "https://api.openai.com/v1/chat/completions",
+		"CORS_ALLOWED_ORIGIN": ""
+	},
+	"kv_namespaces": [
+		{
+			"binding": "TOKEN_POOL_KV",
+			"id": "4dcb6b86fc2d41ba95a96844f7a87efa"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "RELEASES_BUCKET",
+			"bucket_name": "heav3ns-releases"
+		}
+	],
+	"observability": {
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 0.01
+		}
+	}
 }

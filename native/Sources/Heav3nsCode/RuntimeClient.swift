@@ -74,10 +74,9 @@ final class RuntimeClient {
     }
     func start(folder: URL) {
         guard process == nil, !closed else { return }
-        let resource = Bundle.main.resourceURL ?? Bundle.main.bundleURL
         let environment = ProcessInfo.processInfo.environment
-        let node = nodeOverride ?? environment["HEAV3NS_NODE"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/node")
-        let cli = cliOverride ?? environment["HEAV3NS_CLI"].map { URL(fileURLWithPath: $0) } ?? resource.appendingPathComponent("runtime/dist/index.js")
+        let node = EngineManager.shared.resolveNode(override: nodeOverride, environment: environment)
+        let cli = EngineManager.shared.resolveCLI(override: cliOverride, environment: environment)
         guard FileManager.default.isExecutableFile(atPath: node.path), FileManager.default.fileExists(atPath: cli.path) else {
             fail("The bundled LUMI runtime is missing. Rebuild or reinstall this application."); return
         }

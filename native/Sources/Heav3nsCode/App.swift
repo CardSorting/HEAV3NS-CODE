@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 
 final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var launcher: LauncherWindow?
@@ -8,10 +9,17 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private var quitting = false
     private var pods: PodsWindow?
     private var workspaceOrder = [String]()
+    private var updaterController: SPUStandardUpdaterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         if let icon = BrandAssets.appIcon { NSApp.applicationIconImage = icon }
+        if !ProcessInfo.processInfo.arguments.contains("--integration-probe") {
+            updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
+                EngineManager.shared.checkForEngineUpdate()
+            }
+        }
         buildMenus()
         if let probe = IntegrationProbe() { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) } }
         let arguments = ProcessInfo.processInfo.arguments
@@ -108,6 +116,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let main = NSMenu()
         let applicationItem = NSMenuItem(); let applicationMenu = NSMenu()
         applicationMenu.addItem(withTitle: "About HEAV3NS-CODE", action: #selector(about), keyEquivalent: "").target = self
+        let checkUpdatesItem = applicationMenu.addItem(withTitle: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        checkUpdatesItem.target = updaterController
         applicationMenu.addItem(.separator())
         applicationMenu.addItem(withTitle: "Hide HEAV3NS-CODE", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         applicationMenu.addItem(withTitle: "Quit HEAV3NS-CODE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
