@@ -80,16 +80,15 @@ EOF
 cp LICENSE "$STAGING_DIR/LICENSE.txt"
 cp NOTICE "$STAGING_DIR/NOTICE.txt"
 
-# 3. Create compressed DMG
+# 3. Clean and prepare Gumroad distribution tree
 DETAILS_DIR="$DIST_DIR/1_LISTING_DETAILS"
 MEDIA_DIR="$DIST_DIR/2_LISTING_MEDIA"
 UPLOAD_DIR="$DIST_DIR/3_FILES_TO_UPLOAD"
 
+rm -rf "$DIST_DIR"
 mkdir -p "$DETAILS_DIR" "$MEDIA_DIR/gallery" "$UPLOAD_DIR"
 DMG_PATH="$UPLOAD_DIR/$DMG_NAME"
 ZIP_PATH="$UPLOAD_DIR/$ZIP_NAME"
-
-rm -f "$DMG_PATH"
 
 echo "Creating compressed disk image ($DMG_NAME)..."
 hdiutil create \
@@ -125,7 +124,205 @@ if test -d "$IMG_SRC"; then
   test -f "$IMG_SRC/07-welcome.png" && cp -f "$IMG_SRC/07-welcome.png" "$MEDIA_DIR/gallery/08_welcome.png"
 fi
 
-# 7. Generate Signed Sparkle Appcast Feed for In-App Updates
+# 7. Generate Listing Details & Setup Guides
+cat << 'EOF' > "$DETAILS_DIR/GUMROAD_LISTING.md"
+# Gumroad Listing Copy & Configuration Guide
+
+Use this copy directly when creating or updating the product listing on Gumroad.
+
+---
+
+## 1. Basic Product Info
+
+- **Product Name:** `HEAV3NS-CODE for macOS (Native Cockpit & CLI)`
+- **Subtitle / Tagline:** `Your sovereign cockpit for the tight coding loop. Local-first AI agent for macOS.`
+- **URL Slug:** `heav3ns-code` (e.g. `https://yourhandle.gumroad.com/l/heav3ns-code`)
+- **Category:** `Software & Tech` / `Developer Tools`
+- **Call to Action (Button):** `Get this` or `Download`
+
+---
+
+## 2. Pricing Suggestions
+
+- **Model:** `Pay what you want` (Recommended: `$0+` with suggested `$19` or `$29` for supporters), or fixed price.
+- **Display Price:** `$0+` (Free download with optional contribution).
+
+---
+
+## 3. Product Description (Paste directly into Gumroad Description)
+
+```markdown
+# ⚡ HEAV3NS-CODE (v0.1.0 Alpha Preview)
+### The Sovereign Cockpit for the Tight Coding Loop
+
+**HEAV3NS-CODE** is a focused, local-first native AI coding partner for macOS. Built for developers who want fast context, reviewable recovery, and pilot-in-command execution instead of opaque, runaway agent turns.
+
+---
+
+### 🌟 What Makes HEAV3NS-CODE Different
+
+1. 🎯 **The Fighter-Jet Mission Profile**
+Built for tight turns close to code. Takes tightly scoped directives, performs bounded context scans, applies reviewable changes, and verifies them before returning control.
+
+2. 🕹️ **Operate Mode (Pilot in Command)**
+Communicate intent, observe the agent in real time, inspect evidence, and approve or deny operations directly. You don't need to fight an editor: conversation leads the workspace.
+
+3. ⏪ **Reviewable Recovery & Git Checkpoints**
+Automatic before/after Git checkpoints for every instruction. If an AI edit produces regressions or hallucinates, a single click restores your working state with complete safety.
+
+4. 🕷️ **Spider AST Perception Engine**
+Sub-85ms syntax checking, symbol tree navigation, and advisory cycle detection without the weight, memory consumption, or latency of heavy language server daemons.
+
+5. 🔄 **Built-in Auto-Updates & Zero Maintenance**
+Install once and stay current forever. In-app native auto-updating and silent over-the-air engine upgrades mean you never have to hunt for updated DMGs.
+
+6. 👤 **Multi-Specialist Personas**
+Switch specialized personas on the fly using `/profile <name>`:
+- `/coder`: Lead Systems Engineer (TDD, refactoring, implementation)
+- `/researcher`: Deep Research Specialist (API audits, RFC review)
+- `/sre`: Site Reliability Engineer (port conflicts, crash dumps, health)
+- `/writer`: Technical Author (ADRs, architecture documentation)
+- `/student`: Code Mentor (AST breakdowns, explanation of complex patterns)
+- `/minimal`: Rapid single-file scripts with minimal token overhead
+
+7. 🛡️ **Zero Telemetry & 100% Local Execution**
+Your source code and prompt payloads never pass through intermediate third-party servers. All keys and model credentials are encrypted directly inside Apple's native macOS Keychain.
+
+---
+
+### 📦 What You Get
+
+- **HEAV3NS-CODE-v0.1.0-macOS-arm64.dmg**: Complete native macOS universal installer.
+- **HEAV3NS-CODE-v0.1.0-macOS-arm64.zip**: Standalone zipped bundle for manual extraction.
+- **INSTALL_MACOS.md**: Step-by-step onboarding, Gatekeeper clearance command, and shortcut reference.
+- **SHA256SUMS.txt**: Cryptographic verification checksums.
+- **Permanent Mirror**: https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg
+```
+EOF
+
+cat << 'EOF' > "$UPLOAD_DIR/INSTALL_MACOS.md"
+# 🍏 HEAV3NS-CODE for macOS — Installation & Setup Guide
+
+**Version:** 0.1.0 Alpha Preview  
+**Target:** macOS 14.0 (Sonoma) or later • Apple Silicon (M1/M2/M3/M4) & Intel x86_64  
+**Architecture:** Native Swift AppKit Cockpit + Embedded Node.js 22 Worker Substrate  
+**Telemetry:** 0 KB • Completely Local-First  
+
+---
+
+## 1. Quick Installation (DMG)
+
+1. Double-click the downloaded **`HEAV3NS-CODE-v0.1.0-macOS-arm64.dmg`** file to mount the disk image.
+2. Drag **`HEAV3NS-CODE.app`** into the **`Applications`** shortcut folder.
+3. Eject the disk image.
+
+---
+
+## 2. In-App Auto-Updates (Zero Reinstalls)
+
+You only need to install the DMG once!
+- **Automatic Engine Updates**: Background agent engine upgrades are downloaded silently on launch into Application Support.
+- **Native App Updates**: Use **HEAV3NS-CODE > Check for Updates…** to check and apply Sparkle binary updates with a single click.
+- **Latest DMG Mirror**: You can always download the latest DMG from:
+  `https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg`
+
+---
+
+## 3. First-Time Launch & macOS Gatekeeper
+
+Because this alpha preview is distributed directly to developers and supporters without Apple Mac App Store sandboxing:
+
+### Method A (GUI — Easiest):
+1. Navigate to your **Applications** folder in Finder.
+2. **Right-click (or Control-click)** on `HEAV3NS-CODE.app` and select **Open**.
+3. In the security confirmation dialog that appears, click **Open**.
+4. *(You only have to do this once. Subsequent launches can be opened normally via Spotlight, Dock, or Launchpad).*
+
+### Method B (Terminal — One Command):
+If macOS displays an alert saying the app cannot be opened or is damaged by quarantine attributes:
+```bash
+xattr -cr /Applications/HEAV3NS-CODE.app
+```
+Then launch the app normally:
+```bash
+open /Applications/HEAV3NS-CODE.app
+```
+
+---
+
+## 4. Configuring Your AI Model Provider
+
+When you first launch HEAV3NS-CODE:
+1. Click **Select Workspace** or choose an existing project directory.
+2. Bring your preferred AI intelligence:
+   - **Claude DirectSDK / Claude Subscription:** Connect your Claude account directly without proxy friction.
+   - **API Key:** Use standard Anthropic (`sk-ant-...`) or OpenAI (`sk-...`) keys. All credentials are encrypted inside Apple's native **macOS Keychain**.
+   - **Local Models (Ollama):** Select Ollama to run local open-weights (e.g. `llama3`, `qwen2.5-coder`, `mistral`, `hermes`) completely offline.
+
+---
+
+## 5. Cockpit Keyboard Shortcuts
+
+| Shortcut | Action |
+| :--- | :--- |
+| `⌘ + Return` | Send directive / message to the active agent |
+| `⌘ + K` | Focus composer / command input |
+| `⌘ + Shift + P` | Command Palette & profile switcher |
+| `⌃ + M` | Hot-swap active model provider mid-session |
+| `⌘ + .` / `Esc` | Stop agent execution immediately (Stop & Send safeguard) |
+| `⌘ + Z` / Checkpoint | Rollback workspace to the previous Git checkpoint |
+
+---
+
+"WE ARE ALL BENEATH THE HEAV3NS. KEEP BUILDING."
+EOF
+
+cat << 'EOF' > "$DIST_DIR/README.md"
+# 🚀 Gumroad Release Kit — HEAV3NS-CODE (v0.1.0)
+
+This folder is streamlined into **three numbered folders** that correspond directly to each step in the Gumroad product creator.
+
+---
+
+## ⚡ Quick 3-Step Upload Guide
+
+### Step 1: Listing Details (`1_LISTING_DETAILS/`)
+Open [`1_LISTING_DETAILS/GUMROAD_LISTING.md`](./1_LISTING_DETAILS/GUMROAD_LISTING.md):
+- **Product Name:** `HEAV3NS-CODE for macOS (Native Cockpit & CLI)`
+- **Subtitle / Tagline:** `Your sovereign cockpit for the tight coding loop. Local-first AI agent for macOS.`
+- **Price:** Pay what you want (`$0+` recommended)
+- **Description:** Copy and paste the ready-to-use markdown description directly.
+
+---
+
+### Step 2: Media & Visuals (`2_LISTING_MEDIA/`)
+In the Gumroad **Product** tab under **Media**:
+1. **Cover:** Upload [`01_COVER_workspace.png`](./2_LISTING_MEDIA/01_COVER_workspace.png)
+2. **Thumbnail:** Upload [`02_THUMBNAIL_app-icon.png`](./2_LISTING_MEDIA/02_THUMBNAIL_app-icon.png)
+3. **Gallery:** Drag additional screenshots from the [`gallery/`](./2_LISTING_MEDIA/gallery/) folder.
+
+---
+
+### Step 3: Customer Downloads (`3_FILES_TO_UPLOAD/`)
+In the Gumroad **Content** tab, click **Upload files** ➔ **Computer**, open [`3_FILES_TO_UPLOAD/`](./3_FILES_TO_UPLOAD/), and select all 4 files:
+
+| File | Role for Customer |
+| :--- | :--- |
+| **`HEAV3NS-CODE-v0.1.0-macOS-arm64.dmg`** | **Primary macOS installer** (drag-and-drop to `/Applications`) |
+| **`HEAV3NS-CODE-v0.1.0-macOS-arm64.zip`** | **Alternative archive** (standalone app bundle) |
+| **`INSTALL_MACOS.md`** | **Customer setup guide** (first-run Gatekeeper help & shortcuts) |
+| **`SHA256SUMS.txt`** | **Cryptographic hashes** (allows buyers to verify binary integrity) |
+
+---
+
+## 🔄 In-App Auto-Updates (Zero Reinstalls)
+Customers only need to download this package once! All future updates are delivered directly via:
+- In-App Sparkle 2 updates (`HEAV3NS-CODE > Check for Updates…`)
+- Silent Over-The-Air runtime pushes
+- Direct CDN mirror: `https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg`
+EOF
+
+# 8. Generate Signed Sparkle Appcast Feed for In-App Updates
 RELEASES_DIR="dist/releases"
 mkdir -p "$RELEASES_DIR"
 cp -f "$ZIP_PATH" "$RELEASES_DIR/"
@@ -144,5 +341,6 @@ echo "    - $ZIP_NAME ($(du -h "$ZIP_PATH" | cut -f1))"
 echo "    - SHA256SUMS.txt"
 echo "    - INSTALL_MACOS.md"
 echo "  • In-App Auto-Update Feed: $RELEASES_DIR/appcast.xml"
+
 
 
