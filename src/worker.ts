@@ -25,6 +25,7 @@ declare global {
 interface WorkerEnv extends Env {
   LUMI_ADMIN_SECRET?: string;
   OPENAI_API_KEY?: string;
+  RELEASES_BUCKET?: R2Bucket;
 }
 
 interface JsonRecord {
@@ -318,6 +319,41 @@ export default {
           exhausted: accounts.filter((account) => account.status === 'exhausted').length,
         }
       });
+    }
+
+    if (url.pathname === '/download' || url.pathname === '/download/dmg' || url.pathname === '/releases/latest.dmg') {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return jsonResponse(request, env, { error: 'Method not allowed' }, 405, { Allow: 'GET, HEAD' });
+      }
+      return Response.redirect('https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg', 302);
+    }
+
+    if (url.pathname === '/download/zip' || url.pathname === '/releases/latest.zip') {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return jsonResponse(request, env, { error: 'Method not allowed' }, 405, { Allow: 'GET, HEAD' });
+      }
+      return Response.redirect('https://releases.heav3ns.com/HEAV3NS-CODE-v0.1.0-macOS-arm64.zip', 302);
+    }
+
+    if (url.pathname.startsWith('/releases/')) {
+      const fileKey = url.pathname.slice('/releases/'.length);
+      if (fileKey && !fileKey.includes('..') && /^[A-Za-z0-9._-]+$/.test(fileKey)) {
+        if (env.RELEASES_BUCKET) {
+          const object = await env.RELEASES_BUCKET.get(fileKey);
+          if (object) {
+            const headers = new Headers();
+            object.writeHttpMetadata(headers);
+            headers.set('etag', object.httpEtag);
+            headers.set('Cache-Control', 'public, max-age=14400');
+            if (fileKey.endsWith('.dmg')) headers.set('Content-Type', 'application/x-apple-diskimage');
+            if (fileKey.endsWith('.zip')) headers.set('Content-Type', 'application/zip');
+            if (fileKey.endsWith('.xml')) headers.set('Content-Type', 'application/xml');
+            if (fileKey.endsWith('.json')) headers.set('Content-Type', 'application/json');
+            return new Response(object.body, { headers });
+          }
+        }
+        return Response.redirect(`https://releases.heav3ns.com/${fileKey}`, 302);
+      }
     }
 
     const protectedRoute =

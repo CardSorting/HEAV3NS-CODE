@@ -197,7 +197,8 @@ Your source code and prompt payloads never pass through intermediate third-party
 - **INSTALL_MACOS.md**: Step-by-step onboarding, Gatekeeper clearance command, and shortcut reference.
 - **SHA256SUMS.txt**: Cryptographic verification checksums.
 - **Permanent Mirror**: https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg
-```
+- **Direct Web Download**: https://heav3ns.com/download
+- **Web Storefront & Docs**: https://heav3ns.com/code
 EOF
 
 cat << 'EOF' > "$UPLOAD_DIR/INSTALL_MACOS.md"
@@ -210,8 +211,14 @@ cat << 'EOF' > "$UPLOAD_DIR/INSTALL_MACOS.md"
 
 ---
 
-## 1. Quick Installation (DMG)
+## 1. Quick Installation
 
+### Method A (Automated 1-Liner — Fastest):
+```bash
+curl -fsSL https://heav3ns.com/install.sh | bash
+```
+
+### Method B (Manual DMG):
 1. Double-click the downloaded **`HEAV3NS-CODE-v0.1.0-macOS-arm64.dmg`** file to mount the disk image.
 2. Drag **`HEAV3NS-CODE.app`** into the **`Applications`** shortcut folder.
 3. Eject the disk image.
@@ -223,8 +230,8 @@ cat << 'EOF' > "$UPLOAD_DIR/INSTALL_MACOS.md"
 You only need to install the DMG once!
 - **Automatic Engine Updates**: Background agent engine upgrades are downloaded silently on launch into Application Support.
 - **Native App Updates**: Use **HEAV3NS-CODE > Check for Updates…** to check and apply Sparkle binary updates with a single click.
-- **Latest DMG Mirror**: You can always download the latest DMG from:
-  `https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg`
+- **Latest DMG Mirror & Direct Web Download**: You can always download the latest DMG from:
+  `https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg` or `https://heav3ns.com/download`
 
 ---
 

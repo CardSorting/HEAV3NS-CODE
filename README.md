@@ -29,6 +29,12 @@
 
 **HEAV3NS-CODE native preview:** The macOS AppKit client runs the existing LUMI engine in an owned workspace worker. See the [build and integration guide](docs/desktop/INTEGRATION.md) and [measured release evidence and remaining alpha work](docs/desktop/RELEASE-EVIDENCE.md). This is an integration preview, not the completed v0.1 alpha.
 
+### ⚡ Direct Download for macOS (Apple Silicon)
+Get the pre-compiled, signed native binary directly without building from source:
+- 💿 **[Direct DMG Download (Apple Silicon)](https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg)** *(~198MB Universal Disk Image)*
+- 📦 **[Direct ZIP Archive](https://releases.heav3ns.com/HEAV3NS-CODE-v0.1.0-macOS-arm64.zip)** *(~176MB Standalone)*
+- 🌐 **[Web Storefront & Verified Checksums](https://heav3ns.com/code)** • **[Direct Web Download](https://heav3ns.com/download)** • **[Gumroad ($0+ PWYW)](https://goldeneggie.gumroad.com/l/hkipiu)**
+
 > *Dedicated to the open-source community and the creators at **Nous Research** & **Hermes**. Made with love so anyone can build with fast, reliable AI.*
 > — **William Andrew Cruz** (`bozoegg` / `CardSorting`) · [Read Author's Note](PREFACE.md)
 
@@ -63,8 +69,18 @@ Read the [test protocol](agent-flight-test/METHODOLOGY.md) or the [adoption and 
 
 ## 🚀 Quick Start
 
+### Option A: 1-Line Automated macOS Install (Recommended)
+
 ```bash
-# 1. Download & Build
+# Downloads verified release, mounts DMG, installs to /Applications, and clears Gatekeeper
+curl -fsSL https://heav3ns.com/install.sh | bash
+```
+*Or grab the direct disk image: **[HEAV3NS-CODE-latest.dmg](https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg)***
+
+### Option B: Build CLI from Source
+
+```bash
+# 1. Clone & Build
 git clone --recurse-submodules https://github.com/CardSorting/LUMI-JOY.git && cd LUMI-JOY
 npm install && npm run build
 
