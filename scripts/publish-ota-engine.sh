@@ -15,13 +15,17 @@ echo "=========================================================="
 echo "Building engine bundle..."
 npm run build
 
-TARBALL_NAME="engine-v${VERSION}.tar.gz"
+TMP_TARBALL="$OUTPUT_DIR/engine-tmp.tar.gz"
+echo "Packaging dist/ into $TMP_TARBALL..."
+cp package.json dist/package.json
+tar --exclude="dist/gumroad" --exclude="dist/releases" --exclude="*.map" -czf "$TMP_TARBALL" dist/
+
+CHECKSUM="$(shasum -a 256 "$TMP_TARBALL" | cut -d ' ' -f 1)"
+SHORT_HASH="$(echo "$CHECKSUM" | cut -c1-8)"
+TARBALL_NAME="engine-v${VERSION}-${SHORT_HASH}.tar.gz"
 TARBALL_PATH="$OUTPUT_DIR/$TARBALL_NAME"
-
-echo "Packaging dist/ into $TARBALL_PATH..."
-tar --exclude="dist/gumroad" --exclude="dist/releases" --exclude="*.map" -czf "$TARBALL_PATH" dist/
-
-CHECKSUM="$(shasum -a 256 "$TARBALL_PATH" | cut -d ' ' -f 1)"
+mv "$TMP_TARBALL" "$TARBALL_PATH"
+cp "$TARBALL_PATH" "$OUTPUT_DIR/engine-v${VERSION}.tar.gz"
 
 cat << EOF > "$OUTPUT_DIR/engine-latest.json"
 {
