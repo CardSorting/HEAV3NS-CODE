@@ -46,6 +46,9 @@ if test "${1:-}" = "--upload" || test "${UPLOAD_TO_R2:-}" = "true"; then
   npx wrangler r2 object put heav3ns-releases/"$TARBALL_NAME" --file="$TARBALL_PATH" --content-type="application/gzip" --remote
   npx wrangler r2 object put heav3ns-releases/engine-latest.json --file="$OUTPUT_DIR/engine-latest.json" --content-type="application/json" --remote
   echo "✓ Successfully deployed to https://releases.heav3ns.com/engine-latest.json"
+  curl -s -m 3 -X POST "https://heav3ns.com/api/heartbeat" \
+    -H "Content-Type: application/json" \
+    -d "{\"action\":\"OTA Engine Deployed\",\"source\":\"ota_publisher\",\"v\":\"$VERSION\",\"arch\":\"arm64\"}" >/dev/null 2>&1 || true
 else
   echo ""
   echo "To publish live to Cloudflare R2, run:"

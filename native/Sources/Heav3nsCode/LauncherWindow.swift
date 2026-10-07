@@ -170,8 +170,21 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
         all.state = pinnedOnly ? .off : .on; pinned.state = pinnedOnly ? .on : .off
         all.setAccessibilityValue(pinnedOnly ? "" : "Selected"); pinned.setAccessibilityValue(pinnedOnly ? "Selected" : "")
         let accountButton = JourneyButton(connected ? "ChatGPT connected" : "Connect ChatGPT…", symbol: "person.crop.circle") { [weak self] in self?.showSignIn() }
+        let radarPill = SwarmRadarPillButton {
+            SwarmRadarWindow.shared.present()
+        }
         for button in [all, pinned, accountButton] { button.alignment = .left; button.bezelStyle = .inline; button.heightAnchor.constraint(equalToConstant: 36).isActive = true }
-        let rail = JourneyStyle.stack([JourneyStyle.label("HEAV3NS-CODE", size: 13, weight: .semibold), JourneyStyle.rule(), all, pinned, NSView(), JourneyStyle.rule(), accountButton])
+        radarPill.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        let rail = JourneyStyle.stack([
+            JourneyStyle.label("HEAV3NS-CODE", size: 13, weight: .semibold),
+            JourneyStyle.rule(),
+            all,
+            pinned,
+            NSView(),
+            JourneyStyle.rule(),
+            radarPill,
+            accountButton
+        ], spacing: 8)
         sidebar.addSubview(rail); JourneyStyle.pin(rail, to: sidebar, inset: 16)
         for view in rail.arrangedSubviews { view.widthAnchor.constraint(equalTo: rail.widthAnchor).isActive = true }
         sidebar.widthAnchor.constraint(equalToConstant: 200).isActive = true

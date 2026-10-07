@@ -61,7 +61,7 @@ final class EngineManager {
 
     /// Background check and silent update for the agent engine
     func checkForEngineUpdate(completion: ((Bool, String?) -> Void)? = nil) {
-        pingHeartbeat()
+        pingHeartbeat(action: "OTA Engine Checked", source: "engine_updater")
         guard !isUpdating, let feedURL = updateFeedURL else {
             completion?(false, nil)
             return
@@ -185,39 +185,9 @@ final class EngineManager {
         downloadTask.resume()
     }
 
-    /// Maintains anonymous active installation node count at the edge
-    func pingHeartbeat() {
-        // Respect user privacy opt-out via environment variable or macOS UserDefaults
-        if ProcessInfo.processInfo.environment["HEAV3NS_NO_HEARTBEAT"] == "1" ||
-           UserDefaults.standard.bool(forKey: "DisableHeartbeat") {
-            return
-        }
-
-        guard let baseURL = heartbeatURL else { return }
-        let clientID = resolveOrCreateClientID()
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
-        #if arch(arm64)
-        let arch = "arm64"
-        #else
-        let arch = "x86_64"
-        #endif
-
-        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-        components?.queryItems = [
-            URLQueryItem(name: "id", value: clientID),
-            URLQueryItem(name: "v", value: appVersion),
-            URLQueryItem(name: "arch", value: arch),
-            URLQueryItem(name: "source", value: "app")
-        ]
-
-        guard let requestURL = components?.url else { return }
-        var request = URLRequest(url: requestURL)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 5.0
-        request.setValue("HEAV3NS-CODE/\(appVersion) (\(arch))", forHTTPHeaderField: "User-Agent")
-
-        let task = URLSession.shared.dataTask(with: request) { _, _, _ in }
-        task.resume()
+    /// Maintains anonymous active installation node count at the edge with accurate action attribution
+    func pingHeartbeat(action: String = "Heartbeat Pulse", source: String = "engine_manager", completion: ((SwarmRadarState) -> Void)? = nil) {
+        SwarmRadarManager.shared.ping(action: action, source: source, completion: completion)
     }
 
     private func resolveOrCreateClientID() -> String {

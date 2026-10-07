@@ -19,6 +19,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
                 EngineManager.shared.checkForEngineUpdate()
             }
+            let hasLaunched = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+            if !hasLaunched {
+                UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+                SwarmRadarManager.shared.ping(action: "Fresh Cockpit Activated", source: "app_first_run")
+            } else {
+                SwarmRadarManager.shared.ping(action: "Cockpit Online", source: "app_launch")
+            }
+            SwarmRadarManager.shared.startPeriodicKeepAlive()
         }
         buildMenus()
         if let probe = IntegrationProbe() { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) } }
@@ -118,6 +126,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         applicationMenu.addItem(withTitle: "About HEAV3NS-CODE", action: #selector(about), keyEquivalent: "").target = self
         let checkUpdatesItem = applicationMenu.addItem(withTitle: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
         checkUpdatesItem.target = updaterController
+        let swarmRadarItem = applicationMenu.addItem(withTitle: "Sovereign Swarm Radar…", action: #selector(showSwarmRadar), keyEquivalent: "")
+        swarmRadarItem.target = self
         applicationMenu.addItem(.separator())
         applicationMenu.addItem(withTitle: "Hide HEAV3NS-CODE", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         applicationMenu.addItem(withTitle: "Quit HEAV3NS-CODE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -168,8 +178,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         viewItem.submenu = view; main.addItem(viewItem)
         let windowItem = NSMenuItem(); windowItem.title = "Window"; let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        let windowRadar = window.addItem(withTitle: "Sovereign Swarm Radar", action: #selector(showSwarmRadar), keyEquivalent: "r")
+        windowRadar.keyEquivalentModifierMask = [.command, .option]
+        windowRadar.target = self
         windowItem.submenu = window; main.addItem(windowItem); NSApp.windowsMenu = window
         NSApp.mainMenu = main
+    }
+    @objc private func showSwarmRadar() {
+        SwarmRadarWindow.shared.present()
     }
     private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent || $0.window === NSApp.keyWindow?.parent } }
     private var currentPods: PodsWindow? {
