@@ -187,6 +187,12 @@ final class EngineManager {
 
     /// Maintains anonymous active installation node count at the edge
     func pingHeartbeat() {
+        // Respect user privacy opt-out via environment variable or macOS UserDefaults
+        if ProcessInfo.processInfo.environment["HEAV3NS_NO_HEARTBEAT"] == "1" ||
+           UserDefaults.standard.bool(forKey: "DisableHeartbeat") {
+            return
+        }
+
         guard let baseURL = heartbeatURL else { return }
         let clientID = resolveOrCreateClientID()
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
