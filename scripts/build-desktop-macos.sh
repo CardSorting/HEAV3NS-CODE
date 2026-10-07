@@ -32,7 +32,9 @@ cp -R build/native/release/Sparkle.framework "$app/Contents/Frameworks/"
 cp native/Assets/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 cp -R build/native/release/HEAV3NS-CODE_Heav3nsCode.bundle "$app/Contents/Resources/"
 cp "build/downloads/node-v${node_version}-darwin-arm64/bin/node" "$app/Contents/Resources/runtime/node"
-cp -R dist/. "$app/Contents/Resources/runtime/dist/"
+rm -rf "$app/Contents/Resources/runtime/dist"
+mkdir -p "$app/Contents/Resources/runtime/dist"
+rsync -a --exclude="gumroad" --exclude="releases" --exclude="*.map" dist/ "$app/Contents/Resources/runtime/dist/"
 mkdir -p "$app/Contents/Resources/runtime/node_modules"
 cp -R node_modules/typescript "$app/Contents/Resources/runtime/node_modules/"
 cp LICENSE NOTICE THIRD-PARTY-NOTICES.md LICENSE-MAP.md TRADEMARKS.md PATENT-NON-AGGRESSION-PLEDGE.md "$app/Contents/Resources/"
@@ -40,15 +42,26 @@ cp "build/downloads/node-v${node_version}-darwin-arm64/LICENSE" "$app/Contents/R
 cp native/Info.plist "$app/Contents/Info.plist"
 find "$app" -name ".DS_Store" -delete 2>/dev/null || true
 xattr -cr "$app"
-if test -d "$app/Contents/Frameworks/Sparkle.framework"; then
-  codesign --force --sign "$identity" --options runtime "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc"
-  codesign --force --sign "$identity" --options runtime "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
-  codesign --force --sign "$identity" --options runtime "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
-  codesign --force --sign "$identity" --options runtime "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
-  codesign --force --sign "$identity" --options runtime "$app/Contents/Frameworks/Sparkle.framework"
+sign_opts=(--options runtime)
+if test "$identity" != "-"; then
+  sign_opts+=(--timestamp)
 fi
-codesign --force --sign "$identity" --options runtime --entitlements native/Node.entitlements "$app/Contents/Resources/runtime/node"
-codesign --force --sign "$identity" --options runtime "$app"
+
+if test -d "$app/Contents/Frameworks/Sparkle.framework"; then
+  sparkle_root="$app/Contents/Frameworks/Sparkle.framework"
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/XPCServices/Downloader.xpc"
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/XPCServices/Installer.xpc"
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/Autoupdate"
+  if test -f "$sparkle_root/Versions/B/Updater.app/Contents/MacOS/Updater"; then
+    codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/Updater.app/Contents/MacOS/Updater"
+  fi
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/Updater.app"
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root/Versions/B/Sparkle"
+  codesign --force --sign "$identity" "${sign_opts[@]}" "$sparkle_root"
+fi
+codesign --force --sign "$identity" "${sign_opts[@]}" --entitlements native/Node.entitlements "$app/Contents/Resources/runtime/node"
+codesign --force --sign "$identity" "${sign_opts[@]}" --entitlements native/App.entitlements "$app/Contents/MacOS/HEAV3NS-CODE"
+codesign --force --sign "$identity" "${sign_opts[@]}" --entitlements native/App.entitlements "$app"
 codesign --verify --deep --strict "$app"
 echo "Built $task_root/$app"
 if test "$identity" = -; then echo 'Ad-hoc development signature. Developer ID and notarization are not verified.'; fi

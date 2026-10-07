@@ -17,9 +17,10 @@ echo "  Packaging HEAV3NS-CODE v${VERSION} for macOS ($ARCH)"
 echo "  Target Output: $DIST_DIR/$DMG_NAME"
 echo "=========================================================="
 
-# 1. Verify app exists; build if missing
-if ! test -d "$APP_SRC"; then
-  echo "Building desktop app first via npm run desktop:build..."
+# 1. Verify app exists; build if missing or if forced
+FORCE_BUILD="${HEAV3NS_FORCE_BUILD:-1}"
+if test "$FORCE_BUILD" = "1" || ! test -d "$APP_SRC"; then
+  echo "Building desktop app via npm run desktop:build..."
   npm run desktop:build
 fi
 
@@ -40,6 +41,22 @@ ditto "$APP_SRC" "$STAGING_DIR/HEAV3NS-CODE.app"
 echo "Creating Applications shortcut..."
 ln -s /Applications "$STAGING_DIR/Applications"
 
+# Add clickable first-time launch helper inside DMG
+cat << 'EOF' > "$STAGING_DIR/Open (First-Time Bypass).command"
+#!/bin/bash
+echo "=========================================================="
+echo "  Clearing Gatekeeper quarantine for HEAV3NS-CODE..."
+echo "=========================================================="
+if test -d "/Applications/HEAV3NS-CODE.app"; then
+  xattr -cr "/Applications/HEAV3NS-CODE.app" 2>/dev/null || true
+  open "/Applications/HEAV3NS-CODE.app"
+  echo "✓ HEAV3NS-CODE launched successfully!"
+else
+  echo "Please drag HEAV3NS-CODE.app into Applications first!"
+fi
+EOF
+chmod +x "$STAGING_DIR/Open (First-Time Bypass).command"
+
 # Add README / Quickstart instructions inside DMG
 cat << 'EOF' > "$STAGING_DIR/INSTALL & QUICKSTART.txt"
 ========================================================================
@@ -52,12 +69,24 @@ INSTALLATION:
 2. Launch "HEAV3NS-CODE" from your Applications folder or Spotlight (⌘ + Space).
 
 FIRST-TIME LAUNCH (Ad-Hoc Development Signature):
-Because this build is distributed outside the Apple Mac App Store without
-a paid notarization cert, macOS Gatekeeper may ask for confirmation on first open:
-- Right-click (or Control-click) "HEAV3NS-CODE.app" in Applications and choose "Open".
+Because this preview build is distributed outside the Apple Mac App Store without
+a paid notarization certificate, macOS Gatekeeper may show a confirmation dialog:
+
+OPTION 1 (Double-Click Helper — Easiest):
+- Double-click "Open (First-Time Bypass).command" in this DMG window after dragging to Applications.
+
+OPTION 2 (macOS System Settings):
+- Open System Settings > Privacy & Security.
+- Scroll down to "Security".
+- Under "HEAV3NS-CODE was blocked from use", click "Open Anyway".
+
+OPTION 3 (Finder Right-Click):
+- In /Applications, Right-Click (or Control-Click) "HEAV3NS-CODE.app" and choose "Open".
 - Click "Open" in the system security confirmation prompt.
-- OR run this single command in your Terminal:
+
+OPTION 4 (Terminal One-Liner):
     xattr -cr /Applications/HEAV3NS-CODE.app
+    open /Applications/HEAV3NS-CODE.app
 
 FEATURES:
 - Cockpit Workspace: Central human–agent dialogue with persistent composer.
@@ -80,6 +109,10 @@ EOF
 cp LICENSE "$STAGING_DIR/LICENSE.txt"
 cp NOTICE "$STAGING_DIR/NOTICE.txt"
 
+# Sanitize staging metadata and quarantine flags
+find "$STAGING_DIR" -name ".DS_Store" -delete 2>/dev/null || true
+xattr -cr "$STAGING_DIR" 2>/dev/null || true
+
 # 3. Clean and prepare Gumroad distribution tree
 DETAILS_DIR="$DIST_DIR/1_LISTING_DETAILS"
 MEDIA_DIR="$DIST_DIR/2_LISTING_MEDIA"
@@ -97,6 +130,22 @@ hdiutil create \
   -ov \
   -format UDZO \
   "$DMG_PATH"
+
+# Sign disk image if a Developer ID is provided
+if test "${HEAV3NS_SIGN_IDENTITY:--}" != "-"; then
+  echo "Signing disk image with ${HEAV3NS_SIGN_IDENTITY}..."
+  codesign --force --sign "${HEAV3NS_SIGN_IDENTITY}" --timestamp "$DMG_PATH"
+fi
+
+# Apple Notarization & Stapling if credentials are provided
+if test -n "${APPLE_ID:-}" && test -n "${APPLE_PASSWORD:-}" && test -n "${APPLE_TEAM_ID:-}"; then
+  echo "Submitting DMG for Apple Notarization via notarytool..."
+  xcrun notarytool submit "$DMG_PATH" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+  echo "Stapling notarization ticket to DMG..."
+  xcrun stapler staple "$DMG_PATH"
+  echo "Stapling notarization ticket to App..."
+  xcrun stapler staple "$APP_SRC"
+fi
 
 # 4. Create standalone ZIP distribution
 echo "Creating zip archive ($ZIP_NAME)..."
@@ -239,19 +288,25 @@ You only need to install the DMG once!
 
 Because this alpha preview is distributed directly to developers and supporters without Apple Mac App Store sandboxing:
 
-### Method A (GUI — Easiest):
+### Method A (Clickable Helper in DMG — Fastest):
+1. In the mounted DMG window, double-click **`Open (First-Time Bypass).command`**.
+2. The helper automatically clears the Gatekeeper quarantine bit and launches the app.
+
+### Method B (macOS System Settings):
+1. If macOS says the app cannot be opened or verified, open **System Settings > Privacy & Security**.
+2. Scroll to the **Security** section.
+3. Next to *“HEAV3NS-CODE was blocked from use”*, click **Open Anyway**.
+
+### Method C (Finder Right-Click):
 1. Navigate to your **Applications** folder in Finder.
 2. **Right-click (or Control-click)** on `HEAV3NS-CODE.app` and select **Open**.
 3. In the security confirmation dialog that appears, click **Open**.
 4. *(You only have to do this once. Subsequent launches can be opened normally via Spotlight, Dock, or Launchpad).*
 
-### Method B (Terminal — One Command):
+### Method D (Terminal — One Command):
 If macOS displays an alert saying the app cannot be opened or is damaged by quarantine attributes:
 ```bash
 xattr -cr /Applications/HEAV3NS-CODE.app
-```
-Then launch the app normally:
-```bash
 open /Applications/HEAV3NS-CODE.app
 ```
 
@@ -336,7 +391,15 @@ cp -f "$ZIP_PATH" "$RELEASES_DIR/"
 SPARKLE_BIN="build/native/artifacts/sparkle/Sparkle/bin/generate_appcast"
 if test -f "$SPARKLE_BIN"; then
   echo "Generating signed Sparkle appcast.xml for in-app auto-updates..."
-  "$SPARKLE_BIN" --download-url-prefix "https://releases.heav3ns.com/" "$RELEASES_DIR"
+  SPARKLE_STAGING="build/sparkle-staging"
+  rm -rf "$SPARKLE_STAGING"
+  mkdir -p "$SPARKLE_STAGING"
+  cp -f "$ZIP_PATH" "$SPARKLE_STAGING/"
+  if test -f "$RELEASES_DIR/appcast.xml"; then
+    cp -f "$RELEASES_DIR/appcast.xml" "$SPARKLE_STAGING/appcast.xml"
+  fi
+  "$SPARKLE_BIN" --download-url-prefix "https://releases.heav3ns.com/" "$SPARKLE_STAGING"
+  cp -f "$SPARKLE_STAGING/appcast.xml" "$RELEASES_DIR/appcast.xml"
 fi
 
 echo "✓ Successfully packaged Gumroad release in $DIST_DIR:"

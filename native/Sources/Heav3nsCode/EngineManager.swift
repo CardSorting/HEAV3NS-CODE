@@ -8,6 +8,7 @@ final class EngineManager {
 
     private let fileManager = FileManager.default
     private let updateFeedURL = URL(string: "https://releases.heav3ns.com/engine-latest.json")
+    private let heartbeatURL = URL(string: "https://heav3ns.com/api/heartbeat")
     private var isUpdating = false
 
     var appSupportRuntimeDirectory: URL {
@@ -60,6 +61,7 @@ final class EngineManager {
 
     /// Background check and silent update for the agent engine
     func checkForEngineUpdate(completion: ((Bool, String?) -> Void)? = nil) {
+        pingHeartbeat()
         guard !isUpdating, let feedURL = updateFeedURL else {
             completion?(false, nil)
             return
@@ -181,5 +183,45 @@ final class EngineManager {
             }
         }
         downloadTask.resume()
+    }
+
+    /// Maintains anonymous active installation node count at the edge
+    func pingHeartbeat() {
+        guard let baseURL = heartbeatURL else { return }
+        let clientID = resolveOrCreateClientID()
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        #if arch(arm64)
+        let arch = "arm64"
+        #else
+        let arch = "x86_64"
+        #endif
+
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "id", value: clientID),
+            URLQueryItem(name: "v", value: appVersion),
+            URLQueryItem(name: "arch", value: arch),
+            URLQueryItem(name: "source", value: "app")
+        ]
+
+        guard let requestURL = components?.url else { return }
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 5.0
+        request.setValue("HEAV3NS-CODE/\(appVersion) (\(arch))", forHTTPHeaderField: "User-Agent")
+
+        let task = URLSession.shared.dataTask(with: request) { _, _, _ in }
+        task.resume()
+    }
+
+    private func resolveOrCreateClientID() -> String {
+        let fileURL = appSupportRuntimeDirectory.deletingLastPathComponent().appendingPathComponent("client-id")
+        if let existing = try? String(contentsOf: fileURL, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !existing.isEmpty {
+            return existing
+        }
+        let newID = UUID().uuidString.lowercased()
+        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? newID.write(to: fileURL, atomically: true, encoding: .utf8)
+        return newID
     }
 }
