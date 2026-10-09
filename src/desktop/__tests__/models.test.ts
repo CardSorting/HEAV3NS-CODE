@@ -8,6 +8,7 @@ import { type ModelSelection, recentModelSelections, validateModelSelection } fr
 import { ModelResolver } from "../../agents/extensions/resolution/model-resolver.js"
 import { reasoningEfforts } from "../../core/providers/reasoning-effort.js"
 import type { DesktopRequest } from "../protocol.js"
+import { DesktopModelDiscovery, fetchModelList } from "../model-discovery.js"
 import { DesktopSession } from "../worker.js"
 
 describe("desktop model selection", () => {
@@ -17,6 +18,7 @@ describe("desktop model selection", () => {
 	let current: ModelSelection
 	let release: (() => void) | undefined
 	let key = ""
+	let keys: Record<string, string> = {}
 	const request = (method: DesktopRequest["method"], params: Record<string, unknown> = {}) =>
 		bridge.request({
 			v: 1,
@@ -31,6 +33,7 @@ describe("desktop model selection", () => {
 		folder = await mkdtemp(path.join(tmpdir(), "desktop-models-"))
 		database = new BroccoliDatabaseKernel({ workspaceRoot: folder })
 		key = ""
+		keys = {}
 		current = { provider: "openai-codex", model: "gpt-5.6-terra" }
 		bridge = new DesktopSession(
 			{ path: folder, id: "fixture" },
@@ -50,9 +53,15 @@ describe("desktop model selection", () => {
 				saveContext: () => {},
 				models: {
 					credentials: {
-						status: () => ({ saved: !!key, configured: !!key }),
-						save: async (value) => {
-							key = value
+						status: (provider = "openrouter") => {
+							const k = keys[provider] ?? ""
+							return { saved: !!k, configured: !!k }
+						},
+						save: async (keyOrProvider: string, maybeKey?: string) => {
+							const provider = maybeKey !== undefined ? keyOrProvider : "openrouter"
+							const value = maybeKey !== undefined ? maybeKey : keyOrProvider
+							keys[provider] = value
+							if (provider === "openrouter") key = value
 						},
 					},
 					current: () => ({ ...current }),
@@ -87,11 +96,47 @@ describe("desktop model selection", () => {
 		assert.deepEqual(await request("openrouter.saveKey", { apiKey: "" }), { saved: false, configured: false })
 		assert.equal(current.provider, "openai-codex")
 	})
+	it("manages Cline Pass credentials and validates cline-pass model routes", async () => {
+		assert.deepEqual(await request("clinePass.status"), { saved: false, configured: false })
+		assert.deepEqual(await request("clinePass.saveKey", { apiKey: "test-cline-key" }), { saved: true, configured: true })
+		assert.ok(!JSON.stringify(await request("models.list")).includes("test-cline-key"))
+		const selected = await request("models.select", {
+			provider: "cline-pass",
+			model: "cline-pass/qwen3.7-max",
+			revision: 0,
+		})
+		assert.equal(selected.provider, "cline-pass")
+		assert.equal(selected.model, "cline-pass/qwen3.7-max")
+		assert.equal(database.getTable("desktop.metadata.v1").get("model-selection")?.provider, "cline-pass")
+		assert.deepEqual(await request("clinePass.saveKey", { apiKey: "" }), { saved: false, configured: false })
+	})
+	it("manages Nous Research credentials and validates nous model routes", async () => {
+		assert.deepEqual(await request("nous.status"), { saved: false, configured: false })
+		assert.deepEqual(await request("nous.saveKey", { apiKey: "test-nous-key" }), { saved: true, configured: true })
+		assert.ok(!JSON.stringify(await request("models.list")).includes("test-nous-key"))
+		const selected = await request("models.select", {
+			provider: "nous",
+			model: "Hermes-4-405B",
+			revision: 0,
+		})
+		assert.equal(selected.provider, "nous")
+		assert.equal(selected.model, "Hermes-4-405B")
+		assert.equal(database.getTable("desktop.metadata.v1").get("model-selection")?.provider, "nous")
+		assert.deepEqual(await request("nous.saveKey", { apiKey: "" }), { saved: false, configured: false })
+	})
 	it("validates provider/model pairs without silent substitution", () => {
 		assert.equal(validateModelSelection({ provider: claude, model: "claude-sonnet-5[1m]" }).model, "claude-sonnet-5[1m]")
 		assert.equal(
 			validateModelSelection({ provider: "openai-codex", model: "org/custom-model:latest" }).model,
 			"org/custom-model:latest",
+		)
+		assert.equal(
+			validateModelSelection({ provider: "cline-pass", model: "cline-pass/qwen3.7-max" }).model,
+			"cline-pass/qwen3.7-max",
+		)
+		assert.equal(
+			validateModelSelection({ provider: "nous", model: "Hermes-4-405B" }).model,
+			"Hermes-4-405B",
 		)
 		for (const value of [
 			{ provider: claude, model: "gpt-4o" },
@@ -256,5 +301,52 @@ describe("desktop model selection", () => {
 		assert.equal(current.provider, "openai-codex")
 		assert.equal((await request("models.list")).revision, 0)
 		assert.deepEqual((await request("models.list")).recent, [current])
+	})
+	it("dynamically populates models with tag and metadata enrichment across discovery shapes", async () => {
+		const mockResponse = {
+			recommended: [
+				{ id: "cline-pass/qwen3.7-max", name: "Qwen3.7 Max", description: "Flagship", tags: ["recommended"] },
+			],
+			free: [
+				{ id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash", context_length: 128000, tags: ["free"] },
+			],
+		}
+		const fakeFetch: any = async () => ({
+			ok: true,
+			body: {
+				getReader: () => {
+					let read = false
+					return {
+						read: async () => {
+							if (read) return { done: true, value: undefined }
+							read = true
+							return { done: false, value: Buffer.from(JSON.stringify(mockResponse)) }
+						},
+						cancel: async () => {},
+					}
+				},
+			},
+		})
+		const models = await fetchModelList(new URL("https://api.cline.bot/models"), {}, new AbortController().signal, fakeFetch)
+		assert.equal(models.length, 2)
+		assert.equal(models[0].id, "cline-pass/qwen3.7-max")
+		assert.equal(models[0].label, "Qwen3.7 Max")
+		assert.match(models[0].detail!, /recommended/)
+		assert.equal(models[1].id, "deepseek/deepseek-v4-flash")
+		assert.equal(models[1].label, "DeepSeek V4 Flash")
+		assert.match(models[1].detail!, /128k context/)
+		assert.match(models[1].detail!, /free/)
+
+		const discovery = new DesktopModelDiscovery(async () => ({
+			source: "Mock",
+			models: [{ id: "mock-model", label: "Mock Label", detail: "Mock Detail" }],
+		}))
+		assert.ok(discovery.models("cline-pass").length > 0)
+		assert.ok(discovery.models("nous").length > 0)
+		assert.ok(discovery.models(claude).length > 0)
+		const res = await discovery.discover("cline-pass")
+		assert.equal(res.state, "ready")
+		assert.equal(res.models[0].id, "mock-model")
+		discovery.close()
 	})
 })

@@ -5,6 +5,8 @@ import { z } from "zod"
 import { workspaceRevision } from "../agents/extensions/execution/workspace-verification.js"
 import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/intelligence/spider-policy-check.js"
 import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
+import { clineApiKey } from "../core/api/providers/cline-pass-native.js"
+import { nousResearchApiKey } from "../core/api/providers/nous-research-native.js"
 import type {
 	EngineProgressEvent,
 	EngineTickResult,
@@ -14,7 +16,9 @@ import type {
 import type { SessionMessage } from "../core/contracts/session.contracts.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+	CLINE_PASS_PROVIDER,
 	getAgentProviderLabel,
+	NOUS_RESEARCH_PROVIDER,
 	OPENAI_CODEX_PROVIDER,
 } from "../core/providers/provider-ids.js"
 import { reasoningEfforts } from "../core/providers/reasoning-effort.js"
@@ -299,6 +303,7 @@ export class DesktopSession {
 				this.approvals.put(String(approval.operation), { ...approval, decision: "interrupted" })
 		this.metadata.put("session", { session: this.session, seq: this.seq })
 		await this.database.flush()
+		void this.lifecycle?.models?.renew?.().catch(() => undefined)
 	}
 	private event(type: string, payload: unknown, run?: string, seq?: number) {
 		this.send({
@@ -819,7 +824,7 @@ export class DesktopSession {
 				z.object({}).strict().parse(request.params)
 				const credentials = this.lifecycle?.models?.credentials
 				if (!credentials) throw new Error("UNSUPPORTED: OpenRouter credentials are unavailable")
-				return credentials.status()
+				return credentials.status("openrouter")
 			}
 			case "openrouter.saveKey": {
 				const { apiKey } = z
@@ -836,8 +841,56 @@ export class DesktopSession {
 					throw new Error("WORK_PENDING: finish or stop work before changing the API key")
 				const credentials = this.lifecycle?.models?.credentials
 				if (!credentials) throw new Error("UNSUPPORTED: OpenRouter credentials are unavailable")
-				await credentials.save(apiKey)
-				return credentials.status()
+				await credentials.save("openrouter", apiKey)
+				return credentials.status("openrouter")
+			}
+			case "clinePass.status": {
+				z.object({}).strict().parse(request.params)
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: Cline Pass credentials are unavailable")
+				return credentials.status("cline-pass")
+			}
+			case "clinePass.saveKey": {
+				const { apiKey } = z
+					.object({
+						apiKey: z
+							.string()
+							.trim()
+							.max(1024)
+							.refine((value) => value === "" || /^[!-~]+$/.test(value), "Enter an API key without spaces"),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop work before changing the API key")
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: Cline Pass credentials are unavailable")
+				await credentials.save("cline-pass", apiKey)
+				return credentials.status("cline-pass")
+			}
+			case "nous.status": {
+				z.object({}).strict().parse(request.params)
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: Nous Research credentials are unavailable")
+				return credentials.status("nous")
+			}
+			case "nous.saveKey": {
+				const { apiKey } = z
+					.object({
+						apiKey: z
+							.string()
+							.trim()
+							.max(1024)
+							.refine((value) => value === "" || /^[!-~]+$/.test(value), "Enter an API key without spaces"),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop work before changing the API key")
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: Nous Research credentials are unavailable")
+				await credentials.save("nous", apiKey)
+				return credentials.status("nous")
 			}
 			case "models.discover": {
 				const { provider, refresh } = z
@@ -2215,6 +2268,8 @@ export async function runDesktopWorker(): Promise<void> {
 			providerModelLoader({
 				gateway: engine.proxyGateway,
 				openRouterApiKey,
+				clineApiKey,
+				nousApiKey: nousResearchApiKey,
 				authMethod: () => engine!.setupWizard.getOpenAiAuthMethod(),
 				apiKey: () =>
 					engine!.authStorageVault.getToken(OPENAI_CODEX_PROVIDER) ||
@@ -2240,19 +2295,41 @@ export async function runDesktopWorker(): Promise<void> {
 			},
 			models: {
 				credentials: {
-					status: () => ({
-						saved: !!StateManager.get().getSecretKey("openRouterApiKey"),
-						configured: !!openRouterApiKey(),
-					}),
-					save: async (key) => {
+					status: (provider = "openrouter") => {
+						if (provider === "cline-pass") {
+							return {
+								saved: !!StateManager.get().getSecretKey("clineApiKey"),
+								configured: !!clineApiKey(),
+							}
+						}
+						if (provider === "nous" || provider === "nousResearch") {
+							return {
+								saved: !!StateManager.get().getSecretKey("nousResearchApiKey"),
+								configured: !!nousResearchApiKey(),
+							}
+						}
+						return {
+							saved: !!StateManager.get().getSecretKey("openRouterApiKey"),
+							configured: !!openRouterApiKey(),
+						}
+					},
+					save: async (keyOrProvider: string, maybeKey?: string) => {
 						const state = StateManager.get()
-						const before = state.getSecretKey("openRouterApiKey")
-						state.setSecret("openRouterApiKey", key || undefined)
+						const provider = maybeKey !== undefined ? keyOrProvider : "openrouter"
+						const key = maybeKey !== undefined ? maybeKey : keyOrProvider
+						const secretKey =
+							provider === "cline-pass"
+								? "clineApiKey"
+								: provider === "nous" || provider === "nousResearch"
+									? "nousResearchApiKey"
+									: "openRouterApiKey"
+						const before = state.getSecretKey(secretKey)
+						state.setSecret(secretKey, key || undefined)
 						try {
 							await state.flushPendingState()
 						} catch {
-							state.setSecret("openRouterApiKey", before)
-							throw new Error("Could not save the OpenRouter key. Try again.")
+							state.setSecret(secretKey, before)
+							throw new Error(`Could not save the ${provider} key. Try again.`)
 						}
 					},
 				},
@@ -2260,6 +2337,8 @@ export async function runDesktopWorker(): Promise<void> {
 					provider: engine!.modelResolver.getProvider() as
 						| "openrouter"
 						| "openai-codex"
+						| typeof CLINE_PASS_PROVIDER
+						| typeof NOUS_RESEARCH_PROVIDER
 						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 					model: engine!.modelResolver.getActiveModel(),
 					...(engine!.modelResolver.getReasoningEffort()
@@ -2272,24 +2351,35 @@ export async function runDesktopWorker(): Promise<void> {
 					engine!.modelResolver.setReasoningEffort(selection.reasoningEffort)
 				},
 				discover: (provider, refresh) => discovery.discover(provider, refresh),
+				renew: () => discovery.renewAll(),
 				close: () => discovery.close(),
 				catalog: () =>
-					[OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER, "openrouter" as const].map((id) => ({
+					[
+						OPENAI_CODEX_PROVIDER,
+						CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+						"openrouter" as const,
+						CLINE_PASS_PROVIDER,
+						NOUS_RESEARCH_PROVIDER,
+					].map((id) => ({
 						id,
 						label: getAgentProviderLabel(id),
 						detail:
 							id === "openrouter"
 								? "Uses your OpenRouter API key. Browse tool-capable models or enter an exact model ID. OpenRouter bills usage to your account."
-								: id === OPENAI_CODEX_PROVIDER
-									? engine!.proxyGateway.getProxyConfig() ||
-										engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
-										? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
-										: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
-											? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
-											: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
-												? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
-												: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."
-									: "Uses your existing Claude Code connection. If needed, run claude auth login, then reconnect this workspace.",
+								: id === CLINE_PASS_PROVIDER
+									? "Uses Cline Pass personal account credentials or CLINE_API_KEY. Connects to api.cline.bot."
+									: id === NOUS_RESEARCH_PROVIDER
+										? "Uses Nous Research inference with NOUS_API_KEY or Nous Portal subscription. Connects to inference-api.nousresearch.com."
+										: id === OPENAI_CODEX_PROVIDER
+											? engine!.proxyGateway.getProxyConfig() ||
+												engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
+												? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
+												: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
+													? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
+													: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
+														? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
+														: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."
+											: "Uses your existing Claude Code connection. If needed, run claude auth login, then reconnect this workspace.",
 						models: discovery.models(id),
 					})),
 			},

@@ -10,8 +10,16 @@ struct WorkspaceModelSelection: Equatable {
     let busy: Bool
     let blocked: String?
     static let reasoningLevels: Set<String> = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
-    var providerLabel: String { provider == "openrouter" ? "OpenRouter" : provider == "openai-codex" ? "OpenAI Codex" : "Claude Code" }
-    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter"]
+    var providerLabel: String {
+        switch provider {
+        case "openrouter": return "OpenRouter"
+        case "cline-pass": return "Cline Pass"
+        case "nous": return "Nous Research"
+        case "openai-codex": return "OpenAI Codex"
+        default: return "Claude Code"
+        }
+    }
+    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter", "cline-pass", "nous"]
     static func validModel(_ value: String) -> Bool {
         value.utf8.count <= 200 && value.range(of: "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*\\z", options: .regularExpression) != nil
     }

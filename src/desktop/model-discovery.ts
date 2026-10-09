@@ -4,6 +4,9 @@ import {
 	discoverClaudeSubscriptionDirectSdkModels,
 } from "../integrations/claude-subscription-directsdk/provider.js"
 import { OpenAiCodexOAuthService } from "../services/auth/OpenAiCodexOAuthService.js"
+import { clinePassModels, nousResearchModels } from "../shared/api.js"
+import { CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS } from "../core/providers/provider-ids.js"
+import { getNousResearchModelInfo } from "../core/api/providers/nous-research.js"
 import { fetch as configuredFetch } from "../shared/net.js"
 import { type ModelSelection, validateModelSelection } from "./models.js"
 
@@ -38,14 +41,34 @@ export class DesktopModelDiscovery {
 		private readonly now = Date.now,
 	) {}
 	models(provider: Provider): string[] {
-		return this.cache.get(provider)?.result.models.map((model) => model.id) ?? []
+		const cached = this.cache.get(provider)?.result.models.map((model) => model.id)
+		if (cached && cached.length > 0) return cached
+		if (!this.closed && !this.pending.has(provider)) {
+			void this.discover(provider).catch(() => undefined)
+		}
+		if (provider === "cline-pass") return Object.keys(clinePassModels)
+		if (provider === "nous") return Object.keys(nousResearchModels)
+		if (provider === "claude-subscription-directsdk-experimental") return [...CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS]
+		return []
+	}
+	async renewAll(): Promise<void> {
+		if (this.closed) return
+		const providers: Provider[] = [
+			"cline-pass",
+			"nous",
+			"openrouter",
+			"claude-subscription-directsdk-experimental",
+			"openai-codex",
+		]
+		await Promise.allSettled(providers.map((p) => this.discover(p, true)))
 	}
 	discover(provider: Provider, refresh = false): Promise<DiscoveryResult> {
 		if (this.closed) return Promise.reject(new Error("SHUTTING_DOWN: model discovery is closed"))
 		const running = this.pending.get(provider)
 		if (running) return running.promise.then((value) => structuredClone(value))
 		const cached = this.cache.get(provider)
-		if (!refresh && cached && cached.expires > this.now()) return Promise.resolve(structuredClone(cached.result))
+		const isFallbackCached = cached?.result.source.toLowerCase().includes("fallback")
+		if (!refresh && !isFallbackCached && cached && cached.expires > this.now()) return Promise.resolve(structuredClone(cached.result))
 		const controller = new AbortController()
 		const timer = setTimeout(() => controller.abort(), this.timeoutMs)
 		const aborted = new Promise<never>((_, reject) =>
@@ -92,6 +115,7 @@ export class DesktopModelDiscovery {
 					if (visibleModels.length >= (provider === "openrouter" ? 1000 : 200) || bytes > 180_000) break
 					visibleModels.push(model)
 				}
+				const isFallback = listing.source.toLowerCase().includes("fallback")
 				const result: DiscoveryResult = {
 					provider,
 					models: visibleModels,
@@ -99,11 +123,13 @@ export class DesktopModelDiscovery {
 					source: listing.source,
 					checkedAt: this.now(),
 					limited: models.size > visibleModels.length || listing.models.length > 2000,
-					message: models.size
-						? "Provider-reported models. Tool support and access are checked when you send."
-						: "This connection returned no models. Check its setup, refresh, or enter an exact model ID.",
+					message: isFallback
+						? `Offline catalog fallback. ${listing.source}. Refresh to renew live models.`
+						: models.size
+							? "Provider-reported models. Tool support and access are checked when you send."
+							: "This connection returned no models. Check its setup, refresh, or enter an exact model ID.",
 				}
-				this.cache.set(provider, { result, expires: this.now() + 5 * 60_000 })
+				this.cache.set(provider, { result, expires: this.now() + (isFallback ? 15_000 : 2 * 60_000) })
 				return result
 			} catch (error) {
 				const result: DiscoveryResult = {
@@ -118,9 +144,13 @@ export class DesktopModelDiscovery {
 							? error.message
 							: provider === "openrouter"
 								? "Could not load OpenRouter models. Check your connection and API key, then refresh or enter an exact model ID."
-								: provider === "openai-codex"
-									? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
-									: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
+								: provider === "cline-pass"
+									? "Could not load Cline Pass models. Check your connection or CLINE_API_KEY, then refresh. Exact model IDs remain available."
+									: provider === "nous"
+										? "Could not load Nous Research models. Check your connection or NOUS_API_KEY, then refresh. Exact model IDs remain available."
+										: provider === "openai-codex"
+											? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
+											: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
 				}
 				if (!this.closed) this.cache.set(provider, { result, expires: this.now() + 30_000 })
 				return result
@@ -192,13 +222,54 @@ export async function fetchModelList(
 		await reader.cancel().catch(() => undefined)
 	}
 	const body = JSON.parse(Buffer.concat(chunks).toString("utf8"))
-	if (!Array.isArray(body.data))
+	let rawList: any[] = []
+	if (Array.isArray(body)) {
+		rawList = body
+	} else if (Array.isArray(body.data)) {
+		rawList = body.data
+	} else if (Array.isArray(body.models)) {
+		rawList = body.models
+	} else if (
+		Array.isArray(body.clinePass) ||
+		Array.isArray(body.recommended) ||
+		Array.isArray(body.free) ||
+		Array.isArray(body.clineCloud)
+	) {
+		rawList = [
+			...(Array.isArray(body.clinePass) ? body.clinePass : []),
+			...(Array.isArray(body.recommended) ? body.recommended : []),
+			...(Array.isArray(body.free) ? body.free : []),
+			...(Array.isArray(body.clineCloud) ? body.clineCloud : []),
+		]
+	}
+	if (!rawList.length && !Array.isArray(body.data))
 		throw new ModelDiscoveryError("The endpoint returned an unsupported model list. Enter an exact model ID.")
-	return body.data.slice(0, 2000).map((item: { id?: unknown; name?: unknown; description?: unknown }) => ({
-		id: typeof item?.id === "string" ? item.id : "",
-		label: typeof item?.name === "string" ? item.name : undefined,
-		detail: typeof item?.description === "string" ? item.description : undefined,
-	}))
+	const seenIds = new Set<string>()
+	const results: Listing["models"] = []
+	for (const item of rawList.slice(0, 2000)) {
+		const id = typeof item?.id === "string" ? item.id : ""
+		if (!id || seenIds.has(id)) continue
+		seenIds.add(id)
+		const label =
+			typeof item?.name === "string"
+				? item.name
+				: typeof (item as any)?.label === "string"
+					? (item as any).label
+					: undefined
+		let detail = typeof item?.description === "string" ? item.description : undefined
+		if (typeof item?.context_length === "number" && item.context_length > 0) {
+			const ctx = `${Math.round(item.context_length / 1000)}k context`
+			detail = detail ? `${ctx} · ${detail}` : ctx
+		}
+		if (Array.isArray((item as any)?.tags) && (item as any).tags.length > 0) {
+			const tagStr = (item as any).tags.filter((t: unknown) => typeof t === "string" && t).join(", ")
+			if (tagStr) {
+				detail = detail ? `${tagStr} · ${detail}` : tagStr
+			}
+		}
+		results.push({ id, label, detail })
+	}
+	return results
 }
 
 export function providerModelLoader(options: {
@@ -206,6 +277,8 @@ export function providerModelLoader(options: {
 	authMethod: () => "oauth" | "api-key" | undefined
 	apiKey: () => string | undefined
 	openRouterApiKey?: () => string | undefined
+	clineApiKey?: () => string | undefined
+	nousApiKey?: () => string | undefined
 	claude: ClaudeSubscriptionDirectSdkOptions
 }): ModelLoader {
 	return async (provider, signal) => {
@@ -223,6 +296,77 @@ export function providerModelLoader(options: {
 		if (provider === "claude-subscription-directsdk-experimental") {
 			const models = await discoverClaudeSubscriptionDirectSdkModels({ ...options.claude, signal, timeoutMs: 10_000 })
 			return { source: "Claude Code", models: models.map((model) => ({ ...model, detail: model.note })) }
+		}
+		if (provider === "cline-pass") {
+			const key = options.clineApiKey?.() || process.env.CLINE_API_KEY
+			const endpoint = options.gateway.getEffectiveEndpoint("cline-pass", "https://api.cline.bot/api/v1/chat/completions")
+			const url = modelListURL(endpoint.url)
+			try {
+				const recUrl = new URL("https://api.cline.bot/api/v1/ai/cline/recommended-models")
+				const models = await fetchModelList(
+					recUrl,
+					{ "X-CLIENT-TYPE": "cline-sdk", ...(key ? { Authorization: `Bearer ${key}` } : {}), ...endpoint.headers },
+					signal,
+				).catch(() =>
+					fetchModelList(
+						url,
+						{ ...(key ? { Authorization: `Bearer ${key}` } : {}), ...endpoint.headers },
+						signal,
+					),
+				)
+				return {
+					source: "Cline Pass API",
+					models: models.map((m) => {
+						const fallback = clinePassModels[m.id as keyof typeof clinePassModels]
+						return {
+							id: m.id,
+							label: m.label || fallback?.name || m.id,
+							detail: m.detail || fallback?.description || "Cline Pass model",
+						}
+					}),
+				}
+			} catch {
+				return {
+					source: "Cline Pass (offline fallback)",
+					models: Object.entries(clinePassModels).map(([id, info]) => ({
+						id,
+						label: info.name || id,
+						detail: info.description || "Cline Pass model",
+					})),
+				}
+			}
+		}
+		if (provider === "nous") {
+			const key = options.nousApiKey?.() || process.env.NOUS_API_KEY
+			const endpoint = options.gateway.getEffectiveEndpoint("nous", "https://inference-api.nousresearch.com/v1/chat/completions")
+			const url = modelListURL(endpoint.url)
+			try {
+				const models = await fetchModelList(
+					url,
+					{ ...(key ? { Authorization: `Bearer ${key}` } : {}), ...endpoint.headers },
+					signal,
+				)
+				return {
+					source: "Nous Research API",
+					models: models.map((m) => {
+						const info = getNousResearchModelInfo(m.id)
+						return {
+							id: m.id,
+							label: m.label || info.name || m.id,
+							detail: m.detail || info.description || "Nous Research model",
+						}
+					}),
+				}
+			} catch {
+				return {
+					source: "Nous Research (offline fallback)",
+					models: Object.entries(nousResearchModels).map(([id, info]) => ({
+						id,
+						label: (info as { name?: string }).name || id,
+						detail: (info as { description?: string }).description || "Nous Research model",
+					})),
+				}
+			}
 		}
 		const custom = options.gateway.getProviderEndpoint(provider) || options.gateway.getProxyConfig()
 		const auth = options.authMethod()

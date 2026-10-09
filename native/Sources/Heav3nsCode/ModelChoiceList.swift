@@ -7,6 +7,7 @@ final class ModelChoiceList: NSStackView, NSTableViewDataSource, NSTableViewDele
     private let empty = JourneyStyle.label("", size: 12, secondary: true)
     private let custom = NSButton(title: "Other model ID…", target: nil, action: nil)
     private var models = [String](), matches = [String]()
+    private var metadata = [String: (label: String, detail: String)]()
     private var current: String?, context: String?
     private var canSwitch = false
     var onChoose: ((String) -> Void)?
@@ -36,10 +37,14 @@ final class ModelChoiceList: NSStackView, NSTableViewDataSource, NSTableViewDele
         empty.maximumNumberOfLines = 2; empty.isHidden = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    func update(models: [String], current: String?, context: String) {
-        guard self.models != models || self.current != current || self.context != context else { return }
+    func update(models: [String], current: String?, context: String, metadata: [String: (label: String, detail: String)] = [:]) {
+        let metaChanged = self.metadata.count != metadata.count || metadata.contains { (k, v) in
+            guard let existing = self.metadata[k] else { return true }
+            return existing.label != v.label || existing.detail != v.detail
+        }
+        guard self.models != models || self.current != current || self.context != context || metaChanged else { return }
         let contextChanged = self.context != context
-        self.models = models; self.current = current; self.context = context
+        self.models = models; self.current = current; self.context = context; self.metadata = metadata
         if contextChanged { search.stringValue = "" }
         filter(preserve: !contextChanged, catalogUpdate: !contextChanged)
     }
@@ -54,8 +59,12 @@ final class ModelChoiceList: NSStackView, NSTableViewDataSource, NSTableViewDele
         let origin = table.enclosingScrollView?.contentView.bounds.origin
         let terms = search.stringValue.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).split(whereSeparator: { $0.isWhitespace })
         matches = models.filter { id in
-            let value = id.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            return terms.allSatisfy { value.contains($0) }
+            let idVal = id.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            let labelVal = metadata[id]?.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) ?? ""
+            let detailVal = metadata[id]?.detail.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) ?? ""
+            return terms.allSatisfy { term in
+                idVal.contains(term) || labelVal.contains(term) || detailVal.contains(term)
+            }
         }
         table.deselectAll(nil); table.reloadData()
         if !matches.isEmpty {
@@ -100,18 +109,61 @@ final class ModelChoiceList: NSStackView, NSTableViewDataSource, NSTableViewDele
     func activate() { guard canSwitch, let highlighted else { return }; onChoose?(highlighted) }
     @objc private func chooseCustom() { guard custom.isEnabled else { return }; onCustom?() }
     func numberOfRows(in tableView: NSTableView) -> Int { matches.count }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        guard matches.indices.contains(row) else { return 30 }
+        let id = matches[row]
+        if let meta = metadata[id], (!meta.detail.isEmpty || (meta.label != id && !meta.label.isEmpty)) {
+            return 44
+        }
+        return 30
+    }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard matches.indices.contains(row) else { return nil }
         let id = matches[row], active = id == current
-        let name = NSTextField(labelWithString: id); name.lineBreakMode = .byTruncatingMiddle; name.maximumNumberOfLines = 1
-        name.font = .systemFont(ofSize: 13); name.toolTip = id
-        name.setAccessibilityLabel(active ? "\(id), current model" : id)
-        let check = NSImageView(); check.image = active ? NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Current model") : nil
+        let meta = metadata[id]
+        let displayName = (meta?.label.isEmpty == false) ? meta!.label : id
+        let detailText = meta?.detail ?? ""
+        let showSecondaryId = displayName != id
+
+        let check = NSImageView()
+        check.image = active ? NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Current model") : nil
         check.setAccessibilityElement(false)
         check.widthAnchor.constraint(equalToConstant: 16).isActive = true
-        let cell = JourneyStyle.stack([check, name], vertical: false, spacing: 8)
-        cell.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 6)
+
+        let name = NSTextField(labelWithString: displayName)
+        name.lineBreakMode = .byTruncatingMiddle
+        name.maximumNumberOfLines = 1
+        name.font = .systemFont(ofSize: 13, weight: showSecondaryId ? .medium : .regular)
+        name.toolTip = detailText.isEmpty ? id : "\(id)\n\(detailText)"
+        name.setAccessibilityLabel(active ? "\(displayName), current model" : displayName)
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let labelColumn: NSStackView
+        if showSecondaryId || !detailText.isEmpty {
+            var subtitleComponents = [String]()
+            if showSecondaryId { subtitleComponents.append(id) }
+            if !detailText.isEmpty { subtitleComponents.append(detailText) }
+            let subtitleText = subtitleComponents.joined(separator: " · ")
+            let subtitle = NSTextField(labelWithString: subtitleText)
+            subtitle.lineBreakMode = .byTruncatingTail
+            subtitle.maximumNumberOfLines = 1
+            subtitle.font = .systemFont(ofSize: 11)
+            subtitle.textColor = .secondaryLabelColor
+            subtitle.toolTip = subtitleText
+            subtitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+            let stack = JourneyStyle.stack([name, subtitle], vertical: true, spacing: 2)
+            stack.alignment = .leading
+            labelColumn = stack
+        } else {
+            let stack = JourneyStyle.stack([name], vertical: true, spacing: 0)
+            stack.alignment = .leading
+            labelColumn = stack
+        }
+
+        let cell = JourneyStyle.stack([check, labelColumn], vertical: false, spacing: 8)
+        cell.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+        labelColumn.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return cell
     }
     func searchProbe(_ value: String) { search.stringValue = value; filter() }

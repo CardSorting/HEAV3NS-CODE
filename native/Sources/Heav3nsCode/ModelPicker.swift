@@ -112,6 +112,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         dismissed = false
         previousResponder = parent.firstResponder
         focusModelAfterLoad = true
+        forceDiscovery = true
         parent.addChildWindow(window, ordered: .above)
         syncPresentation(recenter: true)
         window.makeKeyAndOrderFront(nil); window.makeFirstResponder(modelChoice.search); load()
@@ -131,13 +132,14 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var validation: String? {
         if displayedProvider == "openrouter" && !draftModel.contains("/") { return "Enter an OpenRouter model ID, such as anthropic/claude-sonnet-4.5." }
         guard WorkspaceModelSelection.validModel(draftModel) else { return "Enter a model ID of up to 200 characters, without spaces." }
-        if displayedProvider == "openai-codex" && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
+        if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
         return nil
     }
     func refreshAvailability() {
         syncPresentation()
         let editable = !dismissed && !pending && !keyPending && selection != nil
-        credentialsRow.isHidden = displayedProvider != "openrouter" || !supportsCredentials()
+        let hasCredentials = ["openrouter", "cline-pass", "nous"].contains(displayedProvider ?? "")
+        credentialsRow.isHidden = !hasCredentials || !supportsCredentials()
         apiKey.isEnabled = connected() && editable && canApply()
         saveKey.isEnabled = apiKey.isEnabled && !apiKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         removeKey.isEnabled = apiKey.isEnabled && keySaved
@@ -195,21 +197,73 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         let item = providers[provider.indexOfSelectedItem]
         if displayedProvider != item.id { apiKey.stringValue = "" }
         displayedProvider = item.id
-        if item.id == "openrouter" { loadKeyStatus() }
+        if item.id == "cline-pass" {
+            apiKey.placeholderString = "Cline Pass API key"
+            apiKey.setAccessibilityLabel("Cline Pass API key")
+            loadKeyStatus()
+        } else if item.id == "nous" {
+            apiKey.placeholderString = "Nous Research API key"
+            apiKey.setAccessibilityLabel("Nous Research API key")
+            loadKeyStatus()
+        } else if item.id == "openrouter" {
+            apiKey.placeholderString = "OpenRouter API key"
+            apiKey.setAccessibilityLabel("OpenRouter API key")
+            loadKeyStatus()
+        }
         model.stringValue = remembered[item.id] ?? ""
         populateModels()
         customMode = customProviders.contains(item.id) || (!model.stringValue.isEmpty && !suggestions.contains(model.stringValue))
         detail.stringValue = item.detail; detail.toolTip = item.detail
         refreshAvailability(); discoverModels(refresh: forceDiscovery); forceDiscovery = false
     }
+    private static func fallbackModelMetadata(for id: String) -> (label: String, detail: String)? {
+        switch id {
+        case "Hermes-4-405B": return ("Hermes 4 (405B)", "128k context · Advanced reasoning")
+        case "Hermes-4-70B": return ("Hermes 4 (70B)", "128k context · Balanced reasoning")
+        case "~x-ai/grok-4.5", "~xai/grok-4.5": return ("Grok 4.5", "500k context · xAI reasoning")
+        case "~anthropic/claude-opus-latest": return ("Claude Opus 4.8", "1M context · Frontier intelligence")
+        case "~google/gemini-flash-latest": return ("Gemini 3.5 Flash", "1M context · Multimodal speed")
+        case "~openai/gpt-latest": return ("GPT-5.5", "1M context · Flagship intelligence")
+        case "xiaomi/mimo-v2-pro": return ("Xiaomi MiMo-v2 Pro", "1M context · Agentic engineering")
+        case "xiaomi/mimo-v2-omni": return ("Xiaomi MiMo-v2 Omni", "262k context · Multimodal agentic")
+        case "moonshotai/kimi-k2.6": return ("Kimi K2.6", "262k context · 1T parameter MoE")
+        case "arcee-ai/trinity-large-thinking": return ("Trinity Large Thinking", "262k context · Thinking MoE")
+        case "deepseek/deepseek-v4-flash": return ("DeepSeek-V4 Flash", "1M context · Fast MoE")
+        case "cline-pass/qwen3.7-max": return ("Qwen3.7 Max", "1M context · Flagship coding")
+        case "cline-pass/qwen3.7-plus": return ("Qwen3.7 Plus", "1M context · Fast coding & vision")
+        case "cline-pass/minimax-m3": return ("MiniMax-M3", "524k context · Long horizon")
+        case "cline-pass/mimo-v2.5-pro": return ("MiMo-V2.5-Pro", "1M context · High precision")
+        case "cline-pass/glm-5.2": return ("GLM-5.2", "1M context · Reasoning")
+        case "cline-pass/kimi-k2.7-code": return ("Kimi K2.7 Code", "262k context · Code intelligence")
+        case "claude-sonnet-5[1m]": return ("Claude Sonnet 5", "1M context · Default")
+        case "claude-opus-5[1m]": return ("Claude Opus 5", "1M context · Maximum intelligence")
+        case "claude-opus-4-8[1m]": return ("Claude Opus 4.8", "1M context · Complex coding")
+        case "claude-haiku-4-5-20251001": return ("Claude Haiku 4.5", "200k context · Fast response")
+        case "claude-fable-5-1[1m]": return ("Claude Fable 5.1", "1M context · Agentic planning")
+        case "gpt-5.6-terra": return ("GPT-5.6 Terra", "Flagship agentic model")
+        default: return nil
+        }
+    }
     private func populateModels() {
         guard let id = displayedProvider, let item = providers.first(where: { $0.id == id }) else { return }
         let draft = model.stringValue
         suggestions = []
         let current = selection?.provider == id ? [selection!.model] : []
-        let discovered = (discoveries[id]?.models.map(\.id) ?? item.models).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let liveModels = discoveries[id]?.models.map(\.id) ?? []
+        let discovered = (!liveModels.isEmpty ? liveModels : item.models).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         for candidate in current + recentSelections.filter({ $0.provider == id }).map(\.model) + discovered where !suggestions.contains(candidate) { suggestions.append(candidate) }
-        modelChoice.update(models: suggestions, current: selection?.provider == id ? selection?.model : nil, context: id)
+        var meta = [String: (label: String, detail: String)]()
+        if let models = discoveries[id]?.models {
+            for m in models {
+                meta[m.id] = (label: m.label, detail: m.detail)
+            }
+        }
+        for s in suggestions {
+            if meta[s] == nil, let fallback = Self.fallbackModelMetadata(for: s) {
+                meta[s] = fallback
+            }
+        }
+        modelChoice.update(models: suggestions, current: selection?.provider == id ? selection?.model : nil, context: id, metadata: meta)
         model.stringValue = draft
     }
     private func chooseCustom() {
@@ -261,10 +315,11 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         }
     }
     private func loadKeyStatus() {
-        guard supportsCredentials(), connected(), !keyPending else { return }
+        guard supportsCredentials(), connected(), !keyPending, let id = displayedProvider else { return }
         keyStatus.stringValue = "Checking saved key…"
         let token = loadID
-        request("openrouter.status", [:]) { [weak self] result in
+        let method = id == "cline-pass" ? "clinePass.status" : id == "nous" ? "nous.status" : "openrouter.status"
+        request(method, [:]) { [weak self] result in
             guard let self, self.loadID == token, !self.dismissed else { return }
             self.installKeyStatus(result)
         }
@@ -273,7 +328,13 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         switch result {
         case .success(let data):
             keySaved = data["saved"] as? Bool == true
-            keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using OPENROUTER_API_KEY from the environment." : "Add your key from openrouter.ai/keys to send instructions."
+            if displayedProvider == "cline-pass" {
+                keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using CLINE_API_KEY from the environment." : "Add your key from app.cline.bot to send instructions."
+            } else if displayedProvider == "nous" {
+                keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using NOUS_API_KEY from the environment." : "Add your key from portal.nousresearch.com/keys to send instructions."
+            } else {
+                keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using OPENROUTER_API_KEY from the environment." : "Add your key from openrouter.ai/keys to send instructions."
+            }
         case .failure(let error): keyStatus.stringValue = error.localizedDescription
         }
         refreshAvailability()
@@ -284,10 +345,11 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     }
     @objc private func clearKey() { updateKey("") }
     private func updateKey(_ value: String) {
-        guard supportsCredentials(), connected(), canApply(), !pending, !keyPending, !dismissed else { return }
+        guard supportsCredentials(), connected(), canApply(), !pending, !keyPending, !dismissed, let id = displayedProvider else { return }
         keyPending = true; keyStatus.stringValue = "Saving key…"; refreshAvailability()
         let token = loadID
-        request("openrouter.saveKey", ["apiKey": value]) { [weak self] result in
+        let method = id == "cline-pass" ? "clinePass.saveKey" : id == "nous" ? "nous.saveKey" : "openrouter.saveKey"
+        request(method, ["apiKey": value]) { [weak self] result in
             guard let self, self.loadID == token, !self.dismissed else { return }
             self.keyPending = false
             if case .success = result { self.apiKey.stringValue = "" }

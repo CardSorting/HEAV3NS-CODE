@@ -2,13 +2,21 @@ import { z } from "zod"
 import { REASONING_EFFORTS, reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+	CLINE_PASS_PROVIDER,
 	isClaudeSubscriptionDirectSdkModel,
+	NOUS_RESEARCH_PROVIDER,
 	OPENAI_CODEX_PROVIDER,
 } from "../core/providers/provider-ids.js"
 
 export const modelSelectionSchema = z
 	.object({
-		provider: z.enum([OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER, "openrouter"]),
+		provider: z.enum([
+			OPENAI_CODEX_PROVIDER,
+			CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+			"openrouter",
+			CLINE_PASS_PROVIDER,
+			NOUS_RESEARCH_PROVIDER,
+		]),
 		reasoningEffort: z.enum(["default", ...REASONING_EFFORTS]).optional(),
 		model: z
 			.string()
@@ -24,7 +32,11 @@ export type DesktopModels = {
 	apply: (selection: ModelSelection) => void
 	catalog: () => { id: string; label: string; detail: string; models: string[] }[]
 	discover?: (provider: ModelSelection["provider"], refresh: boolean) => Promise<unknown>
-	credentials?: { status: () => { saved: boolean; configured: boolean }; save: (key: string) => Promise<void> }
+	renew?: () => Promise<void>
+	credentials?: {
+		status: (provider?: string) => { saved: boolean; configured: boolean }
+		save: (keyOrProvider: string, maybeKey?: string) => Promise<void>
+	}
 	close?: () => void
 }
 export function validateModelSelection(value: unknown): ModelSelection {

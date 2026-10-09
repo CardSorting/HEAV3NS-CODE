@@ -52,6 +52,54 @@ final class ModelPickerTests: XCTestCase {
         XCTAssertEqual(WorkspaceModelSelection(["provider": "openrouter", "model": "org/model", "revision": 0])?.providerLabel, "OpenRouter")
     }
 
+    func testClinePassKeySetupAndModelSelection() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "cline-pass", "label": "Cline Pass", "detail": "API key", "models": ["cline-pass/qwen3.7-max"]]]
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss() }
+        picker.load(); requests[0].2(.success(data)); picker.providerProbe("cline-pass")
+        XCTAssertEqual(requests[1].0, "clinePass.status")
+        requests[1].2(.success(["saved": false, "configured": false]))
+        XCTAssertEqual(picker.diagnostics["credentialsVisible"] as? Bool, true)
+        picker.keyProbe("cline-secret-key")
+        XCTAssertEqual(requests[2].0, "clinePass.saveKey")
+        XCTAssertEqual(requests[2].1["apiKey"] as? String, "cline-secret-key")
+        requests[2].2(.success(["saved": true, "configured": true]))
+        XCTAssertFalse(String(describing: picker.diagnostics).contains("cline-secret-key"))
+        let views = descendants(try XCTUnwrap(picker.window?.contentView))
+        XCTAssertEqual(views.compactMap { $0 as? NSSecureTextField }.first?.stringValue, "")
+        picker.selectProbe("cline-pass/qwen3.7-max")
+        XCTAssertEqual(requests.last?.0, "models.select")
+        XCTAssertEqual(requests.last?.1["provider"] as? String, "cline-pass")
+        XCTAssertEqual(WorkspaceModelSelection(["provider": "cline-pass", "model": "cline-pass/qwen3.7-max", "revision": 0])?.providerLabel, "Cline Pass")
+    }
+
+    func testNousResearchKeySetupAndModelSelection() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "nous", "label": "Nous Research", "detail": "API key", "models": ["Hermes-4-405B"]]]
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss() }
+        picker.load(); requests[0].2(.success(data)); picker.providerProbe("nous")
+        XCTAssertEqual(requests[1].0, "nous.status")
+        requests[1].2(.success(["saved": false, "configured": false]))
+        XCTAssertEqual(picker.diagnostics["credentialsVisible"] as? Bool, true)
+        picker.keyProbe("nous-secret-key")
+        XCTAssertEqual(requests[2].0, "nous.saveKey")
+        XCTAssertEqual(requests[2].1["apiKey"] as? String, "nous-secret-key")
+        requests[2].2(.success(["saved": true, "configured": true]))
+        XCTAssertFalse(String(describing: picker.diagnostics).contains("nous-secret-key"))
+        let views = descendants(try XCTUnwrap(picker.window?.contentView))
+        XCTAssertEqual(views.compactMap { $0 as? NSSecureTextField }.first?.stringValue, "")
+        picker.selectProbe("Hermes-4-405B")
+        XCTAssertEqual(requests.last?.0, "models.select")
+        XCTAssertEqual(requests.last?.1["provider"] as? String, "nous")
+        XCTAssertEqual(WorkspaceModelSelection(["provider": "nous", "model": "Hermes-4-405B", "revision": 0])?.providerLabel, "Nous Research")
+    }
+
     func testListSelectionSwitchesOnceWithoutConfirmationAndClosesAfterSuccess() throws {
         _ = NSApplication.shared
         var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()

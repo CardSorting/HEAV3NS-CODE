@@ -4934,6 +4934,7 @@ export type NousResearchModelId = keyof typeof nousResearchModels
 export const nousResearchDefaultModelId: NousResearchModelId = "Hermes-4-405B"
 export const nousResearchModels = {
 	"~x-ai/grok-4.5": {
+		name: "Grok 4.5",
 		maxTokens: 128_000,
 		contextWindow: 500_000,
 		supportsImages: true,
@@ -4944,6 +4945,7 @@ export const nousResearchModels = {
 		description: "xAI's Grok 4.5 via Nous Portal subscription",
 	},
 	"~xai/grok-4.5": {
+		name: "Grok 4.5",
 		maxTokens: 128_000,
 		contextWindow: 500_000,
 		supportsImages: true,
@@ -4954,30 +4956,36 @@ export const nousResearchModels = {
 		description: "xAI's Grok 4.5 via Nous Portal subscription (alternate mapping)",
 	},
 	"Hermes-4-405B": {
+		name: "Hermes 4 (405B)",
 		maxTokens: 8192,
 		contextWindow: 128_000,
 		supportsImages: false,
 		supportsPromptCache: false,
+		supportsReasoning: true,
 		inputPrice: 0.09,
 		outputPrice: 0.37,
 		description:
 			"This is the largest model in the Hermes 4 family, and it is the fullest expression of our design, focused on advanced reasoning and creative depth rather than optimizing inference speed or cost.",
 	},
 	"Hermes-4-70B": {
+		name: "Hermes 4 (70B)",
 		maxTokens: 8192,
 		contextWindow: 128_000,
 		supportsImages: false,
 		supportsPromptCache: false,
+		supportsReasoning: true,
 		inputPrice: 0.05,
 		outputPrice: 0.2,
 		description:
 			"This incarnation of Hermes 4 balances scale and size. It handles complex reasoning tasks, while staying fast and cost effective. A versatile choice for many use cases.",
 	},
 	"~anthropic/claude-opus-latest": {
+		name: "Claude Opus 4.8",
 		maxTokens: 128_000,
 		contextWindow: 1_000_000,
 		supportsImages: true,
 		supportsPromptCache: true,
+		supportsReasoning: true,
 		inputPrice: 5.0,
 		outputPrice: 25.0,
 		cacheWritesPrice: 6.25,
@@ -4985,6 +4993,7 @@ export const nousResearchModels = {
 		description: "Always routes to the latest model in the Claude Opus family. Currently resolves to Claude Opus 4.8.",
 	},
 	"~google/gemini-flash-latest": {
+		name: "Gemini 3.5 Flash",
 		maxTokens: 65_536,
 		contextWindow: 1_048_576,
 		supportsImages: true,
@@ -4997,6 +5006,7 @@ export const nousResearchModels = {
 			"Always routes to the latest model in the Google Gemini Flash family. Currently resolves to Gemini 3.5 Flash.",
 	},
 	"~openai/gpt-latest": {
+		name: "GPT-5.5",
 		maxTokens: 128_000,
 		contextWindow: 1_050_000,
 		supportsImages: true,
@@ -5008,6 +5018,7 @@ export const nousResearchModels = {
 		description: "Always routes to the latest model in the OpenAI GPT family. Currently resolves to GPT-5.5.",
 	},
 	"xiaomi/mimo-v2-pro": {
+		name: "Xiaomi MiMo-v2 Pro",
 		maxTokens: 64_000,
 		contextWindow: 1_000_000,
 		supportsImages: false,
@@ -5018,6 +5029,7 @@ export const nousResearchModels = {
 			"Xiaomi's flagship foundation model designed primarily for agentic workloads, complex reasoning, and production engineering tasks.",
 	},
 	"xiaomi/mimo-v2-omni": {
+		name: "Xiaomi MiMo-v2 Omni",
 		maxTokens: 66_000,
 		contextWindow: 262_144,
 		supportsImages: true,
@@ -5028,6 +5040,7 @@ export const nousResearchModels = {
 			"Multimodal foundation model designed for agentic tasks requiring simultaneous processing of text, images, video, and audio.",
 	},
 	"moonshotai/kimi-k2.6": {
+		name: "Kimi K2.6",
 		maxTokens: 32_768,
 		contextWindow: 262_144,
 		supportsImages: true,
@@ -5039,6 +5052,7 @@ export const nousResearchModels = {
 			"Kimi K2.6 is a frontier-scale open-source 1T parameter model with a 262.1k context window, vision inputs, and structured outputs for agentic workloads.",
 	},
 	"arcee-ai/trinity-large-thinking": {
+		name: "Trinity Large Thinking",
 		maxTokens: 64_000,
 		contextWindow: 262_144,
 		supportsImages: false,
@@ -5050,6 +5064,7 @@ export const nousResearchModels = {
 			"Trinity Large Thinking is a reasoning-optimized, sparse Mixture-of-Experts (MoE) model developed by Arcee AI. It is designed for complex, long-horizon agentic workflows, multi-turn tool calling, and structured outputs.",
 	},
 	"deepseek/deepseek-v4-flash": {
+		name: "DeepSeek-V4 Flash",
 		maxTokens: 65_536,
 		contextWindow: 1_000_000,
 		supportsImages: false,

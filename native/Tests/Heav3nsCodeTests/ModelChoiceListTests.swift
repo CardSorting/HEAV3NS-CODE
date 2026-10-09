@@ -76,4 +76,49 @@ final class ModelChoiceListTests: XCTestCase {
         XCTAssertFalse(view.control(view.search, textView: editor, doCommandBy: #selector(NSResponder.moveDown(_:))))
         XCTAssertFalse(activated)
     }
+    func testSearchMatchesMetadataLabelsAndDetails() {
+        let view = ModelChoiceList(frame: .zero)
+        let ids = ["Hermes-4-405B", "~x-ai/grok-4.5", "cline-pass/qwen3.7-max"]
+        let meta: [String: (label: String, detail: String)] = [
+            "Hermes-4-405B": ("Hermes 4 (405B)", "128k context · Advanced reasoning"),
+            "~x-ai/grok-4.5": ("Grok 4.5", "500k context · xAI reasoning"),
+            "cline-pass/qwen3.7-max": ("Qwen3.7 Max", "1M context · Flagship coding")
+        ]
+        view.update(models: ids, current: ids.first, context: "nous", metadata: meta)
+        view.setAvailability(browse: true, canSwitch: true)
+
+        view.searchProbe("grok")
+        XCTAssertEqual(view.diagnostics["matches"] as? [String], ["~x-ai/grok-4.5"])
+
+        view.searchProbe("405b")
+        XCTAssertEqual(view.diagnostics["matches"] as? [String], ["Hermes-4-405B"])
+
+        view.searchProbe("reasoning")
+        XCTAssertEqual(view.diagnostics["matches"] as? [String], ["Hermes-4-405B", "~x-ai/grok-4.5"])
+
+        view.searchProbe("coding")
+        XCTAssertEqual(view.diagnostics["matches"] as? [String], ["cline-pass/qwen3.7-max"])
+    }
+    func testTwoLineCellPresentationForModelsWithMetadata() throws {
+        let view = ModelChoiceList(frame: .zero)
+        let ids = ["Hermes-4-405B", "plain-model"]
+        let meta: [String: (label: String, detail: String)] = [
+            "Hermes-4-405B": ("Hermes 4 (405B)", "128k context · Advanced reasoning")
+        ]
+        view.update(models: ids, current: ids.first, context: "nous", metadata: meta)
+        func descendants(_ parent: NSView) -> [NSView] { [parent] + parent.subviews.flatMap(descendants) }
+        let table = try XCTUnwrap(descendants(view).compactMap { $0 as? KeyboardListView }.first)
+
+        XCTAssertEqual(view.tableView(table, heightOfRow: 0), 44)
+        XCTAssertEqual(view.tableView(table, heightOfRow: 1), 30)
+
+        let richCell = try XCTUnwrap(view.tableView(table, viewFor: nil, row: 0))
+        let richLabels = descendants(richCell).compactMap { $0 as? NSTextField }
+        XCTAssertTrue(richLabels.contains { $0.stringValue == "Hermes 4 (405B)" })
+        XCTAssertTrue(richLabels.contains { $0.stringValue.contains("128k context") })
+
+        let plainCell = try XCTUnwrap(view.tableView(table, viewFor: nil, row: 1))
+        let plainLabels = descendants(plainCell).compactMap { $0 as? NSTextField }
+        XCTAssertTrue(plainLabels.contains { $0.stringValue == "plain-model" })
+    }
 }

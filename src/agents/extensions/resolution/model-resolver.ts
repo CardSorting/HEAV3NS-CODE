@@ -2,8 +2,14 @@ import {
 	type AgentProviderId,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS,
+	CLINE_PASS_DEFAULT_MODEL,
+	CLINE_PASS_PROVIDER,
 	isClaudeSubscriptionDirectSdkModel,
 	isClaudeSubscriptionDirectSdkProvider,
+	isClinePassProvider,
+	isNousResearchProvider,
+	NOUS_RESEARCH_DEFAULT_MODEL,
+	NOUS_RESEARCH_PROVIDER,
 	normalizeClaudeSubscriptionDirectSdkModel,
 	normalizeAgentProvider,
 } from "../../../core/providers/provider-ids.js"
@@ -21,16 +27,19 @@ export const KNOWN_CODEX_MODELS = ["gpt-5.6-terra"] as const
 export const KNOWN_CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS = CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS
 
 function providerDefaultModel(provider: AgentProviderId): string {
-	return provider === "openrouter"
-		? "anthropic/claude-sonnet-4.5"
-		: isClaudeSubscriptionDirectSdkProvider(provider)
-			? CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL
-			: "gpt-5.6-terra"
+	if (provider === "openrouter") return "anthropic/claude-sonnet-4.5"
+	if (isClinePassProvider(provider)) return CLINE_PASS_DEFAULT_MODEL
+	if (isNousResearchProvider(provider)) return NOUS_RESEARCH_DEFAULT_MODEL
+	if (isClaudeSubscriptionDirectSdkProvider(provider)) return CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL
+	return "gpt-5.6-terra"
 }
 
 function isModelSupportedByProvider(model: string, provider: AgentProviderId): boolean {
 	const normalized = model.toLowerCase()
 	if (provider === "openrouter") return model.includes("/")
+	if (isClinePassProvider(provider) || isNousResearchProvider(provider)) {
+		return !normalized.startsWith("claude-")
+	}
 	// Claude's native transport is strict about route identity. OpenAI/local
 	// compatibility paths historically accept arbitrary model IDs, so preserve
 	// that behavior outside the Claude provider while still preventing a Claude

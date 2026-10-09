@@ -1,9 +1,11 @@
 import { OpenRouterHandler } from "./providers/openrouter"
 import { ApiConfiguration } from "@shared/api"
 import { Mode } from "@shared/storage/types"
-import { isClaudeSubscriptionDirectSdkProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
+import { isClaudeSubscriptionDirectSdkProvider, isClinePassProvider, isNousResearchProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
 import { Logger } from "@/shared/services/Logger"
 import { ClaudeSubscriptionDirectSdkHandler } from "./providers/claude-subscription-directsdk"
+import { ClinePassHandler } from "./providers/cline-pass"
+import { NousResearchHandler } from "./providers/nous-research"
 import { OpenAiCodexHandler } from "./providers/openai-codex"
 import { ApiHandler, ApiHandlerModel, ApiProviderInfo, CommonApiHandlerOptions, SingleCompletionHandler } from "./types"
 
@@ -31,6 +33,24 @@ function createHandlerForProvider(
 			claudeSubscriptionDirectSdkModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
 			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
 			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+		})
+	}
+	if (isClinePassProvider(normalizedProvider)) {
+		return new ClinePassHandler({
+			clineApiKey: options.clineApiKey,
+			clinePassModelId: mode === "plan" ? (options.planModeApiModelId || options.planModeClinePassModelId) : (options.actModeApiModelId || options.actModeClinePassModelId),
+			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+			onRetryAttempt: options.onRetryAttempt,
+		})
+	}
+	if (isNousResearchProvider(normalizedProvider)) {
+		return new NousResearchHandler({
+			nousResearchApiKey: options.nousResearchApiKey,
+			nousResearchModelId: mode === "plan" ? (options.planModeApiModelId || options.planModeNousResearchModelId) : (options.actModeApiModelId || options.actModeNousResearchModelId),
+			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+			onRetryAttempt: options.onRetryAttempt,
 		})
 	}
 	// Unknown persisted provider values are intentionally ignored here so a
@@ -81,7 +101,13 @@ export function buildApiHandler(configuration: ApiConfiguration, mode: Mode): Ap
 		// would violate the user's account/billing intent and make the active
 		// provider header untrustworthy. OpenAI keeps the legacy compatibility
 		// fallback for non-Claude configurations only.
-		if (apiProvider === "openrouter" || isClaudeSubscriptionDirectSdkProvider(apiProvider)) throw error
+		if (
+			apiProvider === "openrouter" ||
+			isClaudeSubscriptionDirectSdkProvider(apiProvider) ||
+			isClinePassProvider(apiProvider) ||
+			isNousResearchProvider(apiProvider)
+		)
+			throw error
 		return createHandlerForProvider("openai-codex", options, mode)
 	}
 }

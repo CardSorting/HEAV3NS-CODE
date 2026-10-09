@@ -1121,6 +1121,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "models-refresh", "models-refresh-retry": modelPicker?.refreshProbe()
         case "models-claude": modelPicker?.providerProbe("claude-subscription-directsdk-experimental")
         case "models-openrouter": modelPicker?.providerProbe("openrouter")
+        case "models-cline", "models-cline-pass": modelPicker?.providerProbe("cline-pass")
+        case "models-nous", "models-nous-research": modelPicker?.providerProbe("nous")
         case "models-openai": modelPicker?.providerProbe("openai-codex")
         case "models-disconnect": client.closeInput()
         case "models-reconnect": reconnect()

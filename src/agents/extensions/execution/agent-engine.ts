@@ -1,4 +1,6 @@
 import { completeOpenRouter } from "../../../core/api/providers/openrouter-native.js"
+import { completeClinePass } from "../../../core/api/providers/cline-pass-native.js"
+import { completeNousResearch } from "../../../core/api/providers/nous-research-native.js"
 import { randomUUID } from "node:crypto"
 import { invalidateSkillsCache } from "../../../core/context/instructions/user-instructions/skillRuntime.js"
 import * as fs from "node:fs"
@@ -17,6 +19,8 @@ import type { ToolExecutionRecord } from "../../../core/contracts/tooling.contra
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	isClaudeSubscriptionDirectSdkProvider,
+	isClinePassProvider,
+	isNousResearchProvider,
 } from "../../../core/providers/provider-ids.js"
 import { CommandOutputStream } from "../../../core/utilities/command-output-stream.js"
 import { sanitizeProgressText } from "../../../core/utilities/progress-sanitizer.js"
@@ -437,12 +441,16 @@ export class AgentEngine extends AbstractAgentEngine {
 			const activeProvider = this.config.provider ?? "openai-codex"
 			const usesOpenRouter = activeProvider === "openrouter"
 			const usesClaudeSubscriptionDirectSdk = isClaudeSubscriptionDirectSdkProvider(activeProvider)
+			const usesClinePass = isClinePassProvider(activeProvider)
+			const usesNousResearch = isNousResearchProvider(activeProvider)
 			const hasConfiguredOpenAiProxy = Boolean(
 				this.proxyGateway?.getProxyConfig() || this.proxyGateway?.getProviderEndpoint("openai-codex"),
 			)
 			const usesCodexOAuth =
 				!usesOpenRouter &&
 				!usesClaudeSubscriptionDirectSdk &&
+				!usesClinePass &&
+				!usesNousResearch &&
 				!hasConfiguredOpenAiProxy &&
 				authMethod !== "api-key" &&
 				hasOpenAiCodexOAuthCredentials(undefined)
@@ -450,14 +458,22 @@ export class AgentEngine extends AbstractAgentEngine {
 				? "OpenRouter"
 				: usesClaudeSubscriptionDirectSdk
 					? "Claude Code subscription"
-					: "OpenAI Codex"
+					: usesClinePass
+						? "Cline Pass"
+						: usesNousResearch
+							? "Nous Research"
+							: "OpenAI Codex"
 			const progressSource = usesOpenRouter
 				? "openrouter"
 				: usesClaudeSubscriptionDirectSdk
 					? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
-					: "openai-codex-api"
+					: usesClinePass
+						? "cline-pass"
+						: usesNousResearch
+							? "nous"
+							: "openai-codex-api"
 
-			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
+			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
 				const autonomous =
 					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
@@ -529,7 +545,7 @@ export class AgentEngine extends AbstractAgentEngine {
 							timeoutMs: 30000,
 						}
 						const providerTimeoutMs =
-							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesCodexOAuth
+							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesCodexOAuth
 								? (this.config.providerTimeoutMs ?? 180_000)
 								: endpoint.timeoutMs
 						this.reportProgress(input.onProgress, {
@@ -714,6 +730,28 @@ export class AgentEngine extends AbstractAgentEngine {
 									)
 								} else if (usesOpenRouter) {
 									data = await completeOpenRouter({
+										model: activeModel,
+										messages: apiMessages,
+										tools: availableTools,
+										maxTokens: preparedContext.budget.reservedOutputTokens,
+										signal: requestSignal,
+										onText: () => {
+											lastProviderActivityAt = Date.now()
+										},
+									})
+								} else if (usesClinePass) {
+									data = await completeClinePass({
+										model: activeModel,
+										messages: apiMessages,
+										tools: availableTools,
+										maxTokens: preparedContext.budget.reservedOutputTokens,
+										signal: requestSignal,
+										onText: () => {
+											lastProviderActivityAt = Date.now()
+										},
+									})
+								} else if (usesNousResearch) {
+									data = await completeNousResearch({
 										model: activeModel,
 										messages: apiMessages,
 										tools: availableTools,

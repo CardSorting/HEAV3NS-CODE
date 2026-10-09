@@ -1,7 +1,7 @@
 {
 	"name": "heav3ns",
 	"description": "HEAV3NS is a focused, local-first CLI coding agent for reviewable developer workflows.",
-	"version": "14.0.0",
+	"version": "14.1.0",
 	"engines": {
 		"node": ">=22.12.0"
 	},
