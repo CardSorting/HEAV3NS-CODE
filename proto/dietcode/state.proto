@@ -141,7 +141,6 @@ message Settings {
   optional PlanActMode mode = 147;
   optional FocusChainSettings focus_chain_settings = 149;
   optional string custom_prompt = 150;
-  optional bool subagents_enabled = 153;
   optional bool enable_parallel_tool_calling = 154;
   optional bool background_edit_enabled = 155;
   optional bool opt_out_of_remote_config = 157;
@@ -172,15 +171,9 @@ message Settings {
   optional bool audit_completion_gate_enabled = 202;
   optional int32 audit_completion_gate_threshold = 204;
   optional bool audit_completion_gate_critical_only = 206;
-  optional bool audit_act_mode_advisory_enabled = 207;
   optional bool audit_advisory_escalation_enabled = 209;
   optional bool audit_plan_regression_gate_enabled = 210;
   optional bool audit_tool_output_advisory_enabled = 211;
-  optional bool audit_file_write_advisory_enabled = 213;
-  optional bool audit_intent_threshold_adjustments_enabled = 215;
-  optional string audit_intent_threshold_overrides = 217;
-  optional bool audit_sarif_hook_export_enabled = 219;
-  optional bool audit_workspace_artifacts_enabled = 220;
   optional string audit_advisory_auto_scroll_mode = 222;
   optional string lite_llm_base_url = 223;
   optional bool lite_llm_use_prompt_cache = 224;
@@ -404,7 +397,15 @@ message UpdateSettingsRequest {
   reserved 15; // was openai_reasoning_effort (moved to mode-scoped reasoning effort)
   reserved 23; // was dictation_settings (dictation removed)
   reserved 26; // was hooks_enabled (removed - now always enabled on macOS/Linux)
+  reserved 29; // was subagents_enabled
+  reserved 30; // was subagent_terminal_output_line_limit
   reserved 38; // was skills_enabled (removed - now always enabled)
+  reserved 45; // was audit_act_mode_advisory_enabled
+  reserved 50; // was audit_file_write_advisory_enabled
+  reserved 51; // was audit_intent_threshold_adjustments_enabled
+  reserved 52; // was audit_intent_threshold_overrides
+  reserved 53; // was audit_sarif_hook_export_enabled
+  reserved 54; // was audit_workspace_artifacts_enabled
 
   Metadata metadata = 1;
   optional ModelsApiConfiguration api_configuration = 2;
@@ -429,8 +430,6 @@ message UpdateSettingsRequest {
   optional bool multi_root_enabled = 25;
   optional string vscode_terminal_execution_mode = 27;
   optional int32 max_consecutive_mistakes = 28;
-  optional bool subagents_enabled = 29;
-  optional int32 subagent_terminal_output_line_limit = 30;
   optional string dietcode_env = 31;
   optional bool native_tool_call_enabled = 32;
   // Field 33 (onboarding_models) removed
@@ -444,16 +443,10 @@ message UpdateSettingsRequest {
   optional bool audit_completion_gate_enabled = 42;
   optional int32 audit_completion_gate_threshold = 43;
   optional bool audit_completion_gate_critical_only = 44;
-  optional bool audit_act_mode_advisory_enabled = 45;
   optional bool audit_advisory_escalation_enabled = 46;
   optional string audit_advisory_auto_scroll_mode = 47;
   optional bool audit_plan_regression_gate_enabled = 48;
   optional bool audit_tool_output_advisory_enabled = 49;
-  optional bool audit_file_write_advisory_enabled = 50;
-  optional bool audit_intent_threshold_adjustments_enabled = 51;
-  optional string audit_intent_threshold_overrides = 52;
-  optional bool audit_sarif_hook_export_enabled = 53;
-  optional bool audit_workspace_artifacts_enabled = 54;
   optional bool mod_enabled = 55;
   optional string mod_outcome = 56;
   optional bool token_compression_enabled = 57;

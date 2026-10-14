@@ -255,9 +255,6 @@ export class SearchFilesToolHandler implements IToolHandler, IPartialBlockHandle
 		const regex = block.params.regex
 
 		const config = uiHelpers.getConfig()
-		if (config.isSubagentExecution) {
-			return
-		}
 
 		// Create and show partial UI message
 		const filePattern = block.params.file_pattern
@@ -285,7 +282,7 @@ export class SearchFilesToolHandler implements IToolHandler, IPartialBlockHandle
 		// Validate required parameters and check dietcodeignore access
 		const validation = await this.validator.validate(block, "path", "regex")
 		if (!validation.ok) {
-			if (!config.isSubagentExecution && validation.error.includes("RESTRICTED")) {
+			if (validation.error.includes("RESTRICTED")) {
 				await config.callbacks.say("dietcodeignore_error", relDirPath)
 			}
 
@@ -373,11 +370,9 @@ export class SearchFilesToolHandler implements IToolHandler, IPartialBlockHandle
 			operationIsLocatedInWorkspace,
 		} satisfies DietCodeSayTool
 
-		if (!config.isSubagentExecution) {
-			void config.callbacks
-				.say("tool", JSON.stringify(sharedMessageProps), undefined, undefined, false)
-				.catch(() => undefined)
-		}
+		void config.callbacks
+			.say("tool", JSON.stringify(sharedMessageProps), undefined, undefined, false)
+			.catch(() => undefined)
 
 		return results
 	}

@@ -75,7 +75,6 @@ export enum DietCodeAsk {
   REPORT_BUG = 14,
   SUMMARIZE_TASK = 15,
   ACT_MODE_RESPOND = 16,
-  USE_SUBAGENTS = 17,
   UNRECOGNIZED = -1,
 }
 
@@ -132,9 +131,6 @@ export function dietCodeAskFromJSON(object: any): DietCodeAsk {
     case 16:
     case "ACT_MODE_RESPOND":
       return DietCodeAsk.ACT_MODE_RESPOND;
-    case 17:
-    case "USE_SUBAGENTS":
-      return DietCodeAsk.USE_SUBAGENTS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -178,8 +174,6 @@ export function dietCodeAskToJSON(object: DietCodeAsk): string {
       return "SUMMARIZE_TASK";
     case DietCodeAsk.ACT_MODE_RESPOND:
       return "ACT_MODE_RESPOND";
-    case DietCodeAsk.USE_SUBAGENTS:
-      return "USE_SUBAGENTS";
     case DietCodeAsk.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -222,9 +216,6 @@ export enum DietCodeSay {
   HOOK_OUTPUT_STREAM = 31,
   COMMAND_PERMISSION_DENIED = 32,
   CONDITIONAL_RULES_APPLIED = 33,
-  SUBAGENT_STATUS = 34,
-  USE_SUBAGENTS_SAY = 35,
-  SUBAGENT_USAGE = 36,
   PLAN_SUMMARY = 37,
   UNRECOGNIZED = -1,
 }
@@ -333,15 +324,6 @@ export function dietCodeSayFromJSON(object: any): DietCodeSay {
     case 33:
     case "CONDITIONAL_RULES_APPLIED":
       return DietCodeSay.CONDITIONAL_RULES_APPLIED;
-    case 34:
-    case "SUBAGENT_STATUS":
-      return DietCodeSay.SUBAGENT_STATUS;
-    case 35:
-    case "USE_SUBAGENTS_SAY":
-      return DietCodeSay.USE_SUBAGENTS_SAY;
-    case 36:
-    case "SUBAGENT_USAGE":
-      return DietCodeSay.SUBAGENT_USAGE;
     case 37:
     case "PLAN_SUMMARY":
       return DietCodeSay.PLAN_SUMMARY;
@@ -422,12 +404,6 @@ export function dietCodeSayToJSON(object: DietCodeSay): string {
       return "COMMAND_PERMISSION_DENIED";
     case DietCodeSay.CONDITIONAL_RULES_APPLIED:
       return "CONDITIONAL_RULES_APPLIED";
-    case DietCodeSay.SUBAGENT_STATUS:
-      return "SUBAGENT_STATUS";
-    case DietCodeSay.USE_SUBAGENTS_SAY:
-      return "USE_SUBAGENTS_SAY";
-    case DietCodeSay.SUBAGENT_USAGE:
-      return "SUBAGENT_USAGE";
     case DietCodeSay.PLAN_SUMMARY:
       return "PLAN_SUMMARY";
     case DietCodeSay.UNRECOGNIZED:

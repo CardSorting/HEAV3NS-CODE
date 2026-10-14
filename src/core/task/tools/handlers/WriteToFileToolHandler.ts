@@ -4,7 +4,6 @@ import type { ToolUse } from "@core/assistant-message"
 import { constructNewFileContent, getLineNumberFromCharIndex } from "@core/assistant-message/diff"
 import { formatResponse } from "@core/prompts/responses"
 import { resolveWorkspacePath } from "@core/workspace"
-import { buildFileWriteContentAdvisory } from "@shared/audit/auditFileWrite"
 import { isWikiPath, isWikiWriteAuthorized } from "@shared/completion/wikiWritePolicy"
 import { DietCodeSayTool } from "@shared/ExtensionMessage"
 import { getLastApiReqTotalTokens } from "@shared/getApiMetrics"
@@ -240,12 +239,7 @@ export class WriteToFileToolHandler implements IToolHandler, IPartialBlockHandle
 				})()
 			}
 
-			let fileWriteAdvisory = ""
-			if (config.auditFileWriteAdvisoryEnabled && !config.isSubagentExecution && finalContent) {
-				fileWriteAdvisory = buildFileWriteContentAdvisory(finalContent, relPath)
-			}
-
-			return baseResult + fileWriteAdvisory
+			return baseResult
 		} catch (error) {
 			// Reset diff view on error
 			await config.services.diffViewProvider.revertChanges()

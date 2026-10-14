@@ -42,9 +42,6 @@ export class ListFilesToolHandler implements IToolHandler, IPartialBlockHandler 
 
 		// Get config access for services
 		const config = uiHelpers.getConfig()
-		if (config.isSubagentExecution) {
-			return
-		}
 
 		// Create and show partial UI message
 		const recursiveRaw = block.params.recursive
@@ -70,7 +67,7 @@ export class ListFilesToolHandler implements IToolHandler, IPartialBlockHandler 
 		// Validate required parameters and check dietcodeignore access
 		const validation = await this.validator.validate(block, "path")
 		if (!validation.ok) {
-			if (!config.isSubagentExecution && validation.error.includes("RESTRICTED")) {
+			if (validation.error.includes("RESTRICTED")) {
 				await config.callbacks.say("dietcodeignore_error", relDirPath)
 			}
 
@@ -122,10 +119,8 @@ export class ListFilesToolHandler implements IToolHandler, IPartialBlockHandler 
 			)
 		})
 
-		if (!config.isSubagentExecution) {
-			const resultMessage = JSON.stringify({ ...sharedMessageProps, content: result })
-			void config.callbacks.say("tool", resultMessage, undefined, undefined, false).catch(() => undefined)
-		}
+		const resultMessage = JSON.stringify({ ...sharedMessageProps, content: result })
+		void config.callbacks.say("tool", resultMessage, undefined, undefined, false).catch(() => undefined)
 
 		return result
 	}

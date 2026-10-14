@@ -30,7 +30,6 @@ function convertDietCodeAskToProtoEnum(ask: AppDietCodeAsk | undefined): DietCod
 		condense: DietCodeAsk.CONDENSE,
 		summarize_task: DietCodeAsk.SUMMARIZE_TASK,
 		report_bug: DietCodeAsk.REPORT_BUG,
-		use_subagents: DietCodeAsk.USE_SUBAGENTS,
 	}
 
 	const result = mapping[ask]
@@ -63,7 +62,6 @@ function convertProtoEnumToDietCodeAsk(ask: DietCodeAsk): AppDietCodeAsk | undef
 		[DietCodeAsk.CONDENSE]: "condense",
 		[DietCodeAsk.SUMMARIZE_TASK]: "summarize_task",
 		[DietCodeAsk.REPORT_BUG]: "report_bug",
-		[DietCodeAsk.USE_SUBAGENTS]: "use_subagents",
 	}
 
 	return mapping[ask]
@@ -110,9 +108,6 @@ function convertDietCodeSayToProtoEnum(say: AppDietCodeSay | undefined): DietCod
 		hook_status: DietCodeSay.HOOK_STATUS,
 		hook_output_stream: DietCodeSay.HOOK_OUTPUT_STREAM,
 		conditional_rules_applied: DietCodeSay.CONDITIONAL_RULES_APPLIED,
-		subagent: DietCodeSay.SUBAGENT_STATUS,
-		use_subagents: DietCodeSay.USE_SUBAGENTS_SAY,
-		subagent_usage: DietCodeSay.SUBAGENT_USAGE,
 		plan_summary: DietCodeSay.PLAN_SUMMARY,
 		generate_explanation: DietCodeSay.GENERATE_EXPLANATION,
 	}
@@ -163,9 +158,6 @@ function convertProtoEnumToDietCodeSay(say: DietCodeSay): AppDietCodeSay | undef
 		[DietCodeSay.HOOK_STATUS]: "hook_status",
 		[DietCodeSay.HOOK_OUTPUT_STREAM]: "hook_output_stream",
 		[DietCodeSay.CONDITIONAL_RULES_APPLIED]: "conditional_rules_applied",
-		[DietCodeSay.SUBAGENT_STATUS]: "subagent",
-		[DietCodeSay.USE_SUBAGENTS_SAY]: "use_subagents",
-		[DietCodeSay.SUBAGENT_USAGE]: "subagent_usage",
 		[DietCodeSay.PLAN_SUMMARY]: "plan_summary",
 	}
 

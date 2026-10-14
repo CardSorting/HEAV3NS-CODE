@@ -6,5 +6,5 @@
 /* eslint-disable */
 
 export * as dietcode from "./index.dietcode";
-export * as google from "./index.google";
 export * as host from "./index.host";
+export * as google from "./index.google";

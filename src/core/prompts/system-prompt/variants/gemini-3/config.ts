@@ -71,7 +71,6 @@ export const config = createVariant(ModelFamily.GEMINI_3)
 		DietCodeDefaultTool.TODO,
 		DietCodeDefaultTool.GENERATE_EXPLANATION,
 		DietCodeDefaultTool.USE_SKILL,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.GEMINI_3,

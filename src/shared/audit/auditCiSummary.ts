@@ -11,9 +11,9 @@ export function buildCiJobSummaryMarkdown(
 	status: QualityGateStatus,
 	entry: Pick<AuditArtifactIndexEntry, "taskId" | "event" | "manifestPath" | "sarifPath" | "markdownPath">,
 ): string {
-	const gateEmoji = status.passed ? "✅" : "⚠️"
+	const gateEmoji = status.blocked ? "⛔" : status.passed ? "✅" : "⚠️"
 	const lines = [
-		`## ${gateEmoji} Task Audit — Advisory diagnostics`,
+		`## ${gateEmoji} Task Audit — ${entry.event === "gate_block" ? "Gate Blocked" : "Completion"}`,
 		"",
 		"| Metric | Value |",
 		"| --- | --- |",
@@ -80,7 +80,6 @@ export interface CiGateStatusPayload {
 	evaluatedAt: number
 	passed: boolean
 	blocked: boolean
-	advisoryFailed: boolean
 	status: QualityGateStatus["status"]
 	score: number
 	effectiveThreshold: number
@@ -112,8 +111,7 @@ export function buildCiGateStatusJson(
 		event,
 		evaluatedAt: metadata.audited_at ?? Date.now(),
 		passed: status.passed,
-		blocked: false,
-		advisoryFailed: status.advisoryFailed,
+		blocked: status.blocked,
 		status: status.status,
 		score: status.score,
 		effectiveThreshold: status.effectiveThreshold,
@@ -136,8 +134,6 @@ export function buildGatePolicySnapshot(settings: {
 	auditCompletionGateCriticalOnly: boolean
 	auditAdvisoryEscalationEnabled: boolean
 	auditPlanRegressionGateEnabled: boolean
-	auditIntentThresholdAdjustmentsEnabled: boolean
-	auditIntentThresholdOverrides: string
 }): Record<string, unknown> {
 	return {
 		schemaVersion: 1,
@@ -147,7 +143,5 @@ export function buildGatePolicySnapshot(settings: {
 		criticalOnly: settings.auditCompletionGateCriticalOnly,
 		advisoryEscalationEnabled: settings.auditAdvisoryEscalationEnabled,
 		planRegressionGateEnabled: settings.auditPlanRegressionGateEnabled,
-		intentThresholdAdjustmentsEnabled: settings.auditIntentThresholdAdjustmentsEnabled,
-		intentThresholdOverrides: settings.auditIntentThresholdOverrides,
 	}
 }

@@ -6,7 +6,6 @@ const BLOCKING_TASK_ASKS = new Set<DietCodeMessage["ask"]>([
 	"command_output",
 	"browser_action_launch",
 	"use_mcp_server",
-	"use_subagents",
 	"completion_result",
 	"resume_task",
 	"resume_completed_task",

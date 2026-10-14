@@ -35,11 +35,6 @@ export class DependencyMapHandler implements IToolHandler {
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		if (!config.isSubagentExecution) {
-			return formatResponse.toolError(
-				"🛑 **ACCESS DENIED**: Architectural mapping tools are reserved for Forensic Sub-Agents. Call `run_finalization` for authorized documentation in this session.",
-			)
-		}
 		const engine = new SpiderEngine(config.cwd)
 		await engine.loadRegistry()
 		const steering = getTaskArchitectureSteering(config)

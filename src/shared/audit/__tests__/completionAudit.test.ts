@@ -56,14 +56,13 @@ describe("completionAudit", () => {
 		expect(isCompletionBlockedByAudit(metadata, { scoreThreshold: 95, criticalOnly: true })).to.equal(false)
 	})
 
-	it("applies intent-adjusted thresholds for FIX tasks", () => {
+	it("preserves base threshold without intent adjustment for FIX tasks", () => {
 		const metadata = enrichAuditMetadata({
 			violations: ["result_too_short"],
 			intent_classification: "FIX",
 		})
-		// FIX adds +10 to base threshold 50 → effective 60; score ~85 passes at 50 but we verify gate message
 		const message = buildCompletionGateMessage(metadata, { scoreThreshold: 50 })
-		expect(message).to.contain("threshold 60")
+		expect(message).to.contain("threshold 50")
 	})
 
 	it("builds act mode advisory for divergent progress updates", () => {

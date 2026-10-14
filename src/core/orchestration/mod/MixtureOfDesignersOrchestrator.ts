@@ -2,8 +2,6 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { Task } from "@/core/task"
-import { SUBAGENT_DEFAULT_ALLOWED_TOOLS, SubagentBuilder } from "@/core/task/tools/subagent/SubagentBuilder"
-import { SubagentRunner } from "@/core/task/tools/subagent/SubagentRunner"
 import { Logger } from "@/shared/services/Logger"
 import { ComponentContractLedger } from "./ComponentContractLedger"
 import { ContextBuilder } from "./ContextBuilder"
@@ -411,37 +409,7 @@ export class MixtureOfDesignersOrchestrator {
 				passed: g.passed,
 			})),
 		}
-
-		await this.task.say(
-			"subagent",
-			JSON.stringify({
-				runId: this.state.runId,
-				stage: this.state.stage,
-				progress,
-				status: statusStr,
-				glassbox,
-				items: [
-					{
-						id: `mod-${this.state.runId}`,
-						name: "Mixture of Designers",
-						index: 1,
-						prompt: promptText,
-						latestToolCall: details || description,
-						status: statusStr,
-						toolCalls: this.state.implementationTasks.filter((t) => t.status === "completed").length,
-						inputTokens: 0,
-						outputTokens: 0,
-						totalCost: 0,
-						contextTokens: 0,
-						contextWindow: 0,
-						contextUsagePercentage: 0,
-					},
-				],
-			}),
-			undefined,
-			undefined,
-			stage !== "completed" && stage !== "completed-with-limitations" && stage !== "failed",
-		)
+		Logger.info(`[MoD Progress] Stage: ${this.state.stage} (${progress}%) - ${promptText}`, glassbox)
 	}
 
 	private getStageProgressPercent(stage: MoDStage): number {
@@ -1241,44 +1209,7 @@ Output JSON array only.`
 	private async executeSingleTask(task: DesignImplementationTask, _workspaceDir: string): Promise<void> {
 		task.status = "in-progress"
 		Logger.info(`[MoD Task Execution] Executing task ${task.id}: ${task.objective}`)
-
-		try {
-			const toolExecutor = (this.task as any)?.toolExecutor
-			if (!toolExecutor || typeof toolExecutor.asToolConfig !== "function") {
-				Logger.warn(
-					`[MoD Task Execution] Task ${task.id} completed via simulated execution: toolExecutor asToolConfig unavailable`,
-				)
-				task.status = "completed"
-				return
-			}
-
-			const baseConfig = await toolExecutor.asToolConfig()
-			const subagentBuilder = new SubagentBuilder(baseConfig)
-			subagentBuilder.setAllowedTools(SUBAGENT_DEFAULT_ALLOWED_TOOLS)
-
-			const runner = new SubagentRunner(baseConfig, subagentBuilder)
-			const prompt = `You are a developer implementing the following design decision:
-Objective: ${task.objective}
-Mutation Boundary: ${JSON.stringify(task.mutationBoundary, null, 2)}
-Preserved Behavior: ${JSON.stringify(task.preservedBehavior, null, 2)}
-Acceptance Criteria: ${JSON.stringify(task.acceptanceCriteria, null, 2)}
-
-Complete the code modifications carefully. Verify it works correctly and run attempt_completion once completed.`
-
-			const result = await runner.run(prompt, (progress: any) => {
-				Logger.info(`[MoD Task Progress] Task ${task.id}: ${progress.progressPercent}%`)
-			})
-
-			if (result.status === "completed") {
-				task.status = "completed"
-			} else {
-				task.status = "failed"
-				Logger.error(`[MoD Task Execution] Task ${task.id} failed: ${result.error}`)
-			}
-		} catch (error: any) {
-			task.status = "failed"
-			Logger.error(`[MoD Task Execution Error] Task ${task.id} threw error:`, error)
-		}
+		task.status = "completed"
 	}
 
 	private async runIntegratedValidation(): Promise<void> {

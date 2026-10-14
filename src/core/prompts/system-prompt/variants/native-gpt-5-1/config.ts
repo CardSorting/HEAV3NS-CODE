@@ -76,7 +76,6 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5_1)
 		DietCodeDefaultTool.PROJECT_MAP,
 		DietCodeDefaultTool.ROADMAP,
 		DietCodeDefaultTool.ROADMAP_CHECKPOINT,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.NATIVE_GPT_5_1,

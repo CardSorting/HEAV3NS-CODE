@@ -35,7 +35,6 @@ export enum DietCodeDefaultTool {
 	APPLY_PATCH = "apply_patch",
 	GENERATE_EXPLANATION = "generate_explanation",
 	USE_SKILL = "use_skill",
-	USE_SUBAGENTS = "use_subagents",
 	RUN_FINALIZATION = "run_finalization",
 	PROJECT_MAP = "project_map",
 	MEM_QUERY = "query_cognitive_memory",
@@ -102,6 +101,5 @@ export const READ_ONLY_TOOLS = [
 	DietCodeDefaultTool.WEB_FETCH,
 	DietCodeDefaultTool.USE_SKILL,
 	DietCodeDefaultTool.PROJECT_MAP,
-	DietCodeDefaultTool.USE_SUBAGENTS,
 	DietCodeDefaultTool.STABILITY_DIAGNOSE,
 ] as const

@@ -283,7 +283,6 @@ const USER_SETTINGS_FIELDS = {
 	useAutoCondense: { default: true as boolean },
 	/** Opt-in whitespace prompt compression at the provider boundary. */
 	tokenCompressionEnabled: { default: false as boolean },
-	subagentsEnabled: { default: true as boolean },
 	/** Keep JoyZoning architecture guidance in prompts. Audits and reports remain available when disabled. */
 	joyZoningSteeringEnabled: { default: true as boolean },
 	maxSwarmDepth: { default: 3 as number },
@@ -300,16 +299,10 @@ const USER_SETTINGS_FIELDS = {
 	auditCompletionGateEnabled: { default: true as boolean },
 	auditCompletionGateThreshold: { default: 50 as number },
 	auditCompletionGateCriticalOnly: { default: false as boolean },
-	auditActModeAdvisoryEnabled: { default: true as boolean },
-	auditAdvisoryEscalationEnabled: { default: true as boolean },
+	auditAdvisoryEscalationEnabled: { default: false as boolean },
 	auditAdvisoryAutoScrollMode: { default: "critical" as "never" | "critical" | "all" },
 	auditPlanRegressionGateEnabled: { default: true as boolean },
 	auditToolOutputAdvisoryEnabled: { default: true as boolean },
-	auditFileWriteAdvisoryEnabled: { default: true as boolean },
-	auditIntentThresholdAdjustmentsEnabled: { default: true as boolean },
-	auditIntentThresholdOverrides: { default: "{}" as string },
-	auditSarifHookExportEnabled: { default: true as boolean },
-	auditWorkspaceArtifactsEnabled: { default: true as boolean },
 	masEnabled: { default: true as boolean },
 
 	// OpenTelemetry configuration

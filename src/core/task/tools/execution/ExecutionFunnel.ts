@@ -31,7 +31,15 @@ import {
 	type ExecutionFunnelStage,
 	type RecordedApprovalIntent,
 } from "@shared/execution/executionFunnelEvent"
-import type { LaneExecutionMode } from "@shared/subagent/governedExecution"
+export type LaneExecutionMode =
+	| "read_only"
+	| "audit_only"
+	| "planning_only"
+	| "documentation_only"
+	| "diagnostic_only"
+	| "mutation"
+	| "write_set"
+	| string
 import { DietCodeDefaultTool } from "@shared/tools"
 import { SafeNumber } from "@shared/utils/SafeNumber"
 import { createLockAuthority } from "@/core/governance/LockAuthority"
@@ -155,7 +163,7 @@ export function shouldSkipLayerInjectionForParentIoTool(toolName: string): boole
 export function appendSessionStabilityContext(config: TaskConfig, relPath: string, fileText: string): string {
 	const guard = config.universalGuard
 	const steeringEnabled = guard?.isJoyZoningSteeringEnabled?.() ?? true
-	if (!guard || config.isSubagentExecution || !steeringEnabled) return fileText
+	if (!guard || !steeringEnabled) return fileText
 
 	const nodes = guard.engine.getNodes()
 	const absPath = path.resolve(config.cwd, relPath)
@@ -627,7 +635,7 @@ export class ExecutionFunnel {
 
 	async execute(input: ExecutionFunnelInput): Promise<ExecutionFunnelOutcome> {
 		const { config, block } = input
-		const lane = input.lane ?? (config.isSubagentExecution ? "subagent" : "parent")
+		const lane = input.lane ?? "parent"
 		const lifecycleAuthority = getTaskLifecycleAuthority(config.taskState)
 		const lifecycleAdmission = await lifecycleAuthority.ensureActive(config.taskState, config.taskId, {
 			source: "execution_funnel",
@@ -1014,7 +1022,7 @@ export class ExecutionFunnel {
 					if (
 						input.laneMode
 							? shouldDeferLaneGuardPostExecution(input.laneMode, block.name)
-							: shouldDeferParentGuardPostExecution(block.name, config.isSubagentExecution)
+							: shouldDeferParentGuardPostExecution(block.name, false)
 					) {
 						void post().catch((error) =>
 							Logger.warn("[ExecutionFunnel] Deferred post-policy diagnostic failed:", error),
@@ -1800,7 +1808,7 @@ export class ExecutionFunnel {
 	private async runPreToolUseHook(config: TaskConfig, block: ToolUse, laneMode?: LaneExecutionMode): Promise<void> {
 		const fastPath = laneMode
 			? shouldSkipPreToolUseForLaneIoTool(laneMode, block.name)
-			: shouldSkipPreToolUseForParentIoTool(block.name, config.isSubagentExecution)
+			: shouldSkipPreToolUseForParentIoTool(block.name, false)
 		if (fastPath || block.name === DietCodeDefaultTool.ATTEMPT || !config.hooksEnabled) return
 
 		const { executeHook } = await import("@core/hooks/hook-executor")

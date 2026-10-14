@@ -4,7 +4,7 @@ import type { DietCodeMessage } from "../ExtensionMessage"
 import { getApiMetrics, getLastApiReqTotalTokens } from "../getApiMetrics"
 
 describe("getApiMetrics", () => {
-	it("includes subagent_usage in aggregate totals", () => {
+	it("includes api_req_started and deleted_api_reqs in aggregate totals", () => {
 		const messages: DietCodeMessage[] = [
 			{
 				ts: 1,
@@ -21,19 +21,6 @@ describe("getApiMetrics", () => {
 			{
 				ts: 2,
 				type: "say",
-				say: "subagent_usage",
-				text: JSON.stringify({
-					source: "subagents",
-					tokensIn: 4,
-					tokensOut: 8,
-					cacheWrites: 2,
-					cacheReads: 1,
-					cost: 0.05,
-				}),
-			},
-			{
-				ts: 3,
-				type: "say",
 				say: "deleted_api_reqs",
 				text: JSON.stringify({
 					tokensIn: 6,
@@ -47,11 +34,11 @@ describe("getApiMetrics", () => {
 
 		const metrics = getApiMetrics(messages)
 
-		assert.equal(metrics.totalTokensIn, 20)
-		assert.equal(metrics.totalTokensOut, 37)
-		assert.equal(metrics.totalCacheWrites, 6)
-		assert.equal(metrics.totalCacheReads, 2)
-		assert.ok(Math.abs(metrics.totalCost - 0.2) < 1e-9)
+		assert.equal(metrics.totalTokensIn, 16)
+		assert.equal(metrics.totalTokensOut, 29)
+		assert.equal(metrics.totalCacheWrites, 4)
+		assert.equal(metrics.totalCacheReads, 1)
+		assert.ok(Math.abs(metrics.totalCost - 0.15) < 1e-9)
 	})
 
 	it("ignores malformed usage payloads", () => {
@@ -59,7 +46,7 @@ describe("getApiMetrics", () => {
 			{
 				ts: 1,
 				type: "say",
-				say: "subagent_usage",
+				say: "api_req_started",
 				text: "{not-json",
 			},
 		]
@@ -77,9 +64,8 @@ describe("getLastApiReqTotalTokens", () => {
 			{
 				ts: 1,
 				type: "say",
-				say: "subagent_usage",
+				say: "deleted_api_reqs",
 				text: JSON.stringify({
-					source: "subagents",
 					tokensIn: 100,
 					tokensOut: 200,
 				}),

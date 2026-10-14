@@ -81,7 +81,6 @@ export const config = createVariant(ModelFamily.GENERIC)
 		DietCodeDefaultTool.PROJECT_MAP,
 		DietCodeDefaultTool.ROADMAP,
 		DietCodeDefaultTool.ROADMAP_CHECKPOINT,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: "generic",

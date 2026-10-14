@@ -44,11 +44,6 @@ export class StabilityQueryHandler implements IToolHandler {
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		if (!config.isSubagentExecution) {
-			return formatResponse.toolError(
-				"🛑 **ACCESS DENIED**: Architectural query tools are reserved for Forensic Sub-Agents. Call `run_finalization` for authorized documentation in this session.",
-			)
-		}
 		const params = block.params as unknown as QueryParams
 		const parseNumber = (value: number | string | undefined, fallback: number): number => {
 			const parsed = typeof value === "number" ? value : Number(value)

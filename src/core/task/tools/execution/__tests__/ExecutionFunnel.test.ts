@@ -17,7 +17,6 @@ import { DietcodeKernelToolHandler } from "../../handlers/DietcodeKernelToolHand
 import { ExecuteCommandToolHandler } from "../../handlers/ExecuteCommandToolHandler"
 import { GoldenCartridgeToolHandler } from "../../handlers/GoldenCartridgeToolHandler"
 import { RunFinalizationToolHandler } from "../../handlers/RunFinalizationToolHandler"
-import { UseSubagentsToolHandler } from "../../handlers/SubagentToolHandler"
 import type { TaskConfig } from "../../types/TaskConfig"
 import type { ToolValidator } from "../../ToolValidator"
 import { declareApprovalIntent, type IToolHandler, type ToolResponse } from "../../types/ToolContracts"
@@ -211,7 +210,6 @@ describe("ExecutionFunnel approval authority", () => {
 
 	it("runs delegation and task-maintenance helpers without redundant approval prompts", async () => {
 		const cases = [
-			{ operation: new UseSubagentsToolHandler(), params: { prompt_1: "[execution_mode:mutation] Fix the assigned bug" } },
 			{ operation: new RunFinalizationToolHandler(), params: {} },
 			{ operation: new DietcodeKernelToolHandler(), params: { action: "refresh" } },
 			{ operation: new GoldenCartridgeToolHandler({} as never), params: { verb: "compress" } },
@@ -839,9 +837,8 @@ describe("ExecutionFunnel approval authority", () => {
 		const spider = { nodes: new Map() }
 		const taskConfig = {
 			cwd: "/tmp",
-			isSubagentExecution: false,
 			universalGuard: { engine: { getNodes: () => new Map() }, getSpiderEngine: () => spider },
-		} as TaskConfig
+		} as unknown as TaskConfig
 		assert.equal(appendSessionStabilityContext(taskConfig, "src/a.ts", "file body"), "file body")
 		assert.equal(resolveSessionSpiderEngine(taskConfig), spider)
 	})
@@ -854,14 +851,12 @@ describe("ExecutionFunnel approval authority", () => {
 		const subagentAState = new TaskState()
 		const subagentAConfig = config(subagentAState, {
 			taskId: "task-1:subagent:agent-A",
-			isSubagentExecution: true,
 		})
 		bindTaskLifecycleAuthority(subagentAState, getTaskLifecycleAuthority(state))
 
 		const subagentBState = new TaskState()
 		const subagentBConfig = config(subagentBState, {
 			taskId: "task-1:subagent:agent-A:subagent:agent-B",
-			isSubagentExecution: true,
 		})
 		bindTaskLifecycleAuthority(subagentBState, getTaskLifecycleAuthority(state))
 

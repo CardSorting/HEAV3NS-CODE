@@ -49,23 +49,15 @@ export interface TaskConfig {
 	auditCompletionGateEnabled: boolean
 	auditCompletionGateThreshold: number
 	auditCompletionGateCriticalOnly: boolean
-	auditActModeAdvisoryEnabled: boolean
 	auditAdvisoryEscalationEnabled: boolean
 	auditPlanRegressionGateEnabled: boolean
 	auditToolOutputAdvisoryEnabled: boolean
-	auditFileWriteAdvisoryEnabled: boolean
-	auditIntentThresholdAdjustmentsEnabled: boolean
-	auditIntentThresholdOverrides: string
-	auditSarifHookExportEnabled: boolean
-	auditWorkspaceArtifactsEnabled: boolean
 	vscodeTerminalExecutionMode: "vscodeTerminal"
 	enableParallelToolCalling: boolean
-	isSubagentExecution: boolean
 	/** Immutable execution snapshot; avoids hook discovery through global singleton state. */
 	hooksEnabled?: boolean
 	/** True while same-session finalization lane is active — authorizes .wiki writes. */
 	finalizationMode?: boolean
-	recursionDepth?: number
 	latencyTracker?: TaskLatencyTracker
 	/** Task-owned cancellation for non-sibling invocations. */
 	taskSignal?: AbortSignal

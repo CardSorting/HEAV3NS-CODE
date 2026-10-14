@@ -281,7 +281,6 @@ export interface Settings {
   mode?: PlanActMode | undefined;
   focusChainSettings?: FocusChainSettings | undefined;
   customPrompt?: string | undefined;
-  subagentsEnabled?: boolean | undefined;
   enableParallelToolCalling?: boolean | undefined;
   backgroundEditEnabled?: boolean | undefined;
   optOutOfRemoteConfig?: boolean | undefined;
@@ -312,15 +311,9 @@ export interface Settings {
   auditCompletionGateEnabled?: boolean | undefined;
   auditCompletionGateThreshold?: number | undefined;
   auditCompletionGateCriticalOnly?: boolean | undefined;
-  auditActModeAdvisoryEnabled?: boolean | undefined;
   auditAdvisoryEscalationEnabled?: boolean | undefined;
   auditPlanRegressionGateEnabled?: boolean | undefined;
   auditToolOutputAdvisoryEnabled?: boolean | undefined;
-  auditFileWriteAdvisoryEnabled?: boolean | undefined;
-  auditIntentThresholdAdjustmentsEnabled?: boolean | undefined;
-  auditIntentThresholdOverrides?: string | undefined;
-  auditSarifHookExportEnabled?: boolean | undefined;
-  auditWorkspaceArtifactsEnabled?: boolean | undefined;
   auditAdvisoryAutoScrollMode?: string | undefined;
   liteLlmBaseUrl?: string | undefined;
   liteLlmUsePromptCache?: boolean | undefined;
@@ -545,8 +538,6 @@ export interface UpdateSettingsRequest {
   multiRootEnabled?: boolean | undefined;
   vscodeTerminalExecutionMode?: string | undefined;
   maxConsecutiveMistakes?: number | undefined;
-  subagentsEnabled?: boolean | undefined;
-  subagentTerminalOutputLineLimit?: number | undefined;
   dietcodeEnv?: string | undefined;
   nativeToolCallEnabled?:
     | boolean
@@ -562,16 +553,10 @@ export interface UpdateSettingsRequest {
   auditCompletionGateEnabled?: boolean | undefined;
   auditCompletionGateThreshold?: number | undefined;
   auditCompletionGateCriticalOnly?: boolean | undefined;
-  auditActModeAdvisoryEnabled?: boolean | undefined;
   auditAdvisoryEscalationEnabled?: boolean | undefined;
   auditAdvisoryAutoScrollMode?: string | undefined;
   auditPlanRegressionGateEnabled?: boolean | undefined;
   auditToolOutputAdvisoryEnabled?: boolean | undefined;
-  auditFileWriteAdvisoryEnabled?: boolean | undefined;
-  auditIntentThresholdAdjustmentsEnabled?: boolean | undefined;
-  auditIntentThresholdOverrides?: string | undefined;
-  auditSarifHookExportEnabled?: boolean | undefined;
-  auditWorkspaceArtifactsEnabled?: boolean | undefined;
   modEnabled?: boolean | undefined;
   modOutcome?: string | undefined;
   tokenCompressionEnabled?: boolean | undefined;
@@ -2073,7 +2058,6 @@ function createBaseSettings(): Settings {
     mode: undefined,
     focusChainSettings: undefined,
     customPrompt: undefined,
-    subagentsEnabled: undefined,
     enableParallelToolCalling: undefined,
     backgroundEditEnabled: undefined,
     optOutOfRemoteConfig: undefined,
@@ -2104,15 +2088,9 @@ function createBaseSettings(): Settings {
     auditCompletionGateEnabled: undefined,
     auditCompletionGateThreshold: undefined,
     auditCompletionGateCriticalOnly: undefined,
-    auditActModeAdvisoryEnabled: undefined,
     auditAdvisoryEscalationEnabled: undefined,
     auditPlanRegressionGateEnabled: undefined,
     auditToolOutputAdvisoryEnabled: undefined,
-    auditFileWriteAdvisoryEnabled: undefined,
-    auditIntentThresholdAdjustmentsEnabled: undefined,
-    auditIntentThresholdOverrides: undefined,
-    auditSarifHookExportEnabled: undefined,
-    auditWorkspaceArtifactsEnabled: undefined,
     auditAdvisoryAutoScrollMode: undefined,
     liteLlmBaseUrl: undefined,
     liteLlmUsePromptCache: undefined,
@@ -2330,9 +2308,6 @@ export const Settings: MessageFns<Settings> = {
     if (message.customPrompt !== undefined) {
       writer.uint32(1202).string(message.customPrompt);
     }
-    if (message.subagentsEnabled !== undefined) {
-      writer.uint32(1224).bool(message.subagentsEnabled);
-    }
     if (message.enableParallelToolCalling !== undefined) {
       writer.uint32(1232).bool(message.enableParallelToolCalling);
     }
@@ -2423,9 +2398,6 @@ export const Settings: MessageFns<Settings> = {
     if (message.auditCompletionGateCriticalOnly !== undefined) {
       writer.uint32(1648).bool(message.auditCompletionGateCriticalOnly);
     }
-    if (message.auditActModeAdvisoryEnabled !== undefined) {
-      writer.uint32(1656).bool(message.auditActModeAdvisoryEnabled);
-    }
     if (message.auditAdvisoryEscalationEnabled !== undefined) {
       writer.uint32(1672).bool(message.auditAdvisoryEscalationEnabled);
     }
@@ -2434,21 +2406,6 @@ export const Settings: MessageFns<Settings> = {
     }
     if (message.auditToolOutputAdvisoryEnabled !== undefined) {
       writer.uint32(1688).bool(message.auditToolOutputAdvisoryEnabled);
-    }
-    if (message.auditFileWriteAdvisoryEnabled !== undefined) {
-      writer.uint32(1704).bool(message.auditFileWriteAdvisoryEnabled);
-    }
-    if (message.auditIntentThresholdAdjustmentsEnabled !== undefined) {
-      writer.uint32(1720).bool(message.auditIntentThresholdAdjustmentsEnabled);
-    }
-    if (message.auditIntentThresholdOverrides !== undefined) {
-      writer.uint32(1738).string(message.auditIntentThresholdOverrides);
-    }
-    if (message.auditSarifHookExportEnabled !== undefined) {
-      writer.uint32(1752).bool(message.auditSarifHookExportEnabled);
-    }
-    if (message.auditWorkspaceArtifactsEnabled !== undefined) {
-      writer.uint32(1760).bool(message.auditWorkspaceArtifactsEnabled);
     }
     if (message.auditAdvisoryAutoScrollMode !== undefined) {
       writer.uint32(1778).string(message.auditAdvisoryAutoScrollMode);
@@ -3073,14 +3030,6 @@ export const Settings: MessageFns<Settings> = {
             message.customPrompt = reader.string();
             continue;
           }
-          case 153: {
-            if (tag !== 1224) {
-              break;
-            }
-
-            message.subagentsEnabled = reader.bool();
-            continue;
-          }
           case 154: {
             if (tag !== 1232) {
               break;
@@ -3321,14 +3270,6 @@ export const Settings: MessageFns<Settings> = {
             message.auditCompletionGateCriticalOnly = reader.bool();
             continue;
           }
-          case 207: {
-            if (tag !== 1656) {
-              break;
-            }
-
-            message.auditActModeAdvisoryEnabled = reader.bool();
-            continue;
-          }
           case 209: {
             if (tag !== 1672) {
               break;
@@ -3351,46 +3292,6 @@ export const Settings: MessageFns<Settings> = {
             }
 
             message.auditToolOutputAdvisoryEnabled = reader.bool();
-            continue;
-          }
-          case 213: {
-            if (tag !== 1704) {
-              break;
-            }
-
-            message.auditFileWriteAdvisoryEnabled = reader.bool();
-            continue;
-          }
-          case 215: {
-            if (tag !== 1720) {
-              break;
-            }
-
-            message.auditIntentThresholdAdjustmentsEnabled = reader.bool();
-            continue;
-          }
-          case 217: {
-            if (tag !== 1738) {
-              break;
-            }
-
-            message.auditIntentThresholdOverrides = reader.string();
-            continue;
-          }
-          case 219: {
-            if (tag !== 1752) {
-              break;
-            }
-
-            message.auditSarifHookExportEnabled = reader.bool();
-            continue;
-          }
-          case 220: {
-            if (tag !== 1760) {
-              break;
-            }
-
-            message.auditWorkspaceArtifactsEnabled = reader.bool();
             continue;
           }
           case 222: {
@@ -4551,11 +4452,6 @@ export const Settings: MessageFns<Settings> = {
         : isSet(object.custom_prompt)
         ? globalThis.String(object.custom_prompt)
         : undefined,
-      subagentsEnabled: isSet(object.subagentsEnabled)
-        ? globalThis.Boolean(object.subagentsEnabled)
-        : isSet(object.subagents_enabled)
-        ? globalThis.Boolean(object.subagents_enabled)
-        : undefined,
       enableParallelToolCalling: isSet(object.enableParallelToolCalling)
         ? globalThis.Boolean(object.enableParallelToolCalling)
         : isSet(object.enable_parallel_tool_calling)
@@ -4706,11 +4602,6 @@ export const Settings: MessageFns<Settings> = {
         : isSet(object.audit_completion_gate_critical_only)
         ? globalThis.Boolean(object.audit_completion_gate_critical_only)
         : undefined,
-      auditActModeAdvisoryEnabled: isSet(object.auditActModeAdvisoryEnabled)
-        ? globalThis.Boolean(object.auditActModeAdvisoryEnabled)
-        : isSet(object.audit_act_mode_advisory_enabled)
-        ? globalThis.Boolean(object.audit_act_mode_advisory_enabled)
-        : undefined,
       auditAdvisoryEscalationEnabled: isSet(object.auditAdvisoryEscalationEnabled)
         ? globalThis.Boolean(object.auditAdvisoryEscalationEnabled)
         : isSet(object.audit_advisory_escalation_enabled)
@@ -4725,31 +4616,6 @@ export const Settings: MessageFns<Settings> = {
         ? globalThis.Boolean(object.auditToolOutputAdvisoryEnabled)
         : isSet(object.audit_tool_output_advisory_enabled)
         ? globalThis.Boolean(object.audit_tool_output_advisory_enabled)
-        : undefined,
-      auditFileWriteAdvisoryEnabled: isSet(object.auditFileWriteAdvisoryEnabled)
-        ? globalThis.Boolean(object.auditFileWriteAdvisoryEnabled)
-        : isSet(object.audit_file_write_advisory_enabled)
-        ? globalThis.Boolean(object.audit_file_write_advisory_enabled)
-        : undefined,
-      auditIntentThresholdAdjustmentsEnabled: isSet(object.auditIntentThresholdAdjustmentsEnabled)
-        ? globalThis.Boolean(object.auditIntentThresholdAdjustmentsEnabled)
-        : isSet(object.audit_intent_threshold_adjustments_enabled)
-        ? globalThis.Boolean(object.audit_intent_threshold_adjustments_enabled)
-        : undefined,
-      auditIntentThresholdOverrides: isSet(object.auditIntentThresholdOverrides)
-        ? globalThis.String(object.auditIntentThresholdOverrides)
-        : isSet(object.audit_intent_threshold_overrides)
-        ? globalThis.String(object.audit_intent_threshold_overrides)
-        : undefined,
-      auditSarifHookExportEnabled: isSet(object.auditSarifHookExportEnabled)
-        ? globalThis.Boolean(object.auditSarifHookExportEnabled)
-        : isSet(object.audit_sarif_hook_export_enabled)
-        ? globalThis.Boolean(object.audit_sarif_hook_export_enabled)
-        : undefined,
-      auditWorkspaceArtifactsEnabled: isSet(object.auditWorkspaceArtifactsEnabled)
-        ? globalThis.Boolean(object.auditWorkspaceArtifactsEnabled)
-        : isSet(object.audit_workspace_artifacts_enabled)
-        ? globalThis.Boolean(object.audit_workspace_artifacts_enabled)
         : undefined,
       auditAdvisoryAutoScrollMode: isSet(object.auditAdvisoryAutoScrollMode)
         ? globalThis.String(object.auditAdvisoryAutoScrollMode)
@@ -5490,9 +5356,6 @@ export const Settings: MessageFns<Settings> = {
     if (message.customPrompt !== undefined) {
       obj.customPrompt = message.customPrompt;
     }
-    if (message.subagentsEnabled !== undefined) {
-      obj.subagentsEnabled = message.subagentsEnabled;
-    }
     if (message.enableParallelToolCalling !== undefined) {
       obj.enableParallelToolCalling = message.enableParallelToolCalling;
     }
@@ -5583,9 +5446,6 @@ export const Settings: MessageFns<Settings> = {
     if (message.auditCompletionGateCriticalOnly !== undefined) {
       obj.auditCompletionGateCriticalOnly = message.auditCompletionGateCriticalOnly;
     }
-    if (message.auditActModeAdvisoryEnabled !== undefined) {
-      obj.auditActModeAdvisoryEnabled = message.auditActModeAdvisoryEnabled;
-    }
     if (message.auditAdvisoryEscalationEnabled !== undefined) {
       obj.auditAdvisoryEscalationEnabled = message.auditAdvisoryEscalationEnabled;
     }
@@ -5594,21 +5454,6 @@ export const Settings: MessageFns<Settings> = {
     }
     if (message.auditToolOutputAdvisoryEnabled !== undefined) {
       obj.auditToolOutputAdvisoryEnabled = message.auditToolOutputAdvisoryEnabled;
-    }
-    if (message.auditFileWriteAdvisoryEnabled !== undefined) {
-      obj.auditFileWriteAdvisoryEnabled = message.auditFileWriteAdvisoryEnabled;
-    }
-    if (message.auditIntentThresholdAdjustmentsEnabled !== undefined) {
-      obj.auditIntentThresholdAdjustmentsEnabled = message.auditIntentThresholdAdjustmentsEnabled;
-    }
-    if (message.auditIntentThresholdOverrides !== undefined) {
-      obj.auditIntentThresholdOverrides = message.auditIntentThresholdOverrides;
-    }
-    if (message.auditSarifHookExportEnabled !== undefined) {
-      obj.auditSarifHookExportEnabled = message.auditSarifHookExportEnabled;
-    }
-    if (message.auditWorkspaceArtifactsEnabled !== undefined) {
-      obj.auditWorkspaceArtifactsEnabled = message.auditWorkspaceArtifactsEnabled;
     }
     if (message.auditAdvisoryAutoScrollMode !== undefined) {
       obj.auditAdvisoryAutoScrollMode = message.auditAdvisoryAutoScrollMode;
@@ -6034,7 +5879,6 @@ export const Settings: MessageFns<Settings> = {
       ? FocusChainSettings.fromPartial(object.focusChainSettings)
       : undefined;
     message.customPrompt = object.customPrompt ?? undefined;
-    message.subagentsEnabled = object.subagentsEnabled ?? undefined;
     message.enableParallelToolCalling = object.enableParallelToolCalling ?? undefined;
     message.backgroundEditEnabled = object.backgroundEditEnabled ?? undefined;
     message.optOutOfRemoteConfig = object.optOutOfRemoteConfig ?? undefined;
@@ -6065,15 +5909,9 @@ export const Settings: MessageFns<Settings> = {
     message.auditCompletionGateEnabled = object.auditCompletionGateEnabled ?? undefined;
     message.auditCompletionGateThreshold = object.auditCompletionGateThreshold ?? undefined;
     message.auditCompletionGateCriticalOnly = object.auditCompletionGateCriticalOnly ?? undefined;
-    message.auditActModeAdvisoryEnabled = object.auditActModeAdvisoryEnabled ?? undefined;
     message.auditAdvisoryEscalationEnabled = object.auditAdvisoryEscalationEnabled ?? undefined;
     message.auditPlanRegressionGateEnabled = object.auditPlanRegressionGateEnabled ?? undefined;
     message.auditToolOutputAdvisoryEnabled = object.auditToolOutputAdvisoryEnabled ?? undefined;
-    message.auditFileWriteAdvisoryEnabled = object.auditFileWriteAdvisoryEnabled ?? undefined;
-    message.auditIntentThresholdAdjustmentsEnabled = object.auditIntentThresholdAdjustmentsEnabled ?? undefined;
-    message.auditIntentThresholdOverrides = object.auditIntentThresholdOverrides ?? undefined;
-    message.auditSarifHookExportEnabled = object.auditSarifHookExportEnabled ?? undefined;
-    message.auditWorkspaceArtifactsEnabled = object.auditWorkspaceArtifactsEnabled ?? undefined;
     message.auditAdvisoryAutoScrollMode = object.auditAdvisoryAutoScrollMode ?? undefined;
     message.liteLlmBaseUrl = object.liteLlmBaseUrl ?? undefined;
     message.liteLlmUsePromptCache = object.liteLlmUsePromptCache ?? undefined;
@@ -7598,8 +7436,6 @@ function createBaseUpdateSettingsRequest(): UpdateSettingsRequest {
     multiRootEnabled: undefined,
     vscodeTerminalExecutionMode: undefined,
     maxConsecutiveMistakes: undefined,
-    subagentsEnabled: undefined,
-    subagentTerminalOutputLineLimit: undefined,
     dietcodeEnv: undefined,
     nativeToolCallEnabled: undefined,
     dietcodeWebToolsEnabled: undefined,
@@ -7612,16 +7448,10 @@ function createBaseUpdateSettingsRequest(): UpdateSettingsRequest {
     auditCompletionGateEnabled: undefined,
     auditCompletionGateThreshold: undefined,
     auditCompletionGateCriticalOnly: undefined,
-    auditActModeAdvisoryEnabled: undefined,
     auditAdvisoryEscalationEnabled: undefined,
     auditAdvisoryAutoScrollMode: undefined,
     auditPlanRegressionGateEnabled: undefined,
     auditToolOutputAdvisoryEnabled: undefined,
-    auditFileWriteAdvisoryEnabled: undefined,
-    auditIntentThresholdAdjustmentsEnabled: undefined,
-    auditIntentThresholdOverrides: undefined,
-    auditSarifHookExportEnabled: undefined,
-    auditWorkspaceArtifactsEnabled: undefined,
     modEnabled: undefined,
     modOutcome: undefined,
     tokenCompressionEnabled: undefined,
@@ -7700,12 +7530,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     if (message.maxConsecutiveMistakes !== undefined) {
       writer.uint32(224).int32(message.maxConsecutiveMistakes);
     }
-    if (message.subagentsEnabled !== undefined) {
-      writer.uint32(232).bool(message.subagentsEnabled);
-    }
-    if (message.subagentTerminalOutputLineLimit !== undefined) {
-      writer.uint32(240).int32(message.subagentTerminalOutputLineLimit);
-    }
     if (message.dietcodeEnv !== undefined) {
       writer.uint32(250).string(message.dietcodeEnv);
     }
@@ -7742,9 +7566,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     if (message.auditCompletionGateCriticalOnly !== undefined) {
       writer.uint32(352).bool(message.auditCompletionGateCriticalOnly);
     }
-    if (message.auditActModeAdvisoryEnabled !== undefined) {
-      writer.uint32(360).bool(message.auditActModeAdvisoryEnabled);
-    }
     if (message.auditAdvisoryEscalationEnabled !== undefined) {
       writer.uint32(368).bool(message.auditAdvisoryEscalationEnabled);
     }
@@ -7756,21 +7577,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     }
     if (message.auditToolOutputAdvisoryEnabled !== undefined) {
       writer.uint32(392).bool(message.auditToolOutputAdvisoryEnabled);
-    }
-    if (message.auditFileWriteAdvisoryEnabled !== undefined) {
-      writer.uint32(400).bool(message.auditFileWriteAdvisoryEnabled);
-    }
-    if (message.auditIntentThresholdAdjustmentsEnabled !== undefined) {
-      writer.uint32(408).bool(message.auditIntentThresholdAdjustmentsEnabled);
-    }
-    if (message.auditIntentThresholdOverrides !== undefined) {
-      writer.uint32(418).string(message.auditIntentThresholdOverrides);
-    }
-    if (message.auditSarifHookExportEnabled !== undefined) {
-      writer.uint32(424).bool(message.auditSarifHookExportEnabled);
-    }
-    if (message.auditWorkspaceArtifactsEnabled !== undefined) {
-      writer.uint32(432).bool(message.auditWorkspaceArtifactsEnabled);
     }
     if (message.modEnabled !== undefined) {
       writer.uint32(440).bool(message.modEnabled);
@@ -7984,22 +7790,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
             message.maxConsecutiveMistakes = reader.int32();
             continue;
           }
-          case 29: {
-            if (tag !== 232) {
-              break;
-            }
-
-            message.subagentsEnabled = reader.bool();
-            continue;
-          }
-          case 30: {
-            if (tag !== 240) {
-              break;
-            }
-
-            message.subagentTerminalOutputLineLimit = reader.int32();
-            continue;
-          }
           case 31: {
             if (tag !== 250) {
               break;
@@ -8096,14 +7886,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
             message.auditCompletionGateCriticalOnly = reader.bool();
             continue;
           }
-          case 45: {
-            if (tag !== 360) {
-              break;
-            }
-
-            message.auditActModeAdvisoryEnabled = reader.bool();
-            continue;
-          }
           case 46: {
             if (tag !== 368) {
               break;
@@ -8134,46 +7916,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
             }
 
             message.auditToolOutputAdvisoryEnabled = reader.bool();
-            continue;
-          }
-          case 50: {
-            if (tag !== 400) {
-              break;
-            }
-
-            message.auditFileWriteAdvisoryEnabled = reader.bool();
-            continue;
-          }
-          case 51: {
-            if (tag !== 408) {
-              break;
-            }
-
-            message.auditIntentThresholdAdjustmentsEnabled = reader.bool();
-            continue;
-          }
-          case 52: {
-            if (tag !== 418) {
-              break;
-            }
-
-            message.auditIntentThresholdOverrides = reader.string();
-            continue;
-          }
-          case 53: {
-            if (tag !== 424) {
-              break;
-            }
-
-            message.auditSarifHookExportEnabled = reader.bool();
-            continue;
-          }
-          case 54: {
-            if (tag !== 432) {
-              break;
-            }
-
-            message.auditWorkspaceArtifactsEnabled = reader.bool();
             continue;
           }
           case 55: {
@@ -8329,16 +8071,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
         : isSet(object.max_consecutive_mistakes)
         ? globalThis.Number(object.max_consecutive_mistakes)
         : undefined,
-      subagentsEnabled: isSet(object.subagentsEnabled)
-        ? globalThis.Boolean(object.subagentsEnabled)
-        : isSet(object.subagents_enabled)
-        ? globalThis.Boolean(object.subagents_enabled)
-        : undefined,
-      subagentTerminalOutputLineLimit: isSet(object.subagentTerminalOutputLineLimit)
-        ? globalThis.Number(object.subagentTerminalOutputLineLimit)
-        : isSet(object.subagent_terminal_output_line_limit)
-        ? globalThis.Number(object.subagent_terminal_output_line_limit)
-        : undefined,
       dietcodeEnv: isSet(object.dietcodeEnv)
         ? globalThis.String(object.dietcodeEnv)
         : isSet(object.dietcode_env)
@@ -8399,11 +8131,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
         : isSet(object.audit_completion_gate_critical_only)
         ? globalThis.Boolean(object.audit_completion_gate_critical_only)
         : undefined,
-      auditActModeAdvisoryEnabled: isSet(object.auditActModeAdvisoryEnabled)
-        ? globalThis.Boolean(object.auditActModeAdvisoryEnabled)
-        : isSet(object.audit_act_mode_advisory_enabled)
-        ? globalThis.Boolean(object.audit_act_mode_advisory_enabled)
-        : undefined,
       auditAdvisoryEscalationEnabled: isSet(object.auditAdvisoryEscalationEnabled)
         ? globalThis.Boolean(object.auditAdvisoryEscalationEnabled)
         : isSet(object.audit_advisory_escalation_enabled)
@@ -8423,31 +8150,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
         ? globalThis.Boolean(object.auditToolOutputAdvisoryEnabled)
         : isSet(object.audit_tool_output_advisory_enabled)
         ? globalThis.Boolean(object.audit_tool_output_advisory_enabled)
-        : undefined,
-      auditFileWriteAdvisoryEnabled: isSet(object.auditFileWriteAdvisoryEnabled)
-        ? globalThis.Boolean(object.auditFileWriteAdvisoryEnabled)
-        : isSet(object.audit_file_write_advisory_enabled)
-        ? globalThis.Boolean(object.audit_file_write_advisory_enabled)
-        : undefined,
-      auditIntentThresholdAdjustmentsEnabled: isSet(object.auditIntentThresholdAdjustmentsEnabled)
-        ? globalThis.Boolean(object.auditIntentThresholdAdjustmentsEnabled)
-        : isSet(object.audit_intent_threshold_adjustments_enabled)
-        ? globalThis.Boolean(object.audit_intent_threshold_adjustments_enabled)
-        : undefined,
-      auditIntentThresholdOverrides: isSet(object.auditIntentThresholdOverrides)
-        ? globalThis.String(object.auditIntentThresholdOverrides)
-        : isSet(object.audit_intent_threshold_overrides)
-        ? globalThis.String(object.audit_intent_threshold_overrides)
-        : undefined,
-      auditSarifHookExportEnabled: isSet(object.auditSarifHookExportEnabled)
-        ? globalThis.Boolean(object.auditSarifHookExportEnabled)
-        : isSet(object.audit_sarif_hook_export_enabled)
-        ? globalThis.Boolean(object.audit_sarif_hook_export_enabled)
-        : undefined,
-      auditWorkspaceArtifactsEnabled: isSet(object.auditWorkspaceArtifactsEnabled)
-        ? globalThis.Boolean(object.auditWorkspaceArtifactsEnabled)
-        : isSet(object.audit_workspace_artifacts_enabled)
-        ? globalThis.Boolean(object.audit_workspace_artifacts_enabled)
         : undefined,
       modEnabled: isSet(object.modEnabled)
         ? globalThis.Boolean(object.modEnabled)
@@ -8543,12 +8245,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     if (message.maxConsecutiveMistakes !== undefined) {
       obj.maxConsecutiveMistakes = Math.round(message.maxConsecutiveMistakes);
     }
-    if (message.subagentsEnabled !== undefined) {
-      obj.subagentsEnabled = message.subagentsEnabled;
-    }
-    if (message.subagentTerminalOutputLineLimit !== undefined) {
-      obj.subagentTerminalOutputLineLimit = Math.round(message.subagentTerminalOutputLineLimit);
-    }
     if (message.dietcodeEnv !== undefined) {
       obj.dietcodeEnv = message.dietcodeEnv;
     }
@@ -8585,9 +8281,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     if (message.auditCompletionGateCriticalOnly !== undefined) {
       obj.auditCompletionGateCriticalOnly = message.auditCompletionGateCriticalOnly;
     }
-    if (message.auditActModeAdvisoryEnabled !== undefined) {
-      obj.auditActModeAdvisoryEnabled = message.auditActModeAdvisoryEnabled;
-    }
     if (message.auditAdvisoryEscalationEnabled !== undefined) {
       obj.auditAdvisoryEscalationEnabled = message.auditAdvisoryEscalationEnabled;
     }
@@ -8599,21 +8292,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     }
     if (message.auditToolOutputAdvisoryEnabled !== undefined) {
       obj.auditToolOutputAdvisoryEnabled = message.auditToolOutputAdvisoryEnabled;
-    }
-    if (message.auditFileWriteAdvisoryEnabled !== undefined) {
-      obj.auditFileWriteAdvisoryEnabled = message.auditFileWriteAdvisoryEnabled;
-    }
-    if (message.auditIntentThresholdAdjustmentsEnabled !== undefined) {
-      obj.auditIntentThresholdAdjustmentsEnabled = message.auditIntentThresholdAdjustmentsEnabled;
-    }
-    if (message.auditIntentThresholdOverrides !== undefined) {
-      obj.auditIntentThresholdOverrides = message.auditIntentThresholdOverrides;
-    }
-    if (message.auditSarifHookExportEnabled !== undefined) {
-      obj.auditSarifHookExportEnabled = message.auditSarifHookExportEnabled;
-    }
-    if (message.auditWorkspaceArtifactsEnabled !== undefined) {
-      obj.auditWorkspaceArtifactsEnabled = message.auditWorkspaceArtifactsEnabled;
     }
     if (message.modEnabled !== undefined) {
       obj.modEnabled = message.modEnabled;
@@ -8666,8 +8344,6 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     message.multiRootEnabled = object.multiRootEnabled ?? undefined;
     message.vscodeTerminalExecutionMode = object.vscodeTerminalExecutionMode ?? undefined;
     message.maxConsecutiveMistakes = object.maxConsecutiveMistakes ?? undefined;
-    message.subagentsEnabled = object.subagentsEnabled ?? undefined;
-    message.subagentTerminalOutputLineLimit = object.subagentTerminalOutputLineLimit ?? undefined;
     message.dietcodeEnv = object.dietcodeEnv ?? undefined;
     message.nativeToolCallEnabled = object.nativeToolCallEnabled ?? undefined;
     message.dietcodeWebToolsEnabled = object.dietcodeWebToolsEnabled ?? undefined;
@@ -8680,16 +8356,10 @@ export const UpdateSettingsRequest: MessageFns<UpdateSettingsRequest> = {
     message.auditCompletionGateEnabled = object.auditCompletionGateEnabled ?? undefined;
     message.auditCompletionGateThreshold = object.auditCompletionGateThreshold ?? undefined;
     message.auditCompletionGateCriticalOnly = object.auditCompletionGateCriticalOnly ?? undefined;
-    message.auditActModeAdvisoryEnabled = object.auditActModeAdvisoryEnabled ?? undefined;
     message.auditAdvisoryEscalationEnabled = object.auditAdvisoryEscalationEnabled ?? undefined;
     message.auditAdvisoryAutoScrollMode = object.auditAdvisoryAutoScrollMode ?? undefined;
     message.auditPlanRegressionGateEnabled = object.auditPlanRegressionGateEnabled ?? undefined;
     message.auditToolOutputAdvisoryEnabled = object.auditToolOutputAdvisoryEnabled ?? undefined;
-    message.auditFileWriteAdvisoryEnabled = object.auditFileWriteAdvisoryEnabled ?? undefined;
-    message.auditIntentThresholdAdjustmentsEnabled = object.auditIntentThresholdAdjustmentsEnabled ?? undefined;
-    message.auditIntentThresholdOverrides = object.auditIntentThresholdOverrides ?? undefined;
-    message.auditSarifHookExportEnabled = object.auditSarifHookExportEnabled ?? undefined;
-    message.auditWorkspaceArtifactsEnabled = object.auditWorkspaceArtifactsEnabled ?? undefined;
     message.modEnabled = object.modEnabled ?? undefined;
     message.modOutcome = object.modOutcome ?? undefined;
     message.tokenCompressionEnabled = object.tokenCompressionEnabled ?? undefined;

@@ -73,7 +73,6 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 		DietCodeDefaultTool.TODO,
 		DietCodeDefaultTool.GENERATE_EXPLANATION,
 		DietCodeDefaultTool.USE_SKILL,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.NEXT_GEN,

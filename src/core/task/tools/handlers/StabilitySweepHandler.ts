@@ -33,11 +33,6 @@ export class StabilitySweepHandler implements IToolHandler {
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		if (!config.isSubagentExecution) {
-			return formatResponse.toolError(
-				"🛑 **ACCESS DENIED**: Specialized integrity tools are reserved for Forensic Sub-Agents. Call `run_finalization` for authorized documentation in this session.",
-			)
-		}
 		const params = block.params as any
 		const files = params.files
 		if (!Array.isArray(files)) {

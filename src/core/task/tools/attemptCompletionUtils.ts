@@ -25,11 +25,6 @@ import { getRoadmapConfig } from "@/services/roadmap/RoadmapConfig"
 import { buildCompletionSnapshot, hasWorkspaceProgress, isDuplicateAttempt } from "./completion/CompletionFunnel"
 
 import { parseFocusChainListCounts, sanitizeChecklistLabel } from "../focus-chain/utils"
-import {
-	getGovernanceParalysisTracker,
-	hashWorkspaceFingerprint,
-	mergeGovernanceDiagnostics,
-} from "./subagent/CoordinatorExecutionAuthority"
 import type { TaskConfig } from "./types/TaskConfig"
 import type { ToolResponse } from "./types/ToolContracts"
 import { workspaceAuditFingerprint } from "./completion/workspaceAuditFingerprint"
@@ -65,7 +60,6 @@ export const COMPLETION_PREFLIGHT_STAGES = [
 	"task_progress_required",
 	"task_progress_complete",
 	"task_progress_align",
-	"focus_chain",
 	"cooldown",
 	"duplicate",
 	"workspace_progress",
@@ -76,7 +70,7 @@ export const COMPLETION_PREFLIGHT_STAGES = [
 	"double_check",
 ] as const
 
-export type CompletionPreflightStage = (typeof COMPLETION_PREFLIGHT_STAGES)[number]
+export type CompletionPreflightStage = (typeof COMPLETION_PREFLIGHT_STAGES)[number] | "focus_chain"
 
 /** Throttle-only blocks — do not consume circuit-breaker budget (mirrors HTTP 429 vs 4xx). */
 export const COMPLETION_SOFT_BLOCK_REASONS = new Set<CompletionPreflightReason>(["retry_cooldown", "workspace_unchanged"])
@@ -328,9 +322,6 @@ export function validateCompletionResultExcludesChecklist(result: string): strin
 }
 
 export function validateTaskProgressAlignsWithFocusChain(config: TaskConfig, taskProgress: string | undefined): string | null {
-	if (config.isSubagentExecution) {
-		return null
-	}
 	if (!config.focusChainSettings?.enabled) {
 		return null
 	}
@@ -597,7 +588,7 @@ export function buildCompletionGatePipelineBrief(failedStage?: CompletionPreflig
 
 /** Returns stages that run after a failure — helps agents prioritize remaining work. */
 export function getRemainingCompletionGateStages(failedStage: CompletionPreflightStage): CompletionPreflightStage[] {
-	const index = COMPLETION_PREFLIGHT_STAGES.indexOf(failedStage)
+	const index = COMPLETION_PREFLIGHT_STAGES.indexOf(failedStage as (typeof COMPLETION_PREFLIGHT_STAGES)[number])
 	if (index === -1 || index >= COMPLETION_PREFLIGHT_STAGES.length - 1) {
 		return []
 	}
@@ -668,7 +659,9 @@ export function getCompletionGatePressureLevel(config: TaskConfig): CompletionGa
 
 /** CI-style stage progress — shows passed/failed/pending per pipeline stage. */
 export function buildCompletionGateStageProgressBlock(failedStage?: CompletionPreflightStage): string {
-	const failedIndex = failedStage ? COMPLETION_PREFLIGHT_STAGES.indexOf(failedStage) : -1
+	const failedIndex = failedStage
+		? COMPLETION_PREFLIGHT_STAGES.indexOf(failedStage as (typeof COMPLETION_PREFLIGHT_STAGES)[number])
+		: -1
 	const stageElements = COMPLETION_PREFLIGHT_STAGES.map((stage, index) => {
 		let status: "passed" | "failed" | "pending" | "skipped" = "pending"
 		if (failedIndex === -1) {
@@ -1208,9 +1201,6 @@ export function validateCompletionAttemptCooldown(config: TaskConfig): string | 
 }
 
 export function validateCompletionTaskProgressRequired(config: TaskConfig, taskProgress: string | undefined): string | null {
-	if (config.isSubagentExecution) {
-		return null
-	}
 	if (!config.focusChainSettings?.enabled) {
 		return null
 	}
@@ -1236,9 +1226,6 @@ export function validateCompletionTaskProgressRequired(config: TaskConfig, taskP
 }
 
 export function validateFocusChainComplete(config: TaskConfig): string | null {
-	if (config.isSubagentExecution) {
-		return null
-	}
 	if (!config.focusChainSettings?.enabled) {
 		return null
 	}
@@ -1687,23 +1674,7 @@ export function recordCompletionGateBlockEvent(
 		recordBlockedCompletionResultFingerprint(config, options.result, options.checkpointHash)
 	}
 	recordCompletionBlockReason(config, reason)
-	appendGovernanceParalysisDiagnostics(config, reason, options?.checkpointHash)
 	return config.taskState.completionGateBlockCount ?? 0
-}
-
-function appendGovernanceParalysisDiagnostics(
-	config: TaskConfig,
-	reason: CompletionPreflightReason,
-	checkpointHash?: string,
-): void {
-	const tracker = getGovernanceParalysisTracker(config.taskId)
-	const fingerprint = checkpointHash ? hashWorkspaceFingerprint(checkpointHash) : undefined
-	const events = tracker.record(`completion_gate:${reason}`, fingerprint)
-	if (events.length === 0) {
-		return
-	}
-	const existing = config.taskState.governanceDiagnostics ?? []
-	config.taskState.governanceDiagnostics = mergeGovernanceDiagnostics(existing, events)
 }
 
 export function markCompletionGatesPassed(config: TaskConfig): void {
@@ -1711,7 +1682,6 @@ export function markCompletionGatesPassed(config: TaskConfig): void {
 	clearCompletionGateObservabilityState(config)
 	clearBlockedCompletionResultFingerprint(config)
 	config.taskState.lastGateBlockCheckpointHash = undefined
-	config.taskState.governanceDiagnostics = undefined
 	// Graph revision NOT incremented here — gates passing is a validation result,
 	// not a meaningful execution transition.  The revision was already incremented
 	// when the block occurred (if any).  This prevents cosmetic refresh cycles.

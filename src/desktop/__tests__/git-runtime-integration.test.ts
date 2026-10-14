@@ -18,6 +18,7 @@ import { searchCommits } from "../../core/controller/file/searchCommits.js"
 import { parseMentions } from "../../core/mentions/index.js"
 import type { WorkingDiffResult } from "../../core/contracts/v4a-patch.contracts.js"
 import { HostProvider } from "../../hosts/host-provider.js"
+import { setVscodeHostProviderMock } from "../../test/host-provider-test-utils.js"
 import { SessionContext } from "../../sessions/base/session-context.js"
 import { SessionCompactor } from "../../sessions/extensions/compaction/session-compactor.js"
 import { SessionMemoryStore } from "../../sessions/extensions/memory/session-memory-store.js"
@@ -252,7 +253,7 @@ describe("Git through desktop and agent runtime", () => {
 		await write("tracked", "initial\n")
 		await git("add", ".")
 		await commit()
-		HostProvider.get()
+		setVscodeHostProviderMock()
 		sinon.stub(HostProvider.window, "getActiveEditor").resolves({})
 		sinon.stub(HostProvider.workspace, "getWorkspacePaths").callsFake(async () => ({ paths: [root] }))
 		const result = await searchCommits({} as Parameters<typeof searchCommits>[0], { value: ".*" })

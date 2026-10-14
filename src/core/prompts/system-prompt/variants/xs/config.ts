@@ -53,7 +53,6 @@ export const config = createVariant(ModelFamily.XS)
 		DietCodeDefaultTool.ROADMAP,
 		DietCodeDefaultTool.ROADMAP_CHECKPOINT,
 		DietCodeDefaultTool.PLAN_MODE,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.XS,

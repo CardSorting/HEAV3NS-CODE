@@ -93,7 +93,7 @@ export function getApiMetrics(messages: DietCodeMessage[]): ApiMetrics {
 	messages.forEach((message) => {
 		if (
 			message.type === "say" &&
-			(message.say === "api_req_started" || message.say === "deleted_api_reqs" || message.say === "subagent_usage") &&
+			(message.say === "api_req_started" || message.say === "deleted_api_reqs") &&
 			message.text
 		) {
 			const usage = getApiUsage(message)

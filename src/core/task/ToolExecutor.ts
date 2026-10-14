@@ -280,17 +280,9 @@ export class ToolExecutor {
 		config.auditCompletionGateEnabled = this.stateManager.getGlobalSettingsKey("auditCompletionGateEnabled")
 		config.auditCompletionGateThreshold = this.stateManager.getGlobalSettingsKey("auditCompletionGateThreshold")
 		config.auditCompletionGateCriticalOnly = this.stateManager.getGlobalSettingsKey("auditCompletionGateCriticalOnly")
-		config.auditActModeAdvisoryEnabled = this.stateManager.getGlobalSettingsKey("auditActModeAdvisoryEnabled")
 		config.auditAdvisoryEscalationEnabled = this.stateManager.getGlobalSettingsKey("auditAdvisoryEscalationEnabled")
 		config.auditPlanRegressionGateEnabled = this.stateManager.getGlobalSettingsKey("auditPlanRegressionGateEnabled")
 		config.auditToolOutputAdvisoryEnabled = this.stateManager.getGlobalSettingsKey("auditToolOutputAdvisoryEnabled")
-		config.auditFileWriteAdvisoryEnabled = this.stateManager.getGlobalSettingsKey("auditFileWriteAdvisoryEnabled")
-		config.auditIntentThresholdAdjustmentsEnabled = this.stateManager.getGlobalSettingsKey(
-			"auditIntentThresholdAdjustmentsEnabled",
-		)
-		config.auditIntentThresholdOverrides = this.stateManager.getGlobalSettingsKey("auditIntentThresholdOverrides")
-		config.auditSarifHookExportEnabled = this.stateManager.getGlobalSettingsKey("auditSarifHookExportEnabled")
-		config.auditWorkspaceArtifactsEnabled = this.stateManager.getGlobalSettingsKey("auditWorkspaceArtifactsEnabled")
 		config.enableParallelToolCalling = this.isParallelToolCallingEnabled()
 		config.hooksEnabled = getHooksEnabledSafe()
 		config.taskSignal = this.getTaskSignal()
@@ -328,20 +320,11 @@ export class ToolExecutor {
 			auditCompletionGateEnabled: this.stateManager.getGlobalSettingsKey("auditCompletionGateEnabled"),
 			auditCompletionGateThreshold: this.stateManager.getGlobalSettingsKey("auditCompletionGateThreshold"),
 			auditCompletionGateCriticalOnly: this.stateManager.getGlobalSettingsKey("auditCompletionGateCriticalOnly"),
-			auditActModeAdvisoryEnabled: this.stateManager.getGlobalSettingsKey("auditActModeAdvisoryEnabled"),
 			auditAdvisoryEscalationEnabled: this.stateManager.getGlobalSettingsKey("auditAdvisoryEscalationEnabled"),
 			auditPlanRegressionGateEnabled: this.stateManager.getGlobalSettingsKey("auditPlanRegressionGateEnabled"),
 			auditToolOutputAdvisoryEnabled: this.stateManager.getGlobalSettingsKey("auditToolOutputAdvisoryEnabled"),
-			auditFileWriteAdvisoryEnabled: this.stateManager.getGlobalSettingsKey("auditFileWriteAdvisoryEnabled"),
-			auditIntentThresholdAdjustmentsEnabled: this.stateManager.getGlobalSettingsKey(
-				"auditIntentThresholdAdjustmentsEnabled",
-			),
-			auditIntentThresholdOverrides: this.stateManager.getGlobalSettingsKey("auditIntentThresholdOverrides"),
-			auditSarifHookExportEnabled: this.stateManager.getGlobalSettingsKey("auditSarifHookExportEnabled"),
-			auditWorkspaceArtifactsEnabled: this.stateManager.getGlobalSettingsKey("auditWorkspaceArtifactsEnabled"),
 			vscodeTerminalExecutionMode: this.vscodeTerminalExecutionMode,
 			enableParallelToolCalling: this.isParallelToolCallingEnabled(),
-			isSubagentExecution: false,
 			hooksEnabled: getHooksEnabledSafe(),
 			finalizationMode: false,
 			latencyTracker: this.latencyTracker,

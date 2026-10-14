@@ -30,7 +30,6 @@ import { run_finalization_variants } from "./run_finalization"
 import { scaffold_module_variants } from "./scaffold_module"
 import { search_files_variants } from "./search_files"
 import { stability_integrity_sweep_variants } from "./stability_integrity_sweep"
-import { subagent_variants } from "./subagent"
 import { use_mcp_tool_variants } from "./use_mcp_tool"
 import { use_skill_variants } from "./use_skill"
 import { web_fetch_variants } from "./web_fetch"
@@ -75,7 +74,6 @@ export function registerDietCodeToolSets(): void {
 		...decompose_module_variants,
 		...generate_dependency_map_variants,
 		...recalibrate_stability_variants,
-		...subagent_variants,
 		...use_mcp_tool_variants,
 		...use_skill_variants,
 		...web_fetch_variants,

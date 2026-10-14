@@ -40,29 +40,13 @@ export async function getRulesSection(variant: PromptVariant, context: SystemPro
 		TOOL_SYNCHRONIZATION: toolSynchronization,
 	})
 
-	const isSubagent = context.isSubagentRun === true
 	const ledgerLabel = context.joyZoningSteeringEnabled === false ? "KNOWLEDGE LEDGER" : "SOVEREIGN KNOWLEDGE LEDGER"
-	const WIKI_RULES = isSubagent
-		? `\n- ${ledgerLabel}: Return ledger-ready evidence for your assigned scope. Write directly to \`.wiki/\` only when your lane explicitly owns documentation and was launched with mutation/write-set authority; otherwise leave shared-ledger synthesis to the parent to avoid cross-lane conflicts. Do NOT attempt to run \`run_finalization\` (it is unavailable to subagents). When done, call \`attempt_completion\` to complete your task.`
-		: `\n- ${ledgerLabel}: Maintain the project's project-local knowledge through the existing \`run_finalization\` path. Include a concise unverified handoff with changed behavior, evidence/check paths, affected decisions/constraints/incidents, and uncertainty. If a consequential choice changed, submit a complete structured \`project_knowledge\` ADR update; keep decision status separate from implementation and verification, and do not accept or supersede without authority/evidence. If a meaningful project failure meets incident criteria, submit an incident register update plus append-only event(s), remediation evidence and explicit follow-ups; ordinary bugs are not incidents. Never infer canonical ADR/incident records from handoff prose, and never close an incident solely because code changed. Validate relevant lifecycle records at finalization. This maintenance runs only after central task completion and cannot authorize, block, reopen, or seal task completion.`
-
-	const GOVERNED_AUTHORITY_RULES =
-		context.subagentsEnabled === true
-			? isSubagent
-				? `\n- GOVERNED EXECUTION AUTHORITY: Lane receipts and gate envelopes are forensic history for the parent seal barrier — not permission to freeze sibling lanes or override coordinator decisions.`
-				: `\n- GOVERNED EXECUTION AUTHORITY: Receipts, gate snapshots, and audit traces record history — they do not alone authorize halting the swarm. Only you (parent coordinator) decide merge, seal, and continuation. Do not stop delegated work solely because a lane receipt or stale audit suggests blockage; re-check current state and prefer repair/continuation over recursive escalation. Progress is evidence; repeated validation without state change is failure.`
-			: ""
+	const WIKI_RULES = `\n- ${ledgerLabel}: Maintain the project's project-local knowledge through the existing \`run_finalization\` path. Include a concise unverified handoff with changed behavior, evidence/check paths, affected decisions/constraints/incidents, and uncertainty. If a consequential choice changed, submit a complete structured \`project_knowledge\` ADR update; keep decision status separate from implementation and verification, and do not accept or supersede without authority/evidence. If a meaningful project failure meets incident criteria, submit an incident register update plus append-only event(s), remediation evidence and explicit follow-ups; ordinary bugs are not incidents. Never infer canonical ADR/incident records from handoff prose, and never close an incident solely because code changed. Validate relevant lifecycle records at finalization. This maintenance runs only after central task completion and cannot authorize, block, reopen, or seal task completion.`
 
 	let actModeRules = ""
 	if (context.mode === "act") {
 		actModeRules = `\n- EXECUTION RULE: Continue executing while a valid next action exists. Do not return to planning or request additional validation unless a named hard blocker prevents progress.\n- COMPLETION RULE: When all required work and verification conditions are satisfied, call \`attempt_completion\`. Advisory warnings do not block completion.`
 	}
 
-	const throughputRules = context.isSubagentRun
-		? "\n- LANE_THROUGHPUT: Complete independent reads in parallel when the lane allows it. Make a reversible, evidence-backed assumption for non-critical ambiguity, state it in the report, and continue. Stop only for a hard authority, safety, or missing-input blocker.\n- LANE_HANDOFF: End with a concise result containing outcome, evidence paths, verification, changed files (if any), and blockers classified as hard or advisory."
-		: context.subagentsEnabled === true
-			? "\n- PARENT_THROUGHPUT: Dispatch independent research lanes together, let each lane finish its owned scope, and synthesize receipts before deciding whether a follow-up is necessary. Treat advisory findings as context, not automatic blockers."
-			: ""
-
-	return resolved + WIKI_RULES + GOVERNED_AUTHORITY_RULES + actModeRules + throughputRules
+	return resolved + WIKI_RULES + actModeRules
 }

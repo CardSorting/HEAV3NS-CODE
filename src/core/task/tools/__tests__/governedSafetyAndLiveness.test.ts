@@ -15,7 +15,6 @@ import { isPidAlive, UnifiedLockAuthority } from "@/core/governance/LockAuthorit
 import { TaskState } from "../../TaskState"
 import { computeWorkspaceContentDigest, transitionFinding, updateFindingLifecycle } from "../attemptCompletionUtils"
 import { captureAuditCacheObservation, evaluateCompletionAuditGate, recordAdvisoryAuditCache } from "../completionGatePipeline"
-import { isRetryableSubagentFailure } from "../subagent/ParentAgentFlowControl"
 import type { TaskConfig } from "../types/TaskConfig"
 
 function configWithState(taskState: TaskState, cwd = "/tmp"): TaskConfig {
@@ -118,7 +117,7 @@ describe("Sovereign Integrity and Liveness Hardening Test Suite", () => {
 
 	// ─── 2. STRUCTURED COORDINATION ERRORS & RETRY CLASSIFICATION ───
 	describe("Structured Coordination Errors & Retry Policy", () => {
-		it("CoordinationError is correctly recognized by isRetryableSubagentFailure", () => {
+		it("CoordinationError distinguishes retryable from non-retryable errors", () => {
 			const busyErr = new CoordinationError(CoordinationErrorCode.LOCK_BUSY, "Lock is busy", "retry")
 			const splitErr = new CoordinationError(
 				CoordinationErrorCode.SPLIT_BRAIN_DETECTED,
@@ -126,8 +125,8 @@ describe("Sovereign Integrity and Liveness Hardening Test Suite", () => {
 				"fail_closed",
 			)
 
-			isRetryableSubagentFailure(busyErr).should.be.true()
-			isRetryableSubagentFailure(splitErr).should.be.false()
+			busyErr.retryClass.should.equal("retry")
+			splitErr.retryClass.should.equal("fail_closed")
 		})
 	})
 

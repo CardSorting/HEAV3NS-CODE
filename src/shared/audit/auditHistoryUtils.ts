@@ -6,8 +6,6 @@ import type { AuditHealthSummary } from "./auditRollup"
 import { buildViolationSessionLedger, buildViolationSessionLedgerMarkdown } from "./auditSessionLedger"
 import { computeAuditSnapshotDiff } from "./auditSnapshotDiff"
 import { AUDIT_HEALTH_TREND_LABELS, AUDIT_SNAPSHOT_SOURCE_LABELS } from "./auditSnapshotLabels"
-import type { SubagentAuditSummary } from "./auditSubagentRollup"
-import { buildSubagentHandoffMarkdown } from "./auditSubagentRollup"
 import { formatAuditTime, formatViolationLabel } from "./taskAuditUtils"
 
 /** Stable key for audit snapshot selection — mirrors React list key best practice. */
@@ -117,11 +115,7 @@ export function shouldShowAuditHistoryStrip(snapshots: AuditMessageSnapshot[], h
 }
 
 /** Markdown export for audit timeline — mirrors SonarQube project activity export. */
-export function buildAuditHistoryMarkdown(
-	snapshots: AuditMessageSnapshot[],
-	health?: AuditHealthSummary,
-	subagentSummary?: SubagentAuditSummary,
-): string {
+export function buildAuditHistoryMarkdown(snapshots: AuditMessageSnapshot[], health?: AuditHealthSummary): string {
 	const lines = ["## Task Audit History", ""]
 	if (health) {
 		lines.push(
@@ -129,16 +123,12 @@ export function buildAuditHistoryMarkdown(
 			`- Average score: ${health.averageScore}`,
 			`- Trend: ${AUDIT_HEALTH_TREND_LABELS[health.trend] || "unknown"}`,
 		)
-		if (health.gateBlockCount > 0) lines.push(`- Advisory quality findings: ${health.gateBlockCount}`)
+		if (health.gateBlockCount > 0) lines.push(`- Gate blocks: ${health.gateBlockCount}`)
 		if (health.advisorySnapshotCount > 0) lines.push(`- Act-mode advisories: ${health.advisorySnapshotCount}`)
-		if (health.trailingGateBlockStreak > 0) lines.push(`- Consecutive advisory findings: ${health.trailingGateBlockStreak}`)
+		if (health.trailingGateBlockStreak > 0) lines.push(`- Consecutive blocks: ${health.trailingGateBlockStreak}`)
 		if (health.planRegressionDetected) lines.push("- Plan regression detected")
 		if (health.persistentViolationCount > 0) lines.push(`- Persistent violations: ${health.persistentViolationCount}`)
 		lines.push("")
-	}
-
-	if (subagentSummary && subagentSummary.parentGateSignals.length > 0) {
-		lines.push(buildSubagentHandoffMarkdown(subagentSummary))
 	}
 
 	for (let index = 0; index < snapshots.length; index++) {
@@ -150,7 +140,7 @@ export function buildAuditHistoryMarkdown(
 		const time = formatAuditTime(meta.audited_at ?? snapshot.ts)
 		lines.push(`### ${source} · ${time}`)
 		lines.push(`- Grade: ${grade} (${score})`)
-		if (meta.gate_blocked) lines.push("- Status: **Advisory quality findings**")
+		if (meta.gate_blocked) lines.push("- Status: **Gate blocked**")
 		if (snapshot.source === "advisory") lines.push("- Status: Act-mode advisory")
 		if ((meta.violations?.length ?? 0) > 0) {
 			const violations = meta.violations ?? []
@@ -170,11 +160,10 @@ export function buildAuditHistoryMarkdown(
 	return lines.join("\n")
 }
 
-/** Unified audit export — timeline, quality gate checklist, and subagent handoff. */
+/** Unified audit export — timeline and quality gate checklist. */
 export function buildUnifiedAuditExportMarkdown(options: {
 	snapshots: AuditMessageSnapshot[]
 	health?: AuditHealthSummary
-	subagentSummary?: SubagentAuditSummary
 	checklistSummary?: PreCompletionChecklistSummary
 }): string {
 	const sections: string[] = []
@@ -185,6 +174,6 @@ export function buildUnifiedAuditExportMarkdown(options: {
 	if (ledgerMarkdown) {
 		sections.push(ledgerMarkdown)
 	}
-	sections.push(buildAuditHistoryMarkdown(options.snapshots, options.health, options.subagentSummary))
+	sections.push(buildAuditHistoryMarkdown(options.snapshots, options.health))
 	return sections.join("\n")
 }

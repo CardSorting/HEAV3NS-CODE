@@ -45,9 +45,6 @@ export class ReadFileToolHandler implements IToolHandler, IPartialBlockHandler {
 		const relPath = block.params.path
 
 		const config = uiHelpers.getConfig()
-		if (config.isSubagentExecution) {
-			return
-		}
 
 		// Create and show partial UI message
 		const operationIsLocatedInWorkspace = await isLocatedInWorkspace(relPath)
@@ -69,7 +66,7 @@ export class ReadFileToolHandler implements IToolHandler, IPartialBlockHandler {
 		// Validate required parameters and check dietcodeignore access
 		const validation = await this.validator.validate(block, "path")
 		if (!validation.ok) {
-			if (!config.isSubagentExecution && validation.error.includes("RESTRICTED")) {
+			if (validation.error.includes("RESTRICTED")) {
 				await config.callbacks.say("dietcodeignore_error", relPath)
 			}
 

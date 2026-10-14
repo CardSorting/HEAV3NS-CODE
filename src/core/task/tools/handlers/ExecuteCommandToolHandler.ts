@@ -96,10 +96,6 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 
 	async handlePartialBlock(block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
 		const command = block.params.command
-		if (uiHelpers.getConfig().isSubagentExecution) {
-			return
-		}
-
 		await uiHelpers.say("command", uiHelpers.removeClosingTag(block, "command", command), undefined, undefined, block.partial)
 	}
 
@@ -173,9 +169,7 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 		if (mode === "blocking") {
 			const commandValidation = this.validator.validateCommand(actualCommand)
 			if (!commandValidation.ok) {
-				if (!config.isSubagentExecution) {
-					await config.callbacks.say("dietcodeignore_error", commandValidation.error)
-				}
+				await config.callbacks.say("dietcodeignore_error", commandValidation.error)
 				return evidenceResponse(formatResponse.toolError(commandValidation.error), { approvalStatus: "denied" })
 			}
 		}
@@ -248,7 +242,7 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 			durationMs: canonicalEvidence?.durationMs ?? Date.now() - startedAt,
 		})
 
-		if (!userRejected && config.auditToolOutputAdvisoryEnabled && !config.isSubagentExecution) {
+		if (!userRejected && config.auditToolOutputAdvisoryEnabled) {
 			const outputText = extractTextFromToolResponse(result)
 			const taskPreview = getInitialTaskPreview(config) || ""
 			if (isVerificationCommand(finalCommand)) {

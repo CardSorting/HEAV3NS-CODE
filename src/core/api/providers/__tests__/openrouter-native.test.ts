@@ -84,7 +84,7 @@ describe("native OpenRouter transport", () => {
 			type: "function",
 			function: { name: "view_file", arguments: '{"path":"a.ts"}' },
 		})
-		assert.equal((result.choices[0].message.reasoning_details?.[0] as any).data, "opaque")
+		assert.equal((result.choices[0].message.reasoning_details?.[0] as any)?.data, "opaque")
 		assert.equal(f.aborted, true)
 	})
 	it("fails closed on missing credentials, errors, truncation, and malformed tools", async () => {

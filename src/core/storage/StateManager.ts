@@ -1,5 +1,4 @@
 import type { ApiConfiguration, ApiProvider, ModelInfo } from "@shared/api"
-import { DEFAULT_API_PROVIDER } from "@shared/api-defaults"
 import {
 	ApiHandlerSettingsKeys,
 	type GlobalState,
@@ -21,8 +20,6 @@ import chokidar, { FSWatcher } from "chokidar"
 import deepEqual from "fast-deep-equal"
 import { initializeDistinctId } from "@/services/logging/distinctId"
 import { Logger } from "@/shared/services/Logger"
-import { withTimeout } from "@/utils/withTimeout"
-import { AgentConfigLoader } from "../task/tools/subagent/AgentConfigLoader"
 import {
 	getTaskHistoryStateFilePath,
 	readTaskHistoryFromState,
@@ -225,14 +222,6 @@ export class StateManager {
 			StateManager.instance.startAutoCachePurge()
 
 			StateManager.instance.isInitialized = true
-
-			try {
-				await withTimeout(AgentConfigLoader.getInstance().ready(), AGENT_CONFIG_READY_TIMEOUT_MS, "Agent config loading")
-			} catch (error) {
-				// Agent configs are optional at boot and continue loading in the
-				// background; a slow home directory must not hold the editor hostage.
-				Logger.warn("[StateManager] Agent configs are still loading; continuing extension startup.", error)
-			}
 		} catch (error) {
 			Logger.error("[StateManager] Failed to initialize:", error)
 			throw error

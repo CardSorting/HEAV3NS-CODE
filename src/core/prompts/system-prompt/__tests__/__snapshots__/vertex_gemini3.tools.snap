@@ -386,33 +386,6 @@
     }
   },
   {
-    "name": "use_subagents",
-    "description": "Run up to five focused in-process subagents through a bounded, work-conserving pool. Keep critical-path I/O and final synthesis in the parent; delegate substantial, preferably disjoint scopes. Prefix a prompt with [execution_mode:read_only|audit_only|planning_only|documentation_only|diagnostic_only|mutation] to declare its authority. Non-mutating lanes receive only local read/diagnostic tools; use mutation or [write_set:path] whenever a lane may write, run commands, use MCP, or otherwise cause side effects. Add [depends_on:0,1] only for true dependencies, using zero-based lane indices. Each lane returns its result and usage stats.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "prompt_1": {
-          "type": "STRING"
-        },
-        "prompt_2": {
-          "type": "STRING"
-        },
-        "prompt_3": {
-          "type": "STRING"
-        },
-        "prompt_4": {
-          "type": "STRING"
-        },
-        "prompt_5": {
-          "type": "STRING"
-        }
-      },
-      "required": [
-        "prompt_1"
-      ]
-    }
-  },
-  {
     "name": "12345670mcp0test_tool",
     "description": "test-server: A test tool",
     "parameters": {

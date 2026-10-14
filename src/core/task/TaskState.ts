@@ -5,7 +5,6 @@ import type { TaskAuditMetadata } from "@shared/ExtensionMessage"
 import type { ExecutionFunnelEvent } from "@shared/execution/executionFunnelEvent"
 import type { LockClaim } from "@shared/governance/lockTypes"
 import type { TaskLifecycleEvent, TaskLifecycleRecord } from "@shared/lifecycle/taskLifecycleEvent"
-import type { WorkLaneClaim } from "@shared/subagent/governedExecution"
 import { DietCodeAskResponse } from "@shared/WebviewMessage"
 import type { HookExecution } from "./types/HookExecution"
 
@@ -169,6 +168,7 @@ export class TaskState {
 	// Auto-context summarization
 	currentlySummarizing = false
 	lastAutoCompactTriggerIndex?: number
+	completionGateSessionId?: string
 
 	// Adaptive architectural guidance
 	currentTurnReadHistory = new Map<string, number>()
@@ -239,9 +239,6 @@ export class TaskState {
 	/** Whether the first-attempt preflight readiness hint was emitted. */
 	preflightReadinessHintEmitted?: boolean
 	/** Correlation ID for the current completion attempt cycle — tracing across gate blocks. */
-	completionGateSessionId?: string
-	/** Coordinator authority diagnostics from governance paralysis / stale receipt detection. */
-	governanceDiagnostics?: import("@shared/subagent/coordinatorAuthority").GovernanceDiagnosticEvent[]
 	/** Sole modern completion authority cached as one immutable funnel event. */
 	completionFunnelEventJson?: string
 	/** Optional post-completion documentation maintenance state; never a completion gate. */
@@ -299,7 +296,7 @@ export class TaskState {
 
 	public swarmId?: string
 	public laneIndex?: number
-	public activeLockClaim?: LockClaim | WorkLaneClaim
+	public activeLockClaim?: LockClaim
 
 	public lastCompletionDecisionId?: string
 	public lastCompletionDecisionResult?: string

@@ -40,9 +40,6 @@ export class ListCodeDefinitionNamesToolHandler implements IToolHandler, IPartia
 		const relPath = block.params.path
 
 		const config = uiHelpers.getConfig()
-		if (config.isSubagentExecution) {
-			return
-		}
 
 		// Create and show partial UI message
 		const operationIsLocatedInWorkspace = await isLocatedInWorkspace(relPath)
@@ -108,10 +105,8 @@ export class ListCodeDefinitionNamesToolHandler implements IToolHandler, IPartia
 			}),
 		)
 
-		if (!config.isSubagentExecution) {
-			const resultMessage = JSON.stringify({ ...sharedMessageProps, content: result })
-			void config.callbacks.say("tool", resultMessage, undefined, undefined, false).catch(() => undefined)
-		}
+		const resultMessage = JSON.stringify({ ...sharedMessageProps, content: result })
+		void config.callbacks.say("tool", resultMessage, undefined, undefined, false).catch(() => undefined)
 
 		return result
 	}

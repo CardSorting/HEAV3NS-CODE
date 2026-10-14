@@ -3,13 +3,11 @@ import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS,
 	CLINE_PASS_DEFAULT_MODEL,
-	CLINE_PASS_PROVIDER,
 	isClaudeSubscriptionDirectSdkModel,
 	isClaudeSubscriptionDirectSdkProvider,
 	isClinePassProvider,
 	isNousResearchProvider,
 	NOUS_RESEARCH_DEFAULT_MODEL,
-	NOUS_RESEARCH_PROVIDER,
 	normalizeClaudeSubscriptionDirectSdkModel,
 	normalizeAgentProvider,
 } from "../../../core/providers/provider-ids.js"

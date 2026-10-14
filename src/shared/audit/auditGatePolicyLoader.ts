@@ -5,7 +5,6 @@ import type { AuditGateSettingsSource } from "./auditGateOptions"
 import { buildCompletionGateOptionsFromSettings } from "./auditGateOptions"
 import type { CompletionGateOptions } from "./auditGateReport"
 import { DEFAULT_AUDIT_ARTIFACT_DIR } from "./auditWorkspaceArtifacts"
-import { parseIntentThresholdOverrides } from "./gatePolicy"
 import { enrichAuditMetadata } from "./taskAuditUtils"
 import type { TaskAuditMetadata } from "./types"
 
@@ -32,8 +31,6 @@ export interface WorkspaceGatePolicyFile {
 	criticalOnly?: boolean
 	advisoryEscalationEnabled?: boolean
 	planRegressionGateEnabled?: boolean
-	intentThresholdAdjustmentsEnabled?: boolean
-	intentThresholdOverrides?: Record<string, number> | string
 	/** Only block on violations not present in `.audit/baseline.json` — SonarQube new-code gate. */
 	newViolationsOnly?: boolean
 }
@@ -128,22 +125,12 @@ export function mergeWorkspaceGatePolicy(
 ): AuditGateSettingsSource {
 	if (!workspacePolicy) return settings
 
-	const overridesRaw =
-		typeof workspacePolicy.intentThresholdOverrides === "string"
-			? workspacePolicy.intentThresholdOverrides
-			: workspacePolicy.intentThresholdOverrides
-				? JSON.stringify(workspacePolicy.intentThresholdOverrides)
-				: settings.auditIntentThresholdOverrides
-
 	return {
 		auditCompletionGateEnabled: workspacePolicy.gateEnabled ?? settings.auditCompletionGateEnabled,
 		auditCompletionGateThreshold: workspacePolicy.scoreThreshold ?? settings.auditCompletionGateThreshold,
 		auditCompletionGateCriticalOnly: workspacePolicy.criticalOnly ?? settings.auditCompletionGateCriticalOnly,
 		auditAdvisoryEscalationEnabled: workspacePolicy.advisoryEscalationEnabled ?? settings.auditAdvisoryEscalationEnabled,
 		auditPlanRegressionGateEnabled: workspacePolicy.planRegressionGateEnabled ?? settings.auditPlanRegressionGateEnabled,
-		auditIntentThresholdAdjustmentsEnabled:
-			workspacePolicy.intentThresholdAdjustmentsEnabled ?? settings.auditIntentThresholdAdjustmentsEnabled,
-		auditIntentThresholdOverrides: overridesRaw,
 	}
 }
 
@@ -160,10 +147,6 @@ function buildGatePolicyProvenance(
 	if (workspacePolicy.criticalOnly !== undefined) overriddenFields.push("criticalOnly")
 	if (workspacePolicy.advisoryEscalationEnabled !== undefined) overriddenFields.push("advisoryEscalationEnabled")
 	if (workspacePolicy.planRegressionGateEnabled !== undefined) overriddenFields.push("planRegressionGateEnabled")
-	if (workspacePolicy.intentThresholdAdjustmentsEnabled !== undefined) {
-		overriddenFields.push("intentThresholdAdjustmentsEnabled")
-	}
-	if (workspacePolicy.intentThresholdOverrides !== undefined) overriddenFields.push("intentThresholdOverrides")
 	if (workspacePolicy.newViolationsOnly !== undefined) overriddenFields.push("newViolationsOnly")
 	return {
 		source: overriddenFields.length > 0 ? "workspace" : "extension",
@@ -239,7 +222,5 @@ export function serializeWorkspaceGatePolicy(settings: AuditGateSettingsSource):
 		criticalOnly: settings.auditCompletionGateCriticalOnly,
 		advisoryEscalationEnabled: settings.auditAdvisoryEscalationEnabled,
 		planRegressionGateEnabled: settings.auditPlanRegressionGateEnabled,
-		intentThresholdAdjustmentsEnabled: settings.auditIntentThresholdAdjustmentsEnabled,
-		intentThresholdOverrides: parseIntentThresholdOverrides(settings.auditIntentThresholdOverrides),
 	}
 }

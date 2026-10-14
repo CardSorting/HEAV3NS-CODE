@@ -32,11 +32,6 @@ export class StabilityHealHandler implements IToolHandler {
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		if (!config.isSubagentExecution) {
-			return formatResponse.toolError(
-				"🛑 **ACCESS DENIED**: Specialized healing tools are reserved for Forensic Sub-Agents. Call `run_finalization` for authorized documentation in this session.",
-			)
-		}
 		const params = block.params as any
 		const diagnostics = params.diagnostics
 		if (!Array.isArray(diagnostics)) {

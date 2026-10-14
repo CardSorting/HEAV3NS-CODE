@@ -10,8 +10,6 @@ describe("auditGateOptions", () => {
 				auditCompletionGateCriticalOnly: true,
 				auditAdvisoryEscalationEnabled: false,
 				auditPlanRegressionGateEnabled: true,
-				auditIntentThresholdAdjustmentsEnabled: true,
-				auditIntentThresholdOverrides: '{"FIX":15}',
 			},
 			{ planBaselineMetadata: { violations: [] } },
 		)
@@ -20,6 +18,5 @@ describe("auditGateOptions", () => {
 		expect(options.scoreThreshold).to.equal(60)
 		expect(options.criticalOnly).to.equal(true)
 		expect(options.planBaselineMetadata).to.deep.equal({ violations: [] })
-		expect(options.intentThresholdOverrides?.FIX).to.equal(15)
 	})
 })

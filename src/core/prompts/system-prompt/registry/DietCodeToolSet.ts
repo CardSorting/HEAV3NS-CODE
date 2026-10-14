@@ -1,4 +1,3 @@
-import { AgentConfigLoader } from "@core/task/tools/subagent/AgentConfigLoader"
 import { CLINE_MCP_TOOL_IDENTIFIER, McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
 import { DietCodeDefaultTool } from "@/shared/tools"
@@ -106,45 +105,8 @@ export class DietCodeToolSet {
 		return enabledTools
 	}
 
-	private static getDynamicSubagentToolSpecs(variant: PromptVariant, context: SystemPromptContext): DietCodeToolSpec[] {
-		if (context.subagentsEnabled !== true || context.isSubagentRun) {
-			return []
-		}
-
-		const requestedIds = variant.tools ? [...variant.tools] : []
-		const shouldIncludeSubagentTools = requestedIds.length === 0 || requestedIds.includes(DietCodeDefaultTool.USE_SUBAGENTS)
-		if (!shouldIncludeSubagentTools) {
-			return []
-		}
-
-		const agentConfigs = AgentConfigLoader.getInstance().getAllCachedConfigsWithToolNames()
-		return agentConfigs.map(({ toolName, config }) => ({
-			variant: variant.family,
-			id: DietCodeDefaultTool.USE_SUBAGENTS,
-			name: toolName,
-			description: `Use the "${config.name}" subagent: ${config.description}. Keep final synthesis in the parent and declare lane authority in the prompt; non-mutating lanes are limited to local read/diagnostic tools.`,
-			contextRequirements: (ctx) => ctx.subagentsEnabled === true && !ctx.isSubagentRun,
-			parameters: [
-				{
-					name: "prompt",
-					required: true,
-					instruction:
-						"Concrete, self-contained task prefixed with an execution_mode header; use mutation or write_set for writes, commands, MCP, or other side effects.",
-				},
-			],
-		}))
-	}
-
 	public static getEnabledToolSpecs(variant: PromptVariant, context: SystemPromptContext): DietCodeToolSpec[] {
-		const registeredTools = DietCodeToolSet.getEnabledTools(variant, context).map((tool) => tool.config)
-		const dynamicSubagentTools = DietCodeToolSet.getDynamicSubagentToolSpecs(variant, context)
-
-		const includesDynamicSubagents = dynamicSubagentTools.length > 0
-		const filteredRegistered = includesDynamicSubagents
-			? registeredTools.filter((tool) => tool.id !== DietCodeDefaultTool.USE_SUBAGENTS)
-			: registeredTools
-
-		return [...filteredRegistered, ...dynamicSubagentTools]
+		return DietCodeToolSet.getEnabledTools(variant, context).map((tool) => tool.config)
 	}
 
 	/**

@@ -242,9 +242,7 @@ function extractTaskInformation(dietcodeMessages: DietCodeMessage[], metadata: a
 	let totalCost = 0
 
 	// Look for usage-carrying messages with token info
-	const apiReqMessages = dietcodeMessages.filter(
-		(msg) => msg.type === "say" && (msg.say === "api_req_started" || msg.say === "subagent_usage") && msg.text,
-	)
+	const apiReqMessages = dietcodeMessages.filter((msg) => msg.type === "say" && msg.say === "api_req_started" && msg.text)
 
 	for (const msg of apiReqMessages) {
 		try {

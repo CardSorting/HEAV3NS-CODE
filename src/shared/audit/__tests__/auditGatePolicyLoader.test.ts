@@ -47,8 +47,6 @@ describe("auditGatePolicyLoader", () => {
 				auditCompletionGateCriticalOnly: false,
 				auditAdvisoryEscalationEnabled: true,
 				auditPlanRegressionGateEnabled: true,
-				auditIntentThresholdAdjustmentsEnabled: true,
-				auditIntentThresholdOverrides: "{}",
 			},
 			{ scoreThreshold: 80 },
 		)
@@ -97,8 +95,6 @@ describe("auditGatePolicyLoader", () => {
 			auditCompletionGateCriticalOnly: false,
 			auditAdvisoryEscalationEnabled: true,
 			auditPlanRegressionGateEnabled: true,
-			auditIntentThresholdAdjustmentsEnabled: true,
-			auditIntentThresholdOverrides: "{}",
 		}
 		const context = await resolveCompletionGateContext(settings, tempDir)
 		expect(context.options.scoreThreshold).to.equal(85)
@@ -119,8 +115,6 @@ describe("auditGatePolicyLoader", () => {
 			auditCompletionGateCriticalOnly: false,
 			auditAdvisoryEscalationEnabled: true,
 			auditPlanRegressionGateEnabled: true,
-			auditIntentThresholdAdjustmentsEnabled: true,
-			auditIntentThresholdOverrides: "{}",
 		}
 		const result = await applyWorkspaceAuditPolicy(tempDir, enrichAuditMetadata({ violations: [] }), settings)
 		expect(result.workspace_gate_policy_applied).to.equal(true)

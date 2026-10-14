@@ -2,9 +2,9 @@ import { filterNewViolationsSinceBaseline } from "./auditBaselineUtils"
 import { hasAuditScoreRegression } from "./auditRegression"
 import { shouldEscalateFromAdvisory } from "./auditRollup"
 import { hasCriticalViolations, partitionViolationsBySeverity } from "./auditSeverity"
-import { COMPLETION_GATE_SCORE_THRESHOLD, resolveEffectiveGateThreshold } from "./gatePolicy"
-import { computeHardeningAssessment, formatViolationLabel, getIntentClassification } from "./taskAuditUtils"
-import type { CompletionGateReasonCode, IntentClassification, TaskAuditMetadata } from "./types"
+import { COMPLETION_GATE_SCORE_THRESHOLD } from "./gatePolicy"
+import { computeHardeningAssessment, formatViolationLabel } from "./taskAuditUtils"
+import type { CompletionGateReasonCode, TaskAuditMetadata } from "./types"
 
 export type { CompletionGateReasonCode } from "./types"
 
@@ -28,8 +28,7 @@ export interface CompletionGateOptions {
 	gateEnabled?: boolean
 	scoreThreshold?: number
 	criticalOnly?: boolean
-	intentAdjustedThreshold?: boolean
-	intentThresholdOverrides?: Partial<Record<IntentClassification, number>>
+
 	advisoryMetadata?: TaskAuditMetadata
 	advisoryEscalationEnabled?: boolean
 	planBaselineMetadata?: TaskAuditMetadata
@@ -49,12 +48,7 @@ export function evaluateAuditGate(metadata: TaskAuditMetadata, options?: Complet
 	const assessment = computeHardeningAssessment(metadata)
 	const score = metadata.hardening_score ?? assessment.score
 	const grade = metadata.hardening_grade ?? assessment.grade
-	const baseThreshold = options?.scoreThreshold ?? COMPLETION_GATE_SCORE_THRESHOLD
-	const intent = getIntentClassification(metadata.intent_classification)
-	const effectiveThreshold = resolveEffectiveGateThreshold(baseThreshold, intent, {
-		intentAdjustmentsEnabled: options?.intentAdjustedThreshold !== false,
-		overrides: options?.intentThresholdOverrides,
-	})
+	const effectiveThreshold = options?.scoreThreshold ?? COMPLETION_GATE_SCORE_THRESHOLD
 
 	const reasons: CompletionGateReason[] = []
 
@@ -186,3 +180,7 @@ export function buildPreCompletionChecklist(metadata: TaskAuditMetadata, options
 	lines.push("</pre_completion_checklist>")
 	return `\n\n${lines.join("\n")}`
 }
+
+export { evaluateAuditGate as evaluateCompletionGate }
+export type { AuditGateDecision as CompletionGateDecision }
+

@@ -57,9 +57,6 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 	async handlePartialBlock(block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
 		const skillName = block.params.skill_name
-		if (uiHelpers.getConfig().isSubagentExecution) {
-			return
-		}
 		const message = JSON.stringify({ tool: "useSkill", path: skillName || "" })
 		await uiHelpers.say("tool", message, undefined, undefined, true)
 	}
@@ -101,9 +98,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		const provider = currentMode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider
 
 		const message = JSON.stringify({ tool: "useSkill", path: skillName })
-		if (!config.isSubagentExecution) {
-			await config.callbacks.say("tool", message, undefined, undefined, false)
-		}
+		await config.callbacks.say("tool", message, undefined, undefined, false)
 
 		config.taskState.consecutiveMistakeCount = 0
 

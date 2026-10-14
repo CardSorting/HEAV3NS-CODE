@@ -8,14 +8,9 @@ import { type AuditGateDecision, evaluateAuditGate, hasAuditGateFindings } from 
 import { resolvePlanBaselineMetadata } from "@shared/audit/auditMessages"
 import { buildPreCompletionChecklistBlock, buildPreCompletionChecklistSummary } from "@shared/audit/auditPreCompletionChecklist"
 import { buildCompletionGateMessage, runCompletionAudit } from "@shared/audit/completionAudit"
-import {
-	isCompletionAuditFresh,
-	parseIntentThresholdOverrides,
-	SUBAGENT_IO_LANE_RESULT_MIN_LENGTH,
-} from "@shared/audit/gatePolicy"
+import { isCompletionAuditFresh } from "@shared/audit/gatePolicy"
 import type { TaskAuditMetadata } from "@shared/ExtensionMessage"
 import { Logger } from "@shared/services/Logger"
-import type { LaneExecutionMode } from "@shared/subagent/governedExecution"
 import { evaluateRoadmapCompletionBlock, roadmapPreflightReadinessFromDryRun } from "@/services/roadmap/RoadmapCompletionGate"
 import { getRoadmapConfig } from "@/services/roadmap/RoadmapConfig"
 import {
@@ -33,11 +28,9 @@ import {
 	validateCompletionResultQuality,
 	validateCompletionTaskProgress,
 	validateCompletionTaskProgressRequired,
-	validateFocusChainComplete,
 	validateTaskProgressAlignsWithFocusChain,
 	validateWorkspaceProgressSinceGateBlock,
 } from "./attemptCompletionUtils"
-import { isNonMutatingMode } from "./subagent/LockNecessity"
 import type { TaskConfig } from "./types/TaskConfig"
 
 /** Runtime seam for CLI audit orchestration and deterministic failure tests. */
@@ -111,10 +104,6 @@ export const PREFLIGHT_STAGE_RUNNERS: ReadonlyArray<{
 		validate: (ctx) => validateTaskProgressAlignsWithFocusChain(ctx.config, ctx.params.taskProgress),
 	},
 	{
-		stage: "focus_chain",
-		validate: (ctx) => validateFocusChainComplete(ctx.config),
-	},
-	{
 		stage: "cooldown",
 		validate: (ctx) => validateCompletionAttemptCooldown(ctx.config),
 		soft: true,
@@ -145,13 +134,7 @@ export type GatePreflightReadinessIssue = {
 	severity: "warning" | "info"
 }
 
-/** Lane-local blocking stages only — parent-only checks deferred to seal barrier (ADR-013). */
-export const SUBAGENT_LANE_PREFLIGHT_STAGES = new Set<CompletionPreflightStage>([
-	"quality",
-	"min_length",
-	"max_length",
-	"demo_command",
-])
+
 
 /** Non-mutating preflight dry-run — surfaces blockers before attempt_completion (mirrors CI dry-run). */
 export function evaluateGatePreflightReadiness(
@@ -377,8 +360,6 @@ export async function evaluateCompletionAuditGate(
 			const auditHumanMessage = buildCompletionGateMessage(auditMetadata, {
 				scoreThreshold: config.auditCompletionGateThreshold,
 				criticalOnly: gateOptions.criticalOnly ?? config.auditCompletionGateCriticalOnly,
-				intentAdjustedThreshold: config.auditIntentThresholdAdjustmentsEnabled,
-				intentThresholdOverrides: parseIntentThresholdOverrides(config.auditIntentThresholdOverrides),
 				advisoryMetadata: config.taskState.lastAdvisoryAudit,
 				planBaselineMetadata: planBaseline,
 				gateDecision,
@@ -421,96 +402,7 @@ export type CompletionGateFlowResult = {
 	audit: CompletionAuditGateResult
 }
 
-export type SubagentCompletionGateResult = {
-	error: string | null
-	advisoryAudit?: TaskAuditMetadata
-	advisoryWouldBlock?: boolean
-}
 
-/** Fast lane preflight — quality/safety only; no parent circuit breaker or gate telemetry. */
-export function runSubagentCompletionLanePreflight(
-	config: TaskConfig,
-	params: {
-		result: string
-		command?: string
-		laneExecutionMode?: LaneExecutionMode
-	},
-	validateQuality: (result: string) => string | null = validateCompletionResultQuality,
-): string[] {
-	const preflightContext: PreflightCheckContext = {
-		config,
-		params,
-		validateQuality,
-	}
-	const ioAuthorityLane = params.laneExecutionMode ? isNonMutatingMode(params.laneExecutionMode) : false
-	const diagnostics: string[] = []
-
-	for (const runner of PREFLIGHT_STAGE_RUNNERS) {
-		if (!SUBAGENT_LANE_PREFLIGHT_STAGES.has(runner.stage)) {
-			continue
-		}
-		if (runner.stage === "min_length" && ioAuthorityLane) {
-			const trimmed = params.result.trim()
-			if (trimmed.length < SUBAGENT_IO_LANE_RESULT_MIN_LENGTH) {
-				diagnostics.push(
-					`Advisory: lane result is brief (${trimmed.length} chars, suggested minimum ${SUBAGENT_IO_LANE_RESULT_MIN_LENGTH} for I/O authority lanes).`,
-				)
-			}
-			continue
-		}
-		const stageError = runner.validate(preflightContext)
-		if (stageError) {
-			diagnostics.push(`Advisory (${runner.stage}): ${stageError}`)
-		}
-	}
-
-	return diagnostics
-}
-
-/**
- * Shadow audit for subagent lanes — records findings without blocking throughput.
- * Full enforcement remains at the parent seal barrier and parent attempt_completion.
- */
-export async function evaluateSubagentAdvisoryAudit(
-	config: TaskConfig,
-	params: {
-		result: string
-		taskDescription: string
-		logPrefix: string
-	},
-): Promise<{ metadata?: TaskAuditMetadata; wouldBlock: boolean }> {
-	if (!config.auditCompletionGateEnabled) {
-		return { wouldBlock: false }
-	}
-
-	try {
-		const messages = config.messageState?.getDietCodeMessages?.() ?? []
-		const planBaseline = resolvePlanBaselineMetadata(messages, config.taskState.lastPlanAuditMetadata)
-		let auditMetadata = await completionGateRuntime.runCompletionAudit(
-			config.taskId,
-			params.taskDescription,
-			params.result,
-			params.taskDescription,
-			config.latencyTracker,
-		)
-		auditMetadata = await applyWorkspaceAuditPolicy(config.cwd, auditMetadata, config)
-
-		const gateContext = await resolveCompletionGateContext(config, config.cwd, {
-			planBaselineMetadata: planBaseline,
-			lastAdvisoryAudit: config.taskState.lastAdvisoryAudit,
-		})
-		const gateDecision = evaluateAuditGate(auditMetadata, gateContext.options)
-		if (hasAuditGateFindings(gateDecision)) {
-			config.taskState.lastAdvisoryAudit = auditMetadata
-			return { metadata: auditMetadata, wouldBlock: false }
-		}
-
-		return { metadata: auditMetadata, wouldBlock: false }
-	} catch (error) {
-		Logger.warn(`[${params.logPrefix}] Subagent advisory audit skipped (non-blocking):`, error)
-		return { wouldBlock: false }
-	}
-}
 
 /** Parent completion diagnostics — never an execution authority. */
 export async function runCompletionGateFlow(

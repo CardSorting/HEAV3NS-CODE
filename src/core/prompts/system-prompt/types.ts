@@ -163,7 +163,6 @@ export interface SystemPromptContext {
 	readonly isTesting?: boolean
 	readonly runtimePlaceholders?: Readonly<Record<string, unknown>>
 	readonly yoloModeToggled?: boolean
-	readonly subagentsEnabled?: boolean
 	/** Defaults on for backward compatibility; false removes JoyZoning steering prompt sections. */
 	readonly joyZoningSteeringEnabled?: boolean
 	/** Workspace evidence used to choose canonical vs blended agent guidance. */
@@ -171,9 +170,6 @@ export interface SystemPromptContext {
 	readonly dietcodeWebToolsEnabled?: boolean
 	readonly isMultiRootEnabled?: boolean
 	readonly workspaceRoots?: Array<{ path: string; name: string; vcs?: string }>
-	readonly isSubagentsEnabledAndCliInstalled?: boolean
-	readonly isCliSubagent?: boolean
-	readonly isSubagentRun?: boolean
 	readonly isCliEnvironment?: boolean
 	readonly enableNativeToolCalls?: boolean
 	readonly enableParallelToolCalling?: boolean

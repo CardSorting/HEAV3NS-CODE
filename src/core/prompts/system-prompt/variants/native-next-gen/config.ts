@@ -70,7 +70,6 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 		DietCodeDefaultTool.PROJECT_MAP,
 		DietCodeDefaultTool.ROADMAP,
 		DietCodeDefaultTool.ROADMAP_CHECKPOINT,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.NATIVE_NEXT_GEN,

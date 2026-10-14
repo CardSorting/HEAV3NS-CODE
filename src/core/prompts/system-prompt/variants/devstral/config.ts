@@ -57,7 +57,6 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 		DietCodeDefaultTool.MCP_DOCS,
 		DietCodeDefaultTool.TODO,
 		DietCodeDefaultTool.USE_SKILL,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: "devstral",

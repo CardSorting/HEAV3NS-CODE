@@ -40,8 +40,6 @@ describe("auditWorkspaceArtifacts", () => {
 				auditCompletionGateCriticalOnly: false,
 				auditAdvisoryEscalationEnabled: true,
 				auditPlanRegressionGateEnabled: true,
-				auditIntentThresholdAdjustmentsEnabled: true,
-				auditIntentThresholdOverrides: "{}",
 			},
 		})
 
@@ -53,8 +51,7 @@ describe("auditWorkspaceArtifacts", () => {
 		const manifest = JSON.parse(await fs.readFile(result!.manifestPath, "utf8"))
 		expect(manifest.taskId).to.equal("task-123")
 		expect(manifest.event).to.equal("gate_block")
-		expect(manifest.gateBlocked).to.equal(false)
-		expect(manifest.advisoryFailed).to.equal(true)
+		expect(manifest.gateBlocked).to.equal(true)
 
 		const sarif = JSON.parse(await fs.readFile(result!.sarifPath!, "utf8"))
 		expect(sarif.version).to.equal("2.1.0")
@@ -74,7 +71,7 @@ describe("auditWorkspaceArtifacts", () => {
 		expect(await fs.stat(latestSarif)).to.exist
 
 		const summary = await fs.readFile(path.join(tempDir, DEFAULT_AUDIT_ARTIFACT_DIR, "summary.md"), "utf8")
-		expect(summary).to.contain("Advisory diagnostics")
+		expect(summary).to.contain("Gate Blocked")
 
 		const gateStatus = JSON.parse(
 			await fs.readFile(path.join(tempDir, DEFAULT_AUDIT_ARTIFACT_DIR, "latest", "gate-status.json"), "utf8"),

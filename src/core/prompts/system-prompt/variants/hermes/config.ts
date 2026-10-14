@@ -59,7 +59,6 @@ export const config = createVariant(ModelFamily.HERMES)
 		DietCodeDefaultTool.TODO,
 		DietCodeDefaultTool.GENERATE_EXPLANATION,
 		DietCodeDefaultTool.USE_SKILL,
-		DietCodeDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
 		MODEL_FAMILY: "hermes",

@@ -6,7 +6,7 @@ export function isWikiPath(relPath: string): boolean {
 	return normalized.startsWith(".wiki/") || normalized.includes("/.wiki/")
 }
 
-/** Main agents may write .wiki only during authorized finalization or subagent execution. */
-export function isWikiWriteAuthorized(config: Pick<TaskConfig, "isSubagentExecution" | "finalizationMode">): boolean {
-	return config.isSubagentExecution || config.finalizationMode === true
+/** Main agents may write .wiki only during authorized finalization. */
+export function isWikiWriteAuthorized(config: Pick<TaskConfig, "finalizationMode">): boolean {
+	return config.finalizationMode === true
 }

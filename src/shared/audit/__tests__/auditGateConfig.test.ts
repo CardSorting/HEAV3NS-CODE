@@ -9,8 +9,6 @@ describe("auditGateConfig", () => {
 			auditCompletionGateCriticalOnly: true,
 			auditAdvisoryEscalationEnabled: false,
 			auditPlanRegressionGateEnabled: true,
-			auditIntentThresholdAdjustmentsEnabled: true,
-			auditIntentThresholdOverrides: '{"FIX":10}',
 		})
 		expect(config.scoreThreshold).to.equal(55)
 		expect(config.criticalOnly).to.equal(true)

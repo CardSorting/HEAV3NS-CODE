@@ -2678,7 +2678,6 @@ export class Task {
 			preferredLanguageInstructions,
 			browserSettings: this.stateManager.getGlobalSettingsKey("browserSettings"),
 			yoloModeToggled: this.stateManager.getGlobalSettingsKey("yoloModeToggled"),
-			subagentsEnabled: this.stateManager.getGlobalSettingsKey("subagentsEnabled"),
 			joyZoningSteeringEnabled: this.stateManager.getGlobalSettingsKey("joyZoningSteeringEnabled"),
 			workspaceArchitectureProfile:
 				this.stateManager.getGlobalSettingsKey("joyZoningSteeringEnabled") !== false
@@ -2688,7 +2687,6 @@ export class Task {
 				this.stateManager.getGlobalSettingsKey("dietcodeWebToolsEnabled") && featureFlagsService.getWebtoolsEnabled(),
 			isMultiRootEnabled: multiRootEnabled,
 			workspaceRoots,
-			isSubagentRun: false,
 			isCliEnvironment,
 			enableNativeToolCalls:
 				providerInfo.model.info.apiFormat === ApiFormat.OPENAI_RESPONSES ||

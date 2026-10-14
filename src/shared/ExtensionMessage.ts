@@ -18,10 +18,6 @@ import type { TaskLifecycleEvent } from "./lifecycle/taskLifecycleEvent"
 import { McpDisplayMode } from "./McpDisplayMode"
 import { DietCodeMessageModelInfo } from "./messages"
 import { Mode } from "./storage/types"
-import type { GovernedReceiptDiagnostics, GovernedReceiptIncident, GovernedReceiptSummary } from "./subagent/governedExecution"
-
-export type { GovernedReceiptDiagnostics, GovernedReceiptIncident, GovernedReceiptSummary }
-
 import { TelemetrySetting } from "./TelemetrySetting"
 import { UserInfo } from "./UserInfo"
 // webview will hold state
@@ -94,7 +90,6 @@ export interface ExtensionState {
 	yoloModeToggled?: boolean
 	useAutoCondense?: boolean
 	tokenCompressionEnabled?: boolean
-	subagentsEnabled?: boolean
 	joyZoningSteeringEnabled?: boolean
 	/** Saved default; the effective value may be overridden for the active task. */
 	joyZoningSteeringDefaultEnabled?: boolean
@@ -127,17 +122,8 @@ export interface ExtensionState {
 	doubleCheckCompletionEnabled?: boolean
 	auditCompletionGateEnabled?: boolean
 	auditCompletionGateThreshold?: number
-	auditCompletionGateCriticalOnly?: boolean
-	auditActModeAdvisoryEnabled?: boolean
-	auditAdvisoryEscalationEnabled?: boolean
-	auditAdvisoryAutoScrollMode?: "never" | "critical" | "all"
 	auditPlanRegressionGateEnabled?: boolean
 	auditToolOutputAdvisoryEnabled?: boolean
-	auditFileWriteAdvisoryEnabled?: boolean
-	auditIntentThresholdAdjustmentsEnabled?: boolean
-	auditIntentThresholdOverrides?: string
-	auditSarifHookExportEnabled?: boolean
-	auditWorkspaceArtifactsEnabled?: boolean
 	/** Explicit developer-only diagnostic projection flag. Defaults to false. */
 	showInternalDiagnostics?: boolean
 	banners?: BannerCardData[]
@@ -192,7 +178,6 @@ export type DietCodeAsk =
 	| "condense"
 	| "summarize_task"
 	| "report_bug"
-	| "use_subagents"
 
 export type DietCodeSay =
 	| "task"
@@ -229,9 +214,6 @@ export type DietCodeSay =
 	| "task_progress"
 	| "hook_status"
 	| "hook_output_stream"
-	| "subagent"
-	| "use_subagents"
-	| "subagent_usage"
 	| "plan_summary"
 	| "conditional_rules_applied"
 
@@ -310,93 +292,6 @@ export interface DietCodeSayGenerateExplanation {
 	toRef: string
 	status: "generating" | "complete" | "error"
 	error?: string
-}
-
-export type SubagentExecutionStatus = "pending" | "running" | "completed" | "failed"
-
-export type SubagentExecutionConfidence = "high" | "medium" | "low" | "unknown"
-
-export interface SubagentToolStepSummary {
-	index: number
-	toolName: string
-	preview: string
-	timestamp: number
-	touchedPaths?: string[]
-}
-
-export interface SubagentContinuityMarker {
-	swarmId: string
-	taskId: string
-	resumeToken: string
-	lastPersistedAt: number
-	completedAgents: number
-	totalAgents: number
-	status: "running" | "completed" | "failed" | "interrupted"
-}
-
-export interface SubagentStatusItem {
-	id: string
-	name: string
-	index: number
-	prompt: string
-	status: SubagentExecutionStatus
-	toolCalls: number
-	inputTokens: number
-	outputTokens: number
-	totalCost: number
-	contextTokens: number
-	contextWindow: number
-	contextUsagePercentage: number
-	latestToolCall?: string
-	result?: string
-	error?: string
-	criticalSignals?: string[]
-	envelopeId?: string
-	blockers?: string[]
-	warnings?: string[]
-	toolSteps?: SubagentToolStepSummary[]
-	touchedFiles?: string[]
-	executionValidity?: "valid" | "invalid"
-	confidence?: SubagentExecutionConfidence
-	evidenceCount?: number
-	transcriptEventCount?: number
-	compactionEventCount?: number
-	compactionWarnings?: string[]
-	/** Explicit lane lifecycle state (pending | running | partial | degraded_complete | ...). */
-	laneRuntimeState?: string
-}
-
-export interface DietCodeSaySubagentStatus {
-	status: "running" | "completed" | "failed"
-	total: number
-	completed: number
-	successes: number
-	failures: number
-	toolCalls: number
-	inputTokens: number
-	outputTokens: number
-	contextWindow: number
-	maxContextTokens: number
-	maxContextUsagePercentage: number
-	items: SubagentStatusItem[]
-	swarmId?: string
-	continuityMarker?: SubagentContinuityMarker
-	artifactPath?: string
-	summaryOverlay?: string
-	invariantViolations?: string[]
-	resumeAttemptId?: string
-	recoveryReceipt?: {
-		resumeAttemptId: string
-		parentExecutionId: string
-		sourceSwarmId: string
-		reusedAgentCount: number
-		retriedAgentCount: number
-		restartedAgentCount: number
-		recoveredAt: number
-		operatorVisible: true
-	}
-	availableSwarmIds?: string[]
-	governedReceipt?: GovernedReceiptSummary
 }
 
 export type BrowserActionResult = {
@@ -512,15 +407,6 @@ export interface DietCodeApiReqInfo {
 		delaySec: number
 		errorSnippet?: string
 	}
-}
-
-export interface DietCodeSubagentUsageInfo {
-	source: "subagents"
-	tokensIn: number
-	tokensOut: number
-	cacheWrites: number
-	cacheReads: number
-	cost: number
 }
 
 export type DietCodeApiReqCancelReason = "streaming_failed" | "user_cancelled" | "retries_exhausted"

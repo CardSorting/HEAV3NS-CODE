@@ -40,8 +40,8 @@ export function getTaskCompletionTelemetry(
 		auditAdvisoryEscalated: auditMetadata ? shouldEscalateFromAdvisory(options?.advisoryMetadata, auditMetadata) : false,
 		auditPlanRegressionDetected: auditMetadata ? hasAuditScoreRegression(options?.planBaseline, auditMetadata) : false,
 		auditCompletionGateBlockCount: config.taskState.completionGateBlockCount ?? 0,
-		auditSarifExported: config.auditSarifHookExportEnabled && !!auditMetadata,
+		auditSarifExported: false,
 		auditGateBlocked: auditMetadata?.gate_blocked ?? false,
-		auditArtifactsPersisted: config.auditWorkspaceArtifactsEnabled && !!auditMetadata?.artifact_manifest_path,
+		auditArtifactsPersisted: false,
 	}
 }

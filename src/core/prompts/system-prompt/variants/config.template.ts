@@ -149,5 +149,4 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			DietCodeDefaultTool.PLAN_MODE,
 			DietCodeDefaultTool.MCP_DOCS,
 			DietCodeDefaultTool.TODO,
-			DietCodeDefaultTool.USE_SUBAGENTS,
 		)

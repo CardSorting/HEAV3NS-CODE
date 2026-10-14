@@ -2,9 +2,8 @@ import type { ToolUse } from "@core/assistant-message"
 import { getHooksEnabledSafe } from "@core/hooks/hooks-utils"
 import { formatResponse } from "@core/prompts/responses"
 import { telemetryService } from "@services/telemetry"
-import { type GatePolicyProvenance, resolveCompletionGateOptions } from "@shared/audit/auditGatePolicyLoader"
+import { resolveCompletionGateOptions } from "@shared/audit/auditGatePolicyLoader"
 import { resolvePlanBaselineMetadata } from "@shared/audit/auditMessages"
-import { enrichAuditMetadataWithArtifactPaths, persistAuditWorkspaceArtifacts } from "@shared/audit/auditWorkspaceArtifacts"
 import { buildAuditHookMetadata } from "@shared/audit/completionAudit"
 import { type TaskAuditMetadata } from "@shared/ExtensionMessage"
 import { CoordinationError, CoordinationErrorCode } from "@shared/governance/CoordinationErrors"
@@ -32,35 +31,6 @@ async function buildAuditGateOptions(
 	})
 }
 
-async function persistAuditArtifactsIfEnabled(
-	config: TaskConfig,
-	metadata: TaskAuditMetadata,
-	event: "completion" | "gate_block",
-	gateOptions?: Awaited<ReturnType<typeof buildAuditGateOptions>>,
-	policyProvenance?: GatePolicyProvenance,
-): Promise<TaskAuditMetadata> {
-	if (!config.auditWorkspaceArtifactsEnabled) {
-		return metadata
-	}
-	try {
-		const result = await persistAuditWorkspaceArtifacts({
-			cwd: config.cwd,
-			taskId: config.taskId,
-			metadata,
-			event,
-			includeSarif: config.auditSarifHookExportEnabled,
-			gateOptions: gateOptions ?? (await buildAuditGateOptions(config)),
-			gatePolicySettings: config,
-			policyProvenance,
-		})
-		if (result) {
-			return enrichAuditMetadataWithArtifactPaths(metadata, result)
-		}
-	} catch (error) {
-		Logger.warn("[AttemptCompletionHandler] Failed to persist audit workspace artifacts:", error)
-	}
-	return metadata
-}
 
 export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = DietCodeDefaultTool.ATTEMPT
@@ -155,13 +125,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				workspacePolicyApplied: auditGateResult.policyProvenance.workspacePolicyApplied,
 			})
 
-			auditMetadata = await persistAuditArtifactsIfEnabled(
-				config,
-				auditMetadata,
-				"completion",
-				auditGateResult.gateOptions,
-				auditGateResult.policyProvenance,
-			)
 			config.taskState.lastCompletionAudit = structuredClone(auditMetadata)
 		}
 
@@ -272,7 +235,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 							command: block.params.command || "",
 							...(config.taskState.lastCompletionAudit
 								? buildAuditHookMetadata(config.taskState.lastCompletionAudit, {
-										includeSarif: config.auditSarifHookExportEnabled,
 										gateOptions,
 										taskUri: `task://${config.taskId}`,
 									})
