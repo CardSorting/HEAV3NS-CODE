@@ -120,6 +120,10 @@ const copyWasmFiles = {
 				const filename = `tree-sitter-${lang}.wasm`
 				fs.copyFileSync(path.join(languageWasmDir, filename), path.join(targetDir, filename))
 			})
+
+			try {
+				fs.chmodSync(path.join(__dirname, destDir, "index.js"), 0o755)
+			} catch {}
 		})
 	},
 }

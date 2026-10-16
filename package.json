@@ -11,10 +11,13 @@
 	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/CardSorting/LUMI-JOY.git"
+		"url": "https://github.com/CardSorting/HEAV3NS-CODE.git"
 	},
 	"files": [
 		"dist",
+		"!dist/releases",
+		"!dist/gumroad",
+		"!dist/**/*.map",
 		"README.md",
 		"PRODUCT.md",
 		"CHANGELOG.md",
@@ -103,7 +106,7 @@
 		"install:all": "npm install",
 		"check:handler-imports": "node scripts/check-handler-imports.mjs",
 		"check:task-lifecycle-boundary": "node scripts/check-task-lifecycle-boundary.mjs",
-		"prepare": "npx husky",
+		"prepare": "node -e \"if (require('node:fs').existsSync('.git')) try { require('node:child_process').execSync('npx husky', { stdio: 'inherit' }); } catch {}\"",
 		"docs": "cd docs && npm run dev",
 		"docs:check-links": "cd docs && npm run check",
 		"docs:check-agent-links": "node scripts/check-agent-docs-links.mjs",

@@ -17,7 +17,18 @@ const required = [
 	"THIRD-PARTY-NOTICES.md",
 	"LICENSE-MAP.md",
 ]
-const allowed = new Set(["dist", "package.json", "README.md", "PRODUCT.md", "CHANGELOG.md", "SECURITY.md", ...required])
+const allowed = new Set([
+	"dist",
+	"!dist/releases",
+	"!dist/gumroad",
+	"!dist/**/*.map",
+	"package.json",
+	"README.md",
+	"PRODUCT.md",
+	"CHANGELOG.md",
+	"SECURITY.md",
+	...required,
+])
 const failures = []
 for (const entry of metadata.files ?? []) if (!allowed.has(entry)) failures.push(`unreviewed package entry: ${entry}`)
 for (const entry of ["dist", ...required]) if (!metadata.files?.includes(entry)) failures.push(`package files omits ${entry}`)
