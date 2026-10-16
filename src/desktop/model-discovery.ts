@@ -4,7 +4,7 @@ import {
 	discoverClaudeSubscriptionDirectSdkModels,
 } from "../integrations/claude-subscription-directsdk/provider.js"
 import { OpenAiCodexOAuthService } from "../services/auth/OpenAiCodexOAuthService.js"
-import { clinePassModels, nousResearchModels } from "../shared/api.js"
+import { clinePassModels, nousResearchModels, opencodeModels } from "../shared/api.js"
 import { CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS } from "../core/providers/provider-ids.js"
 import { getNousResearchModelInfo } from "../core/api/providers/nous-research.js"
 import { fetch as configuredFetch } from "../shared/net.js"
@@ -48,6 +48,7 @@ export class DesktopModelDiscovery {
 		}
 		if (provider === "cline-pass") return Object.keys(clinePassModels)
 		if (provider === "nous") return Object.keys(nousResearchModels)
+		if (provider === "opencode") return Object.keys(opencodeModels)
 		if (provider === "claude-subscription-directsdk-experimental") return [...CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS]
 		return []
 	}
@@ -56,6 +57,7 @@ export class DesktopModelDiscovery {
 		const providers: Provider[] = [
 			"cline-pass",
 			"nous",
+			"opencode",
 			"openrouter",
 			"claude-subscription-directsdk-experimental",
 			"openai-codex",
@@ -148,6 +150,8 @@ export class DesktopModelDiscovery {
 									? "Could not load Cline Pass models. Check your connection or CLINE_API_KEY, then refresh. Exact model IDs remain available."
 									: provider === "nous"
 										? "Could not load Nous Research models. Check your connection or NOUS_API_KEY, then refresh. Exact model IDs remain available."
+										: provider === "opencode"
+											? "Could not load OpenCode models. Check your connection or sign-in, then refresh. Exact model IDs remain available."
 										: provider === "openai-codex"
 											? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
 											: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
@@ -279,6 +283,7 @@ export function providerModelLoader(options: {
 	openRouterApiKey?: () => string | undefined
 	clineApiKey?: () => string | undefined
 	nousApiKey?: () => string | undefined
+	opencodeApiKey?: () => string | undefined
 	claude: ClaudeSubscriptionDirectSdkOptions
 }): ModelLoader {
 	return async (provider, signal) => {
@@ -364,6 +369,38 @@ export function providerModelLoader(options: {
 						id,
 						label: (info as { name?: string }).name || id,
 						detail: (info as { description?: string }).description || "Nous Research model",
+					})),
+				}
+			}
+		}
+		if (provider === "opencode") {
+			const key = options.opencodeApiKey?.() || process.env.OPENCODE_API_KEY || process.env.OPENCODE_TOKEN
+			const endpoint = options.gateway.getEffectiveEndpoint("opencode", "https://opencode.ai/inference/openai/v1/chat/completions")
+			const url = modelListURL(endpoint.url)
+			try {
+				const models = await fetchModelList(
+					url,
+					{ ...(key ? { Authorization: `Bearer ${key}` } : {}), ...endpoint.headers },
+					signal,
+				)
+				return {
+					source: "OpenCode API",
+					models: models.map((m) => {
+						const fallback = opencodeModels[m.id as keyof typeof opencodeModels]
+						return {
+							id: m.id,
+							label: m.label || fallback?.name || m.id,
+							detail: m.detail || fallback?.description || "OpenCode model",
+						}
+					}),
+				}
+			} catch {
+				return {
+					source: "OpenCode (offline fallback)",
+					models: Object.entries(opencodeModels).map(([id, info]) => ({
+						id,
+						label: info.name || id,
+						detail: info.description || "OpenCode model",
 					})),
 				}
 			}

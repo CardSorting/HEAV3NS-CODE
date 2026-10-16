@@ -100,6 +100,30 @@ final class ModelPickerTests: XCTestCase {
         XCTAssertEqual(WorkspaceModelSelection(["provider": "nous", "model": "Hermes-4-405B", "revision": 0])?.providerLabel, "Nous Research")
     }
 
+    func testOpencodeKeySetupAndModelSelection() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "opencode", "label": "OpenCode", "detail": "API key or session", "models": ["kimi-k2.6"]]]
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss() }
+        picker.load(); requests[0].2(.success(data)); picker.providerProbe("opencode")
+        XCTAssertEqual(requests[1].0, "opencode.status")
+        requests[1].2(.success(["saved": false, "configured": false]))
+        XCTAssertEqual(picker.diagnostics["credentialsVisible"] as? Bool, true)
+        picker.keyProbe("opencode-secret-key")
+        XCTAssertEqual(requests[2].0, "opencode.saveKey")
+        XCTAssertEqual(requests[2].1["apiKey"] as? String, "opencode-secret-key")
+        requests[2].2(.success(["saved": true, "configured": true]))
+        XCTAssertFalse(String(describing: picker.diagnostics).contains("opencode-secret-key"))
+        let views = descendants(try XCTUnwrap(picker.window?.contentView))
+        XCTAssertEqual(views.compactMap { $0 as? NSSecureTextField }.first?.stringValue, "")
+        picker.selectProbe("kimi-k2.6")
+        XCTAssertEqual(requests.last?.0, "models.select")
+        XCTAssertEqual(requests.last?.1["provider"] as? String, "opencode")
+        XCTAssertEqual(WorkspaceModelSelection(["provider": "opencode", "model": "kimi-k2.6", "revision": 0])?.providerLabel, "OpenCode")
+    }
+
     func testListSelectionSwitchesOnceWithoutConfirmationAndClosesAfterSuccess() throws {
         _ = NSApplication.shared
         var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()

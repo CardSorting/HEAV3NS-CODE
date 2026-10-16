@@ -15,6 +15,7 @@ export class EnvironmentKeyResolver {
 	private readonly providerEnvMap: Record<string, string> = {
 		"openai-codex": "OPENAI_API_KEY",
 		openrouter: "OPENROUTER_API_KEY",
+		opencode: "OPENCODE_API_KEY",
 	}
 
 	resolveKey(provider: string): string | null {
@@ -25,6 +26,9 @@ export class EnvironmentKeyResolver {
 		}
 		if (p === "openai" || p === "codex" || p === "openai-codex" || p.includes("gpt")) {
 			return process.env.OPENAI_API_KEY || null
+		}
+		if (p === "opencode" || p.includes("opencode")) {
+			return process.env.OPENCODE_API_KEY || process.env.OPENCODE_TOKEN || null
 		}
 		return null
 	}

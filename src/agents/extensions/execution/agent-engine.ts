@@ -1,6 +1,7 @@
 import { completeOpenRouter } from "../../../core/api/providers/openrouter-native.js"
 import { completeClinePass } from "../../../core/api/providers/cline-pass-native.js"
 import { completeNousResearch } from "../../../core/api/providers/nous-research-native.js"
+import { completeOpencode } from "../../../core/api/providers/opencode-native.js"
 import { randomUUID } from "node:crypto"
 import { invalidateSkillsCache } from "../../../core/context/instructions/user-instructions/skillRuntime.js"
 import * as fs from "node:fs"
@@ -21,6 +22,7 @@ import {
 	isClaudeSubscriptionDirectSdkProvider,
 	isClinePassProvider,
 	isNousResearchProvider,
+	isOpencodeProvider,
 } from "../../../core/providers/provider-ids.js"
 import { CommandOutputStream } from "../../../core/utilities/command-output-stream.js"
 import { sanitizeProgressText } from "../../../core/utilities/progress-sanitizer.js"
@@ -443,6 +445,7 @@ export class AgentEngine extends AbstractAgentEngine {
 			const usesClaudeSubscriptionDirectSdk = isClaudeSubscriptionDirectSdkProvider(activeProvider)
 			const usesClinePass = isClinePassProvider(activeProvider)
 			const usesNousResearch = isNousResearchProvider(activeProvider)
+			const usesOpencode = isOpencodeProvider(activeProvider)
 			const hasConfiguredOpenAiProxy = Boolean(
 				this.proxyGateway?.getProxyConfig() || this.proxyGateway?.getProviderEndpoint("openai-codex"),
 			)
@@ -451,6 +454,7 @@ export class AgentEngine extends AbstractAgentEngine {
 				!usesClaudeSubscriptionDirectSdk &&
 				!usesClinePass &&
 				!usesNousResearch &&
+				!usesOpencode &&
 				!hasConfiguredOpenAiProxy &&
 				authMethod !== "api-key" &&
 				hasOpenAiCodexOAuthCredentials(undefined)
@@ -462,7 +466,9 @@ export class AgentEngine extends AbstractAgentEngine {
 						? "Cline Pass"
 						: usesNousResearch
 							? "Nous Research"
-							: "OpenAI Codex"
+							: usesOpencode
+								? "OpenCode"
+								: "OpenAI Codex"
 			const progressSource = usesOpenRouter
 				? "openrouter"
 				: usesClaudeSubscriptionDirectSdk
@@ -471,9 +477,11 @@ export class AgentEngine extends AbstractAgentEngine {
 						? "cline-pass"
 						: usesNousResearch
 							? "nous"
-							: "openai-codex-api"
+							: usesOpencode
+								? "opencode"
+								: "openai-codex-api"
 
-			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
+			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
 				const autonomous =
 					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
@@ -545,7 +553,7 @@ export class AgentEngine extends AbstractAgentEngine {
 							timeoutMs: 30000,
 						}
 						const providerTimeoutMs =
-							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesCodexOAuth
+							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || usesCodexOAuth
 								? (this.config.providerTimeoutMs ?? 180_000)
 								: endpoint.timeoutMs
 						this.reportProgress(input.onProgress, {
@@ -752,6 +760,17 @@ export class AgentEngine extends AbstractAgentEngine {
 									})
 								} else if (usesNousResearch) {
 									data = await completeNousResearch({
+										model: activeModel,
+										messages: apiMessages,
+										tools: availableTools,
+										maxTokens: preparedContext.budget.reservedOutputTokens,
+										signal: requestSignal,
+										onText: () => {
+											lastProviderActivityAt = Date.now()
+										},
+									})
+								} else if (usesOpencode) {
+									data = await completeOpencode({
 										model: activeModel,
 										messages: apiMessages,
 										tools: availableTools,

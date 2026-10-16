@@ -343,6 +343,7 @@ describe("desktop model selection", () => {
 		}))
 		assert.ok(discovery.models("cline-pass").length > 0)
 		assert.ok(discovery.models("nous").length > 0)
+		assert.ok(discovery.models("opencode").length > 0)
 		assert.ok(discovery.models(claude).length > 0)
 		const res = await discovery.discover("cline-pass")
 		assert.equal(res.state, "ready")

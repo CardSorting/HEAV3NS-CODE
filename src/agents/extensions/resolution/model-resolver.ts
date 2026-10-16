@@ -7,7 +7,9 @@ import {
 	isClaudeSubscriptionDirectSdkProvider,
 	isClinePassProvider,
 	isNousResearchProvider,
+	isOpencodeProvider,
 	NOUS_RESEARCH_DEFAULT_MODEL,
+	OPENCODE_DEFAULT_MODEL,
 	normalizeClaudeSubscriptionDirectSdkModel,
 	normalizeAgentProvider,
 } from "../../../core/providers/provider-ids.js"
@@ -28,6 +30,7 @@ function providerDefaultModel(provider: AgentProviderId): string {
 	if (provider === "openrouter") return "anthropic/claude-sonnet-4.5"
 	if (isClinePassProvider(provider)) return CLINE_PASS_DEFAULT_MODEL
 	if (isNousResearchProvider(provider)) return NOUS_RESEARCH_DEFAULT_MODEL
+	if (isOpencodeProvider(provider)) return OPENCODE_DEFAULT_MODEL
 	if (isClaudeSubscriptionDirectSdkProvider(provider)) return CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL
 	return "gpt-5.6-terra"
 }
@@ -35,7 +38,7 @@ function providerDefaultModel(provider: AgentProviderId): string {
 function isModelSupportedByProvider(model: string, provider: AgentProviderId): boolean {
 	const normalized = model.toLowerCase()
 	if (provider === "openrouter") return model.includes("/")
-	if (isClinePassProvider(provider) || isNousResearchProvider(provider)) {
+	if (isClinePassProvider(provider) || isNousResearchProvider(provider) || isOpencodeProvider(provider)) {
 		return !normalized.startsWith("claude-")
 	}
 	// Claude's native transport is strict about route identity. OpenAI/local

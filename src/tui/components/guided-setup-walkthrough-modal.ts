@@ -11,6 +11,7 @@ import { getAgentProviderLabel, isClaudeSubscriptionDirectSdkProvider } from "..
 const PROVIDER_DETAILS: Record<SetupProviderId, { label: string; envVar?: string; external?: boolean }> = {
 	"openai-codex": { label: "OpenAI Codex", envVar: "OPENAI_API_KEY" },
 	"claude-subscription-directsdk-experimental": { label: "Claude Code subscription", external: true },
+	opencode: { label: "OpenCode", envVar: "OPENCODE_API_KEY" },
 }
 
 const WIZARD_MARKDOWN_THEME: MarkdownTheme = {

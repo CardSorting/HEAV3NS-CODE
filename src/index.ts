@@ -175,8 +175,10 @@ import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	getAgentProviderLabel,
 	isClaudeSubscriptionDirectSdkProvider,
+	isOpencodeProvider,
 	normalizeAgentProvider,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_PROVIDER,
 } from "./core/providers/provider-ids.js"
 import { MonolithFactory, type MonolithFactoryOptions } from "./factories/monolith-factory.js"
 import { SessionContext } from "./sessions/base/session-context.js"
@@ -2964,9 +2966,13 @@ export {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	getAgentProviderLabel,
 	isClaudeSubscriptionDirectSdkModel,
+	isOpencodeProvider,
 	normalizeAgentProvider,
 	normalizeClaudeSubscriptionDirectSdkModel,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_DEFAULT_MODEL,
+	OPENCODE_MODELS,
+	OPENCODE_PROVIDER,
 } from "./core/providers/provider-ids.js"
 export {
 	estimateMessagesTokens,
@@ -4973,7 +4979,9 @@ export class LumiMonolith implements IAgentEngine {
 				? OPENAI_CODEX_PROVIDER
 				: normalizedProvider === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
 					? CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
-					: undefined
+					: normalizedProvider === OPENCODE_PROVIDER
+						? OPENCODE_PROVIDER
+						: undefined
 		if (persist && persistableProvider) {
 			this.setupWizard.setSavedProvider(persistableProvider)
 		}
@@ -5105,7 +5113,11 @@ if (isDirectCliExecution) {
 	const configuredProviderValue = providerFlagValue || process.env.LUMI_PROVIDER
 	const configuredProvider = normalizeAgentProvider(configuredProviderValue)
 	const configuredModelValue = modelFlagValue || process.env.LUMI_MODEL_ID
-	const supportedCliProviders = new Set<AgentProviderId>([OPENAI_CODEX_PROVIDER, CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER])
+	const supportedCliProviders = new Set<AgentProviderId>([
+		OPENAI_CODEX_PROVIDER,
+		CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+		OPENCODE_PROVIDER,
+	])
 
 	const isSmoke = args.includes("--smoke") || args.includes("-s") || primaryCmd === "smoke"
 	const isSetup = args.includes("--setup") || primaryCmd === "setup"
@@ -5132,11 +5144,18 @@ if (isDirectCliExecution) {
 	const isModelSwitch = primaryCmd === "model" && Boolean(args[1])
 
 	if (isHelp) {
-		const modelExample = isClaudeSubscriptionDirectSdkProvider(configuredProvider) ? "claude-sonnet-5[1m]" : "terra"
+		const modelExample = isClaudeSubscriptionDirectSdkProvider(configuredProvider)
+			? "claude-sonnet-5[1m]"
+			: isOpencodeProvider(configuredProvider)
+				? "kimi-k2.6"
+				: "terra"
 		const modelCommands = isClaudeSubscriptionDirectSdkProvider(configuredProvider)
 			? `  heav3ns models [--refresh]  Resolve the signed-in Claude Code account route catalog
   heav3ns model <route>       Set an account route (e.g. ${modelExample})`
-			: `  heav3ns terra               Quick-switch default model to Flagship Reasoning Engine (gpt-5.6-terra)
+			: isOpencodeProvider(configuredProvider)
+				? `  heav3ns models              Display OpenCode models catalog (28 provisioned models)
+  heav3ns model <name>        Set active model (e.g. heav3ns model ${modelExample})`
+				: `  heav3ns terra               Quick-switch default model to Flagship Reasoning Engine (gpt-5.6-terra)
   heav3ns luna                Quick-switch default model to High-Velocity Engine (gpt-5.6-luna)
   heav3ns sol                 Quick-switch default model to Balanced Engine (gpt-5.6-sol)
   heav3ns model <name>        Set active model by name or alias (e.g. heav3ns model luna)
@@ -5146,7 +5165,7 @@ if (isDirectCliExecution) {
 
 \x1b[1;34mInteractive Mode:\x1b[0m
   heav3ns                     Start interactive terminal TUI session
-  heav3ns --provider <id>    Select provider (codex/openai or claude-code)
+  heav3ns --provider <id>    Select provider (codex/openai, claude-code, or opencode)
   heav3ns --model <name>      Start with an active route (e.g. ${modelExample})
 
 \x1b[1;34mModel Swapping & Catalog:\x1b[0m
@@ -5446,6 +5465,7 @@ ${modelCommands}
 		} else if (isModels) {
 			const force = args.includes("--refresh") || args.includes("-r")
 			const isClaudeProvider = isClaudeSubscriptionDirectSdkProvider(lumi.config.provider)
+			const isOpencode = isOpencodeProvider(lumi.config.provider)
 			let models: ReturnType<ModelCatalog["getAllModels"]>
 			if (isClaudeProvider) {
 				console.log("\n\x1b[33mResolving the signed-in Claude Code model picker…\x1b[0m")
@@ -5467,6 +5487,8 @@ ${modelCommands}
 				if (catalog.source === "pinned" && catalog.detail) {
 					console.log(`\x1b[90m  Diagnostic: ${catalog.detail.slice(0, 240)}\x1b[0m`)
 				}
+			} else if (isOpencode) {
+				models = lumi.modelCatalog.getModelsForProvider(OPENCODE_PROVIDER)
 			} else {
 				if (force) {
 					console.log("\n\x1b[33mFetching latest models dynamically from OpenAI Codex...\x1b[0m")
@@ -5487,7 +5509,9 @@ ${modelCommands}
 			console.log(
 				isClaudeProvider
 					? "\x1b[90mChoose an account route with \x1b[36mheav3ns --provider claude-code --model <route>\x1b[90m or use \x1b[36m/model <route>\x1b[90m.\x1b[0m\n"
-					: "\x1b[90mSwitch models instantly with \x1b[36mheav3ns terra\x1b[90m, \x1b[36mheav3ns luna\x1b[90m, \x1b[36mheav3ns sol\x1b[90m, or in TUI with \x1b[36m/model <name>\x1b[90m.\x1b[0m\n",
+					: isOpencode
+						? "\x1b[90mChoose an OpenCode model with \x1b[36mheav3ns --provider opencode --model <name>\x1b[90m or use \x1b[36m/model <name>\x1b[90m.\x1b[0m\n"
+						: "\x1b[90mSwitch models instantly with \x1b[36mheav3ns terra\x1b[90m, \x1b[36mheav3ns luna\x1b[90m, \x1b[36mheav3ns sol\x1b[90m, or in TUI with \x1b[36m/model <name>\x1b[90m.\x1b[0m\n",
 			)
 		} else if (isBaseline) {
 			const passed = await updateLiveBaseline(lumi)

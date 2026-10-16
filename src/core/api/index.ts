@@ -1,11 +1,12 @@
 import { OpenRouterHandler } from "./providers/openrouter"
 import { ApiConfiguration } from "@shared/api"
 import { Mode } from "@shared/storage/types"
-import { isClaudeSubscriptionDirectSdkProvider, isClinePassProvider, isNousResearchProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
+import { isClaudeSubscriptionDirectSdkProvider, isClinePassProvider, isNousResearchProvider, isOpencodeProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
 import { Logger } from "@/shared/services/Logger"
 import { ClaudeSubscriptionDirectSdkHandler } from "./providers/claude-subscription-directsdk"
 import { ClinePassHandler } from "./providers/cline-pass"
 import { NousResearchHandler } from "./providers/nous-research"
+import { OpencodeHandler } from "./providers/opencode"
 import { OpenAiCodexHandler } from "./providers/openai-codex"
 import { ApiHandler, ApiHandlerModel, ApiProviderInfo, CommonApiHandlerOptions, SingleCompletionHandler } from "./types"
 
@@ -48,6 +49,14 @@ function createHandlerForProvider(
 		return new NousResearchHandler({
 			nousResearchApiKey: options.nousResearchApiKey,
 			nousResearchModelId: mode === "plan" ? (options.planModeApiModelId || options.planModeNousResearchModelId) : (options.actModeApiModelId || options.actModeNousResearchModelId),
+			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+			onRetryAttempt: options.onRetryAttempt,
+		})
+	}
+	if (isOpencodeProvider(normalizedProvider)) {
+		return new OpencodeHandler({
+			apiModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
 			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
 			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
 			onRetryAttempt: options.onRetryAttempt,

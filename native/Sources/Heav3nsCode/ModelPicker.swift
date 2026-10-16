@@ -132,13 +132,13 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var validation: String? {
         if displayedProvider == "openrouter" && !draftModel.contains("/") { return "Enter an OpenRouter model ID, such as anthropic/claude-sonnet-4.5." }
         guard WorkspaceModelSelection.validModel(draftModel) else { return "Enter a model ID of up to 200 characters, without spaces." }
-        if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
+        if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous" || displayedProvider == "opencode") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
         return nil
     }
     func refreshAvailability() {
         syncPresentation()
         let editable = !dismissed && !pending && !keyPending && selection != nil
-        let hasCredentials = ["openrouter", "cline-pass", "nous"].contains(displayedProvider ?? "")
+        let hasCredentials = ["openrouter", "cline-pass", "nous", "opencode"].contains(displayedProvider ?? "")
         credentialsRow.isHidden = !hasCredentials || !supportsCredentials()
         apiKey.isEnabled = connected() && editable && canApply()
         saveKey.isEnabled = apiKey.isEnabled && !apiKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -205,6 +205,10 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             apiKey.placeholderString = "Nous Research API key"
             apiKey.setAccessibilityLabel("Nous Research API key")
             loadKeyStatus()
+        } else if item.id == "opencode" {
+            apiKey.placeholderString = "OpenCode API key or Access Token"
+            apiKey.setAccessibilityLabel("OpenCode API key")
+            loadKeyStatus()
         } else if item.id == "openrouter" {
             apiKey.placeholderString = "OpenRouter API key"
             apiKey.setAccessibilityLabel("OpenRouter API key")
@@ -241,6 +245,34 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         case "claude-haiku-4-5-20251001": return ("Claude Haiku 4.5", "200k context · Fast response")
         case "claude-fable-5-1[1m]": return ("Claude Fable 5.1", "1M context · Agentic planning")
         case "gpt-5.6-terra": return ("GPT-5.6 Terra", "Flagship agentic model")
+        case "kimi-k2.6": return ("Kimi K2.6", "262k context · Moonshot reasoning")
+        case "kimi-k2.7-code": return ("Kimi K2.7 Code", "262k context · Moonshot coding")
+        case "kimi-k3": return ("Kimi K3", "262k context · Moonshot frontier")
+        case "glm-5": return ("GLM-5", "128k context · General reasoning")
+        case "glm-5.1": return ("GLM-5.1", "128k context · Advanced reasoning")
+        case "glm-5.2": return ("GLM-5.2", "128k context · High capability")
+        case "glm-5.3": return ("GLM-5.3", "128k context · Frontier Chinese/English")
+        case "mimo-v2.5-pro": return ("MiMo-V2.5-Pro", "1M context · High precision")
+        case "minimax-m3": return ("MiniMax-M3", "524k context · Long horizon")
+        case "qwen3.7-max": return ("Qwen3.7 Max", "1M context · Flagship coding")
+        case "qwen3.7-plus": return ("Qwen3.7 Plus", "1M context · Fast coding & vision")
+        case "deepseek-v4": return ("DeepSeek V4", "1M context · Frontier reasoning")
+        case "deepseek-v4.1": return ("DeepSeek V4.1", "1M context · Enhanced reasoning")
+        case "deepseek-v4.1-flash": return ("DeepSeek V4.1 Flash", "1M context · High speed")
+        case "grok-4": return ("Grok 4", "500k context · xAI flagship")
+        case "gpt-5.6-luna": return ("GPT-5.6 Luna", "128k context · High-speed agentic")
+        case "beam-free": return ("Beam (Free)", "128k context · Free tier")
+        case "deepseek-v4.1-flash-free": return ("DeepSeek V4.1 Flash (Free)", "1M context · Free tier")
+        case "glm-5.3-flash-free": return ("GLM-5.3 Flash (Free)", "128k context · Free tier")
+        case "jev-1.13-free": return ("Jev 1.13 (Free)", "128k context · Free tier")
+        case "ll-alpha-free": return ("LL Alpha (Free)", "128k context · Free tier")
+        case "longcat-2.5-preview-free": return ("LongCat 2.5 Preview (Free)", "128k context · Free tier")
+        case "mimo-v2.6-flash-free": return ("MiMo-V2.6 Flash (Free)", "1M context · Free tier")
+        case "muse-spark-1.3-contributor-free": return ("Muse Spark 1.3 (Free)", "128k context · Free tier")
+        case "nemotron-3-ultra-free": return ("Nemotron 3 Ultra (Free)", "128k context · Free tier")
+        case "nemotron-3.5-lightning-free": return ("Nemotron 3.5 Lightning (Free)", "128k context · Free tier")
+        case "nemotron-3.5-super-vl-free": return ("Nemotron 3.5 Super VL (Free)", "128k context · Free tier vision")
+        case "space-bunny-free": return ("Space Bunny (Free)", "128k context · Free tier")
         default: return nil
         }
     }
@@ -318,7 +350,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         guard supportsCredentials(), connected(), !keyPending, let id = displayedProvider else { return }
         keyStatus.stringValue = "Checking saved key…"
         let token = loadID
-        let method = id == "cline-pass" ? "clinePass.status" : id == "nous" ? "nous.status" : "openrouter.status"
+        let method = id == "cline-pass" ? "clinePass.status" : id == "nous" ? "nous.status" : id == "opencode" ? "opencode.status" : "openrouter.status"
         request(method, [:]) { [weak self] result in
             guard let self, self.loadID == token, !self.dismissed else { return }
             self.installKeyStatus(result)
@@ -332,6 +364,8 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
                 keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using CLINE_API_KEY from the environment." : "Add your key from app.cline.bot to send instructions."
             } else if displayedProvider == "nous" {
                 keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using NOUS_API_KEY from the environment." : "Add your key from portal.nousresearch.com/keys to send instructions."
+            } else if displayedProvider == "opencode" {
+                keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using OPENCODE_API_KEY or OpenCode session." : "Add your OpenCode API key or access token to send instructions."
             } else {
                 keyStatus.stringValue = keySaved ? "API key saved. Access is checked when you send." : data["configured"] as? Bool == true ? "Using OPENROUTER_API_KEY from the environment." : "Add your key from openrouter.ai/keys to send instructions."
             }
@@ -348,7 +382,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         guard supportsCredentials(), connected(), canApply(), !pending, !keyPending, !dismissed, let id = displayedProvider else { return }
         keyPending = true; keyStatus.stringValue = "Saving key…"; refreshAvailability()
         let token = loadID
-        let method = id == "cline-pass" ? "clinePass.saveKey" : id == "nous" ? "nous.saveKey" : "openrouter.saveKey"
+        let method = id == "cline-pass" ? "clinePass.saveKey" : id == "nous" ? "nous.saveKey" : id == "opencode" ? "opencode.saveKey" : "openrouter.saveKey"
         request(method, ["apiKey": value]) { [weak self] result in
             guard let self, self.loadID == token, !self.dismissed else { return }
             self.keyPending = false

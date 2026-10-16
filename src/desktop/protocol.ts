@@ -25,6 +25,8 @@ export const requestSchema = z
 			"clinePass.saveKey",
 			"nous.status",
 			"nous.saveKey",
+			"opencode.status",
+			"opencode.saveKey",
 			"snapshot",
 			"task.submit",
 			"task.edit",

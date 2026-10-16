@@ -6,6 +6,7 @@ import {
 	isClaudeSubscriptionDirectSdkModel,
 	NOUS_RESEARCH_PROVIDER,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_PROVIDER,
 } from "../core/providers/provider-ids.js"
 
 export const modelSelectionSchema = z
@@ -16,6 +17,7 @@ export const modelSelectionSchema = z
 			"openrouter",
 			CLINE_PASS_PROVIDER,
 			NOUS_RESEARCH_PROVIDER,
+			OPENCODE_PROVIDER,
 		]),
 		reasoningEffort: z.enum(["default", ...REASONING_EFFORTS]).optional(),
 		model: z

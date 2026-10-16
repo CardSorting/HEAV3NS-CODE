@@ -7,6 +7,7 @@ import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/
 import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
 import { clineApiKey } from "../core/api/providers/cline-pass-native.js"
 import { nousResearchApiKey } from "../core/api/providers/nous-research-native.js"
+import { opencodeApiKey } from "../core/api/providers/opencode-native.js"
 import type {
 	EngineProgressEvent,
 	EngineTickResult,
@@ -20,6 +21,7 @@ import {
 	getAgentProviderLabel,
 	NOUS_RESEARCH_PROVIDER,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_PROVIDER,
 } from "../core/providers/provider-ids.js"
 import { reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import { StateManager } from "../core/storage/StateManager.js"
@@ -891,6 +893,30 @@ export class DesktopSession {
 				if (!credentials) throw new Error("UNSUPPORTED: Nous Research credentials are unavailable")
 				await credentials.save("nous", apiKey)
 				return credentials.status("nous")
+			}
+			case "opencode.status": {
+				z.object({}).strict().parse(request.params)
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: OpenCode credentials are unavailable")
+				return credentials.status("opencode")
+			}
+			case "opencode.saveKey": {
+				const { apiKey } = z
+					.object({
+						apiKey: z
+							.string()
+							.trim()
+							.max(1024)
+							.refine((value) => value === "" || /^[!-~]+$/.test(value), "Enter an API key without spaces"),
+					})
+					.strict()
+					.parse(request.params)
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop work before changing the API key")
+				const credentials = this.lifecycle?.models?.credentials
+				if (!credentials) throw new Error("UNSUPPORTED: OpenCode credentials are unavailable")
+				await credentials.save("opencode", apiKey)
+				return credentials.status("opencode")
 			}
 			case "models.discover": {
 				const { provider, refresh } = z
@@ -2270,6 +2296,7 @@ export async function runDesktopWorker(): Promise<void> {
 				openRouterApiKey,
 				clineApiKey,
 				nousApiKey: nousResearchApiKey,
+				opencodeApiKey,
 				authMethod: () => engine!.setupWizard.getOpenAiAuthMethod(),
 				apiKey: () =>
 					engine!.authStorageVault.getToken(OPENAI_CODEX_PROVIDER) ||
@@ -2308,6 +2335,12 @@ export async function runDesktopWorker(): Promise<void> {
 								configured: !!nousResearchApiKey(),
 							}
 						}
+						if (provider === "opencode") {
+							return {
+								saved: !!StateManager.get().getSecretKey("opencodeApiKey"),
+								configured: !!opencodeApiKey(),
+							}
+						}
 						return {
 							saved: !!StateManager.get().getSecretKey("openRouterApiKey"),
 							configured: !!openRouterApiKey(),
@@ -2322,7 +2355,9 @@ export async function runDesktopWorker(): Promise<void> {
 								? "clineApiKey"
 								: provider === "nous" || provider === "nousResearch"
 									? "nousResearchApiKey"
-									: "openRouterApiKey"
+									: provider === "opencode"
+										? "opencodeApiKey"
+										: "openRouterApiKey"
 						const before = state.getSecretKey(secretKey)
 						state.setSecret(secretKey, key || undefined)
 						try {
@@ -2339,6 +2374,7 @@ export async function runDesktopWorker(): Promise<void> {
 						| "openai-codex"
 						| typeof CLINE_PASS_PROVIDER
 						| typeof NOUS_RESEARCH_PROVIDER
+						| typeof OPENCODE_PROVIDER
 						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 					model: engine!.modelResolver.getActiveModel(),
 					...(engine!.modelResolver.getReasoningEffort()
@@ -2360,6 +2396,7 @@ export async function runDesktopWorker(): Promise<void> {
 						"openrouter" as const,
 						CLINE_PASS_PROVIDER,
 						NOUS_RESEARCH_PROVIDER,
+						OPENCODE_PROVIDER,
 					].map((id) => ({
 						id,
 						label: getAgentProviderLabel(id),
@@ -2370,6 +2407,8 @@ export async function runDesktopWorker(): Promise<void> {
 									? "Uses Cline Pass personal account credentials or CLINE_API_KEY. Connects to api.cline.bot."
 									: id === NOUS_RESEARCH_PROVIDER
 										? "Uses Nous Research inference with NOUS_API_KEY or Nous Portal subscription. Connects to inference-api.nousresearch.com."
+										: id === OPENCODE_PROVIDER
+											? "Uses OpenCode Console account or OPENCODE_API_KEY. Connects to opencode.ai with long context and free tier models."
 										: id === OPENAI_CODEX_PROVIDER
 											? engine!.proxyGateway.getProxyConfig() ||
 												engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)

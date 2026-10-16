@@ -4,12 +4,15 @@ import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	normalizeAgentProvider,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_DEFAULT_MODEL,
+	OPENCODE_PROVIDER,
 } from "../../../core/providers/provider-ids.js"
 import {
 	type ClaudeSubscriptionDirectSdkDiscoveredModel,
 	type ClaudeSubscriptionDirectSdkOptions,
 	discoverClaudeSubscriptionDirectSdkModels,
 } from "../../../integrations/claude-subscription-directsdk/provider.js"
+import { opencodeModels } from "../../../shared/api.js"
 import { DeterministicLocalEndpointEngine } from "../../../tooling/extensions/endpoints/deterministic-local-endpoint-engine.js"
 import { DynamicModelCache } from "./dynamic-model-cache.js"
 
@@ -112,6 +115,32 @@ const claudeSubscriptionModels: ModelSpecs[] = [
 	},
 ]
 
+const opencodeCatalogModels: ModelSpecs[] = Object.entries(opencodeModels).map(([id, rawInfo]) => {
+	const info = rawInfo as {
+		name?: string
+		description?: string
+		contextWindow?: number
+		maxTokens?: number
+		inputPrice?: number
+		outputPrice?: number
+		supportsImages?: boolean
+		supportsReasoning?: boolean
+	}
+	return {
+		modelName: id,
+		provider: OPENCODE_PROVIDER,
+		catalogSource: "pinned",
+		contextWindowTokens: info.contextWindow ?? 128_000,
+		maxOutputTokens: info.maxTokens ?? 32_768,
+		inputPricePer1M: (info.inputPrice ?? 0) * 1_000_000,
+		outputPricePer1M: (info.outputPrice ?? 0) * 1_000_000,
+		supportsVision: info.supportsImages ?? true,
+		supportsReasoning: info.supportsReasoning ?? true,
+		estimatedLatencyMs: 1_200,
+		description: info.description || info.name || id,
+	}
+})
+
 type CodexModelResponse = {
 	data?: Array<{
 		id?: string
@@ -155,6 +184,7 @@ export class ModelCatalog {
 	private registerDefaults(): void {
 		this.registerModel(defaultOpenAiCodexModel)
 		for (const model of claudeSubscriptionModels) this.registerModel(model)
+		for (const model of opencodeCatalogModels) this.registerModel(model)
 	}
 
 	registerModel(specs: ModelSpecs): void {
@@ -200,7 +230,9 @@ export class ModelCatalog {
 		const fallbackKey =
 			normalizedProvider.toLowerCase() === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
 				? `${CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER}::${CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL.toLowerCase()}`
-				: `${OPENAI_CODEX_PROVIDER}::gpt-5.6-terra`
+				: normalizedProvider.toLowerCase() === OPENCODE_PROVIDER
+					? `${OPENCODE_PROVIDER}::${OPENCODE_DEFAULT_MODEL.toLowerCase()}`
+					: `${OPENAI_CODEX_PROVIDER}::gpt-5.6-terra`
 		return matchingModel ?? this.catalog.get(fallbackKey) ?? defaultOpenAiCodexModel
 	}
 

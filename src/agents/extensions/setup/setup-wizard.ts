@@ -10,12 +10,14 @@ import {
 	isClaudeSubscriptionDirectSdkProvider,
 	normalizeAgentProvider,
 	OPENAI_CODEX_PROVIDER,
+	OPENCODE_PROVIDER,
 } from "../../../core/providers/provider-ids.js"
 import {
 	diagnoseClaudeSubscriptionDirectSdk,
 	resolveClaudeSubscriptionDirectSdkPluginDir,
 } from "../../../integrations/claude-subscription-directsdk/provider.js"
 import type { ClaudeSubscriptionDirectSdkOptions } from "../../../integrations/claude-subscription-directsdk/provider.js"
+import { OpencodeOAuthManager } from "../../../integrations/opencode/oauth.js"
 import type { AuthStorageVault } from "../resolution/auth-storage-vault.js"
 import type { EnvironmentKeyResolver } from "../resolution/environment-key-resolver.js"
 import type { LlmProxyGateway, ProxyEndpointConfig } from "../resolution/llm-proxy-gateway.js"
@@ -47,13 +49,17 @@ export interface SetupWizardOptions {
 }
 
 export type ApiKeyProviderId = "openai-codex"
-export type SetupProviderId = ApiKeyProviderId | typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
+export type SetupProviderId =
+	| ApiKeyProviderId
+	| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
+	| typeof OPENCODE_PROVIDER
 export type OpenAiAuthMethod = "oauth" | "api-key"
 
 function normalizeSetupProvider(provider: string): SetupProviderId | undefined {
 	const normalized = normalizeAgentProvider(provider)
 	if (normalized === OPENAI_CODEX_PROVIDER) return OPENAI_CODEX_PROVIDER
 	if (normalized === CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER) return CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER
+	if (normalized === OPENCODE_PROVIDER) return OPENCODE_PROVIDER
 	return undefined
 }
 
@@ -106,6 +112,18 @@ export class SetupWizard {
 				if (hasOpenAiCodexOAuthCredentials(undefined)) {
 					source = "oauth"
 					masked = "ChatGPT account session"
+				}
+			} else if (status.provider === OPENCODE_PROVIDER) {
+				const cred = OpencodeOAuthManager.get().loadStoredCredential()
+				if (cred?.access) {
+					source = "oauth"
+					masked = cred.metadata?.email ? `OpenCode (${cred.metadata.email})` : "OpenCode Console session"
+				} else if (vaultToken) {
+					source = "vault"
+					masked = `${vaultToken.substring(0, 4)}...${vaultToken.slice(-4)}`
+				} else if (status.hasKey) {
+					source = "environment"
+					masked = status.maskedKey
 				}
 			} else if (vaultToken) {
 				source = "vault"
@@ -744,6 +762,17 @@ export class SetupWizard {
 			return {
 				passed: diagnostic.ready,
 				details: diagnostic.ready ? `Claude Code CLI and subscription credentials are ready${plan}` : diagnostic.detail,
+			}
+		}
+		if (p === OPENCODE_PROVIDER) {
+			const cred = OpencodeOAuthManager.get().loadStoredCredential()
+			const token = this.authStorageVault.getToken("opencode") || this.envKeyResolver.resolveKey("opencode") || cred?.access
+			const passed = Boolean(token)
+			return {
+				passed,
+				details: passed
+					? `Resolved credentials for OpenCode${cred?.metadata?.email ? ` (${cred.metadata.email})` : ""}`
+					: `No credentials found for OpenCode. Run OpenCode login or enter an API key in settings.`,
 			}
 		}
 		const token = this.authStorageVault.getToken(p) || this.envKeyResolver.resolveKey(p)
