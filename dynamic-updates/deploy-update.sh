@@ -81,8 +81,10 @@ case "$ACTION" in
     npx wrangler r2 object put "$BUCKET/$DMG_NAME" --file="dist/gumroad/3_FILES_TO_UPLOAD/$DMG_NAME" --content-type="application/x-apple-diskimage" --remote
     npx wrangler r2 object put "$BUCKET/HEAV3NS-CODE-latest.dmg" --file="dist/gumroad/3_FILES_TO_UPLOAD/$DMG_NAME" --content-type="application/x-apple-diskimage" --remote
     npx wrangler r2 object put "$BUCKET/HEAV3NS-CODE-latest.zip" --file="dist/releases/$ZIP_NAME" --content-type="application/zip" --remote
+    npx wrangler r2 object put "$BUCKET/latest.json" --file="dist/releases/latest.json" --content-type="application/json" --remote
+    npx wrangler r2 object put "$BUCKET/SHA256SUMS.txt" --file="dist/releases/SHA256SUMS.txt" --content-type="text/plain; charset=utf-8" --remote
 
-    log_ok "Native app update and signed Sparkle feed published to $BASE_URL/appcast.xml"
+    log_ok "Native app update, latest.json manifest, and signed Sparkle feed published to $BASE_URL/appcast.xml"
     ;;
 
   *)

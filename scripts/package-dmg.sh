@@ -412,6 +412,44 @@ if test -f "$SPARKLE_BIN"; then
   cp -f "$SPARKLE_STAGING/appcast.xml" "$RELEASES_DIR/appcast.xml"
 fi
 
+# 9. Generate Canonical latest.json Manifest for Web App & Dynamic Resolvers
+DMG_SHA="$(shasum -a 256 "$DMG_PATH" | cut -d ' ' -f 1)"
+ZIP_SHA="$(shasum -a 256 "$ZIP_PATH" | cut -d ' ' -f 1)"
+DMG_BYTES="$(stat -f%z "$DMG_PATH" 2>/dev/null || wc -c < "$DMG_PATH")"
+ZIP_BYTES="$(stat -f%z "$ZIP_PATH" 2>/dev/null || wc -c < "$ZIP_PATH")"
+DMG_SIZE_HUMAN="$(du -h "$DMG_PATH" | cut -f1 | tr -d ' ')"
+ZIP_SIZE_HUMAN="$(du -h "$ZIP_PATH" | cut -f1 | tr -d ' ')"
+
+cat << EOF > "$RELEASES_DIR/latest.json"
+{
+  "version": "$VERSION",
+  "buildNumber": 2,
+  "releasedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "architecture": "Apple Silicon (arm64)",
+  "minSystemVersion": "14.0",
+  "dmg": {
+    "filename": "$DMG_NAME",
+    "url": "https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg",
+    "versionedUrl": "https://releases.heav3ns.com/$DMG_NAME",
+    "sha256": "$DMG_SHA",
+    "sizeBytes": $DMG_BYTES,
+    "sizeFormatted": "$DMG_SIZE_HUMAN"
+  },
+  "zip": {
+    "filename": "$ZIP_NAME",
+    "url": "https://releases.heav3ns.com/HEAV3NS-CODE-latest.zip",
+    "versionedUrl": "https://releases.heav3ns.com/$ZIP_NAME",
+    "sha256": "$ZIP_SHA",
+    "sizeBytes": $ZIP_BYTES,
+    "sizeFormatted": "$ZIP_SIZE_HUMAN"
+  },
+  "oneLineCommand": "curl -fsSL https://heav3ns.com/install.sh | bash",
+  "verifyCommand": "echo \"$DMG_SHA  \$HOME/Downloads/HEAV3NS-CODE-latest.dmg\" | shasum -a 256 --check"
+}
+EOF
+cp -f "$RELEASES_DIR/latest.json" "$UPLOAD_DIR/latest.json"
+cp -f "$UPLOAD_DIR/SHA256SUMS.txt" "$RELEASES_DIR/SHA256SUMS.txt"
+
 echo "✓ Successfully packaged Gumroad release in $DIST_DIR:"
 echo "  • Product Info: $DETAILS_DIR/GUMROAD_LISTING.md"
 echo "  • Listing Media: $MEDIA_DIR/"
