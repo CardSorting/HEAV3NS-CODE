@@ -332,7 +332,7 @@ export default {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         return jsonResponse(request, env, { error: 'Method not allowed' }, 405, { Allow: 'GET, HEAD' });
       }
-      return Response.redirect('https://releases.heav3ns.com/HEAV3NS-CODE-v0.1.0-macOS-arm64.zip', 302);
+      return Response.redirect('https://releases.heav3ns.com/HEAV3NS-CODE-latest.zip', 302);
     }
 
     if (url.pathname.startsWith('/releases/')) {

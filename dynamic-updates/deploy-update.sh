@@ -48,8 +48,9 @@ case "$ACTION" in
     check_endpoint "Sparkle Appcast Feed" "$BASE_URL/appcast.xml" "application/xml"
     check_endpoint "OTA Engine Manifest" "$BASE_URL/engine-latest.json" "application/json"
     check_endpoint "OTA 7MB Engine Tarball" "$BASE_URL/engine-v14.0.0.tar.gz" "application/gzip"
-    check_endpoint "Sparkle Release Archive" "$BASE_URL/HEAV3NS-CODE-v0.1.0-macOS-arm64.zip" "application/zip"
+    check_endpoint "Sparkle Release Archive" "$BASE_URL/HEAV3NS-CODE-v0.2.0-macOS-arm64.zip" "application/zip"
     check_endpoint "Permanent DMG Download" "$BASE_URL/HEAV3NS-CODE-latest.dmg" "application/x-apple-diskimage"
+    check_endpoint "Permanent ZIP Download" "$BASE_URL/HEAV3NS-CODE-latest.zip" "application/zip"
     echo ""
     log_info "Local Sparkle EdDSA Public Key:"
     echo "  SUPublicEDKey: GOOutbIDL5kYZ9sNS726PQkfEUOtMlcWZ2ORLjX3Hb0="
@@ -69,7 +70,7 @@ case "$ACTION" in
     echo "=========================================================="
     npm run package:dmg
 
-    VERSION="0.1.0"
+    VERSION="0.2.0"
     ARCH="$(uname -m)"
     ZIP_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.zip"
     DMG_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.dmg"
@@ -79,6 +80,7 @@ case "$ACTION" in
     npx wrangler r2 object put "$BUCKET/appcast.xml" --file="dist/releases/appcast.xml" --content-type="application/xml" --remote
     npx wrangler r2 object put "$BUCKET/$DMG_NAME" --file="dist/gumroad/3_FILES_TO_UPLOAD/$DMG_NAME" --content-type="application/x-apple-diskimage" --remote
     npx wrangler r2 object put "$BUCKET/HEAV3NS-CODE-latest.dmg" --file="dist/gumroad/3_FILES_TO_UPLOAD/$DMG_NAME" --content-type="application/x-apple-diskimage" --remote
+    npx wrangler r2 object put "$BUCKET/HEAV3NS-CODE-latest.zip" --file="dist/releases/$ZIP_NAME" --content-type="application/zip" --remote
 
     log_ok "Native app update and signed Sparkle feed published to $BASE_URL/appcast.xml"
     ;;
