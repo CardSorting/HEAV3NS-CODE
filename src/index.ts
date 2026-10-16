@@ -5376,8 +5376,9 @@ ${modelCommands}
 					},
 				})
 				console.log(`\n\n\x1b[1;32m[✓] Model ${modelTag} downloaded and ready for offline inference!\x1b[0m\n`)
-			} catch (err: any) {
-				console.error(`\n\n\x1b[1;31m[✗] Failed to pull model:\x1b[0m ${err.message || String(err)}\n`)
+			} catch (err: unknown) {
+				const message = err instanceof Error ? err.message : String(err)
+				console.error(`\n\n\x1b[1;31m[✗] Failed to pull model:\x1b[0m ${message}\n`)
 			}
 		} else if (isHardware) {
 			console.log()

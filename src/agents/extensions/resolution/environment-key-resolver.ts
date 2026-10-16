@@ -22,7 +22,7 @@ export class EnvironmentKeyResolver {
 		const p = provider.toLowerCase()
 		const envVar = this.providerEnvMap[p]
 		if (envVar && process.env[envVar]) {
-			return process.env[envVar]!
+			return process.env[envVar] ?? null
 		}
 		if (p === "openai" || p === "codex" || p === "openai-codex" || p.includes("gpt")) {
 			return process.env.OPENAI_API_KEY || null

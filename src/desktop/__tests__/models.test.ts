@@ -331,11 +331,11 @@ describe("desktop model selection", () => {
 		assert.equal(models.length, 2)
 		assert.equal(models[0].id, "cline-pass/qwen3.7-max")
 		assert.equal(models[0].label, "Qwen3.7 Max")
-		assert.match(models[0].detail!, /recommended/)
+		assert.match(models[0].detail ?? "", /recommended/)
 		assert.equal(models[1].id, "deepseek/deepseek-v4-flash")
 		assert.equal(models[1].label, "DeepSeek V4 Flash")
-		assert.match(models[1].detail!, /128k context/)
-		assert.match(models[1].detail!, /free/)
+		assert.match(models[1].detail ?? "", /128k context/)
+		assert.match(models[1].detail ?? "", /free/)
 
 		const discovery = new DesktopModelDiscovery(async () => ({
 			source: "Mock",

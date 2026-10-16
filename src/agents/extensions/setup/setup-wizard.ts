@@ -235,7 +235,7 @@ export class SetupWizard {
 	}
 
 	/** Interactive login — authenticate to OpenAI Codex with the ChatGPT browser OAuth flow. */
-	async loginInteractive(providedReadLine?: readline.Interface): Promise<void> {
+	async loginInteractive(_providedReadLine?: readline.Interface): Promise<void> {
 		console.log("\nOpenAI Codex sign-in")
 		console.log(
 			"A browser window will open. Sign in to ChatGPT, then return here. The link expires in 5 minutes; press Ctrl+C to cancel.\n",
