@@ -70,7 +70,7 @@ case "$ACTION" in
     echo "=========================================================="
     npm run package:dmg
 
-    VERSION="0.3.0"
+    VERSION="${HEAV3NS_VERSION:-$(node -p "require('./package.json').version")}"
     ARCH="$(uname -m)"
     ZIP_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.zip"
     DMG_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.dmg"

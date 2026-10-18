@@ -4,7 +4,7 @@ set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
 
-VERSION="0.3.0"
+VERSION="${HEAV3NS_VERSION:-$(node -p "require('./package.json').version")}"
 ARCH="$(uname -m)"
 APP_SRC="build/HEAV3NS-CODE.app"
 DIST_DIR="dist/gumroad"
@@ -423,7 +423,7 @@ ZIP_SIZE_HUMAN="$(du -h "$ZIP_PATH" | cut -f1 | tr -d ' ')"
 cat << EOF > "$RELEASES_DIR/latest.json"
 {
   "version": "$VERSION",
-  "buildNumber": 2,
+  "buildNumber": 1501,
   "releasedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "architecture": "Apple Silicon (arm64)",
   "minSystemVersion": "14.0",

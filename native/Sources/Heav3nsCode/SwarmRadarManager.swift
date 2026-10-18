@@ -148,7 +148,7 @@ final class SwarmRadarManager {
         let clientID = resolveOrCreateClientID()
         let shortID = clientID.suffix(4).uppercased()
         let displayID = "NODE_\(shortID)"
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3.0"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "15.0.1"
         #if arch(arm64)
         let arch = "arm64"
         #else
