@@ -83,7 +83,12 @@ final class RuntimeClient {
         let child = Process()
         child.executableURL = node; child.arguments = [cli.path, "--desktop-worker"]
         child.currentDirectoryURL = folder
-        child.environment = environment.merging(["NO_COLOR": "1", "TERM": "dumb"]) { _, new in new }
+        child.environment = environment.merging([
+            "NO_COLOR": "1",
+            "TERM": "dumb",
+            "HEAV3NS_GZIP_REQUEST_BODIES": "1",
+            "LUMI_GZIP_REQUEST_BODIES": "1"
+        ]) { _, new in new }
         // Test peers do not own repository evidence or consume durable slots.
         if cliOverride == nil && environment["BROCCOLIGIT_MODE"] != "disabled" {
             historyReservation = BroccoliGitAdmission.reserve(folder)

@@ -93,11 +93,55 @@
  * ```
  */
 
+import type { AxiosRequestConfig } from "axios"
 import OpenAI, { ClientOptions as OpenAIClientOptions } from "openai"
 import { EnvHttpProxyAgent, setGlobalDispatcher, fetch as undiciFetch } from "undici"
+import { BroccoliWireEngine } from "@/infrastructure/db/BroccoliWireEngine"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
+import { Logger } from "@/shared/services/Logger"
 
 let mockFetch: typeof globalThis.fetch | undefined
+let gzipLatchedOff = false
+const GZIP_MIN_SIZE_BYTES = 4096 // 4 KB threshold
+
+function isCompressibleEndpoint(urlStr: string): boolean {
+	return (
+		urlStr.includes("api.anthropic.com") ||
+		urlStr.includes("api.openai.com") ||
+		urlStr.includes("generativelanguage.googleapis.com") ||
+		urlStr.includes("openrouter.ai") ||
+		urlStr.includes("/v1/messages") ||
+		urlStr.includes("/v1/chat/completions")
+	)
+}
+
+function shouldCompressRequest(url: string | URL | Request, init?: RequestInit): boolean {
+	if (
+		gzipLatchedOff ||
+		process.env.HEAV3NS_GZIP_REQUEST_BODIES === "0" ||
+		process.env.LUMI_GZIP_REQUEST_BODIES === "0" ||
+		process.env.DIETCODE_GZIP_REQUEST_BODIES === "0" ||
+		process.env.CLAUDE_CODE_GZIP_REQUEST_BODIES === "0"
+	) {
+		return false
+	}
+	const method = init?.method || (url instanceof Request ? url.method : "GET")
+	if (method.toUpperCase() !== "POST") {
+		return false
+	}
+	const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url
+	if (!isCompressibleEndpoint(urlStr)) {
+		return false
+	}
+	const body = init?.body
+	if (typeof body === "string") {
+		return body.length >= GZIP_MIN_SIZE_BYTES
+	}
+	if (Buffer.isBuffer(body)) {
+		return body.length >= GZIP_MIN_SIZE_BYTES
+	}
+	return false
+}
 
 /**
  * Platform-configured fetch that respects proxy settings.
@@ -110,8 +154,6 @@ let mockFetch: typeof globalThis.fetch | undefined
  * ```
  */
 export const fetch: typeof globalThis.fetch = (() => {
-	// Note: Don't use Logger here; it may not be initialized.
-
 	let baseFetch: typeof globalThis.fetch = globalThis.fetch
 	// Note: See esbuild.mjs, process.env.IS_STANDALONE is statically rewritten
 	// to "true" or "false" (as strings) in the JetBrains/CLI build.
@@ -120,10 +162,62 @@ export const fetch: typeof globalThis.fetch = (() => {
 		// Configure undici with ProxyAgent
 		const agent = new EnvHttpProxyAgent({})
 		setGlobalDispatcher(agent)
-		baseFetch = undiciFetch as any as typeof globalThis.fetch
+		baseFetch = undiciFetch as unknown as typeof globalThis.fetch
 	}
 
-	return (input: string | URL | Request, init?: RequestInit): Promise<Response> => (mockFetch || baseFetch)(input, init)
+	return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+		const runner = mockFetch || baseFetch
+		if (!shouldCompressRequest(input, init)) {
+			return runner(input, init)
+		}
+
+		const engine = BroccoliWireEngine.getInstance()
+		const originalBody = init?.body as string | Buffer
+		let compressedInit: RequestInit | undefined
+
+		try {
+			const res = await engine.compressPayload(originalBody)
+			const headers = new Headers(init?.headers)
+			headers.set("Content-Encoding", "gzip")
+			headers.set("Content-Length", res.compressedSize.toString())
+
+			compressedInit = {
+				...init,
+				headers,
+				body: res.buffer as unknown as BodyInit,
+			}
+		} catch {
+			// Fallback to uncompressed on any compression error
+			return runner(input, init)
+		}
+
+		let response = await runner(input, compressedInit)
+
+		// Latch-off safety: if upstream rejected compressed body with 400 Bad Request,
+		// automatically latch off gzip for the rest of the session and retry uncompressed.
+		if (response.status === 400) {
+			const clone = response.clone()
+			try {
+				const errorText = await clone.text()
+				if (
+					errorText.includes("could not parse request body") ||
+					errorText.includes("not valid JSON") ||
+					errorText.includes("bad json") ||
+					errorText.includes("decompression")
+				) {
+					gzipLatchedOff = true
+					Logger.warn(
+						"[BroccoliWireEngine] Server rejected gzipped request body. Retrying uncompressed and latching off for session.",
+					)
+					response = await runner(input, init)
+				}
+			} catch {
+				// Ignore clone text read error
+			}
+		}
+
+		return response
+	}
 })()
 
 /**
@@ -170,9 +264,9 @@ export function mockFetchForTesting<T>(theFetch: typeof globalThis.fetch, callba
  * })
  * ```
  */
-export function getAxiosSettings(): { adapter?: any; fetch?: typeof globalThis.fetch } {
+export function getAxiosSettings(): { adapter?: AxiosRequestConfig["adapter"]; fetch?: typeof globalThis.fetch } {
 	return {
-		adapter: "fetch" as any,
+		adapter: "fetch",
 		fetch, // Use our configured fetch
 	}
 }

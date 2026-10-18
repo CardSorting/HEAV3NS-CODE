@@ -27,6 +27,7 @@ const PRIMARY_KEYS: Record<string, readonly string[]> = {
 	task_lifecycle_records: ["taskId", "generationId"],
 	task_lifecycle_events: ["eventId"],
 	task_lifecycle_sequence: ["id"],
+	compressed_chunks: ["chunk_hash"],
 }
 
 function keyFor(table: string, row: Row): string {
@@ -35,7 +36,17 @@ function keyFor(table: string, row: Row): string {
 		return fields.map((field) => String(row[field])).join("\u0000")
 	}
 
-	for (const field of ["id", "key", "resource", "resourceKey", "completionAttemptId", "taskId", "decisionId", "eventId", "monotonicSequence"]) {
+	for (const field of [
+		"id",
+		"key",
+		"resource",
+		"resourceKey",
+		"completionAttemptId",
+		"taskId",
+		"decisionId",
+		"eventId",
+		"monotonicSequence",
+	]) {
 		if (row[field] !== undefined && row[field] !== null) return String(row[field])
 	}
 
@@ -55,11 +66,18 @@ function matchesValue(actual: unknown, operator: string, expected: unknown): boo
 		return Array.isArray(expected) && expected.every((value) => !valuesEqual(actual, value))
 	}
 	if (normalized === "is") return expected === null ? actual === null || actual === undefined : valuesEqual(actual, expected)
-	if (normalized === "is not") return expected === null ? actual !== null && actual !== undefined : !valuesEqual(actual, expected)
+	if (normalized === "is not")
+		return expected === null ? actual !== null && actual !== undefined : !valuesEqual(actual, expected)
 	if (normalized === "like") {
 		if (typeof actual !== "string") return false
 		const pattern = String(expected)
-		const regex = new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".")}$`, "i")
+		const regex = new RegExp(
+			`^${pattern
+				.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+				.replace(/%/g, ".*")
+				.replace(/_/g, ".")}$`,
+			"i",
+		)
 		return regex.test(actual)
 	}
 	if (normalized === "=") return valuesEqual(actual, expected)
@@ -137,8 +155,14 @@ function parseWhere(sql: string, params: unknown[]): Predicate[] {
 		}
 		match = clause.match(/^([A-Za-z_][\w]*)\s+(IN|NOT\s+IN)\s*\((.*)\)$/i)
 		if (match) {
-			const rawValues = splitComma(match[3]!).map((value) => (value === "?" ? params[parameterIndex++] : literalValue(value)))
-			predicates.push({ column: match[1]!, operator: match[2]!.toLowerCase().startsWith("not") ? "NOT IN" : "IN", value: rawValues })
+			const rawValues = splitComma(match[3]!).map((value) =>
+				value === "?" ? params[parameterIndex++] : literalValue(value),
+			)
+			predicates.push({
+				column: match[1]!,
+				operator: match[2]!.toLowerCase().startsWith("not") ? "NOT IN" : "IN",
+				value: rawValues,
+			})
 			continue
 		}
 		match = clause.match(/^([A-Za-z_][\w]*)\s*(<=|>=|!=|=|<|>)\s*(\?|NULL|'.*?'|".*?"|-?\d+(?:\.\d+)?)$/i)
@@ -184,13 +208,19 @@ export class BroccoliRawDatabase {
 	}
 
 	private execute(sql: string, params: unknown[], mode: "get" | "all" | "run"): unknown {
-		const select = sql.match(/^SELECT\s+(.+?)\s+FROM\s+([A-Za-z_][\w]*)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([A-Za-z_][\w]*)\s+(ASC|DESC))?(?:\s+LIMIT\s+(\d+))?$/i)
+		const select = sql.match(
+			/^SELECT\s+(.+?)\s+FROM\s+([A-Za-z_][\w]*)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([A-Za-z_][\w]*)\s+(ASC|DESC))?(?:\s+LIMIT\s+(\d+))?$/i,
+		)
 		if (select) {
 			const [, projection, tableName, whereSql, orderColumn, orderDirection, limit] = select
-			const rows = this.database.rows(tableName as TableName).filter((row) => matchesRow(row, parseWhere(whereSql ?? "", params)))
+			const rows = this.database
+				.rows(tableName as TableName)
+				.filter((row) => matchesRow(row, parseWhere(whereSql ?? "", params)))
 			if (orderColumn) {
 				const direction = orderDirection?.toUpperCase() === "DESC" ? -1 : 1
-				rows.sort((a, b) => (a[orderColumn] === b[orderColumn] ? 0 : a[orderColumn] > b[orderColumn] ? direction : -direction))
+				rows.sort((a, b) =>
+					a[orderColumn] === b[orderColumn] ? 0 : a[orderColumn] > b[orderColumn] ? direction : -direction,
+				)
 			}
 			const projected = rows.slice(0, limit ? Number(limit) : undefined).map((row) => {
 				if (projection!.trim() === "*") return row
@@ -202,7 +232,9 @@ export class BroccoliRawDatabase {
 			return mode === "get" ? projected[0] : mode === "all" ? projected : { changes: 0 }
 		}
 
-		const insert = sql.match(/^INSERT(?:\s+OR\s+(IGNORE|REPLACE))?\s+INTO\s+([A-Za-z_][\w]*)\s*\(([^)]+)\)\s+VALUES\s*(.+?)(?:\s+ON\s+CONFLICT[\s\S]*)?$/i)
+		const insert = sql.match(
+			/^INSERT(?:\s+OR\s+(IGNORE|REPLACE))?\s+INTO\s+([A-Za-z_][\w]*)\s*\(([^)]+)\)\s+VALUES\s*(.+?)(?:\s+ON\s+CONFLICT[\s\S]*)?$/i,
+		)
 		if (insert) {
 			const [, conflictMode, tableName, columnsText, valuesText] = insert
 			const columns = splitComma(columnsText!).map((column) => column.trim())
@@ -210,10 +242,14 @@ export class BroccoliRawDatabase {
 			let parameterIndex = 0
 			let changes = 0
 			for (const group of groups) {
-				const values = splitComma(group.slice(1, -1)).map((value) => (value === "?" ? params[parameterIndex++] : literalValue(value)))
+				const values = splitComma(group.slice(1, -1)).map((value) =>
+					value === "?" ? params[parameterIndex++] : literalValue(value),
+				)
 				const row = Object.fromEntries(columns.map((column, index) => [column, values[index]]))
 				const table = this.database.table(tableName as TableName)
-				const existing = this.database.rows(tableName as TableName).find((candidate) => keyFor(tableName!, candidate) === keyFor(tableName!, row))
+				const existing = this.database
+					.rows(tableName as TableName)
+					.find((candidate) => keyFor(tableName!, candidate) === keyFor(tableName!, row))
 				const upsert = /\sON\s+CONFLICT\b/i.test(sql)
 				if (existing && conflictMode?.toUpperCase() === "IGNORE") continue
 				if (existing && conflictMode?.toUpperCase() !== "REPLACE" && !upsert) continue
@@ -241,10 +277,13 @@ export class BroccoliRawDatabase {
 				for (const assignment of parsedAssignments) {
 					if (assignment.expression === "?") next[assignment.column] = params[parameterIndex++]
 					else {
-						const increment = assignment.expression.match(new RegExp(`^${assignment.column}\\s*([+-])\\s*(\\d+|\\?)$`, "i"))
+						const increment = assignment.expression.match(
+							new RegExp(`^${assignment.column}\\s*([+-])\\s*(\\d+|\\?)$`, "i"),
+						)
 						if (increment) {
 							const amount = increment[2] === "?" ? Number(params[parameterIndex++]) : Number(increment[2])
-							next[assignment.column] = Number(row[assignment.column] ?? 0) + (increment[1] === "+" ? amount : -amount)
+							next[assignment.column] =
+								Number(row[assignment.column] ?? 0) + (increment[1] === "+" ? amount : -amount)
 						} else next[assignment.column] = literalValue(assignment.expression)
 					}
 				}
@@ -365,7 +404,10 @@ class SelectQuery<T extends Row = Row> {
 	private sortDirection: "asc" | "desc" = "asc"
 	private maxRows: number | undefined
 
-	constructor(private readonly database: BroccoliStateDatabase, private readonly tableName: string) {}
+	constructor(
+		private readonly database: BroccoliStateDatabase,
+		private readonly tableName: string,
+	) {}
 
 	selectAll(): this {
 		this.columns = null
@@ -428,7 +470,10 @@ class InsertQuery {
 	private conflictColumns: string[] | undefined
 	private conflictValues: Row | undefined
 
-	constructor(private readonly database: BroccoliStateDatabase, private readonly tableName: string) {}
+	constructor(
+		private readonly database: BroccoliStateDatabase,
+		private readonly tableName: string,
+	) {}
 
 	values(value: Row | readonly Row[]): this {
 		this.input = Array.isArray(value) ? [...value] : value
@@ -481,7 +526,10 @@ class UpdateQuery {
 	private valuesToSet: Row = {}
 	private readonly predicates: PredicateExpression[] = []
 
-	constructor(private readonly database: BroccoliStateDatabase, private readonly tableName: string) {}
+	constructor(
+		private readonly database: BroccoliStateDatabase,
+		private readonly tableName: string,
+	) {}
 
 	set(values: Row): this {
 		this.valuesToSet = { ...values }
@@ -497,8 +545,10 @@ class UpdateQuery {
 		const changes = this.database.updateWhere(this.tableName, this.predicates, (row) => {
 			const next = { ...row }
 			for (const [column, value] of Object.entries(this.valuesToSet)) {
-				if (value && typeof value === "object" && "_increment" in value) next[column] = Number(row[column] ?? 0) + Number((value as any)._increment)
-				else if (value && typeof value === "object" && "_type" in value && (value as any)._type === "increment") next[column] = Number(row[column] ?? 0) + Number((value as any).value)
+				if (value && typeof value === "object" && "_increment" in value)
+					next[column] = Number(row[column] ?? 0) + Number((value as any)._increment)
+				else if (value && typeof value === "object" && "_type" in value && (value as any)._type === "increment")
+					next[column] = Number(row[column] ?? 0) + Number((value as any).value)
 				else next[column] = value
 			}
 			return next
@@ -510,7 +560,10 @@ class UpdateQuery {
 class DeleteQuery {
 	private readonly predicates: PredicateExpression[] = []
 
-	constructor(private readonly database: BroccoliStateDatabase, private readonly tableName: string) {}
+	constructor(
+		private readonly database: BroccoliStateDatabase,
+		private readonly tableName: string,
+	) {}
 
 	where(column: string, operator = "=", value?: unknown): this {
 		this.predicates.push({ column, operator, value })
@@ -528,8 +581,8 @@ class DeleteQuery {
 }
 
 export function resolveBroccoliStateRoot(dbPath: string): { root: string; temporary: boolean } {
-		if (dbPath === ":memory:") return { root: path.join(os.tmpdir(), `lumi-broccolidb-${crypto.randomUUID()}`), temporary: true }
-		return { root: path.resolve(`${dbPath}.broccolidb`), temporary: false }
+	if (dbPath === ":memory:") return { root: path.join(os.tmpdir(), `lumi-broccolidb-${crypto.randomUUID()}`), temporary: true }
+	return { root: path.resolve(`${dbPath}.broccolidb`), temporary: false }
 }
 
 export function getRowId(table: string, row: Row): string {
