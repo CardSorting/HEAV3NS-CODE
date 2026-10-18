@@ -48,7 +48,7 @@ case "$ACTION" in
     check_endpoint "Sparkle Appcast Feed" "$BASE_URL/appcast.xml" "application/xml"
     check_endpoint "OTA Engine Manifest" "$BASE_URL/engine-latest.json" "application/json"
     check_endpoint "OTA 7MB Engine Tarball" "$BASE_URL/engine-v14.0.0.tar.gz" "application/gzip"
-    check_endpoint "Sparkle Release Archive" "$BASE_URL/HEAV3NS-CODE-v0.2.0-macOS-arm64.zip" "application/zip"
+    check_endpoint "Sparkle Release Archive" "$BASE_URL/HEAV3NS-CODE-v0.3.0-macOS-arm64.zip" "application/zip"
     check_endpoint "Permanent DMG Download" "$BASE_URL/HEAV3NS-CODE-latest.dmg" "application/x-apple-diskimage"
     check_endpoint "Permanent ZIP Download" "$BASE_URL/HEAV3NS-CODE-latest.zip" "application/zip"
     echo ""
@@ -70,7 +70,7 @@ case "$ACTION" in
     echo "=========================================================="
     npm run package:dmg
 
-    VERSION="0.2.0"
+    VERSION="0.3.0"
     ARCH="$(uname -m)"
     ZIP_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.zip"
     DMG_NAME="HEAV3NS-CODE-v${VERSION}-macOS-${ARCH}.dmg"

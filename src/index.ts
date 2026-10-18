@@ -5297,7 +5297,7 @@ ${modelCommands}
 		const benchmark = await runBenchmarkSuite(lumi)
 		const guardrails = await new ArchitectureGuardrailGate().runFullGuardrailAudit(lumi)
 		const writeResult = new LiveBaselineReporter().write(process.cwd(), {
-			repositoryVersion: process.env.npm_package_version ?? "0.2.0",
+			repositoryVersion: process.env.npm_package_version ?? "15.0.0",
 			configuredModel: lumi.modelResolver.getActiveModel(),
 			smoke,
 			benchmark,

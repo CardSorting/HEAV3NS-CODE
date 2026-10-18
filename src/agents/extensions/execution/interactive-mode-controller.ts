@@ -245,7 +245,7 @@ export class InteractiveModeController {
 		const headerBox = new Box(1, 0, headerBg)
 
 		const headerText = new Text(
-			`\x1b[1;35m❖ HEAV3NS v0.2.0\x1b[0m  │  ` +
+			`\x1b[1;35m❖ HEAV3NS v15.0.0\x1b[0m  │  ` +
 				`\x1b[90mProvider:\x1b[0m \x1b[1;35m${getAgentProviderLabel(monolith.config.provider)}\x1b[0m  │  ` +
 				`\x1b[90mModel:\x1b[0m \x1b[1;36m${monolith.config.modelName}\x1b[0m  │  ` +
 				`\x1b[90mHealth:\x1b[0m \x1b[1;32m[OPERATIONAL]\x1b[0m`,
@@ -724,7 +724,7 @@ export class InteractiveModeController {
 			const memCount = monolith.sessionMemoryStore.listMemories().length
 			const memSuffix = memCount > 0 ? `  │  \x1b[90mMem:\x1b[0m \x1b[36m${memCount}\x1b[0m` : ""
 			headerText.setText(
-				`\x1b[1;35m❖ HEAV3NS v0.2.0\x1b[0m  │  ` +
+				`\x1b[1;35m❖ HEAV3NS v15.0.0\x1b[0m  │  ` +
 					`\x1b[90mProvider:\x1b[0m \x1b[1;35m${getAgentProviderLabel(monolith.config.provider)}\x1b[0m  │  ` +
 					`\x1b[90mModel:\x1b[0m \x1b[1;36m${monolith.config.modelName}\x1b[0m  │  ` +
 					`\x1b[90mFrame:\x1b[0m \x1b[1;33m#${turnCount}\x1b[0m${memSuffix}  │  ` +

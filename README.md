@@ -32,7 +32,7 @@
 ### ⚡ Direct Download for macOS (Apple Silicon)
 Get the pre-compiled, signed native binary directly without building from source:
 - 💿 **[Direct DMG Download (Apple Silicon)](https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg)** *(~198MB Universal Disk Image)*
-- 📦 **[Direct ZIP Archive](https://releases.heav3ns.com/HEAV3NS-CODE-v0.2.0-macOS-arm64.zip)** *(~176MB Standalone)*
+- 📦 **[Direct ZIP Archive](https://releases.heav3ns.com/HEAV3NS-CODE-v0.3.0-macOS-arm64.zip)** *(~176MB Standalone)*
 - 🌐 **[Web Storefront & Verified Checksums](https://heav3ns.com/code)** • **[Direct Web Download](https://heav3ns.com/download)** • **[Gumroad ($0+ PWYW)](https://goldeneggie.gumroad.com/l/hkipiu)**
 
 > *Dedicated to the open-source community and the creators at **Nous Research** & **Hermes**. Made with love so anyone can build with fast, reliable AI.*

@@ -4,7 +4,7 @@ set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 ARCH="$(uname -m)"
 APP_SRC="build/HEAV3NS-CODE.app"
 DIST_DIR="dist/gumroad"
@@ -67,7 +67,7 @@ chmod +x "$STAGING_DIR/Open (First-Time Bypass).command"
 # Add README / Quickstart instructions inside DMG
 cat << 'EOF' > "$STAGING_DIR/INSTALL & QUICKSTART.txt"
 ========================================================================
-  HEAV3NS-CODE (v0.2.0 Alpha Preview)
+  HEAV3NS-CODE (v0.3.0 Alpha Preview)
   Sovereign AI Coding Cockpit for macOS (Apple Silicon & Intel)
 ========================================================================
 
@@ -211,7 +211,7 @@ Use this copy directly when creating or updating the product listing on Gumroad.
 ## 3. Product Description (Paste directly into Gumroad Description)
 
 ```markdown
-# ⚡ HEAV3NS-CODE (v0.2.0 Alpha Preview)
+# ⚡ HEAV3NS-CODE (v0.3.0 Alpha Preview)
 ### The Sovereign Cockpit for the Tight Coding Loop
 
 **HEAV3NS-CODE** is a focused, local-first native AI coding partner for macOS. Built for developers who want fast context, reviewable recovery, and pilot-in-command execution instead of opaque, runaway agent turns.
@@ -251,8 +251,8 @@ Your source code and prompt payloads never pass through intermediate third-party
 
 ### 📦 What You Get
 
-- **HEAV3NS-CODE-v0.2.0-macOS-arm64.dmg**: Complete native macOS universal installer.
-- **HEAV3NS-CODE-v0.2.0-macOS-arm64.zip**: Standalone zipped bundle for manual extraction.
+- **HEAV3NS-CODE-v0.3.0-macOS-arm64.dmg**: Complete native macOS universal installer.
+- **HEAV3NS-CODE-v0.3.0-macOS-arm64.zip**: Standalone zipped bundle for manual extraction.
 - **INSTALL_MACOS.md**: Step-by-step onboarding, Gatekeeper clearance command, and shortcut reference.
 - **SHA256SUMS.txt**: Cryptographic verification checksums.
 - **Permanent Mirror**: https://releases.heav3ns.com/HEAV3NS-CODE-latest.dmg
@@ -263,7 +263,7 @@ EOF
 cat << 'EOF' > "$UPLOAD_DIR/INSTALL_MACOS.md"
 # 🍏 HEAV3NS-CODE for macOS — Installation & Setup Guide
 
-**Version:** 0.2.0 Alpha Preview  
+**Version:** 0.3.0 Alpha Preview  
 **Target:** macOS 14.0 (Sonoma) or later • Apple Silicon (M1/M2/M3/M4) & Intel x86_64  
 **Architecture:** Native Swift AppKit Cockpit + Embedded Node.js 22 Worker Substrate  
 **Telemetry:** 0 KB • Completely Local-First  
@@ -278,7 +278,7 @@ curl -fsSL https://heav3ns.com/install.sh | bash
 ```
 
 ### Method B (Manual DMG):
-1. Double-click the downloaded **`HEAV3NS-CODE-v0.2.0-macOS-arm64.dmg`** file to mount the disk image.
+1. Double-click the downloaded **`HEAV3NS-CODE-v0.3.0-macOS-arm64.dmg`** file to mount the disk image.
 2. Drag **`HEAV3NS-CODE.app`** into the **`Applications`** shortcut folder.
 3. Eject the disk image.
 
@@ -350,7 +350,7 @@ When you first launch HEAV3NS-CODE:
 EOF
 
 cat << 'EOF' > "$DIST_DIR/README.md"
-# 🚀 Gumroad Release Kit — HEAV3NS-CODE (v0.2.0)
+# 🚀 Gumroad Release Kit — HEAV3NS-CODE (v0.3.0)
 
 This folder is streamlined into **three numbered folders** that correspond directly to each step in the Gumroad product creator.
 
@@ -380,8 +380,8 @@ In the Gumroad **Content** tab, click **Upload files** ➔ **Computer**, open [`
 
 | File | Role for Customer |
 | :--- | :--- |
-| **`HEAV3NS-CODE-v0.2.0-macOS-arm64.dmg`** | **Primary macOS installer** (drag-and-drop to `/Applications`) |
-| **`HEAV3NS-CODE-v0.2.0-macOS-arm64.zip`** | **Alternative archive** (standalone app bundle) |
+| **`HEAV3NS-CODE-v0.3.0-macOS-arm64.dmg`** | **Primary macOS installer** (drag-and-drop to `/Applications`) |
+| **`HEAV3NS-CODE-v0.3.0-macOS-arm64.zip`** | **Alternative archive** (standalone app bundle) |
 | **`INSTALL_MACOS.md`** | **Customer setup guide** (first-run Gatekeeper help & shortcuts) |
 | **`SHA256SUMS.txt`** | **Cryptographic hashes** (allows buyers to verify binary integrity) |
 
