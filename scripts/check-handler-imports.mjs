@@ -92,7 +92,8 @@ async function main() {
 	const tsFiles = await globby("src/**/*.ts", {
 		cwd: repoRoot,
 		gitignore: true,
-		ignore: ["src/generated/**", "**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "dist/**", "out/**"],
+		followSymbolicLinks: false,
+		ignore: ["src/generated/**", "**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "dist/**", "out/**", "build/**"],
 	})
 
 	await Promise.all(
