@@ -14,10 +14,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 gh release download "$TAG" --repo "$REPO" --dir "$WORK"
 ( cd "$WORK"; shasum -a 256 --check SHA256SUMS.txt )
+FEED_REVISION="$(gh api "repos/$REPO/commits/main" --jq .sha)"
 for ARCH in arm64 x86_64; do
     cmp "$ROOT/build/release/${TAG}-${ARCH}/HEAV3NS-CODE-macOS-${ARCH}.zip" "$WORK/HEAV3NS-CODE-macOS-${ARCH}.zip"
     curl --fail --location --silent --show-error --retry 2 --proto '=https' --proto-redir '=https' \
-        "https://raw.githubusercontent.com/$REPO/main/appcast-${ARCH}.xml" --output "$WORK/appcast-${ARCH}.xml"
+        "https://raw.githubusercontent.com/$REPO/$FEED_REVISION/appcast-${ARCH}.xml" --output "$WORK/appcast-${ARCH}.xml"
     "$SPARKLE/bin/sign_update" --verify "$WORK/appcast-${ARCH}.xml"
 done
 python3 scripts/macos/create_mirror_manifest.py "$WORK"

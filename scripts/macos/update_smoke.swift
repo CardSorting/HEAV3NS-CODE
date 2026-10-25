@@ -1,4 +1,5 @@
 // Package this executable in a disposable, Developer ID signed HEAV3NS-CODE.app.
+// Include native/Assets/AppIcon.icns at Contents/Resources/AppIcon.icns.
 // --menus tests production menu wiring; --probe checks the real signed feed;
 // --apply exercises Sparkle replacement with no relaunch or Studio data access.
 import AppKit
@@ -14,6 +15,21 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private func log(_ value: String) { print(value); fflush(stdout) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if mode == "--icon-check" {
+            let quitMenu = NSMenu()
+            let applicationItem = NSMenuItem()
+            let applicationMenu = NSMenu()
+            applicationMenu.addItem(withTitle: "Quit HEAV3NS-CODE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            applicationItem.submenu = applicationMenu
+            quitMenu.addItem(applicationItem)
+            NSApp.mainMenu = quitMenu
+            window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 140), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window?.title = "HEAV3NS-CODE icon verification"
+            window?.center()
+            window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         if mode == "--menus" {
             let menu = NSMenu()
             let native = NativeUpdater(readiness: { $0(true) }, waiting: { fatalError("Idle test host was blocked") })
@@ -47,6 +63,8 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         log("FOUND: \(item.displayVersionString) build \(item.versionString)")
         if mode != "--apply" { exit(0) }
@@ -71,7 +89,15 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let app = NSApplication.shared
         let delegate = UpdaterSmoke()
         app.delegate = delegate
-        app.setActivationPolicy(.regular)
+        // Set the Dock image before activation; a missing test resource must never
+        // register a blank Dock item under the production app's bundle identifier.
+        let iconURL = Bundle.main.resourceURL?.appendingPathComponent("AppIcon.icns")
+        if let iconURL, let icon = NSImage(contentsOf: iconURL) {
+            app.applicationIconImage = icon
+            app.setActivationPolicy(.regular)
+        } else {
+            app.setActivationPolicy(.accessory)
+        }
         app.run()
         withExtendedLifetime(delegate) {}
     }

@@ -61,7 +61,8 @@ including its engine and runtime, so the executable code has one release identit
    source tag without replacing an already-public package.
 6. Update the compatible R2 aliases, release manifest, and legacy appcast only after
    validating the published packages and feeds. The legacy appcast remains arm64;
-   new Intel installations use their dedicated feed. Deploy website instructions
+   new Intel installations use their dedicated feed. Mirror publication reads feeds
+   at an immutable Git commit to avoid stale raw-GitHub cache entries. Deploy website instructions
    that use normal installation and signature verification rather than bypasses.
 
 ## Install and recover
