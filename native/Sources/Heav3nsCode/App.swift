@@ -1,6 +1,7 @@
 import AppKit
 import Sparkle
 
+@MainActor
 final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var launcher: LauncherWindow?
     private var newProjectWindow: NewProjectWindow?
@@ -9,16 +10,22 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private var quitting = false
     private var pods: PodsWindow?
     private var workspaceOrder = [String]()
-    private var updaterController: SPUStandardUpdaterController?
+    private lazy var updates = NativeUpdater(readiness: { [weak self] completion in
+        guard let self, !self.quitting else { completion(false); return }
+        completion(self.workspaces.values.allSatisfy { $0.prepareForUpdateRestart() })
+    }, waiting: {
+        guard let window = NSApp.keyWindow, window.attachedSheet == nil else { return }
+        let alert = NSAlert()
+        alert.messageText = "Your update is ready when you are"
+        alert.informativeText = "Finish active work and save your edits, then choose HEAV3NS-CODE → Install Downloaded Update… to restart. Your update will wait."
+        alert.addButton(withTitle: "Keep Working")
+        alert.beginSheetModal(for: window)
+    })
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         if let icon = BrandAssets.appIcon { NSApp.applicationIconImage = icon }
         if !ProcessInfo.processInfo.arguments.contains("--integration-probe") {
-            updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3.0) {
-                EngineManager.shared.checkForEngineUpdate()
-            }
             let hasLaunched = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
             if !hasLaunched {
                 UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
@@ -29,6 +36,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             SwarmRadarManager.shared.startPeriodicKeepAlive()
         }
         buildMenus()
+        if !ProcessInfo.processInfo.arguments.contains("--integration-probe") { updates.start() }
         if let probe = IntegrationProbe() { for path in probe.projectPaths { projects.opened(URL(fileURLWithPath: path)) } }
         let arguments = ProcessInfo.processInfo.arguments
         let workspaceIndexes = arguments.indices.filter { arguments[$0] == "--workspace" && arguments.indices.contains($0 + 1) }
@@ -124,8 +132,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let main = NSMenu()
         let applicationItem = NSMenuItem(); let applicationMenu = NSMenu()
         applicationMenu.addItem(withTitle: "About HEAV3NS-CODE", action: #selector(about), keyEquivalent: "").target = self
-        let checkUpdatesItem = applicationMenu.addItem(withTitle: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
-        checkUpdatesItem.target = updaterController
+        if !ProcessInfo.processInfo.arguments.contains("--integration-probe") { updates.addMenuItems(to: applicationMenu) }
         let swarmRadarItem = applicationMenu.addItem(withTitle: "Sovereign Swarm Radar…", action: #selector(showSwarmRadar), keyEquivalent: "")
         swarmRadarItem.target = self
         applicationMenu.addItem(.separator())
@@ -193,7 +200,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         return pods
     }
     @objc private func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HEAV3NS-CODE", .applicationVersion: "0.1 · Integration Preview", .credits: NSAttributedString(string: "A native workspace for LUMI.\nExecution and credentials remain in the CLI.")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HEAV3NS-CODE", .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development", .credits: NSAttributedString(string: "A native workspace for LUMI.\nExecution and credentials remain in the CLI.")])
     }
     @objc func openFolder() {
         if currentPods != nil { loadPods(); return }
@@ -385,7 +392,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 }
 
 @main struct Heav3nsCodeApp {
-    static func main() {
+    @MainActor static func main() {
         let delegate = ApplicationDelegate()
         NSApplication.shared.delegate = delegate
         NSApplication.shared.run()

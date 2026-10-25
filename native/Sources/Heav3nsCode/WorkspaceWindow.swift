@@ -916,6 +916,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             updateStatus(); return false
         }
     }
+    /// Native update restarts wait for every workspace and its draft checkpoint.
+    func prepareForUpdateRestart() -> Bool {
+        guard !hasWork, !closing, !switchingConversation, pendingRequest == nil,
+              uncertainSubmission == nil, !projectRun.running, !composer.hasMarkedText(),
+              window?.attachedSheet == nil else { return false }
+        return prepareToClose()
+    }
     /// Flush every workspace before Quit starts stopping workers.
     @discardableResult func prepareToClose() -> Bool {
         if let memoryWindow, memoryWindow.state.dirty || memoryWindow.state.uncertain || memoryWindow.state.saving {
