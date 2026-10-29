@@ -101,11 +101,16 @@ export class SessionCompactor {
       return this.getLastReport();
     }
 
-    // Checkpoints are projections, never source material for the next projection.
+    // A live transcript normally has the original messages, not generated
+    // checkpoints. A restored active context can contain only a checkpoint
+    // for older history. Preserve that checkpoint verbatim: treating it as a
+    // new summary source would truncate it, and dropping it loses context.
+    const retainedCheckpoints = sourceMessages.filter(SessionCompactor.isCheckpoint);
     const canonicalMessages = sourceMessages.filter((message) => !SessionCompactor.isCheckpoint(message));
-    const systemMessages = this.preserveSystemPrompt
-      ? canonicalMessages.filter((message) => message.role === "system")
-      : [];
+    const systemMessages = [
+      ...(this.preserveSystemPrompt ? canonicalMessages.filter((message) => message.role === "system") : []),
+      ...retainedCheckpoints,
+    ];
     const conversation = canonicalMessages.filter((message) => message.role !== "system");
     const turns = this.groupTurns(conversation);
 
@@ -159,7 +164,7 @@ export class SessionCompactor {
     }
 
     const summarizedMessages = turns.slice(0, selectedCutoff).flat();
-    const checkpoint = selected.find(SessionCompactor.isCheckpoint);
+    const checkpoint = selected[systemMessages.length];
     const outputTokens = reservedTokens + estimateMessagesTokens(selected);
     const reason: CompactionReason = policy.force
       ? "manual"

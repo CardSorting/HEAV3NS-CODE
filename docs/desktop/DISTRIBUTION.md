@@ -70,7 +70,8 @@ including its engine and runtime, so the executable code has one release identit
 Open the matching DMG, drag HEAV3NS-CODE to Applications, and launch normally.
 The verified terminal installer selects the architecture, pins the app identity and
 Developer Team, verifies SHA-256 and Gatekeeper acceptance, refuses a running app,
-prevents downgrades, and keeps a rollback copy. `--check` does not install anything.
+prevents downgrades, and keeps a hidden rollback copy without a `.app` extension,
+so the old version does not appear as another installed app. `--check` does not install anything.
 It updates an existing installation rather than stopping work or silently creating
 another app. Workspace files, credentials, histories, and drafts remain outside the
 app bundle.

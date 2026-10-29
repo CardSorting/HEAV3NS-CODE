@@ -1,8 +1,104 @@
 import AppKit
 import CryptoKit
+import Foundation
+
+final class AttachmentTokenBar: NSStackView {
+    private(set) var urls = [URL]()
+    var onRemove: ((URL) -> Void)?
+    var onChange: (() -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        orientation = .horizontal; alignment = .centerY; spacing = 6
+        translatesAutoresizingMaskIntoConstraints = false
+        isHidden = true
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+
+    func add(url: URL) {
+        guard !urls.contains(url) else { return }
+        urls.append(url)
+        render(); onChange?()
+    }
+
+    func remove(url: URL) {
+        urls.removeAll { $0 == url }
+        render(); onRemove?(url); onChange?()
+    }
+
+    func clear() {
+        urls.removeAll(); render(); onChange?()
+    }
+
+    private func render() {
+        arrangedSubviews.forEach { $0.removeFromSuperview() }
+        isHidden = urls.isEmpty
+        for url in urls {
+            let pill = NSStackView()
+            pill.orientation = .horizontal; pill.alignment = .centerY; pill.spacing = 4
+            pill.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+            pill.wantsLayer = true; pill.layer?.cornerRadius = 5
+            pill.layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+
+            let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: url.path))
+            icon.widthAnchor.constraint(equalToConstant: 14).isActive = true
+            icon.heightAnchor.constraint(equalToConstant: 14).isActive = true
+
+            let name = JourneyStyle.label(url.lastPathComponent, size: 11, weight: .medium)
+            name.maximumNumberOfLines = 1; name.lineBreakMode = .byTruncatingMiddle
+
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value ?? 0
+            let sizeLabel = JourneyStyle.label(ByteCountFormatter.string(fromByteCount: size, countStyle: .file), size: 10, secondary: true)
+
+            let remove = JourneyButton("", symbol: "xmark.circle.fill") { [weak self] in
+                self?.remove(url: url)
+            }
+            remove.bezelStyle = .inline; remove.toolTip = "Remove attachment"
+            remove.widthAnchor.constraint(equalToConstant: 14).isActive = true
+            remove.heightAnchor.constraint(equalToConstant: 14).isActive = true
+
+            for child in [icon, name, sizeLabel, remove] { pill.addArrangedSubview(child) }
+            addArrangedSubview(pill)
+        }
+    }
+}
 
 final class ComposerView: NSTextView {
     var submit: (() -> Void)?
+    var onFileDropped: ((URL) -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        registerForDraggedTypes([.fileURL])
+    }
+    override init(frame frameRect: NSRect, textContainer: NSTextContainer?) {
+        super.init(frame: frameRect, textContainer: textContainer)
+        registerForDraggedTypes([.fileURL])
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes([.fileURL])
+    }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if sender.draggingPasteboard.canReadItem(withDataConformingToTypes: [NSPasteboard.PasteboardType.fileURL.rawValue]) {
+            return .copy
+        }
+        return super.draggingEntered(sender)
+    }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !urls.isEmpty {
+            for url in urls { onFileDropped?(url) }
+            return true
+        }
+        return super.performDragOperation(sender)
+    }
+    override func paste(_ sender: Any?) {
+        if let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], !urls.isEmpty {
+            for url in urls { onFileDropped?(url) }
+            return
+        }
+        super.paste(sender)
+    }
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard string.isEmpty, !hasMarkedText() else { return }
@@ -28,6 +124,100 @@ private final class TranscriptScrollView: NSScrollView {
     }
 }
 
+final class TurnScrubberRail: NSView {
+    struct TurnItem {
+        let index: Int
+        let rowIndex: Int
+        let preview: String
+        let isActive: Bool
+        let isError: Bool
+    }
+    var turns: [TurnItem] = [] {
+        didSet {
+            isHidden = turns.count < 2
+            needsDisplay = true
+        }
+    }
+    var onSelectTurn: ((Int) -> Void)?
+    private var hoveredIndex: Int?
+    private var trackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true; translatesAutoresizingMaskIntoConstraints = false
+        widthAnchor.constraint(equalToConstant: 18).isActive = true
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        self.trackingArea = area
+    }
+
+    private func dotCenter(for index: Int) -> NSPoint {
+        let count = turns.count
+        guard count > 0 else { return .zero }
+        let totalHeight = bounds.height - 24
+        let step = totalHeight / CGFloat(max(1, count - 1))
+        let y = bounds.height - 12 - (CGFloat(index) * min(step, 24))
+        return NSPoint(x: bounds.midX, y: max(12, min(bounds.height - 12, y)))
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard turns.count >= 2 else { return }
+        if let first = turns.indices.first, let last = turns.indices.last {
+            let p1 = dotCenter(for: first), p2 = dotCenter(for: last)
+            let path = NSBezierPath()
+            path.move(to: p1); path.line(to: p2); path.lineWidth = 1.0
+            NSColor.separatorColor.withAlphaComponent(0.4).setStroke()
+            path.stroke()
+        }
+        for (i, turn) in turns.enumerated() {
+            let center = dotCenter(for: i)
+            let isHovered = (hoveredIndex == i)
+            let radius: CGFloat = isHovered ? 4.5 : (turn.isActive ? 4.0 : 3.0)
+            let dotRect = NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+            let dotPath = NSBezierPath(ovalIn: dotRect)
+            let color: NSColor = turn.isError ? .systemOrange : (turn.isActive ? .controlAccentColor : (isHovered ? .secondaryLabelColor : .tertiaryLabelColor))
+            color.setFill()
+            dotPath.fill()
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        let previous = hoveredIndex
+        hoveredIndex = turns.indices.first(where: {
+            let center = dotCenter(for: $0)
+            let dx = location.x - center.x, dy = location.y - center.y
+            return (dx * dx + dy * dy) <= 64
+        })
+        if previous != hoveredIndex {
+            needsDisplay = true
+            if let hoveredIndex, turns.indices.contains(hoveredIndex) {
+                toolTip = turns[hoveredIndex].preview
+            } else { toolTip = nil }
+        }
+    }
+    override func mouseExited(with event: NSEvent) {
+        hoveredIndex = nil; toolTip = nil; needsDisplay = true
+    }
+    override func mouseUp(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        if let target = turns.indices.first(where: {
+            let center = dotCenter(for: $0)
+            let dx = location.x - center.x, dy = location.y - center.y
+            return (dx * dx + dy * dy) <= 100
+        }) {
+            onSelectTurn?(turns[target].rowIndex)
+        }
+    }
+}
+
 final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate, NSToolbarDelegate {
     let folder: URL
     private(set) var client = RuntimeClient()
@@ -45,14 +235,37 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var removingQueued = Set<String>()
     private let jumpButton = NSButton(title: "Jump to Latest", target: nil, action: nil)
     private let composer = ComposerView()
+    private let attachmentBar = AttachmentTokenBar()
+    private let jumpBar = NSPathControl()
+    private let toolbarHistory = NSSegmentedControl(images: [
+        NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Back in history")!,
+        NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Forward in history")!
+    ], trackingMode: .momentary, target: nil, action: nil)
     private let transcript = NSTableView()
     private let transcriptScroll = TranscriptScrollView()
+    private let turnScrubber = TurnScrubberRail()
     private let inspection = NSTextView()
     private let inspectionScroll = NSScrollView()
+    private let documentView = NativeDocumentView()
+    private var binaryDocumentLoader: BinaryDocumentLoader?
+    private let viewportStore: WorkspaceViewportStore
+    private var currentViewport: WorkspaceViewport?
+    private var viewportBranch: String?
+    private var viewportObserver: NSObjectProtocol?
+    private var viewportSaveTimer: Timer?
+    private var viewportRestoring = false
+    private var viewportSaveFailed = false
+    private var viewportBranchGeneration = 0
+    private var viewportBranchTimer: Timer?
+    private var viewportBranchCheckPending = false
+    private var viewportBranchCheckFailureShown = false
     private let inspector = NSStackView()
     private let inspectorTitle = NSTextField(labelWithString: "Inspect")
     private let navigation = NavigationSidebar()
     private lazy var conversations = ConversationSidebar(folder: folder)
+    private let leftSidebar = NSVisualEffectView()
+    private let navigatorTabs = NSSegmentedControl(labels: ["Chats", "Files", "Changes"], trackingMode: .selectOne, target: nil, action: nil)
+    private let leftNavigatorStack = NSStackView()
     private let chatTitle = JourneyStyle.label("New conversation", size: 21, weight: .semibold)
     private let chatState = JourneyStyle.label("Tell LUMI what you want to build.", size: 12, secondary: true)
     private let contextPanel = NSStackView()
@@ -72,6 +285,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let contextSeparator = JourneyStyle.rule()
     private let browseContext = NSButton(title: "Browse files", target: nil, action: nil)
     private var browsingCompact = true
+    private var isContextMaximized = false
+    var canMaximizeContext: Bool { showingInspector && !contextPanel.isHidden }
+    @objc func toggleMaximizeContext() {
+        guard canMaximizeContext else { return }
+        isContextMaximized.toggle()
+        adapt()
+    }
     private var currentConversation: String?
     private var conversationList = [ConversationSummary]()
     private var conversationOffset = 0
@@ -84,6 +304,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let approvalText = NSTextView()
     private let reviewApprovalButton = NSButton(title: "Review Request…", target: nil, action: nil)
     private let denyButton = NSButton(title: "Deny", target: nil, action: nil)
+    private let allowButton = NSButton(title: "Allow Once", target: nil, action: nil)
     private var approvalReview: ApprovalReview?
     private struct ApprovalDecision: Equatable {
         let id = UUID()
@@ -98,6 +319,22 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let surfaces = NSSegmentedControl(labels: ["Conversation", "Task context"], trackingMode: .selectOne, target: nil, action: nil)
     private var rows = [TranscriptRow]()
     private var runs = [[String: Any]]()
+    private struct SideQuestion {
+        let id: String, conversation: String, question: String
+        var answer: String? = nil
+        var failed = false
+        var contextLimited = false
+    }
+    private var sideQuestions = [SideQuestion]()
+    private var sideQuestionPending: String?
+    private var projectTaskRevision = -1
+    private var projectTaskDisplayedRevision = -1
+    private var projectTaskMovePending = false
+    private var projectTaskOffset = 0
+    private var projectTaskPreviousOffsets = [Int]()
+    private var projectTaskFilters = [ProjectTaskFilter]()
+    private var projectTasksLoading = false
+    private var projectTasksRefreshPending = false
     private var sequence = 0
     private var active: String?
     private var pendingRequest: String?
@@ -156,6 +393,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private var recoverySubmission: WorkspaceDraft.Submission?
     private var draftTimer: Timer?
     private var savedDraftText = ""
+    private var savedDraftAttachments: [String] = []
     private var savedSubmission: WorkspaceDraft.Submission?
     private var draftSaveFailed = false
     private var stopThenSend: (text: String, runs: Set<String>)?
@@ -177,15 +415,16 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     var isClosing: Bool { closing }
     var canInspectBack: Bool { inspectionHistory.canGoBack && window?.attachedSheet == nil }
     var canInspectForward: Bool { inspectionHistory.canGoForward && window?.attachedSheet == nil }
-    var canFindInInspection: Bool { showingInspector && !inspector.isHidden && window?.attachedSheet == nil }
+    var canFindInInspection: Bool { showingInspector && !inspector.isHidden && documentView.isHidden && window?.attachedSheet == nil }
     var canReviewApproval: Bool { currentApproval != nil && window?.attachedSheet == nil && !closing }
     var canOpenFile: Bool { client.isReady && client.capabilities.contains("file-search-v1") && !switchingConversation && !closing && window?.attachedSheet == nil }
     var canChooseModels: Bool { !reasoningPicker.pending && client.isReady && client.capabilities.contains("model-selection-v1") && !closing && window?.attachedSheet == nil }
     var canCreateConversation: Bool { canSwitchConversation && window?.attachedSheet == nil }
 
-    init(folder: URL, runtimeClient: RuntimeClient? = nil, draftStore: WorkspaceDraftStore? = nil) {
+    init(folder: URL, runtimeClient: RuntimeClient? = nil, draftStore: WorkspaceDraftStore? = nil, viewportStore: WorkspaceViewportStore? = nil) {
         self.folder = folder
         self.draftStore = draftStore ?? WorkspaceDraftStore(folder: folder, root: IntegrationProbe()?.draftRoot)
+        self.viewportStore = viewportStore ?? WorkspaceViewportStore(folder: folder)
         if let runtimeClient { client = runtimeClient }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1440, height: 880), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "\(folder.lastPathComponent) — HEAV3NS-CODE"
@@ -198,10 +437,20 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         build()
         restoreDraft()
         configureClient()
+        viewportBranchTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            guard let self, self.window?.isVisible == true, self.window?.isMiniaturized == false, !self.closing else { return }
+            self.checkViewportBranch()
+        }
         window.center()
     }
     private func configureClient() {
+        viewportBranchGeneration += 1; viewportBranchCheckPending = false; viewportBranchCheckFailureShown = false
         let source = client
+        projectTaskRevision = -1; projectTaskDisplayedRevision = -1; projectTaskOffset = 0; projectTaskPreviousOffsets = []; projectTaskMovePending = false; projectTasksLoading = false; projectTasksRefreshPending = false
+        client.onNotice = { [weak self, weak source] message in
+            guard let self, self.client === source else { return }
+            self.showNotice(message)
+        }
         client.onConnection = { [weak self, weak source] value in
             guard let self, let source, self.client === source else { return }; self.connection = value; self.updateStatus(); self.walkthroughLoaded = nil; self.updateWalkthrough()
             self.modelPicker?.connectionChanged()
@@ -212,6 +461,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.recovering = false
                 self.reconcileSubmission()
                 self.refreshNavigation()
+                self.refreshProjectTasks()
                 self.loadConversations()
                 if self.client.capabilities.contains("model-selection-v1") {
                     source.request("models.list", params: [:]) { [weak self, weak source] result in
@@ -221,6 +471,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 }
                 self.probe?.connected(self)
             } else if value != "Connecting to LUMI…" {
+                self.walkthrough.projectTasksUnavailable("Connect to LUMI to view project tasks.")
+                self.walkthrough.setProjectTaskMovesEnabled(false)
                 self.reasoningPicker.connectionLost()
                 self.switchingConversation = false; self.expectedConversation = nil
                 self.quickOpen?.dismiss()
@@ -295,8 +547,41 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         let toolbar = NSToolbar(identifier: "workspace"); toolbar.delegate = self; toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window?.toolbar = toolbar; window?.toolbarStyle = .unified
+        toolbarHistory.target = self; toolbarHistory.action = #selector(toolbarHistoryClicked)
+        toolbarHistory.segmentDistribution = .fit
+        toolbarHistory.setAccessibilityLabel("Navigation History")
+        toolbarHistory.setEnabled(false, forSegment: 0)
+        toolbarHistory.setEnabled(false, forSegment: 1)
+        toolbarHistory.widthAnchor.constraint(equalToConstant: 54).isActive = true
+        jumpBar.pathStyle = .standard; jumpBar.isEditable = false; jumpBar.target = self; jumpBar.action = #selector(openJumpBarSegment)
+        jumpBar.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        jumpBar.setAccessibilityLabel("Workspace jump bar")
+        jumpBar.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
+        jumpBar.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
+        updateJumpBar()
         navigation.useAsContextBrowser()
-        conversations.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        navigatorTabs.target = self; navigatorTabs.action = #selector(switchNavigatorTab); navigatorTabs.selectedSegment = 0
+        navigatorTabs.setAccessibilityLabel("Navigator: Chats, Files, or Changes")
+        navigatorTabs.segmentDistribution = .fillEqually
+        leftSidebar.material = .sidebar; leftSidebar.blendingMode = .withinWindow; leftSidebar.state = .followsWindowActiveState
+        leftSidebar.widthAnchor.constraint(equalToConstant: 250).isActive = true
+        leftNavigatorStack.orientation = .vertical; leftNavigatorStack.alignment = .leading; leftNavigatorStack.spacing = 8
+        leftNavigatorStack.edgeInsets = NSEdgeInsets(top: 14, left: 8, bottom: 14, right: 8)
+        leftSidebar.addSubview(leftNavigatorStack)
+        leftNavigatorStack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            leftNavigatorStack.leadingAnchor.constraint(equalTo: leftSidebar.leadingAnchor),
+            leftNavigatorStack.trailingAnchor.constraint(equalTo: leftSidebar.trailingAnchor),
+            leftNavigatorStack.topAnchor.constraint(equalTo: leftSidebar.topAnchor),
+            leftNavigatorStack.bottomAnchor.constraint(equalTo: leftSidebar.bottomAnchor)
+        ])
+        leftNavigatorStack.addArrangedSubview(navigatorTabs)
+        navigatorTabs.widthAnchor.constraint(equalTo: leftNavigatorStack.widthAnchor, constant: -16).isActive = true
+        leftNavigatorStack.addArrangedSubview(conversations)
+        leftNavigatorStack.addArrangedSubview(navigation)
+        conversations.widthAnchor.constraint(equalTo: leftNavigatorStack.widthAnchor).isActive = true
+        navigation.widthAnchor.constraint(equalTo: leftNavigatorStack.widthAnchor).isActive = true
+        navigation.isHidden = true
         conversations.onDelete = { [weak self] id in self?.confirmDeleteConversation(id) }
         conversations.onNew = { [weak self] in self?.newConversation() }
         conversations.onSelect = { [weak self] id in self?.selectConversation(id) }
@@ -350,6 +635,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             control.setContentHuggingPriority(.required, for: .horizontal)
         }
         inspectionBack.isEnabled = false; inspectionForward.isEnabled = false
+        toolbarHistory.setEnabled(false, forSegment: 0)
+        toolbarHistory.setEnabled(false, forSegment: 1)
+        updateJumpBar()
         let inspectorBar = stack([inspectionBack, inspectionForward, inspectorTitle, inspectionFind, refreshInspect], spacing: 4)
         inspector.addArrangedSubview(inspectorBar)
         inspectorBar.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
@@ -374,15 +662,23 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         outline.setAccessibilityLabel("Declarations in the displayed code page")
         inspector.addArrangedSubview(outline); outline.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
         inspection.isEditable = false; inspection.isSelectable = true; inspection.isRichText = false
+        inspection.delegate = self
         inspection.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         inspection.textContainerInset = NSSize(width: 12, height: 12)
         inspection.isAutomaticLinkDetectionEnabled = false
         inspection.usesFindBar = true; inspection.isIncrementalSearchingEnabled = true
         inspection.setAccessibilityLabel("Read-only file, diff or recorded evidence")
         inspectionScroll.documentView = inspection; inspectionScroll.hasVerticalScroller = true
+        inspectionScroll.contentView.postsBoundsChangedNotifications = true
+        viewportObserver = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: inspectionScroll.contentView, queue: .main) { [weak self] _ in self?.scheduleViewportSave() }
         inspectionScroll.autohidesScrollers = true
         inspection.isVerticallyResizable = true; inspection.autoresizingMask = [.width]
         inspector.addArrangedSubview(inspectionScroll)
+        documentView.isHidden = true
+        documentView.onChange = { [weak self] in self?.scheduleViewportSave() }
+        inspector.addArrangedSubview(documentView)
+        documentView.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
+        documentView.setContentHuggingPriority(.init(1), for: .vertical); documentView.setContentCompressionResistancePriority(.init(1), for: .vertical)
         moreButton.target = self; moreButton.action = #selector(loadNextPage); moreButton.bezelStyle = .rounded; moreButton.isHidden = true
         previousButton.target = self; previousButton.action = #selector(loadPreviousPage); previousButton.bezelStyle = .rounded; previousButton.isEnabled = false
         pageLabel.font = .systemFont(ofSize: 10); pageLabel.textColor = .secondaryLabelColor; pageLabel.lineBreakMode = .byTruncatingTail
@@ -397,13 +693,20 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         inspectionScroll.widthAnchor.constraint(equalTo: inspector.widthAnchor).isActive = true
         transcriptScroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 270).isActive = true
 
+        turnScrubber.onSelectTurn = { [weak self] rowIndex in
+            guard let self, self.rows.indices.contains(rowIndex) else { return }
+            self.transcript.scrollRowToVisible(rowIndex)
+        }
+        let transcriptArea = stack([turnScrubber, transcriptScroll], vertical: false, spacing: 6)
+        transcriptScroll.setContentHuggingPriority(.init(1), for: .horizontal)
+
         surfaces.selectedSegment = 0; surfaces.target = self; surfaces.action = #selector(switchSurface); surfaces.isHidden = true
         // Reserve a stable navigation row so the jump control never covers a reply
         // or changes the reading position when it appears.
         let transcriptNavigation = stack([NSView(), jumpButton], spacing: 8)
         transcriptNavigation.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        let work = stack([transcriptScroll, transcriptNavigation], vertical: true, spacing: 0)
-        transcriptScroll.widthAnchor.constraint(equalTo: work.widthAnchor).isActive = true
+        let work = stack([transcriptArea, transcriptNavigation], vertical: true, spacing: 0)
+        transcriptArea.widthAnchor.constraint(equalTo: work.widthAnchor).isActive = true
         transcriptNavigation.widthAnchor.constraint(equalTo: work.widthAnchor).isActive = true
 
         approval.orientation = .vertical; approval.alignment = .leading; approval.spacing = 6; approval.isHidden = true
@@ -421,13 +724,30 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         reviewApprovalButton.target = self; reviewApprovalButton.action = #selector(showApprovalReview); reviewApprovalButton.bezelStyle = .rounded
         reviewApprovalButton.toolTip = "Review the full operation before deciding (⌘5)"
         denyButton.target = self; denyButton.action = #selector(deny); denyButton.bezelStyle = .rounded
-        approval.addArrangedSubview(stack([denyButton, reviewApprovalButton]))
+        denyButton.toolTip = "Deny this operation"
+        allowButton.target = self; allowButton.action = #selector(allowOnce); allowButton.bezelStyle = .rounded
+        allowButton.bezelColor = .controlAccentColor
+        allowButton.isEnabled = false
+        allowButton.toolTip = "Allow this operation once without opening full review"
+        denyButton.isEnabled = false
+        approval.addArrangedSubview(stack([denyButton, reviewApprovalButton, allowButton]))
 
         composer.font = .systemFont(ofSize: 14); composer.isRichText = false; composer.delegate = self
         composer.isAutomaticQuoteSubstitutionEnabled = false; composer.isAutomaticDashSubstitutionEnabled = false
         composer.textContainerInset = NSSize(width: 0, height: 3); composer.drawsBackground = false
         composer.setAccessibilityLabel("Instruction to LUMI")
         composer.submit = { [weak self] in self?.submit() }
+        composer.onFileDropped = { [weak self] url in
+            guard let self else { return }
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value ?? 0
+            if size > 20 * 1024 * 1024 {
+                self.showNotice("Attachments are limited to 20MB. Choose a smaller file.")
+                return
+            }
+            self.attachmentBar.add(url: url)
+            self.saveDraft()
+        }
+        attachmentBar.onChange = { [weak self] in self?.saveDraft() }
         let composerScroll = NSScrollView(); composerScroll.documentView = composer; composerScroll.hasVerticalScroller = true
         composerScroll.borderType = .noBorder; composerScroll.drawsBackground = false; composerScroll.autohidesScrollers = true
         composer.isVerticallyResizable = true; composer.autoresizingMask = [.width]
@@ -461,8 +781,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         composerSurface.borderWidth = 1; composerSurface.cornerRadius = 10
         composerSurface.fillColor = .textBackgroundColor; composerSurface.borderColor = .separatorColor; composerSurface.contentViewMargins = .zero
         let composerContent = NSView(); composerSurface.contentView = composerContent
-        let composerGroup = stack([composerScroll, composerBar], vertical: true, spacing: 8)
+        let composerGroup = stack([attachmentBar, composerScroll, composerBar], vertical: true, spacing: 8)
         composerContent.addSubview(composerGroup); JourneyStyle.pin(composerGroup, to: composerContent, inset: 10)
+        attachmentBar.widthAnchor.constraint(equalTo: composerGroup.widthAnchor).isActive = true
         composerScroll.widthAnchor.constraint(equalTo: composerGroup.widthAnchor).isActive = true
         composerBar.widthAnchor.constraint(equalTo: composerGroup.widthAnchor).isActive = true
         chatTitle.maximumNumberOfLines = 1; chatTitle.lineBreakMode = .byTruncatingTail
@@ -503,10 +824,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         buildContextPanel()
         contextWidth = contextPanel.widthAnchor.constraint(equalToConstant: 350); contextWidth?.isActive = true
         contextSeparator.widthAnchor.constraint(equalToConstant: 1).isActive = true
-        let body = stack([conversations, center, contextSeparator, contextPanel], spacing: 0)
+        let body = stack([leftSidebar, center, contextSeparator, contextPanel], spacing: 0)
         body.alignment = .top
         center.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
-        conversations.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        leftSidebar.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
+        conversations.heightAnchor.constraint(equalTo: leftNavigatorStack.heightAnchor, constant: -44).isActive = true
+        navigation.heightAnchor.constraint(equalTo: leftNavigatorStack.heightAnchor, constant: -44).isActive = true
         contextPanel.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
         contextSeparator.heightAnchor.constraint(equalTo: body.heightAnchor).isActive = true
         let root = stack([body], vertical: true, spacing: 0)
@@ -534,11 +857,27 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         walkthrough.onOpenFile = { [weak self] path in self?.readFile(path) }
         walkthrough.onChanges = { [weak self] in self?.showChanges() }
         walkthrough.onOutput = { [weak self] id in self?.inspect(.run(id)) }
+        walkthrough.onMoveProjectTask = { [weak self] task, status in self?.moveProjectTask(task, status: status) }
+        walkthrough.onPreviousTaskPage = { [weak self] in
+            guard let self, let previous = self.projectTaskPreviousOffsets.popLast() else { return }
+            self.projectTaskOffset = previous; self.refreshProjectTasks()
+        }
+        walkthrough.onNextTaskPage = { [weak self] next in
+            guard let self, next > self.projectTaskOffset else { return }
+            self.projectTaskPreviousOffsets.append(self.projectTaskOffset); self.projectTaskOffset = next; self.refreshProjectTasks()
+        }
+        walkthrough.onProjectTaskFilters = { [weak self] filters in
+            guard let self, self.projectTaskFilters != filters else { return }
+            self.projectTaskFilters = filters; self.projectTaskOffset = 0; self.projectTaskPreviousOffsets = []; self.refreshProjectTasks()
+        }
         walkthrough.onReview = { [weak self] in self?.showApprovalReview() }
         walkthrough.onRetryLoad = { [weak self] in self?.walkthroughLoaded = nil; self?.loadWalkthrough() }
         walkthrough.onContinue = { [weak self] continuation in self?.continueWork(continuation) }
         let rule = JourneyStyle.rule()
-        projectRun.onState = { [weak self] in self?.checkpointWindow?.refreshAvailability() }
+        projectRun.onState = { [weak self] in
+            self?.checkpointWindow?.refreshAvailability()
+            self?.adapt()
+        }
         projectRun.onRepair = { [weak self] launch in self?.repairProject(launch) }
         projectRun.onShowRepair = { [weak self] run in self?.showProjectRepair(run) }
         projectRunScroll.documentView = projectRun; projectRunScroll.hasVerticalScroller = true; projectRunScroll.drawsBackground = false
@@ -546,9 +885,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         projectRun.heightAnchor.constraint(greaterThanOrEqualTo: projectRunScroll.contentView.heightAnchor).isActive = true
         let fittingHeight = projectRun.heightAnchor.constraint(equalTo: projectRunScroll.contentView.heightAnchor); fittingHeight.priority = .defaultLow; fittingHeight.isActive = true
         projectRunScroll.setContentHuggingPriority(.init(1), for: .vertical)
-        [heading, contextTabs, rule, browseContext, walkthrough, navigation, inspector, projectRunScroll].forEach(contextPanel.addArrangedSubview)
+        [heading, contextTabs, rule, walkthrough, inspector, projectRunScroll].forEach(contextPanel.addArrangedSubview)
         for view in contextPanel.arrangedSubviews { view.widthAnchor.constraint(equalTo: contextPanel.widthAnchor, constant: -28).isActive = true }
-        browserHeight = navigation.heightAnchor.constraint(equalToConstant: 236); browserHeight?.isActive = true
         walkthrough.setContentHuggingPriority(.init(1), for: .vertical)
         inspector.setContentHuggingPriority(.init(1), for: .vertical)
     }
@@ -596,6 +934,44 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         updateWalkthroughVisibility()
         loadWalkthrough()
         probe?.walkthroughChanged(self, stage: walkthroughStage)
+    }
+    private func moveProjectTask(_ task: ProjectTask, status: String) {
+        guard client.isReady, client.capabilities.contains("project-tasks-move-v1"), !projectTaskMovePending, projectTaskDisplayedRevision >= 0 else { return }
+        projectTaskMovePending = true; walkthrough.setProjectTaskMovesEnabled(false)
+        let source = client
+        source.request("project.tasks.move", params: ["board": task.board, "id": task.id, "status": status, "revision": projectTaskDisplayedRevision]) { [weak self, weak source] result in
+            guard let self, let source, self.client === source else { return }
+            self.projectTaskMovePending = false
+            self.walkthrough.setProjectTaskMovesEnabled(source.isReady && source.capabilities.contains("project-tasks-move-v1"))
+            if case .failure(let error) = result { self.showNotice(error.localizedDescription) }
+            self.refreshProjectTasks()
+        }
+    }
+    private func refreshProjectTasks() {
+        guard client.isReady, client.capabilities.contains("project-tasks-v1") else {
+            walkthrough.projectTasksUnavailable(client.isReady ? "This runtime does not provide project tasks." : "Connect to LUMI to view project tasks.")
+            return
+        }
+        if projectTasksLoading { projectTasksRefreshPending = true; return }
+        projectTasksLoading = true; projectTasksRefreshPending = false
+        walkthrough.setProjectTaskMovesEnabled(false); walkthrough.projectTasksLoading()
+        let source = client
+        let offset = projectTaskOffset
+        let filters = projectTaskFilters
+        let query = filters.map { ["field": $0.field.rawValue.lowercased(), "operator": $0.operation.rawValue, "value": $0.value] }
+        source.request("project.tasks.list", params: ["offset": offset, "filters": query]) { [weak self, weak source] result in
+            guard let self, let source, self.client === source else { return }
+            self.projectTasksLoading = false
+            switch result {
+            case .success(let data):
+                if let snapshot = ProjectTaskSnapshot(data), snapshot.revision >= self.projectTaskRevision, offset == self.projectTaskOffset, filters == self.projectTaskFilters {
+                    self.projectTaskRevision = snapshot.revision; self.projectTaskDisplayedRevision = snapshot.revision; self.walkthrough.showProjectTasks(snapshot)
+                    self.walkthrough.setProjectTaskMovesEnabled(source.capabilities.contains("project-tasks-move-v1") && !self.projectTaskMovePending)
+                } else { self.projectTasksRefreshPending = true }
+            case .failure(let error): self.walkthrough.projectTasksUnavailable(error.localizedDescription)
+            }
+            if self.projectTasksRefreshPending { self.refreshProjectTasks() }
+        }
     }
     var walkthroughStage: String { walkthrough.diagnostics["stage"] as? String ?? "" }
     private func updateWalkthroughVisibility() {
@@ -725,6 +1101,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         workspaceRefreshTimer?.invalidate(); workspaceRefreshTimer = nil
         inspectionHistory = InspectionHistory(); reloadInspection = nil; nextChunk = nil; previousChunk = nil
         inspectionBack.isEnabled = false; inspectionForward.isEnabled = false
+        toolbarHistory.setEnabled(false, forSegment: 0)
+        toolbarHistory.setEnabled(false, forSegment: 1)
+        updateJumpBar()
         inspectedFile = nil; inspectedDiff = nil; declarations = []
         inspection.string = "Choose a file, change, or recorded instruction to inspect."
         inspectorTitle.stringValue = "Inspect"; pageLabel.stringValue = "Read only"
@@ -740,12 +1119,20 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
 
     // The toolbar stays in native window chrome. Stop never enters overflow.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("navigation"), .flexibleSpace, .init("project"), .init("state"), .init("stop"), .init("actions")]
+        [.init("navigation"), .init("history"), .init("jumpBar"), .flexibleSpace, .init("project"), .init("state"), .init("stop"), .init("actions")]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier.rawValue {
+        case "history":
+            item.label = "History"
+            item.toolTip = "Navigate Back (⌘[) or Forward (⌘])"
+            item.view = toolbarHistory
+        case "jumpBar":
+            item.label = "Jump Bar"
+            item.toolTip = "Current Workspace Context (Jump Bar)"
+            item.view = jumpBar
         case "project":
             item.label = "Run Project"; item.toolTip = "Run Project (⌘R)"
             item.image = NSImage(systemSymbolName: "play.circle", accessibilityDescription: "Run Project")
@@ -765,6 +1152,41 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         default: return nil
         }
         return item
+    }
+    @objc private func toolbarHistoryClicked() {
+        if toolbarHistory.selectedSegment == 0 {
+            inspectBack()
+        } else if toolbarHistory.selectedSegment == 1 {
+            inspectForward()
+        }
+    }
+    @objc private func openJumpBarSegment() {
+        guard let item = jumpBar.clickedPathItem, let url = item.url else { return }
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) {
+            if isDir.boolValue {
+                showFiles()
+            } else {
+                readFile(url.path)
+            }
+        }
+    }
+    private func updateJumpBar() {
+        switch inspectionHistory.current {
+        case .file(let path):
+            let fullURL = path.hasPrefix("/") ? URL(fileURLWithPath: path) : folder.appendingPathComponent(path)
+            jumpBar.url = fullURL
+        case .diff(let path, _):
+            let fullURL = path.hasPrefix("/") ? URL(fileURLWithPath: path) : folder.appendingPathComponent(path)
+            jumpBar.url = fullURL
+        default:
+            if let convo = currentConversation, !convo.isEmpty {
+                let title = chatTitle.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                jumpBar.url = folder.appendingPathComponent(title.isEmpty ? "Chat" : title)
+            } else {
+                jumpBar.url = folder
+            }
+        }
     }
     private func updateModel(_ selection: WorkspaceModelSelection) {
         reasoningPicker.receive(selection)
@@ -791,12 +1213,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }, onSelection: { [weak self] in self?.updateModel($0) })
         modelPicker?.present(for: window)
     }
-    @objc func showActions() {
-        guard let window, window.attachedSheet == nil else { return }
-        palette?.cancelOperation(nil)
+    private func buildActions() -> [WorkspaceAction] {
         var actions = [
             WorkspaceAction(title: "Open Workspace…", shortcut: "⌘O") { NSApp.sendAction(#selector(ApplicationDelegate.openFolder), to: NSApp.delegate, from: nil) },
             WorkspaceAction(title: "Focus Composer", shortcut: "⌘L") { [weak self] in self?.focusComposer() },
+            WorkspaceAction(title: "Show Chats", shortcut: "⇧⌘C", keywords: ["chat", "conversations", "threads", "sidebar"]) { [weak self] in self?.showChats() },
             WorkspaceAction(title: "Show Files", shortcut: "⌘1") { [weak self] in self?.showFiles() },
             WorkspaceAction(title: "Show Changes", shortcut: "⌘2") { [weak self] in self?.showChanges() },
             WorkspaceAction(title: "Show Recorded Runs", shortcut: "⌘3", keywords: ["history", "sessions"]) { [weak self] in self?.showSessions() },
@@ -821,13 +1242,24 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if canSwitchConversation { actions.insert(WorkspaceAction(title: "New Conversation", shortcut: "⌘N") { [weak self] in self?.newConversation() }, at: 1) }
         if hasWork { actions.insert(WorkspaceAction(title: "Stop All Work", shortcut: "⌘.") { [weak self] in self?.stop() }, at: 1) }
         if canReviewApproval { actions.insert(WorkspaceAction(title: "Review Request…", shortcut: "⌘5") { [weak self] in self?.showApprovalReview() }, at: 1) }
+        if canDecideApproval {
+            actions.insert(WorkspaceAction(title: "Allow Operation Once", shortcut: "⇧⌘A", keywords: ["approval", "permission", "allow", "run"]) { [weak self] in self?.allowOnce() }, at: 1)
+            actions.insert(WorkspaceAction(title: "Deny Operation", shortcut: "⇧⌘D", keywords: ["approval", "reject", "cancel"]) { [weak self] in self?.deny() }, at: 2)
+        }
         if canContinueWork, let continuation = WorkspaceContinuation.latest(in: runs) {
             actions.insert(WorkspaceAction(title: continuation.title, shortcut: "") { [weak self] in self?.continueWork(continuation) }, at: 0)
         }
         if showingInspector { actions.append(WorkspaceAction(title: "Reload Inspected Content", shortcut: "") { [weak self] in self?.refreshInspection() }) }
+        if canMaximizeContext { actions.append(WorkspaceAction(title: isContextMaximized ? "Restore Task Context Size" : "Maximize Task Context", shortcut: "⌃⌘M", keywords: ["maximize", "expand", "context", "panel", "preview", "run", "inspect"]) { [weak self] in self?.toggleMaximizeContext() }) }
         if canInspectBack { actions.append(WorkspaceAction(title: "Back in Inspector", shortcut: "⌘[") { [weak self] in self?.inspectBack() }) }
         if canInspectForward { actions.append(WorkspaceAction(title: "Forward in Inspector", shortcut: "⌘]") { [weak self] in self?.inspectForward() }) }
         if canFindInInspection { actions.append(WorkspaceAction(title: "Find in Current Page", shortcut: "⌘F") { [weak self] in self?.findInInspection() }) }
+        return actions
+    }
+    @objc func showActions() {
+        guard let window, window.attachedSheet == nil else { return }
+        palette?.cancelOperation(nil)
+        let actions = buildActions()
         palette = ActionPalette(actions: actions); palette?.present(for: window)
     }
     @objc func showQuickOpen() {
@@ -836,8 +1268,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         quickOpen = QuickOpenWindow(folder: folder, search: { [weak self] query, refresh, completion in
             guard let self else { return }
             self.client.request("files.search", params: ["query": query, "refresh": refresh], completion: completion)
-        }, open: { [weak self] path in self?.readFile(path) })
-        quickOpen?.present(for: window)
+        }, actions: buildActions(), open: { [weak self] path in self?.readFile(path) })
+        quickOpen?.present(for: window, mode: .files)
     }
     var canShowMemory: Bool { client.isReady && client.capabilities.contains("conversation-memory-v1") && !switchingConversation && !closing }
     var canShowContext: Bool { client.isReady && client.capabilities.contains("conversation-context-v1") && !switchingConversation && !closing }
@@ -896,6 +1328,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             composer.string = draft.text; savedDraftText = draft.text
             currentConversation = draft.conversation; draftByConversation = draft.conversations ?? [:]
             recoverySubmission = draft.submission; savedSubmission = draft.submission
+            attachmentBar.clear()
+            if let attachments = draft.attachments {
+                for path in attachments {
+                    attachmentBar.add(url: URL(fileURLWithPath: path))
+                }
+            }
+            savedDraftAttachments = attachmentBar.urls.map(\.path)
             if let submission = draft.submission {
                 uncertainSubmission = submission
                 showNotice("Draft restored. Checking whether LUMI recorded the previous instruction before you can send again.")
@@ -904,11 +1343,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @discardableResult private func saveDraft() -> Bool {
         draftTimer?.invalidate(); draftTimer = nil
-        guard composer.string != savedDraftText || recoverySubmission != savedSubmission || draftSaveFailed else { return true }
+        let currentAttachments = attachmentBar.urls.map(\.path)
+        guard composer.string != savedDraftText || recoverySubmission != savedSubmission || currentAttachments != savedDraftAttachments || draftSaveFailed else { return true }
         do {
             if let currentConversation { draftByConversation[currentConversation] = composer.string }
-            try draftStore.save(text: composer.string, submission: recoverySubmission, conversation: currentConversation, conversations: draftByConversation)
-            savedDraftText = composer.string; savedSubmission = recoverySubmission; draftSaveFailed = false
+            try draftStore.save(text: composer.string, submission: recoverySubmission, conversation: currentConversation, conversations: draftByConversation, attachments: currentAttachments)
+            savedDraftText = composer.string; savedDraftAttachments = currentAttachments; savedSubmission = recoverySubmission; draftSaveFailed = false
             updateStatus(); return true
         } catch {
             draftSaveFailed = true
@@ -919,7 +1359,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     /// Native update restarts wait for every workspace and its draft checkpoint.
     func prepareForUpdateRestart() -> Bool {
         guard !hasWork, !closing, !switchingConversation, pendingRequest == nil,
-              uncertainSubmission == nil, !projectRun.running, !composer.hasMarkedText(),
+              uncertainSubmission == nil, sideQuestionPending == nil, !projectRun.running, !composer.hasMarkedText(),
               window?.attachedSheet == nil else { return false }
         return prepareToClose()
     }
@@ -933,7 +1373,74 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     @objc func submit() {
         guard !composer.hasMarkedText() else { return }
-        submitInstruction(composer.string.trimmingCharacters(in: .whitespacesAndNewlines))
+        let text = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text == "/compact" { compactContext(); return }
+        if let question = Self.sideQuestion(from: text) { askSideQuestion(question, original: text); return }
+        submitInstruction(text)
+    }
+    private static func sideQuestion(from text: String) -> String? {
+        guard text == "/btw" || (text.hasPrefix("/btw") && text.dropFirst(4).first?.isWhitespace == true) else { return nil }
+        return text.dropFirst(4).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private func askSideQuestion(_ question: String, original: String) {
+        guard !question.isEmpty else { showNotice("Add a question after /btw. Your draft is preserved."); return }
+        guard client.isReady, client.capabilities.contains("side-query-v1"), let conversation = currentConversation, !switchingConversation, !closing else {
+            showNotice("Isolated side questions are unavailable. Your draft is preserved."); return
+        }
+        guard sideQuestionPending == nil else { showNotice("Wait for the current side question to finish. Your draft is preserved."); return }
+        guard attachmentBar.urls.isEmpty else { showNotice("Remove attachments before asking a side question. Your draft is preserved."); return }
+        guard question.utf16.count <= client.instructionLimit else { showNotice("The side question is too long. Your draft is preserved."); return }
+        let id = UUID().uuidString, source = client
+        sideQuestionPending = id
+        sideQuestions.append(SideQuestion(id: id, conversation: conversation, question: question))
+        sideQuestions = Array(sideQuestions.suffix(12))
+        rebuildRows()
+        var starting = true
+        var immediateFailure: Error?
+        source.request("side.query", params: ["conversation": conversation, "question": question], id: id) { [weak self, weak source] result in
+            guard let self, let source, self.client === source else { return }
+            if starting, case .failure(let error) = result { immediateFailure = error; return }
+            self.sideQuestionPending = nil
+            guard let index = self.sideQuestions.firstIndex(where: { $0.id == id }) else { self.updateStatus(); return }
+            switch result {
+            case .success(let data):
+                if data["conversation"] as? String == conversation {
+                    self.sideQuestions[index].answer = data["response"] as? String
+                    self.sideQuestions[index].contextLimited = data["contextLimited"] as? Bool == true
+                } else { self.sideQuestions[index].answer = "The answer belonged to a different conversation and was not shown."; self.sideQuestions[index].failed = true }
+            case .failure(let error): self.sideQuestions[index].answer = error.localizedDescription; self.sideQuestions[index].failed = true
+            }
+            self.rebuildRows()
+        }
+        starting = false
+        if let immediateFailure {
+            sideQuestionPending = nil; sideQuestions.removeAll { $0.id == id }; rebuildRows(); showNotice(immediateFailure.localizedDescription); return
+        }
+        if composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == original { composer.string = "" }
+        saveDraft(); updateStatus()
+    }
+    private func compactContext() {
+        guard client.capabilities.contains("context-compact-v1"), let conversation = currentConversation else {
+            showNotice("Context compaction is unavailable in this runtime. Your draft is preserved."); return
+        }
+        guard canRequestRecovery, pendingRequest == nil else {
+            showNotice("Finish or stop current work before compacting context. Your draft is preserved."); return
+        }
+        guard attachmentBar.urls.isEmpty else { showNotice("Remove attachments before compacting context. Your draft is preserved."); return }
+        let id = UUID().uuidString
+        pendingRequest = id; updateStatus()
+        client.request("context.compact", params: ["conversation": conversation], id: id) { [weak self] result in
+            guard let self else { return }
+            self.pendingRequest = nil
+            switch result {
+            case .success(let report):
+                if self.currentConversation == conversation && self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == "/compact" { self.composer.string = "" }
+                let before = report["before"] as? Int ?? 0, after = report["after"] as? Int ?? 0
+                self.showNotice(report["compacted"] as? Bool == true ? "Context compacted: \(before) to \(after) active messages. Recorded conversation remains available." : "Context is already minimal. Recorded conversation remains available.")
+            case .failure(let error): self.showNotice(error.localizedDescription)
+            }
+            self.saveDraft(); self.updateStatus()
+        }
     }
     private var canRequestRecovery: Bool { client.isReady && !hasWork && !switchingConversation && uncertainSubmission == nil && !closing && !cancelRequested }
     private var canContinueWork: Bool { canRequestRecovery && client.capabilities.contains("task-continuation-v1") }
@@ -971,7 +1478,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         recoverySubmission = submission
         guard saveDraft() else { recoverySubmission = nil; return }
         pendingRequest = id; updateStatus()
-        var parameters: [String: Any] = ["text": text, "attachments": []]
+        var parameters: [String: Any] = ["text": text, "attachments": attachmentBar.urls.map(\.path)]
         if client.capabilities.contains("conversations"), let currentConversation { parameters["conversation"] = currentConversation }
         if let continuation { parameters["continueFrom"] = ["run": continuation.run, "revision": continuation.revision] }
         if let repairLaunch { parameters["repairProject"] = ["launch": repairLaunch] }
@@ -986,7 +1493,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                         if case .failure(let error) = result { self?.showNotice(error.localizedDescription) }
                     }
                 }
-                if submission.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == text { self.composer.string = "" }
+                if submission.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == text {
+                    self.composer.string = ""
+                    self.attachmentBar.clear()
+                }
                 self.rebuildRows()
                 self.walkthrough.followCurrentInstruction()
                 if repairLaunch != nil, let run = data["run"] as? [String: Any], let id = run["id"] as? String { self.showProjectRepair(id) }
@@ -1012,7 +1522,10 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                 self.recoverySubmission = nil
                 if data["found"] as? Bool == true, let run = data["run"] as? [String: Any] {
                     self.mergeRun(run)
-                    if uncertain.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == uncertain.text { self.composer.string = "" }
+                    if uncertain.preservesDraft != true, self.composer.string.trimmingCharacters(in: .whitespacesAndNewlines) == uncertain.text {
+                        self.composer.string = ""
+                        self.attachmentBar.clear()
+                    }
                     self.showNotice("LUMI recorded the instruction. Its recovered state is shown below; it was not resubmitted.")
                     self.rebuildRows()
                     self.walkthrough.followCurrentInstruction()
@@ -1180,7 +1693,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         var controls = [String: Any]()
         for (name, view) in [("transcript", transcriptScroll as NSView), ("jumpLatest", jumpButton), ("model", modelButton), ("reasoning", reasoningPicker), ("composer", composer.enclosingScrollView! as NSView), ("send", sendButton), ("queue", queueButton), ("stop", stopButton), ("reviewApproval", reviewApprovalButton), ("deny", denyButton), ("inspection", inspectionScroll), ("inspectionBack", inspectionBack), ("inspectionForward", inspectionForward), ("inspectionFind", inspectionFind), ("recordedOutput", recordedOutput), ("relatedEvidence", relatedEvidence)] {
             if !view.isHiddenOrHasHiddenAncestor {
-                let frame = view.convert(view.bounds, to: nil)
+                let frame = view.convert(view.bounds, to: nil as NSView?)
                 controls[name] = ["visibleWithinWindow": bounds.contains(frame), "x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
             }
         }
@@ -1223,6 +1736,12 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }
         if event["type"] as? String == "models.changed", let selection = WorkspaceModelSelection(payload) { updateModel(selection); modelPicker?.receive(payload); return }
         if event["type"] as? String == "project.state" { projectRun.receiveProjectState(payload); return }
+        if event["type"] as? String == "project.tasks_updated", let revision = payload["revision"] as? Int {
+            if revision > projectTaskRevision {
+                projectTaskRevision = revision; projectTaskOffset = 0; projectTaskPreviousOffsets = []; refreshProjectTasks()
+            }
+            return
+        }
         if ["activity", "activity.batch"].contains(event["type"] as? String ?? ""), let runID = event["run"] as? String, let index = runs.firstIndex(where: { $0["id"] as? String == runID }) {
             let values = event["type"] as? String == "activity.batch" ? payload["activities"] as? [[String: Any]] ?? [] : [payload]
             let previousSequence = runs[index]["activitySequence"] as? Int ?? 0
@@ -1258,16 +1777,25 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             let visibleActivities = activities.filter { ($0["metadata"] as? [String: Any])?["scope"] as? String != "turn" }
             let summaryID = "\(id)-activity"
             if !activities.isEmpty {
+                let swarmWorkers = visibleActivities.filter {
+                    let meta = $0["metadata"] as? [String: Any]
+                    let kind = $0["kind"] as? String ?? ""
+                    let msg = $0["message"] as? String ?? ""
+                    return kind.contains("swarm") || kind.contains("worker") || meta?["swarm"] != nil || meta?["worker"] != nil || msg.hasPrefix("Worker ") || msg.hasPrefix("Subagent ")
+                }
                 let latest = activities.max(by: { ($0["sequence"] as? Int ?? 0) < ($1["sequence"] as? Int ?? 0) })?["message"] as? String ?? "Recorded activity"
                 let count = visibleActivities.count
                 let coverage = (run["activityCount"] as? Int ?? activities.count) > activities.count ? "loaded" : "recorded"
-                next.append(TranscriptRow(id: summaryID, title: "Activity · \(count) \(coverage) · \(latest)", text: expandedActions.contains(summaryID) ? "Details below · code, commands and results are in Walkthrough" : "", activity: true))
+                let swarmBadge = swarmWorkers.isEmpty ? "" : " [Swarm: \(swarmWorkers.count) updates]"
+                next.append(TranscriptRow(id: summaryID, title: "Activity · \(count) \(coverage)\(swarmBadge) · \(latest)", text: expandedActions.contains(summaryID) ? "Details below · code, commands and results are in Walkthrough" : "", activity: true))
             }
             for activity in expandedActions.contains(summaryID) ? visibleActivities : [] {
                 let aid = "\(id)-\(activity["activityId"] as? String ?? "")"
                 let phase = activity["status"] as? String ?? ""
                 let elapsed = (activity["elapsedMs"] as? Double).map { String(format: " · %.1fs", $0 / 1000) } ?? ""
-                next.append(TranscriptRow(id: aid, title: "\(activity["message"] as? String ?? "Activity") · \(phase.replacingOccurrences(of: "_", with: " "))\(elapsed)", text: expandedActions.contains(aid) ? activity["detail"] as? String ?? "No additional display detail. Recorded output is available in Sessions after the run." : "", activity: true))
+                let meta = activity["metadata"] as? [String: Any]
+                let workerTag = (meta?["worker"] as? String).map { "[\($0)] " } ?? ""
+                next.append(TranscriptRow(id: aid, title: "\(workerTag)\(activity["message"] as? String ?? "Activity") · \(phase.replacingOccurrences(of: "_", with: " "))\(elapsed)", text: expandedActions.contains(aid) ? activity["detail"] as? String ?? "No additional display detail. Recorded output is available in Sessions after the run." : "", activity: true))
             }
             if let response = run["response"] as? String {
                 let route = run["modelSelection"] as? [String: Any]
@@ -1280,6 +1808,13 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if state == "awaiting_approval", let a = run["approval"] as? [String: Any], a["decision"] == nil, let operation = a["operation"] as? String {
                 currentApproval = ApprovalRequest(run: id, operation: operation, tool: a["tool"] as? String ?? "Operation", scope: a["scope"] as? String ?? folder.path, reason: a["reason"] as? String ?? "", arguments: a["args"] as? String ?? "")
             }
+        }
+        for query in sideQuestions where query.conversation == currentConversation {
+            next.append(TranscriptRow(id: "\(query.id)-side-user", title: "You · Side question", text: query.question, activity: false, user: true))
+            let title = query.answer == nil ? "LUMI · Answering" : query.failed ? "Side question failed" : "LUMI · Side answer"
+            let detail = query.answer == nil ? "Answering without tools. You can continue the conversation." : query.answer ?? ""
+            let evidence = query.contextLimited ? "Temporary · recent context only · no tools" : "Temporary · not added to conversation context · no tools"
+            next.append(TranscriptRow(id: "\(query.id)-side-answer", title: title, text: detail, activity: false, evidence: evidence))
         }
         next = Array(next.suffix(200))
         var bytes = next.reduce(0) { $0 + $1.text.utf8.count + $1.title.utf8.count }
@@ -1297,6 +1832,16 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             if following { jumpLatest() }
             else { transcriptScroll.contentView.scroll(to: origin); transcriptScroll.reflectScrolledClipView(transcriptScroll.contentView); jumpButton.isHidden = runs.isEmpty }
         }
+        var turnItems = [TurnScrubberRail.TurnItem]()
+        var turnCounter = 0
+        for (idx, row) in rows.enumerated() where row.user || row.id == "welcome" {
+            let preview = String(row.text.prefix(80))
+            let isActive = (active != nil && idx == rows.count - 1)
+            let isError = row.text.localizedCaseInsensitiveContains("error") || row.text.localizedCaseInsensitiveContains("failed")
+            turnItems.append(TurnScrubberRail.TurnItem(index: turnCounter, rowIndex: idx, preview: preview, isActive: isActive, isError: isError))
+            turnCounter += 1
+        }
+        turnScrubber.turns = turnItems
         updateWalkthrough(); updateStatus()
     }
     private func updateApproval() {
@@ -1304,7 +1849,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if let failure = approvalFailureAttempt, failure.request != currentApproval || failure.context != podContextID { approvalFailure = nil; approvalFailureAttempt = nil }
         approval.isHidden = currentApproval == nil
         reviewApprovalButton.isEnabled = canReviewApproval
-        denyButton.isEnabled = currentApproval != nil && client.isReady && decidingApproval == nil && !cancelRequested && !closing
+        denyButton.isEnabled = canDecideApproval
+        allowButton.isEnabled = canDecideApproval
         let summary = currentApproval.map { "\($0.tool)\n\($0.scope)" } ?? ""
         if approvalText.string != summary { approvalText.string = summary }
         if let review = approvalReview {
@@ -1330,7 +1876,8 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         reconnectButton.isEnabled = !checkingSubmission && !closing
         reconnectButton.isHidden = closing || (!needsLookup && (client.isReady || client.process?.isRunning == true))
         let draft = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
-        sendButton.isEnabled = !reasoningPicker.pending && client.isReady && !switchingConversation && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit
+        let side = Self.sideQuestion(from: draft)
+        sendButton.isEnabled = side != nil ? (client.isReady && !switchingConversation && !closing && sideQuestionPending == nil && draft.utf16.count <= client.instructionLimit) : (!reasoningPicker.pending && client.isReady && !switchingConversation && pendingRequest == nil && uncertainSubmission == nil && !closing && !cancelRequested && !draft.isEmpty && draft.utf16.count <= client.instructionLimit && queued < client.queueLimit)
         stopButton.isEnabled = forceAvailable || (!cancelRequested && hasWork) || (closing && !stopped)
         let run = runs.first(where: { $0["id"] as? String == active })
         let state = run?["state"] as? String
@@ -1341,11 +1888,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         status.toolTip = status.stringValue
         chatState.stringValue = switchingConversation ? "Opening conversation…" : activity.map { $0 + elapsed } ?? (runs.isEmpty ? "Tell LUMI what you want to build." : "Recorded conversation · send a follow-up to continue")
         conversations.setCanSwitch(canSwitchConversation)
-        sendButton.title = hasWork ? "Queue" : "Send"
-        stopSendButton.isHidden = !hasWork || draft.isEmpty
+        sendButton.title = side != nil ? "Ask" : hasWork ? "Queue" : "Send"
+        stopSendButton.isHidden = side != nil || !hasWork || draft.isEmpty
         stopSendButton.isEnabled = client.isReady && pendingRequest == nil && uncertainSubmission == nil && !cancelRequested && stopThenSend == nil && draft.utf16.count <= client.instructionLimit
-        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? (client.isReady ? "Acceptance unknown · Check Status before sending" : "Acceptance unknown · reconnect to reconcile") : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
-        hint.toolTip = hint.stringValue + "\nEnter to send · Shift–Enter for a new line. Use Stop to interrupt."
+        hint.stringValue = draftSaveFailed ? "Draft not saved · keep this window open" : draft.utf16.count > client.instructionLimit ? "Instruction too long · draft preserved" : side != nil ? "Side question · temporary · no tools" : queued >= client.queueLimit ? "Queue full · draft preserved" : uncertainSubmission != nil ? (client.isReady ? "Acceptance unknown · Check Status before sending" : "Acceptance unknown · reconnect to reconcile") : client.capabilities.contains("autonomous-execution-v1") ? "Autonomous · Enter to send · Stop anytime" : "Enter to send · Shift–Enter for a new line"
+        hint.toolTip = side != nil ? "Side questions use a copy of recent context, run no tools, and do not stop the active instruction." : hint.stringValue + "\nEnter to send · Shift–Enter for a new line. Use Stop to interrupt."
         queueButton.title = queued > 0 ? "Up Next (\(queued))" : "Up Next"
         queueButton.setAccessibilityLabel("Up Next, \(queued) queued instructions")
         updateQueue()
@@ -1497,7 +2044,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         }, didClose: { [weak self] in self?.approvalReview = nil; self?.updateApproval() })
         approvalReview?.present(for: window); updateApproval()
     }
-    @objc private func deny() { if let request = currentApproval { resolveApproval(request, decision: "deny") } }
+    @objc func allowOnce() { if let request = currentApproval { resolveApproval(request, decision: "allow") } }
+    @objc func deny() { if let request = currentApproval { resolveApproval(request, decision: "deny") } }
+    var canDecideApproval: Bool { currentApproval != nil && client.isReady && decidingApproval == nil && !cancelRequested && !closing && !switchingConversation }
     @discardableResult func resolveApproval(_ approval: ApprovalRequest, decision: String) -> Bool {
         guard ["allow", "deny"].contains(decision), currentApproval == approval, client.isReady, decidingApproval == nil, !cancelRequested, !closing, !switchingConversation else { return false }
         let source = client, attempt = ApprovalDecision(request: approval, context: podContextID)
@@ -1525,17 +2074,64 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         } else { sidebarPreferred.toggle() }
         adapt()
     }
-    @objc func showFiles() { contextTabs.selectedSegment = 2; navigation.select(.files) }
-    @objc func showChanges() { contextTabs.selectedSegment = 1; navigation.select(.changes) }
+    @objc func showChats() {
+        navigatorTabs.selectedSegment = 0
+        sidebarPreferred = true
+        compactSidebarRevealed = true
+        switchNavigatorTab()
+    }
+    @objc func showFiles() {
+        navigatorTabs.selectedSegment = 1
+        sidebarPreferred = true
+        compactSidebarRevealed = true
+        navigate(.files)
+    }
+    @objc func showChanges() {
+        navigatorTabs.selectedSegment = 2
+        sidebarPreferred = true
+        compactSidebarRevealed = true
+        navigate(.changes)
+    }
     @objc func showSessions() { loadConversations(); navigation.select(.sessions) }
+    @objc private func switchNavigatorTab() {
+        switch navigatorTabs.selectedSegment {
+        case 0:
+            conversations.isHidden = false
+            navigation.isHidden = true
+        case 1:
+            conversations.isHidden = true
+            navigation.isHidden = false
+            navigation.select(.files)
+        case 2:
+            conversations.isHidden = true
+            navigation.isHidden = false
+            navigation.select(.changes)
+        default:
+            break
+        }
+        adapt()
+    }
     private func navigate(_ destination: WorkspaceDestination) {
         navigationGeneration += 1; navigationQuery = ""; navigationOffset = 0; nextNavigationPage = nil; previousNavigationPage = nil; navigationData = []
         showingContextSummary = false
         showingInspector = true; surfaces.selectedSegment = 1
         browsingCompact = true
-        if destination == .files { contextTabs.selectedSegment = 2 }
-        else if destination == .changes { contextTabs.selectedSegment = 1 }
-        else { contextTabs.selectedSegment = 2 }
+        if destination == .files {
+            navigatorTabs.selectedSegment = 1
+            conversations.isHidden = true
+            navigation.isHidden = false
+            contextTabs.selectedSegment = 2
+        } else if destination == .changes {
+            navigatorTabs.selectedSegment = 2
+            conversations.isHidden = true
+            navigation.isHidden = false
+            contextTabs.selectedSegment = 1
+        } else {
+            navigatorTabs.selectedSegment = 1
+            conversations.isHidden = true
+            navigation.isHidden = false
+            contextTabs.selectedSegment = 2
+        }
         compactSidebarRevealed = false
         adapt(); refreshNavigation()
     }
@@ -1555,6 +2151,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             guard self.client.isReady else { return }
             if !self.navigation.isHiddenOrHasHiddenAncestor, self.navigation.destination != .sessions { self.refreshNavigation() }
             if self.inspectedFile != nil { self.pageLabel.stringValue = "Workspace activity recorded · Reload to update preview" }
+            self.checkViewportBranch()
         }
     }
     private func loadDirectory(_ path: String, offset: Int = 0) {
@@ -1638,10 +2235,15 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private func readDiff(_ path: String) { inspect(.diff(path, staged: diffScope.selectedSegment == 1)) }
     func inspect(_ destination: InspectionDestination, addToHistory: Bool = true) {
         guard !switchingConversation else { return }
+        saveViewport()
+        currentViewport = nil; viewportBranch = nil; viewportBranchGeneration += 1
         if case .diff = destination { contextTabs.selectedSegment = 1 }
         else { contextTabs.selectedSegment = 2 }
         if addToHistory { inspectionHistory.visit(destination) }
         inspectionBack.isEnabled = inspectionHistory.canGoBack; inspectionForward.isEnabled = inspectionHistory.canGoForward
+        toolbarHistory.setEnabled(inspectionHistory.canGoBack, forSegment: 0)
+        toolbarHistory.setEnabled(inspectionHistory.canGoForward, forSegment: 1)
+        updateJumpBar()
         reloadInspection = { [weak self] in self?.inspect(destination, addToHistory: false) }
         switch destination {
         case .savedState(let conversation):
@@ -1697,7 +2299,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             let folder = parent.isEmpty ? "." : parent
             if navigation.destination != .files || directory != folder { navigation.select(.files, notify: false); loadDirectory(folder) }
             prepareInspection(title: path, file: path)
-            showPage("files.read", params: ["path": path], offset: 0, trail: [], revision: nil)
+            openFileWithViewport(path)
         case .diff(let path, let staged):
             diffScope.selectedSegment = staged ? 1 : 0
             prepareInspection(title: path, file: path, diff: true)
@@ -1782,6 +2384,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     private func prepareInspection(title: String, file: String?, diff: Bool = false, contextSummary: Bool = false) {
         inspectionGeneration += 1
+        binaryDocumentLoader?.cancel(); binaryDocumentLoader = nil
+        documentView.isHidden = true; inspectionScroll.isHidden = false
+        inspectionFind.isEnabled = true
         showingContextSummary = contextSummary
         let hideFind = NSMenuItem(); hideFind.tag = NSTextFinder.Action.hideFindInterface.rawValue
         inspection.performTextFinderAction(hideFind)
@@ -1812,14 +2417,156 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         moreButton.isHidden = true; previousButton.isHidden = true; previousButton.isEnabled = false; nextChunk = nil; previousChunk = nil
         adapt()
     }
-    private func showPage(_ method: String, params: [String: Any], offset: Int, trail: [Int], revision: String?) {
+    private func openFileWithViewport(_ path: String) {
+        guard client.isReady, client.capabilities.contains("workspace-branch-v1") else {
+            openInspectedFile(path, saved: nil); return
+        }
+        let generation = inspectionGeneration
+        let source = client
+        source.request("workspace.branch") { [weak self, weak source] result in
+            guard let self, let source, self.client === source, self.inspectionGeneration == generation, self.inspectedFile == path else { return }
+            switch result {
+            case .success(let data):
+                guard let branch = data["branch"] as? String else { return }
+                self.viewportBranch = branch
+                let kind = self.viewportKind(path)
+                do {
+                    let saved = try self.viewportStore.load().first { $0.branch == branch && $0.path == path && $0.kind == kind }
+                    self.openInspectedFile(path, saved: saved)
+                } catch {
+                    self.showNotice("Could not restore the saved file position. \(error.localizedDescription)")
+                    self.openInspectedFile(path, saved: nil)
+                }
+            case .failure(let error):
+                self.showNotice("Could not identify the current branch; file position will not be saved. \(error.localizedDescription)")
+                self.openInspectedFile(path, saved: nil)
+            }
+        }
+    }
+    private func viewportKind(_ path: String) -> WorkspaceViewport.Kind {
+        let ext = (path as NSString).pathExtension.lowercased()
+        if ext == "pdf" { return .pdf }
+        if ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "bmp"].contains(ext) { return .image }
+        return ext == "csv" ? .csv : .code
+    }
+    private func openInspectedFile(_ path: String, saved: WorkspaceViewport?) {
+        let kind = viewportKind(path)
+        guard [.pdf, .image].contains(kind), client.isReady, client.capabilities.contains("binary-inspection-v1") else {
+            showPage("files.read", params: ["path": path], offset: saved?.pageOffset ?? 0, trail: saved?.pageTrail ?? [], revision: nil, restore: saved); return
+        }
+        inspectionGeneration += 1; let generation = inspectionGeneration, source = client
+        let loader = BinaryDocumentLoader(path: path) { [weak source] params, completion in
+            guard let source else { completion(.failure(BridgeError.message("The workspace disconnected."))); return }
+            source.request("files.readBinary", params: params, completion: completion)
+        }
+        binaryDocumentLoader = loader
+        loader.onProgress = { [weak self] count, total in
+            guard let self, self.inspectionGeneration == generation else { return }
+            self.pageLabel.stringValue = "Loading \(count.formatted()) / \(total.formatted()) bytes…"
+        }
+        loader.onComplete = { [weak self, weak loader] result in
+            guard let self, let loader, self.binaryDocumentLoader === loader, self.inspectionGeneration == generation else { return }
+            self.binaryDocumentLoader = nil
+            switch result {
+            case .failure(let error): self.inspectionFailed(error, initial: true)
+            case .success(let data):
+                if let branch = self.viewportBranch {
+                    source.request("workspace.branch") { [weak self, weak source] result in
+                        guard let self, let source, self.client === source, self.inspectionGeneration == generation else { return }
+                        switch result {
+                        case .success(let identity) where identity["branch"] as? String == branch:
+                            self.presentDocument(data, path: path, kind: kind, saved: saved)
+                        case .success: self.inspectionFailed(BridgeError.message("The branch changed while loading this document. Use Reload to open the current version."), initial: true)
+                        case .failure(let error): self.inspectionFailed(error, initial: true)
+                        }
+                    }
+                } else { self.presentDocument(data, path: path, kind: kind, saved: saved) }
+            }
+        }
+        loader.start()
+    }
+    private func presentDocument(_ data: Data, path: String, kind: WorkspaceViewport.Kind, saved: WorkspaceViewport?) {
+        do {
+            try documentView.open(data, kind: kind)
+            inspectionScroll.isHidden = true; documentView.isHidden = false; inspectionFind.isEnabled = false
+            window?.contentView?.layoutSubtreeIfNeeded()
+            documentView.restore(saved)
+            if let branch = viewportBranch { currentViewport = WorkspaceViewport(branch: branch, path: path, kind: kind) }
+            pageLabel.stringValue = "\(data.count.formatted()) bytes · Read only"
+        } catch { inspectionFailed(error, initial: true) }
+    }
+    private func restoreTextViewport(_ state: WorkspaceViewport) {
+        viewportRestoring = true
+        defer { viewportRestoring = false }
+        let length = (inspection.string as NSString).length
+        let location = min(state.selectionLocation, length)
+        inspection.setSelectedRange(NSRange(location: location, length: min(state.selectionLength, length - location)))
+        if let container = inspection.textContainer { inspection.layoutManager?.ensureLayout(for: container) }
+        window?.contentView?.layoutSubtreeIfNeeded()
+        let clip = inspectionScroll.contentView
+        let desired = NSRect(origin: NSPoint(x: state.scrollX, y: state.scrollY), size: clip.bounds.size)
+        clip.scroll(to: clip.constrainBoundsRect(desired).origin); inspectionScroll.reflectScrolledClipView(clip)
+    }
+    private func scheduleViewportSave() {
+        guard currentViewport != nil, !viewportRestoring else { return }
+        viewportSaveTimer?.invalidate()
+        viewportSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in self?.saveViewport() }
+    }
+    private func saveViewport() {
+        viewportSaveTimer?.invalidate(); viewportSaveTimer = nil
+        guard var state = currentViewport, !viewportRestoring else { return }
+        if [.pdf, .image].contains(state.kind) { documentView.capture(into: &state) }
+        else {
+            let selected = inspection.selectedRange()
+            state.selectionLocation = selected.location; state.selectionLength = selected.length
+            state.scrollX = max(0, inspectionScroll.contentView.bounds.origin.x)
+            state.scrollY = max(0, inspectionScroll.contentView.bounds.origin.y)
+        }
+        state.updatedAt = Date().timeIntervalSince1970
+        do { try viewportStore.save(state); currentViewport = state; viewportSaveFailed = false }
+        catch {
+            if !viewportSaveFailed { showNotice("Could not save the file position. \(error.localizedDescription)") }
+            viewportSaveFailed = true
+        }
+    }
+    private func checkViewportBranch() {
+        guard !viewportBranchCheckPending, let state = currentViewport, client.isReady, client.capabilities.contains("workspace-branch-v1") else { return }
+        viewportBranchCheckPending = true
+        viewportBranchGeneration += 1; let generation = viewportBranchGeneration, source = client
+        source.request("workspace.branch") { [weak self, weak source] result in
+            guard let self, let source, self.client === source else { return }
+            self.viewportBranchCheckPending = false
+            guard self.viewportBranchGeneration == generation,
+                  self.currentViewport?.path == state.path, self.currentViewport?.branch == state.branch else { return }
+            switch result {
+            case .success(let data):
+                self.viewportBranchCheckFailureShown = false
+                if let branch = data["branch"] as? String, branch != state.branch {
+                    self.saveViewport(); self.inspect(.file(state.path), addToHistory: false)
+                }
+            case .failure(let error):
+                if !self.viewportBranchCheckFailureShown { self.showNotice("Could not check the current branch. \(error.localizedDescription)") }
+                self.viewportBranchCheckFailureShown = true
+            }
+        }
+    }
+    func textViewDidChangeSelection(_ notification: Notification) {
+        if notification.object as? NSTextView === inspection { scheduleViewportSave() }
+    }
+    private func showPage(_ method: String, params: [String: Any], offset: Int, trail: [Int], revision: String?, restore: WorkspaceViewport? = nil) {
+        if method == "files.read" { saveViewport(); currentViewport = nil }
         inspectionGeneration += 1; let generation = inspectionGeneration
         var request = params; request["offset"] = offset; if let revision { request["revision"] = revision }
+        if method == "files.read", let branch = viewportBranch { request["branch"] = branch }
         moreButton.isEnabled = false; previousButton.isEnabled = false
         client.request(method, params: request) { [weak self] result in
             guard let self, self.inspectionGeneration == generation else { return }
             switch result {
             case .success(let data):
+                if method == "files.read", restore != nil, offset > 0, data["binary"] as? Bool == true {
+                    self.showNotice("The saved position no longer matches this file. Showing its first page.")
+                    self.showPage(method, params: params, offset: 0, trail: [], revision: nil); return
+                }
                 if method == "context.history" {
                     guard let conversation = params["conversation"] as? String, self.currentConversation == conversation else { return }
                     guard ContextHistoryPage.isValid(data, conversation: conversation, offset: offset, revision: revision) else {
@@ -1836,7 +2583,14 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                     self.outline.removeAllItems(); self.outline.addItem(withTitle: "Outline · declarations on this page")
                     self.outline.addItems(withTitles: self.declarations.map(\.title)); self.outline.isHidden = self.declarations.isEmpty
                 }
+                if method == "files.read", restore == nil { self.inspection.setSelectedRange(NSRange(location: 0, length: 0)) }
                 self.inspection.scrollToBeginningOfDocument(nil)
+                if method == "files.read", data["binary"] as? Bool == false,
+                   let branch = self.viewportBranch, let path = params["path"] as? String {
+                    let kind: WorkspaceViewport.Kind = (path as NSString).pathExtension.lowercased() == "csv" ? .csv : .code
+                    self.currentViewport = WorkspaceViewport(branch: branch, path: path, kind: kind, pageOffset: offset, pageTrail: trail)
+                    if let restore { self.restoreTextViewport(restore) }
+                }
                 let end = data["nextOffset"] as? Int ?? offset
                 let size = data["size"] as? Int ?? end
                 self.pageLabel.stringValue = "\(offset)–\(end) / \(size) bytes · Read only\(data["truncated"] as? Bool == true ? " · Limited" : "")"
@@ -1856,7 +2610,11 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
                     if method == "artifact.read" { self.showNotice("Recorded output reached its storage limit. This evidence is incomplete; review the instruction and its activity before continuing.") }
                     else if method == "changes.read" { self.showNotice("This diff exceeds the 1 MiB preview limit. The preview is incomplete; inspect the full diff with Git before reviewing it.") }
                 }
-            case .failure(let error): self.inspectionFailed(error, initial: revision == nil)
+            case .failure(let error):
+                if method == "files.read", restore != nil, offset > 0 {
+                    self.showNotice("The saved position could not be restored. Showing the first page. \(error.localizedDescription)")
+                    self.showPage(method, params: params, offset: 0, trail: [], revision: nil)
+                } else { self.inspectionFailed(error, initial: revision == nil) }
             }
         }
     }
@@ -1935,19 +2693,26 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         let narrow = (window?.frame.width ?? 1280) < 1000
         let short = (window?.frame.height ?? 800) < 640
         navigation.previewsSelection = !short
-        conversations.isHidden = narrow ? !compactSidebarRevealed : !sidebarPreferred
+        leftSidebar.isHidden = narrow ? !compactSidebarRevealed : !sidebarPreferred
+        conversations.isHidden = leftSidebar.isHidden || navigatorTabs.selectedSegment != 0
+        navigation.isHidden = leftSidebar.isHidden || navigatorTabs.selectedSegment == 0
         surfaces.isHidden = !narrow
         contextPanel.isHidden = !showingInspector || (narrow && (surfaces.selectedSegment == 0 || compactSidebarRevealed))
         contextSeparator.isHidden = contextPanel.isHidden
-        contextWidth?.constant = narrow ? 300 : min(400, max(330, (window?.frame.width ?? 1280) * 0.27))
-        let contextSummary = showingContextSummary && contextTabs.selectedSegment == 2
-        browserHeight?.isActive = !short && !contextSummary
-        browseContext.isHidden = contextSummary || !short || ![1, 2].contains(contextTabs.selectedSegment)
-        browseContext.title = browsingCompact ? "Back to preview" : (contextTabs.selectedSegment == 1 ? "Browse changed files" : "Browse files")
-        navigation.isHidden = contextSummary || ![1, 2].contains(contextTabs.selectedSegment) || (short && !browsingCompact)
+        let isPreviewActive = contextTabs.selectedSegment == 3 && projectRun.isInAppPreviewVisible
+        let defaultContextWidth = narrow ? 300.0 : min(400.0, max(330.0, (window?.frame.width ?? 1280.0) * 0.27))
+        let targetWidth: CGFloat
+        if isContextMaximized {
+            targetWidth = max(680.0, (window?.frame.width ?? 1280.0) - (narrow ? 20.0 : 280.0))
+        } else if isPreviewActive {
+            targetWidth = max(680.0, min(800.0, (window?.frame.width ?? 1280.0) * 0.52))
+        } else {
+            targetWidth = defaultContextWidth
+        }
+        contextWidth?.constant = targetWidth
         walkthrough.isHidden = contextTabs.selectedSegment != 0
         walkthrough.setCompact(short)
-        inspector.isHidden = ![1, 2].contains(contextTabs.selectedSegment) || (short && browsingCompact)
+        inspector.isHidden = ![1, 2].contains(contextTabs.selectedSegment)
         projectRunScroll.isHidden = contextTabs.selectedSegment != 3
         projectRun.setVisible(!contextPanel.isHidden && !projectRunScroll.isHidden)
         transcriptScroll.isHidden = false
@@ -1969,7 +2734,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         resizeAnchor = nil
     }
     func windowDidResize(_ notification: Notification) { adapt(); modelPicker?.syncPresentation(recenter: true) }
-    func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady && !closing { client.requestSnapshot() } }
+    func windowDidBecomeKey(_ notification: Notification) { if needsRebuild { rebuildRows() }; if client.isReady && !closing { client.requestSnapshot(); checkViewportBranch() } }
     func windowDidChangeOcclusionState(_ notification: Notification) { if needsRebuild && window?.occlusionState.contains(.visible) == true { rebuildRows() }; updateElapsedTimer(); updateWalkthroughVisibility() }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard prepareToClose() else { return false }
@@ -1990,6 +2755,9 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         closing = true; composer.isEditable = false; stopThenSend = nil; status.stringValue = "Stopping and flushing workspace…"; stop(); client.shutdown()
     }
     func windowWillClose(_ notification: Notification) {
+        viewportBranchTimer?.invalidate(); viewportBranchTimer = nil
+        saveViewport(); if let viewportObserver { NotificationCenter.default.removeObserver(viewportObserver); self.viewportObserver = nil }
+        binaryDocumentLoader?.cancel(); binaryDocumentLoader = nil
         memoryWindow?.dismiss(); memoryWindow = nil
         palette?.cancelOperation(nil); palette = nil; modelPicker?.dismiss(restoreFocus: false); modelPicker = nil; saveDraft(); layoutTimer?.invalidate(); elapsedTimer?.invalidate(); client.closeInput(); onClosed?() }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }

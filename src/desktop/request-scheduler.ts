@@ -1,11 +1,13 @@
 import { type DesktopRequest, MAX_PENDING_BYTES } from "./protocol.js"
 
 const inspectionMethods = new Set([
+	"workspace.branch",
 	"models.list",
 	"models.discover",
 	"files.list",
 	"files.search",
 	"files.read",
+	"files.readBinary",
 	"changes.list",
 	"changes.read",
 	"broccoligit.read",
@@ -22,8 +24,10 @@ const inspectionMethods = new Set([
 	"memory.read",
 	"checkpoint.list",
 	"project.discover",
+	"project.tasks.list",
 	"project.status",
 	"task.lookup",
+	"side.query",
 ])
 // Discovery can involve network requests or workspace-wide scans. Keep two
 // inspection slots available for navigation and recorded task evidence.

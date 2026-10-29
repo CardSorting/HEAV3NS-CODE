@@ -42,4 +42,18 @@ final class ApprovalReviewTests: XCTestCase {
         XCTAssertTrue(allow.isEnabled)
         XCTAssertTrue(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("could not be saved") })
     }
+
+    func testDockedApprovalResolvesDirectlyWithoutAttachedSheet() throws {
+        _ = NSApplication.shared
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("lumi-docked-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let workspace = WorkspaceWindow(folder: folder)
+        defer { workspace.window?.close() }
+        XCTAssertFalse(workspace.canDecideApproval)
+        XCTAssertNil(workspace.window?.attachedSheet)
+        let views = descendants(try XCTUnwrap(workspace.window?.contentView))
+        let allowButton = try XCTUnwrap(views.compactMap { $0 as? NSButton }.first { $0.title == "Allow Once" })
+        XCTAssertFalse(allowButton.isEnabled)
+    }
 }

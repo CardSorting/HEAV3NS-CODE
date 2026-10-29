@@ -104,6 +104,60 @@ function terminalEvents(events: EngineProgressEvent[]) {
 	)
 }
 
+describe("isolated side questions", () => {
+	afterEach(() => sinon.restore())
+	it("uses a copied context with no tools or changes to the live session", async () => {
+		const { engine, executeTool } = createEngine()
+		const store = engine.sessionStore as PersistentSessionStore
+		store.addMessage({ role: "user", content: "Keep the existing navigation" })
+		store.addMessage({ role: "assistant", content: "The navigation is in progress." })
+		const before = store.exportJsonl(), turn = engine.sessionContext.turnCount
+		let payload: any
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			payload = JSON.parse(String(init?.body))
+			return Response.json({ choices: [{ message: { content: "It uses the current navigation." } }] })
+		})
+		const result = await engine.askSideQuestion("Why this navigation?", new AbortController().signal)
+		assert.equal(result.response, "It uses the current navigation.")
+		assert.match(payload.messages[1].content, /Keep the existing navigation/)
+		assert.match(payload.messages[1].content, /Why this navigation/)
+		assert.equal(payload.tools, undefined)
+		assert.equal(store.exportJsonl(), before)
+		assert.equal(engine.sessionContext.turnCount, turn)
+		assert.equal(executeTool.callCount, 0)
+	})
+	it("rejects an unsolicited tool call without executing it", async () => {
+		const { engine, executeTool } = createEngine()
+		sinon.stub(globalThis, "fetch").resolves(toolResponse(1))
+		await assert.rejects(engine.askSideQuestion("run this", new AbortController().signal), /SIDE_QUERY_TOOL_REQUEST/)
+		assert.equal(executeTool.callCount, 0)
+		assert.equal(engine.sessionStore.getMessages().length, 0)
+	})
+	it("does not wait for an active coordinator turn or append the side answer to it", async () => {
+		const { engine } = createEngine()
+		let started!: () => void, release!: () => void
+		const running = new Promise<void>((resolve) => { started = resolve })
+		const gate = new Promise<void>((resolve) => { release = resolve })
+		sinon.stub(globalThis, "fetch").callsFake(async (_url, init) => {
+			const payload = JSON.parse(String(init?.body))
+			if (String(payload.messages[0]?.content).includes("isolated inquiry"))
+				return Response.json({ choices: [{ message: { content: "Separate answer" } }] })
+			started(); await gate
+			return Response.json({ choices: [{ message: { content: "Main answer" } }] })
+		})
+		const main = engine.tick({ prompt: "Continue main work" })
+		try {
+			await running
+			const side = await engine.askSideQuestion("A side question?", new AbortController().signal)
+			assert.equal(side.response, "Separate answer")
+		} finally { release() }
+		assert.equal((await main).outcome, "completed")
+		const saved = (engine.sessionStore as PersistentSessionStore).exportJsonl()
+		assert.match(saved, /Main answer/)
+		assert.doesNotMatch(saved, /A side question\?|Separate answer/)
+	})
+})
+
 describe("native agent compiler feedback loop", () => {
 	let folder: string
 	beforeEach(async () => {

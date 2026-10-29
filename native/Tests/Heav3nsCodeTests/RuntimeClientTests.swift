@@ -15,10 +15,10 @@ final class RuntimeClientTests: XCTestCase {
         for client in clients { client.forceStop() }
         clients.removeAll(); try FileManager.default.removeItem(at: directory)
     }
-    private func peer(_ behavior: String, timeout: TimeInterval = 0.3) throws -> RuntimeClient {
+    private func peer(_ behavior: String, timeout: TimeInterval = 0.3, nodeOverride: URL? = nil, sleepAssertion: RunSleepAssertion = RunSleepAssertion()) throws -> RuntimeClient {
         var root = URL(fileURLWithPath: #filePath)
         for _ in 0..<4 { root.deleteLastPathComponent() }
-        let node = root.appendingPathComponent("build/HEAV3NS-CODE.app/Contents/Resources/runtime/node")
+        let node = nodeOverride ?? root.appendingPathComponent("build/HEAV3NS-CODE.app/Contents/Resources/runtime/node")
         guard FileManager.default.isExecutableFile(atPath: node.path) else { throw XCTSkip("Build the desktop package to test its pinned Node runtime.") }
         let script = directory.appendingPathComponent("peer-\(UUID().uuidString).cjs")
         let source = """
@@ -36,11 +36,49 @@ final class RuntimeClientTests: XCTestCase {
         });
         """
         try source.write(to: script, atomically: true, encoding: .utf8)
-        let client = RuntimeClient(node: node, cli: script, requestTimeout: timeout)
+        let client = RuntimeClient(node: node, cli: script, requestTimeout: timeout, sleepAssertion: sleepAssertion)
         clients.append(client); return client
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testSleepAssertionFollowsConfirmedRunStateAndWorkerExit() throws {
+        let node = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"].first { FileManager.default.isExecutableFile(atPath: $0) }
+        guard let node else { throw XCTSkip("Node is needed for the protocol peer") }
+        var acquired = 0, released = 0
+        let assertion = RunSleepAssertion(acquire: { acquired += 1; return 1 }, release: { _ in released += 1 })
+        let client = try peer(hello + snapshot + """
+        if (request.method === 'start') {
+          send({kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'run.state',seq:1,payload:{id:'a',text:'work',state:'running',session:'session',createdAt:1}});
+          reply(request,{}); continue;
+        }
+        if (request.method === 'finish') {
+          send({kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'run.state',seq:2,payload:{id:'a',text:'work',state:'completed',session:'session',createdAt:1}});
+          reply(request,{}); continue;
+        }
+        if (request.method === 'restart') {
+          send({kind:'event',workspace:'ws',session:'session',runtime:'runtime',type:'run.state',seq:3,payload:{id:'b',text:'work',state:'running',session:'session',createdAt:1}});
+          reply(request,{}); continue;
+        }
+        """, timeout: 2, nodeOverride: URL(fileURLWithPath: node), sleepAssertion: assertion)
+        let exited = expectation(description: "worker exit releases assertion")
+        client.onExit = { XCTAssertEqual(released, 2); exited.fulfill() }
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            client.request("start") { _ in
+                XCTAssertEqual(acquired, 1); XCTAssertEqual(released, 0)
+                client.request("finish") { _ in
+                    XCTAssertEqual(released, 1)
+                    client.request("restart") { _ in
+                        XCTAssertEqual(acquired, 2)
+                        client.closeInput()
+                        XCTAssertEqual(released, 1, "transport loss alone is not an idle boundary")
+                    }
+                }
+            }
+        }
+        client.start(folder: directory)
+        wait(for: [exited], timeout: 5)
+    }
     func testRepeatedBurstsDrainOneHundredThousandEventsWithoutRetainingQueues() throws {
         let client = try peer(hello + snapshot + """
         if (request.method === 'burst') {

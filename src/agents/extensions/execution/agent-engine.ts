@@ -65,6 +65,7 @@ import type { ModelResolver } from "../resolution/model-resolver.js"
 import type { BroccoliRuntimeQueue } from "./broccoli-runtime-queue.js"
 import { FlappyBirdProjectSynthesizer } from "./flappy-bird-project-synthesizer.js"
 import { WorkspaceVerification } from "./workspace-verification.js"
+import { sideQueryContext } from "./side-query-context.js"
 
 interface PreparedProviderContext {
 	messages: SessionMessage[]
@@ -206,6 +207,71 @@ export class AgentEngine extends AbstractAgentEngine {
 	private turnQueue: Promise<void> = Promise.resolve()
 	readonly requestQueue?: BroccoliRuntimeQueue
 	private broccoliGit?: import("../../../desktop/broccoligit/service.js").BroccoliGit
+	/** One provider-only request over a copied context; no engine tick, tools, or checkpoint. */
+	async askSideQuestion(question: string, signal: AbortSignal): Promise<{ response: string; contextLimited: boolean }> {
+		const { messages, contextLimited } = sideQueryContext(question, (this.sessionStore as PersistentSessionStore).getActiveMessages())
+		const model = this.modelResolver.getActiveModel()
+		const provider = this.config.provider ?? "openai-codex"
+		const authMethod = this.getOpenAiAuthMethod?.()
+		const key = authMethod === "oauth" ? undefined : this.getOpenAiApiKey?.() || this.openAiApiKey || process.env.OPENAI_API_KEY
+		const proxy = Boolean(this.proxyGateway?.getProxyConfig() || this.proxyGateway?.getProviderEndpoint("openai-codex"))
+		const oauth = provider === "openai-codex" && !proxy && authMethod !== "api-key" && hasOpenAiCodexOAuthCredentials(undefined)
+		const effort = this.modelResolver.getReasoningEffort(model)
+		const sideTimeout = Math.max(1, Math.min(this.config.providerTimeoutMs ?? 180_000, 180_000))
+		const timeout = AbortSignal.timeout(sideTimeout)
+		const requestSignal = AbortSignal.any([signal, timeout])
+		const bounded = (value: string) => { if (Buffer.byteLength(value) > 64 * 1024 || Buffer.byteLength(JSON.stringify(value)) > 128 * 1024) throw new Error("SIDE_QUERY_LIMIT: the provider response exceeded the side question limit") }
+		let data: ProviderCompletionResponse
+		if (isClaudeSubscriptionDirectSdkProvider(provider)) {
+			data = await createClaudeSubscriptionDirectSdkCompletion({ model, messages, max_tokens: 2048, tools: [], ...(effort ? { reasoning: { effort } } : {}) }, {
+				pluginDir: this.config.claudePluginDir, pythonPath: this.config.claudePythonPath, command: this.config.claudeCommand,
+				timeoutMs: sideTimeout, cwd: this.sessionContext.cwd, signal: requestSignal,
+			})
+		} else if (provider === "openrouter") {
+			data = await completeOpenRouter({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
+		} else if (isClinePassProvider(provider)) {
+			data = await completeClinePass({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
+		} else if (isNousResearchProvider(provider)) {
+			data = await completeNousResearch({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
+		} else if (isOpencodeProvider(provider)) {
+			data = await completeOpencode({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
+		} else if (oauth) {
+			const handler = new OpenAiCodexHandler({ openAiCodexModelId: model, reasoningEffort: effort, abortSignal: requestSignal, parallelToolCalls: false })
+			const { instructions, transcript } = toCodexOAuthTranscript(messages)
+			let content = ""
+			for await (const chunk of handler.createMessage(instructions, transcript, [])) {
+				if (chunk.type === "tool_calls") throw new Error("SIDE_QUERY_TOOL_REQUEST: a side question cannot execute tools")
+				if (chunk.type === "text") { content += chunk.text; bounded(content) }
+			}
+			data = { choices: [{ message: { content } }] }
+		} else {
+			if (!key && !proxy) throw new Error("SIDE_QUERY_UNAVAILABLE: configure a model connection before asking a side question")
+			const endpoint = this.proxyGateway?.getEffectiveEndpoint("openai-codex", "https://api.openai.com/v1/chat/completions") ?? { url: "https://api.openai.com/v1/chat/completions", headers: {}, timeoutMs: 30_000 }
+			const response = await fetch(endpoint.url, { method: "POST", headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}), ...endpoint.headers }, body: JSON.stringify({ model, messages, max_tokens: 2048, ...(effort ? { reasoning_effort: effort } : {}) }), signal: requestSignal })
+			if (!response.ok) throw new Error(`SIDE_QUERY_PROVIDER: provider returned HTTP ${response.status}`)
+			const reader = response.body?.getReader()
+			if (!reader) throw new Error("SIDE_QUERY_PROVIDER: the provider returned no response")
+			const chunks: Uint8Array[] = []; let bytes = 0
+			try {
+				while (true) {
+					const part = await reader.read(); if (part.done) break
+					bytes += part.value.length
+					if (bytes > 256 * 1024) throw new Error("SIDE_QUERY_LIMIT: the provider response exceeded the side question limit")
+					chunks.push(part.value)
+				}
+			} finally { await reader.cancel().catch(() => {}) }
+			data = JSON.parse(Buffer.concat(chunks).toString("utf8")) as ProviderCompletionResponse
+		}
+		requestSignal.throwIfAborted()
+		const choice = data.choices?.[0]
+		if (choice?.message?.tool_calls?.length) throw new Error("SIDE_QUERY_TOOL_REQUEST: a side question cannot execute tools")
+		if (choice?.finish_reason === "length") throw new Error("SIDE_QUERY_INCOMPLETE: the provider reached its response limit; try a shorter question")
+		if (choice?.finish_reason === "content_filter") throw new Error("SIDE_QUERY_FILTERED: the provider filtered the answer")
+		const response = choice?.message?.content?.trim() ?? ""
+		bounded(response)
+		if (!response) throw new Error("SIDE_QUERY_EMPTY: the provider returned no answer")
+		return { response, contextLimited }
+	}
 	setBroccoliGit(service: import("../../../desktop/broccoligit/service.js").BroccoliGit) {
 		this.broccoliGit = service
 		;(this.toolRegistry as ValidatingToolRegistry).setBroccoliGit(service)

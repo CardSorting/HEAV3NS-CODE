@@ -53,4 +53,47 @@ final class InspectionNavigationTests: XCTestCase {
         XCTAssertEqual(details.related.count, 1)
         XCTAssertEqual(details.related.first?.kind, .run)
     }
+
+    func testIntraLineDiffHighlightingIdentifiesWordChangesAndAppliesLayeredWash() {
+        let diff = "@@ -1,3 +1,3 @@\n-let total = price\n+let total = price * discount"
+        let highlighted = CodeOutline.highlight(diff, diff: true)
+        XCTAssertEqual(highlighted.string, diff)
+        let oldLineRange = (diff as NSString).range(of: "-let total = price")
+        let newLineRange = (diff as NSString).range(of: "+let total = price * discount")
+        XCTAssertNotEqual(oldLineRange.location, NSNotFound)
+        XCTAssertNotEqual(newLineRange.location, NSNotFound)
+
+        var oldWashEffectiveRange = NSRange()
+        let oldWash = highlighted.attribute(.backgroundColor, at: oldLineRange.location, effectiveRange: &oldWashEffectiveRange) as? NSColor
+        XCTAssertNotNil(oldWash)
+
+        var newWashEffectiveRange = NSRange()
+        let newWash = highlighted.attribute(.backgroundColor, at: newLineRange.location, effectiveRange: &newWashEffectiveRange) as? NSColor
+        XCTAssertNotNil(newWash)
+
+        let changeRange = (diff as NSString).range(of: " * discount")
+        XCTAssertNotEqual(changeRange.location, NSNotFound)
+        let tokenBg = highlighted.attribute(.backgroundColor, at: changeRange.location, effectiveRange: nil) as? NSColor
+        XCTAssertNotNil(tokenBg)
+        let tokenFont = highlighted.attribute(.font, at: changeRange.location, effectiveRange: nil) as? NSFont
+        XCTAssertNotNil(tokenFont)
+    }
+
+    func testInspectionDestinationJumpBarURLResolution() {
+        let folder = URL(fileURLWithPath: "/test/project")
+        let fileDest = InspectionDestination.file("Sources/App.swift")
+        let diffDest = InspectionDestination.diff("Sources/Model.swift", staged: true)
+
+        func resolveURL(_ dest: InspectionDestination) -> URL {
+            switch dest {
+            case .file(let path), .diff(let path, _):
+                return path.hasPrefix("/") ? URL(fileURLWithPath: path) : folder.appendingPathComponent(path)
+            default:
+                return folder
+            }
+        }
+
+        XCTAssertEqual(resolveURL(fileDest).path, "/test/project/Sources/App.swift")
+        XCTAssertEqual(resolveURL(diffDest).path, "/test/project/Sources/Model.swift")
+    }
 }

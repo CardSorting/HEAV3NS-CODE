@@ -61,6 +61,8 @@ export class BroccoliKanbanSubstrate {
   private readonly undoStack: KanbanMutationUndoRecord[] = [];
   private readonly redoStack: KanbanMutationUndoRecord[] = [];
   private readonly notificationDispatcher: KanbanDesktopNotificationDispatcher;
+  private readonly boardObservers = new Set<() => void>();
+  private boardNotificationPending = false;
 
   // Optional BroccoliDB Table Backing
   private kernel?: IBroccoliDatabaseKernel;
@@ -140,6 +142,23 @@ export class BroccoliKanbanSubstrate {
     return this.notificationDispatcher;
   }
 
+  /** Observe settled board changes without coupling task mutations to a UI. */
+  public subscribeBoardChanges(observer: () => void): () => void {
+    this.boardObservers.add(observer);
+    return () => this.boardObservers.delete(observer);
+  }
+
+  private boardChanged(): void {
+    if (this.boardNotificationPending || this.boardObservers.size === 0) return;
+    this.boardNotificationPending = true;
+    queueMicrotask(() => {
+      this.boardNotificationPending = false;
+      for (const observer of this.boardObservers) {
+        try { observer(); } catch { /* Observers cannot change mutation outcomes. */ }
+      }
+    });
+  }
+
   /**
    * Helper to derive numeric priority weight.
    */
@@ -194,6 +213,7 @@ export class BroccoliKanbanSubstrate {
       });
     }
 
+    this.boardChanged();
     return board;
   }
 
@@ -243,6 +263,7 @@ export class BroccoliKanbanSubstrate {
       timestampMs: Date.now(),
     });
 
+    this.boardChanged();
     return true;
   }
 
@@ -381,6 +402,7 @@ export class BroccoliKanbanSubstrate {
       this.tasksTable.put(taskId, this.taskToRow(boardId, updatedTask));
     }
 
+    this.boardChanged();
     return updatedTask;
   }
 
@@ -412,6 +434,7 @@ export class BroccoliKanbanSubstrate {
       this.tasksTable.put(restored.id, this.taskToRow(boardId, restored));
     }
 
+    this.boardChanged();
     return { success: true, restoredTask: restored };
   }
 
@@ -443,6 +466,7 @@ export class BroccoliKanbanSubstrate {
       this.tasksTable.put(restored.id, this.taskToRow(boardId, restored));
     }
 
+    this.boardChanged();
     return { success: true, restoredTask: restored };
   }
 
@@ -475,6 +499,7 @@ export class BroccoliKanbanSubstrate {
       }
     }
 
+    this.boardChanged();
     return true;
   }
 
@@ -584,6 +609,7 @@ export class BroccoliKanbanSubstrate {
         timestampMs: event.timestampMs,
       });
     }
+    this.boardChanged();
   }
 
   /**
@@ -934,6 +960,7 @@ export class BroccoliKanbanSubstrate {
       this.tasksTable.put(taskId, this.taskToRow(toBoardId, task));
     }
 
+    this.boardChanged();
     return true;
   }
 
@@ -1213,6 +1240,7 @@ export class BroccoliKanbanSubstrate {
       });
     }
 
+    this.boardChanged();
     return true;
   }
 
@@ -1359,6 +1387,7 @@ export class BroccoliKanbanSubstrate {
         }
       }
     }
+    this.boardChanged();
   }
 
   importSnapshot(snapshot: KanbanWorkspaceSnapshot): void {

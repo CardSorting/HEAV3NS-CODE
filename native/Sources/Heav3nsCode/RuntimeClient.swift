@@ -16,6 +16,7 @@ final class RuntimeClient {
     var onEvent: (([String: Any]) -> Void)?
     var onConnection: ((String) -> Void)?
     var onExit: (() -> Void)?
+    var onNotice: ((String) -> Void)?
     private(set) var workspace = ""
     private(set) var session = ""
     private(set) var runtime = ""
@@ -47,11 +48,12 @@ final class RuntimeClient {
     private var snapshotGeneration = 0
     private var snapshotCompletions = [() -> Void]()
     private var activeRunIDs = Set<String>()
+    private let sleepAssertion: RunSleepAssertion
     private var runSequence = -1
     static let runEvents: Set<String> = ["run.state", "run.progress", "run.accepted", "approval.requested", "approval.resolved"]
     private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
     private static let discoveries: Set<String> = ["models.discover", "files.search", "project.discover", "changes.list", "spider.check"]
-    private static let inspections: Set<String> = ["models.list", "models.discover", "files.list", "files.search", "files.read", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "task.lookup", "memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"]
+    private static let inspections: Set<String> = ["workspace.branch", "models.list", "models.discover", "files.list", "files.search", "files.read", "files.readBinary", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "project.tasks.list", "task.lookup", "side.query", "memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"]
     private var pendingWrites = 0
     private let nodeOverride: URL?
     private let cliOverride: URL?
@@ -62,8 +64,10 @@ final class RuntimeClient {
     var pendingSnapshotCount: Int { snapshotCompletions.count }
     static let snapshotWaiterLimit = 64
 
-    init(node: URL? = nil, cli: URL? = nil, requestTimeout: TimeInterval = 15) {
+    init(node: URL? = nil, cli: URL? = nil, requestTimeout: TimeInterval = 15, sleepAssertion: RunSleepAssertion = RunSleepAssertion()) {
+        self.sleepAssertion = sleepAssertion
         nodeOverride = node; cliOverride = cli; self.requestTimeout = requestTimeout
+        sleepAssertion.onFailure = { [weak self] in self?.onNotice?("macOS could not prevent idle sleep while LUMI is working.") }
         reader = ControlFrameReader(receive: { [weak self] messages in self?.receive(messages) }, failure: { [weak self] message in
             guard let self else { return }
             self.diagnosticLock.lock()
@@ -112,6 +116,7 @@ final class RuntimeClient {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.exitStatus = status
+                self.sleepAssertion.update(hasWork: false)
                 self.diagnostic.fileHandleForReading.readabilityHandler = nil
                 // Stdout's EOF drains the final bounded batches before disconnecting.
                 // An intentional close has already stopped delivery and can finish now.
@@ -173,7 +178,7 @@ final class RuntimeClient {
             guard data.count <= FrameParser.limit, pendingWrites + data.count < 4 * 1024 * 1024 - (control ? 0 : 64 * 1024) else { throw BridgeError.message("The input queue is full. Your draft is preserved; try again after LUMI catches up.") }
             data.append(10)
             let checkpointOperation = ["checkpoint.preview", "checkpoint.restore"].contains(method)
-            let deadline = DispatchTime.now() + (checkpointOperation ? max(120, requestTimeout) : requestTimeout)
+            let deadline = DispatchTime.now() + (method == "side.query" ? max(210, requestTimeout) : checkpointOperation ? max(120, requestTimeout) : requestTimeout)
             callbacks[id] = Pending(method: method, completion: completion, deadline: deadline)
             scheduleDeadline()
             pendingWrites += data.count
@@ -230,6 +235,7 @@ final class RuntimeClient {
                 let sequence = snapshot["seq"] as? Int ?? 0
                 if sequence >= self.runSequence {
                     self.activeRunIDs = Set((snapshot["runs"] as? [[String: Any]] ?? []).filter { !WalkthroughProjection.terminal.contains($0["state"] as? String ?? "") }.compactMap { $0["id"] as? String })
+                    self.sleepAssertion.update(hasWork: self.exitStatus == nil && !self.activeRunIDs.isEmpty)
                     self.runSequence = sequence
                 }
                 let completions = self.snapshotCompletions; self.snapshotCompletions.removeAll()
@@ -263,6 +269,7 @@ final class RuntimeClient {
                         if WalkthroughProjection.terminal.contains(payload["state"] as? String ?? "") { activeRunIDs.remove(id) }
                         else { activeRunIDs.insert(id) }
                         guard activeRunIDs.count <= queueLimit + 1 else { fail("LUMI reported more active instructions than its queue allows. Reconnect to recover recorded state."); return }
+                        sleepAssertion.update(hasWork: exitStatus == nil && !activeRunIDs.isEmpty)
                         runSequence = sequence
                     }
                 }
@@ -278,6 +285,9 @@ final class RuntimeClient {
                 }
                 if message["type"] as? String == "project.state" {
                     guard let payload = message["payload"] as? [String: Any], self.validResult(payload, for: "project.status"), payload["revision"] is NSNumber else { self.fail("LUMI sent an invalid app state. Reconnect to check its status."); return }
+                }
+                if message["type"] as? String == "project.tasks_updated" {
+                    guard let payload = message["payload"] as? [String: Any], let revision = payload["revision"], Self.validSequence(revision) else { self.fail("LUMI sent an invalid task update. Reconnect to refresh the task board."); return }
                 }
                 self.onEvent?(message)
             } else if message["kind"] as? String == "protocol.error" { self.fail("LUMI reported a protocol error. Reinstall a matching app and runtime pair.") }
@@ -325,9 +335,15 @@ final class RuntimeClient {
         case "checkpoint.list": return result["checkpoints"] is [[String: Any]] && result["more"] is Bool
         case "checkpoint.preview": return result["token"] is String && result["changes"] is [[String: Any]] && result["total"] is NSNumber
         case "project.discover": return result["targets"] is [[String: Any]]
+        case "project.tasks.list": return ProjectTaskSnapshot(result) != nil
+        case "project.tasks.move": return result["updated"] as? Bool == true && result["revision"].map(Self.validSequence) == true
         case "project.status", "project.start", "project.stop", "project.healing": return ["idle", "running", "stopping", "stopped", "completed", "failed"].contains(result["state"] as? String ?? "") && result["output"] is String
         case "files.search": return result["entries"] is [[String: Any]] && result["matched"] is NSNumber && result["more"] is Bool && result["scanLimited"] is Bool && ["git", "workspace"].contains(result["scope"] as? String ?? "")
         case "approval.resolve": return result["resolved"] as? Bool == true
+        case "context.compact": return result["conversation"] is String && result["compacted"] is Bool && ["before", "after", "inputTokens", "outputTokens"].allSatisfy { result[$0] is NSNumber }
+        case "side.query": return (result["conversation"] as? String).map { !$0.isEmpty && $0.utf8.count <= 128 } == true && (result["response"] as? String).map { !$0.isEmpty && $0.utf8.count <= 64 * 1024 } == true && result["contextLimited"] is Bool
+        case "workspace.branch": return (result["branch"] as? String).map { !$0.isEmpty && $0.utf8.count <= 4105 && ($0 == "unversioned" || $0.hasPrefix("branch:") || $0.hasPrefix("detached:")) } == true
+        case "files.readBinary": return result["data"] is String && result["revision"] is String && result["offset"] is NSNumber && result["nextOffset"] is NSNumber && result["size"] is NSNumber && result["more"] is Bool
         case "files.read", "artifact.read", "changes.read", "context.history": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
         case "files.list", "changes.list": return result["entries"] is [[String: Any]]
         default: return true

@@ -101,7 +101,13 @@ fi''')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('C35F6CCNLU', self.log.read_text())
         self.assertIn('identifier "io.heav3ns.code"', self.log.read_text())
-        self.assertEqual(len(list(self.app.parent.glob('HEAV3NS-CODE.previous.*.app'))), 1)
+        backups = list(self.app.parent.glob('.HEAV3NS-CODE.rollback.*'))
+        self.assertEqual(len(backups), 1)
+        with (backups[0] / 'Contents/Info.plist').open('rb') as file:
+            self.assertEqual(plistlib.load(file)['CFBundleShortVersionString'], '1.9.0')
+        self.assertEqual(list(self.app.parent.glob('*.app')), [self.app])
+        with (self.app / 'Contents/Info.plist').open('rb') as file:
+            self.assertEqual(plistlib.load(file)['CFBundleShortVersionString'], '2.0.0')
         self.assertFalse((self.app.parent / '.HEAV3NS-CODE.update.lock').exists())
 
     def test_bad_checksum_leaves_old_installation_untouched(self):
@@ -110,7 +116,7 @@ fi''')
         result = self.run_installer()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('SHA-256 verification failed', result.stderr)
-        self.assertFalse(list(self.app.parent.glob('HEAV3NS-CODE.previous.*.app')))
+        self.assertFalse(list(self.app.parent.glob('.HEAV3NS-CODE.rollback.*')))
 
     def test_duplicate_checksum_is_rejected(self):
         manifest = self.download / 'SHA256SUMS.txt'
@@ -145,7 +151,7 @@ fi''')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Another install', result.stderr)
         self.assertTrue(lock.exists())
-        self.assertFalse(list(self.app.parent.glob('HEAV3NS-CODE.previous.*.app')))
+        self.assertFalse(list(self.app.parent.glob('.HEAV3NS-CODE.rollback.*')))
 
     def test_incomplete_newer_release_is_skipped(self):
         self.releases('v2.1.0', 'v2.0.0')

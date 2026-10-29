@@ -8,6 +8,8 @@ import { WorkspaceFileSearch } from "./file-search.js"
 import { gitFailure, withGitInspection } from "./git.js"
 
 const PAGE = 32 * 1024
+const BINARY_PAGE = 64 * 1024
+const BINARY_LIMIT = 64 * 1024 * 1024
 const DIFF_LIMIT = 1024 * 1024
 const revisionOf = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
 // Read-only inspection must not launch repository-configured fsmonitor helpers,
@@ -118,6 +120,24 @@ export class WorkspaceInspection {
 		} finally {
 			await handle.close()
 		}
+	}
+	async readBinary(relative: string, offset: number, expectedRevision?: string) {
+		const file = await this.resolve(relative)
+		const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+		try {
+			const info = await handle.stat()
+			if (!info.isFile()) throw new Error("NOT_A_FILE: select a regular file")
+			if (info.size > BINARY_LIMIT) throw new Error("FILE_TOO_LARGE: native document preview is limited to 64 MiB")
+			const revision = revisionOf(`${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`)
+			if (expectedRevision && expectedRevision !== revision) throw new Error("FILE_CHANGED: reload the document before continuing")
+			if (offset > info.size) throw new Error("INVALID_OFFSET: reload the document")
+			const buffer = Buffer.alloc(Math.min(BINARY_PAGE, info.size - offset))
+			const { bytesRead } = buffer.length ? await handle.read(buffer, 0, buffer.length, offset) : { bytesRead: 0 }
+			const after = await handle.stat()
+			if (info.mtimeMs !== after.mtimeMs || info.ctimeMs !== after.ctimeMs || info.size !== after.size)
+				throw new Error("FILE_CHANGED: the document changed during this read; reload it")
+			return { data: buffer.subarray(0, bytesRead).toString("base64"), size: info.size, offset, nextOffset: offset + bytesRead, more: offset + bytesRead < info.size, revision }
+		} finally { await handle.close() }
 	}
 	private readonly observations = new BoundedSingleFlight<unknown>("Git observation", {
 		maxActive: 4,

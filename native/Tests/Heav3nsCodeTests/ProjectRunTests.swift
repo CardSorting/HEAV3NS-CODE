@@ -293,4 +293,18 @@ extension ProjectRunTests {
         XCTAssertEqual(h.view.diagnostics["state"] as? String, "running")
         XCTAssertEqual(h.view.diagnostics["runEnabled"] as? Bool, false)
     }
+    func testInAppPreviewToggleActivatesEmbeddedWebKitViewWhenLocalAddressIsAvailable() {
+        let h = RunHarness(); h.ready()
+        XCTAssertEqual(h.view.diagnostics["inAppPreviewVisible"] as? Bool, false)
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "running", "preview": "http://127.0.0.1:3000/"]))
+        XCTAssertEqual(h.view.diagnostics["previewEnabled"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["inAppPreviewVisible"] as? Bool, false)
+        h.view.navigateProbe("in-app-preview")
+        XCTAssertEqual(h.view.diagnostics["inAppPreviewVisible"] as? Bool, true)
+        XCTAssertEqual(h.view.diagnostics["inAppPreviewEnabled"] as? Bool, true)
+        h.view.navigateProbe("poll")
+        h.answer("project.status", .success(["state": "stopped", "preview": "http://127.0.0.1:3000/"]))
+        XCTAssertEqual(h.view.diagnostics["inAppPreviewVisible"] as? Bool, false)
+    }
 }

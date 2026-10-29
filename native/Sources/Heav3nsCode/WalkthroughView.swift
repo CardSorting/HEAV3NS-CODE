@@ -208,6 +208,13 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
     var onReview: (() -> Void)?
     var onRetryLoad: (() -> Void)?
     var onContinue: ((WorkspaceContinuation) -> Void)?
+    var onMoveProjectTask: ((ProjectTask, String) -> Void)?
+    var onPreviousTaskPage: (() -> Void)?
+    var onNextTaskPage: ((Int) -> Void)?
+    var onProjectTaskFilters: (([ProjectTaskFilter]) -> Void)?
+    private let modeControl = NSSegmentedControl(labels: ["Timeline", "List", "Board"], trackingMode: .selectOne, target: nil, action: nil)
+    private let taskBoard = ProjectTaskBoardView()
+    private var timeline: NSStackView!
     private let stageIcon = NSImageView()
     private let spinner = NSProgressIndicator()
     private let stageTitle = JourneyStyle.label("Ready when you are", size: 16, weight: .semibold)
@@ -295,7 +302,16 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         let coverageRow = JourneyStyle.stack([coverage, clearFilters], vertical: false, spacing: 8)
         progressSummary.maximumNumberOfLines = 2
         progressSummary.toolTip = "Observed actions in the current batch or loaded activity. Finished includes unsuccessful actions; drafts are counted separately."
-        let root = JourneyStyle.stack([stageRow, stageDetail, progressSummary, resume, JourneyStyle.rule(), filters, empty, scroll, latest, coverageRow, retry, review, evidence, actions], spacing: 9)
+        timeline = JourneyStyle.stack([stageRow, stageDetail, progressSummary, resume, JourneyStyle.rule(), filters, empty, scroll, latest, coverageRow, retry, review, evidence, actions], spacing: 9)
+        for view in timeline.arrangedSubviews { view.widthAnchor.constraint(equalTo: timeline.widthAnchor).isActive = true }
+        modeControl.selectedSegment = 0; modeControl.target = self; modeControl.action = #selector(changeWalkthroughMode)
+        modeControl.setAccessibilityLabel("Walkthrough view")
+        taskBoard.onMove = { [weak self] task, status in self?.onMoveProjectTask?(task, status) }
+        taskBoard.onPreviousPage = { [weak self] in self?.onPreviousTaskPage?() }
+        taskBoard.onNextPage = { [weak self] offset in self?.onNextTaskPage?(offset) }
+        taskBoard.onFiltersChanged = { [weak self] filters in self?.onProjectTaskFilters?(filters) }
+        taskBoard.isHidden = true
+        let root = JourneyStyle.stack([modeControl, timeline, taskBoard], spacing: 9)
         addSubview(root); JourneyStyle.pin(root, to: self)
         for view in root.arrangedSubviews { view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true }
         scroll.setContentHuggingPriority(.init(1), for: .vertical); scroll.setContentCompressionResistancePriority(.init(1), for: .vertical)
@@ -304,6 +320,15 @@ final class WalkthroughView: NSView, NSTableViewDataSource, NSTableViewDelegate,
         preferenceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.updateMotion() }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+    @objc private func changeWalkthroughMode() {
+        let selected = modeControl.selectedSegment
+        timeline.isHidden = selected != 0; taskBoard.isHidden = selected == 0
+        if selected != 0 { taskBoard.setMode(selected == 1 ? .list : .board) }
+    }
+    func showProjectTasks(_ snapshot: ProjectTaskSnapshot) { taskBoard.show(snapshot) }
+    func projectTasksUnavailable(_ message: String) { taskBoard.showUnavailable(message) }
+    func setProjectTaskMovesEnabled(_ enabled: Bool) { taskBoard.setCanMove(enabled) }
+    func projectTasksLoading() { taskBoard.showLoading() }
     deinit {
         if let preferenceObserver { NSWorkspace.shared.notificationCenter.removeObserver(preferenceObserver) }
         if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }

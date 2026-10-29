@@ -28,6 +28,19 @@ final class FileSearchRequestQueue {
     }
 }
 
+enum OmnibarItem {
+    case file(path: String, name: String)
+    case action(WorkspaceAction)
+    case symbol(name: String, kind: String, line: Int)
+}
+
+enum OmnibarMode {
+    case files
+    case actions
+    case symbols
+    case checkpoints
+}
+
 /// A modeless native picker: the conversation and Stop remain available.
 final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     private let search = NSSearchField()
@@ -36,33 +49,38 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     private let status = JourneyStyle.label("Loading project files…", size: 12, secondary: true)
     private let chooseButton = NSButton(title: "Open Preview", target: nil, action: nil)
     private let retry = NSButton(title: "Refresh", target: nil, action: nil)
-    private var entries = [(path: String, name: String)]()
+    private var items = [OmnibarItem]()
+    private let actions: [WorkspaceAction]
+    var onSelectSymbol: ((Int) -> Void)?
+    var onSelectCheckpoint: ((String) -> Void)?
     private let requests: FileSearchRequestQueue
     private let openFile: (String) -> Void
     private var debounce: DispatchWorkItem?
     private weak var previousResponder: NSResponder?
     private var dismissed = false
 
-    init(folder: URL, search: @escaping FileSearchRequestQueue.Search, open: @escaping (String) -> Void) {
-        requests = FileSearchRequestQueue(search: search); openFile = open
+    init(folder: URL, search: @escaping FileSearchRequestQueue.Search, actions: [WorkspaceAction] = [], open: @escaping (String) -> Void) {
+        self.requests = FileSearchRequestQueue(search: search)
+        self.openFile = open
+        self.actions = actions
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 370), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        panel.title = "Open File — \(folder.lastPathComponent)"; panel.isReleasedWhenClosed = false
+        panel.title = "Omnibar — \(folder.lastPathComponent)"; panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         super.init(window: panel)
         panel.delegate = self
-        self.search.placeholderString = "Search by filename or path"; self.search.delegate = self
-        self.search.setAccessibilityLabel("Search workspace filenames and paths")
-        table.addTableColumn(NSTableColumn(identifier: .init("file")))
+        self.search.placeholderString = "Search files (or type > for commands, @ for symbols, # for checkpoints)"; self.search.delegate = self
+        self.search.setAccessibilityLabel("Unified omnibar search")
+        table.addTableColumn(NSTableColumn(identifier: .init("item")))
         table.headerView = nil; table.rowHeight = 46; table.dataSource = self; table.delegate = self; table.style = .plain
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.target = self; table.doubleAction = #selector(choose)
-        table.setAccessibilityLabel("Matching workspace files")
+        table.setAccessibilityLabel("Matching items")
         table.onActivate = { [weak self] in self?.choose() }; table.onCancel = { [weak self] in self?.dismiss() }
         let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
         scroll.setContentHuggingPriority(.init(1), for: .vertical)
         chooseButton.target = self; chooseButton.action = #selector(choose); chooseButton.bezelStyle = .rounded; chooseButton.isEnabled = false
         retry.target = self; retry.action = #selector(refresh); retry.bezelStyle = .rounded
-        let hint = JourneyStyle.label("↑ ↓ to select · Return to open · Esc to close", size: 11, secondary: true)
+        let hint = JourneyStyle.label("↑ ↓ to select · Return to open · Esc to close · Type > for commands", size: 11, secondary: true)
         hint.maximumNumberOfLines = 1; hint.lineBreakMode = .byTruncatingTail
         let footer = JourneyStyle.stack([retry, NSView(), chooseButton], vertical: false, spacing: 8)
         let root = JourneyStyle.stack([scope, self.search, scroll, status, hint, footer], spacing: 10)
@@ -74,14 +92,28 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         requests.onResult = { [weak self] in self?.received($0) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    func present(for parent: NSWindow) {
+    func present(for parent: NSWindow, mode: OmnibarMode = .files) {
         guard let window else { return }
+        dismissed = false
         previousResponder = parent.firstResponder
         window.appearance = parent.appearance
         window.setFrameOrigin(NSPoint(x: parent.frame.midX - window.frame.width / 2, y: parent.frame.maxY - window.frame.height - 72))
         parent.addChildWindow(window, ordered: .above)
         window.makeKeyAndOrderFront(nil); window.makeFirstResponder(search)
-        performSearch()
+        switch mode {
+        case .files:
+            search.stringValue = ""
+            performSearch()
+        case .actions:
+            search.stringValue = ">"
+            filterActions(query: "")
+        case .symbols:
+            search.stringValue = "@"
+            clearResults("Type symbol name to jump.")
+        case .checkpoints:
+            search.stringValue = "#"
+            clearResults("Type checkpoint name to preview.")
+        }
     }
     func dismiss(restoreFocus: Bool = true) {
         guard !dismissed else { return }; dismissed = true
@@ -95,15 +127,41 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
     }
     override func cancelOperation(_ sender: Any?) { dismiss() }
     func windowShouldClose(_ sender: NSWindow) -> Bool { dismiss(); return false }
-    // Clicking the conversation dismisses the picker without stealing focus back.
     func windowDidResignKey(_ notification: Notification) {
         guard !dismissed else { return }
         dismiss(restoreFocus: false)
     }
     func controlTextDidChange(_ obj: Notification) {
-        debounce?.cancel(); requests.invalidate(); clearResults("Searching filenames…")
-        let work = DispatchWorkItem { [weak self] in self?.performSearch() }; debounce = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+        let text = search.stringValue
+        if text.hasPrefix(">") {
+            debounce?.cancel(); requests.invalidate()
+            let query = String(text.dropFirst()).trimmingCharacters(in: .whitespaces)
+            filterActions(query: query)
+        } else if text.hasPrefix("@") {
+            debounce?.cancel(); requests.invalidate()
+            scope.stringValue = "Symbols · Jump to declaration"
+            clearResults("Type symbol name to filter.")
+        } else if text.hasPrefix("#") {
+            debounce?.cancel(); requests.invalidate()
+            scope.stringValue = "Checkpoints · Timeline snapshots"
+            clearResults("Type checkpoint name to filter.")
+        } else {
+            scope.stringValue = "Search filenames and paths in this workspace."
+            chooseButton.title = "Open Preview"
+            debounce?.cancel(); requests.invalidate(); clearResults("Searching filenames…")
+            let work = DispatchWorkItem { [weak self] in self?.performSearch() }; debounce = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+        }
+    }
+    private func filterActions(query: String) {
+        scope.stringValue = "Workspace Actions · Press Return to run command"
+        chooseButton.title = "Run Command"
+        let matches = actions.filter { query.isEmpty || $0.matches(query) }
+        items = matches.map { .action($0) }
+        status.stringValue = items.isEmpty ? "No matching commands." : "\(items.count) command\(items.count == 1 ? "" : "s")"
+        table.reloadData()
+        if !items.isEmpty { table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false); table.scrollRowToVisible(0) }
+        chooseButton.isEnabled = !items.isEmpty
     }
     @objc private func refresh() { debounce?.cancel(); performSearch(refresh: true) }
     private func performSearch(refresh: Bool = false) {
@@ -114,7 +172,7 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         requests.submit(query, refresh: refresh)
     }
     private func clearResults(_ message: String) {
-        entries = []; table.deselectAll(nil); table.reloadData(); chooseButton.isEnabled = false
+        items = []; table.deselectAll(nil); table.reloadData(); chooseButton.isEnabled = false
         status.stringValue = message
     }
     private func received(_ result: Result<[String: Any], Error>) {
@@ -123,17 +181,19 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
             clearResults("Could not search files. Choose Refresh to retry, or browse files in Code.")
             retry.title = "Retry"
         case .success(let data):
-            entries = (data["entries"] as? [[String: Any]] ?? []).prefix(50).compactMap { item in
+            let fileEntries: [(path: String, name: String)] = (data["entries"] as? [[String: Any]] ?? []).prefix(50).compactMap { item in
                 guard let path = item["path"] as? String, WalkthroughActivity.safeRelativePath(path) else { return nil }
                 return (path, (path as NSString).lastPathComponent)
             }
+            items = fileEntries.map { .file(path: $0.path, name: $0.name) }
             scope.stringValue = data["scope"] as? String == "git" ? "Project files · Git ignore rules apply. File contents aren’t searched." : "Workspace files · Hidden and generated folders are excluded."
+            chooseButton.title = "Open Preview"
             let limited = data["scanLimited"] as? Bool == true
-            status.stringValue = entries.isEmpty ? (limited ? "No matches in the scanned files. Browse Code to look further." : "No matching files. Try a filename or part of its path.") : "\(entries.count) file\(entries.count == 1 ? "" : "s")\(data["more"] as? Bool == true ? " shown · keep typing to narrow results" : "")\(limited ? " · partial workspace scan" : "")"
+            status.stringValue = items.isEmpty ? (limited ? "No matches in the scanned files. Browse Code to look further." : "No matching files. Try a filename or part of its path.") : "\(items.count) file\(items.count == 1 ? "" : "s")\(data["more"] as? Bool == true ? " shown · keep typing to narrow results" : "")\(limited ? " · partial workspace scan" : "")"
             retry.title = "Refresh"
             table.reloadData()
-            if !entries.isEmpty { table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false); table.scrollRowToVisible(0) }
-            chooseButton.isEnabled = !entries.isEmpty
+            if !items.isEmpty { table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false); table.scrollRowToVisible(0) }
+            chooseButton.isEnabled = !items.isEmpty
         }
     }
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -141,35 +201,70 @@ final class QuickOpenWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) { dismiss(); return true }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) { choose(); return true }
         if [#selector(NSResponder.moveDown(_:)), #selector(NSResponder.moveUp(_:))].contains(commandSelector) {
-            guard !entries.isEmpty else { return true }
+            guard !items.isEmpty else { return true }
             let delta = commandSelector == #selector(NSResponder.moveDown(_:)) ? 1 : -1
-            let row = max(0, min(entries.count - 1, table.selectedRow + delta))
+            let row = max(0, min(items.count - 1, table.selectedRow + delta))
             table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false); table.scrollRowToVisible(row); return true
         }
         return false
     }
     @objc private func choose() {
-        guard entries.indices.contains(table.selectedRow), !dismissed else { return }
-        let path = entries[table.selectedRow].path; dismiss(); openFile(path)
+        guard items.indices.contains(table.selectedRow), !dismissed else { return }
+        let selected = items[table.selectedRow]
+        dismiss()
+        switch selected {
+        case .file(let path, _):
+            openFile(path)
+        case .action(let action):
+            action.perform()
+        case .symbol(_, _, let line):
+            onSelectSymbol?(line)
+        }
     }
-    func tableViewSelectionDidChange(_ notification: Notification) { chooseButton.isEnabled = entries.indices.contains(table.selectedRow) }
-    func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
+    func tableViewSelectionDidChange(_ notification: Notification) { chooseButton.isEnabled = items.indices.contains(table.selectedRow) }
+    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let entry = entries[row], cell = NSTableCellView()
-        let name = JourneyStyle.label(entry.name, size: 13, weight: .medium)
-        let path = JourneyStyle.label(entry.path, size: 11, secondary: true)
+        guard items.indices.contains(row) else { return nil }
+        let item = items[row], cell = NSTableCellView()
+        let name: NSTextField, path: NSTextField, icon: NSImageView
+        switch item {
+        case .file(let filePath, let fileName):
+            name = JourneyStyle.label(fileName, size: 13, weight: .medium)
+            path = JourneyStyle.label(filePath, size: 11, secondary: true)
+            icon = NSImageView(image: NSImage(systemSymbolName: "doc", accessibilityDescription: nil)!)
+            cell.toolTip = filePath
+        case .action(let action):
+            name = JourneyStyle.label(action.title, size: 13, weight: .medium)
+            path = JourneyStyle.label(action.shortcut, size: 11, secondary: true)
+            icon = NSImageView(image: NSImage(systemSymbolName: "command", accessibilityDescription: nil)!)
+            cell.toolTip = action.title
+        case .symbol(let symbolName, let kind, let line):
+            name = JourneyStyle.label(symbolName, size: 13, weight: .medium)
+            path = JourneyStyle.label("\(kind) · Line \(line)", size: 11, secondary: true)
+            icon = NSImageView(image: NSImage(systemSymbolName: "number", accessibilityDescription: nil)!)
+            cell.toolTip = "\(symbolName) (\(kind))"
+        }
         for label in [name, path] { label.maximumNumberOfLines = 1; label.lineBreakMode = .byTruncatingMiddle }
         let labels = JourneyStyle.stack([name, path], spacing: 3)
-        let icon = NSImageView(image: NSImage(systemSymbolName: "doc", accessibilityDescription: nil)!)
         icon.widthAnchor.constraint(equalToConstant: 18).isActive = true
         let content = JourneyStyle.stack([icon, labels], vertical: false, spacing: 10)
         cell.addSubview(content); JourneyStyle.pin(content, to: cell, inset: 5)
         for label in [name, path] { label.widthAnchor.constraint(equalTo: labels.widthAnchor).isActive = true }
-        cell.textField = name; cell.imageView = icon; cell.toolTip = entry.path
+        cell.textField = name; cell.imageView = icon
         return cell
     }
-    func searchProbe(_ query: String) { search.stringValue = query; performSearch() }
+    func searchProbe(_ query: String) {
+        search.stringValue = query
+        if query.hasPrefix(">") {
+            filterActions(query: String(query.dropFirst()).trimmingCharacters(in: .whitespaces))
+        } else {
+            performSearch()
+        }
+    }
     func openSelectedProbe() { choose() }
-    var diagnostics: [String: Any] { ["visible": window?.isVisible == true, "count": entries.count, "query": search.stringValue, "status": status.stringValue, "scope": scope.stringValue, "paths": entries.map(\.path)] }
+    var diagnostics: [String: Any] {
+        let filePaths = items.compactMap { if case .file(let path, _) = $0 { return path }; return nil }
+        return ["visible": window?.isVisible == true, "count": items.count, "query": search.stringValue, "status": status.stringValue, "scope": scope.stringValue, "paths": filePaths]
+    }
     deinit { debounce?.cancel(); requests.close() }
 }

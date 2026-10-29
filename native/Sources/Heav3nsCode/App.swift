@@ -157,11 +157,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         editItem.submenu = edit; main.addItem(editItem)
         let viewItem = NSMenuItem(); viewItem.title = "Workspace"; let view = NSMenu(title: "Workspace")
         let palette = view.addItem(withTitle: "Actions…", action: #selector(actions), keyEquivalent: "p"); palette.keyEquivalentModifierMask = [.command, .shift]; palette.target = self
+        let commandPalette = view.addItem(withTitle: "Command Palette…", action: #selector(actions), keyEquivalent: "k"); commandPalette.target = self
         view.addItem(withTitle: "Toggle Navigation", action: #selector(toggleNavigation), keyEquivalent: "b").target = self
         let models = view.addItem(withTitle: "Model & Provider…", action: #selector(showModels), keyEquivalent: "m")
         models.keyEquivalentModifierMask = [.command, .shift]; models.target = self
         view.addItem(withTitle: "Focus Composer", action: #selector(focusComposer), keyEquivalent: "l").target = self
         view.addItem(.separator())
+        let chats = view.addItem(withTitle: "Chats", action: #selector(showChats), keyEquivalent: "c")
+        chats.keyEquivalentModifierMask = [.command, .shift]; chats.target = self
         view.addItem(withTitle: "Code", action: #selector(showFiles), keyEquivalent: "1").target = self
         view.addItem(withTitle: "Changes", action: #selector(showChanges), keyEquivalent: "2").target = self
         view.addItem(withTitle: "Recorded Runs", action: #selector(showSessions), keyEquivalent: "3").target = self
@@ -174,12 +177,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         view.addItem(withTitle: "Saved State", action: #selector(showSavedState), keyEquivalent: "").target = self
         view.addItem(withTitle: "Up Next", action: #selector(showQueue), keyEquivalent: "4").target = self
         view.addItem(withTitle: "Review Request…", action: #selector(showApprovalReview), keyEquivalent: "5").target = self
+        let allowItem = view.addItem(withTitle: "Allow Operation Once", action: #selector(allowOperation), keyEquivalent: "a")
+        allowItem.keyEquivalentModifierMask = [.command, .shift]; allowItem.target = self
+        let denyItem = view.addItem(withTitle: "Deny Operation", action: #selector(denyOperation), keyEquivalent: "d")
+        denyItem.keyEquivalentModifierMask = [.command, .shift]; denyItem.target = self
         view.addItem(withTitle: "Next Request in Pods", action: #selector(nextPodRequest), keyEquivalent: "j").target = self
         let previousRequest = view.addItem(withTitle: "Previous Request in Pods", action: #selector(previousPodRequest), keyEquivalent: "j")
         previousRequest.keyEquivalentModifierMask = [.command, .shift]; previousRequest.target = self
         view.addItem(.separator())
         view.addItem(withTitle: "Back in Inspector", action: #selector(inspectBack), keyEquivalent: "[").target = self
         view.addItem(withTitle: "Forward in Inspector", action: #selector(inspectForward), keyEquivalent: "]").target = self
+        let maxContext = view.addItem(withTitle: "Toggle Maximize Task Context", action: #selector(toggleMaximizeContext), keyEquivalent: "m")
+        maxContext.keyEquivalentModifierMask = [.command, .control]; maxContext.target = self
         view.addItem(.separator())
         view.addItem(withTitle: "Stop LUMI", action: #selector(stop), keyEquivalent: ".").target = self
         viewItem.submenu = view; main.addItem(viewItem)
@@ -321,15 +330,19 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showSavedState() { current?.showSavedState() }
     @objc private func toggleNavigation() { current?.toggleNavigation() }
     @objc private func focusComposer() { current?.focusComposer() }
+    @objc private func showChats() { current?.showChats() }
     @objc private func showFiles() { current?.showFiles() }
     @objc private func showChanges() { current?.showChanges() }
     @objc private func showSessions() { current?.showSessions() }
     @objc private func showQueue() { current?.showQueue() }
     @objc private func showApprovalReview() { if let currentPods { currentPods.focusNextRequest() } else { current?.showApprovalReview() } }
+    @objc private func allowOperation() { current?.allowOnce() }
+    @objc private func denyOperation() { current?.deny() }
     @objc private func nextPodRequest() { currentPods?.focusNextRequest() }
     @objc private func previousPodRequest() { currentPods?.focusNextRequest(backward: true) }
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
+    @objc private func toggleMaximizeContext() { current?.toggleMaximizeContext() }
     @objc private func findInInspection() {
         if let currentPods { currentPods.focusSearch() }
         else if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() }
@@ -366,8 +379,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             return inLibrary ? launcher?.canFindProjects == true : current?.canFindInInspection == true
         }
         if menuItem.action == #selector(stop) { return current?.hasWork == true }
+        if [#selector(allowOperation), #selector(denyOperation)].contains(menuItem.action) { return current?.canDecideApproval == true }
         if menuItem.action == #selector(showApprovalReview) { return currentPods.map { $0.hasRequests && $0.window?.attachedSheet == nil } ?? (current?.canReviewApproval == true) }
-        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue), #selector(showWalkthrough)].contains(menuItem.action) { return current != nil }
+        if [#selector(toggleNavigation), #selector(focusComposer), #selector(showChats), #selector(showFiles), #selector(showChanges), #selector(showSessions), #selector(showQueue), #selector(showWalkthrough), #selector(toggleMaximizeContext)].contains(menuItem.action) { return current != nil }
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

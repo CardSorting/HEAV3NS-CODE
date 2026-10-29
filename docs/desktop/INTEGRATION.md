@@ -280,9 +280,13 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 |---|---|
 | `hello` | Protocol, runtime/workspace/session IDs, actual capabilities, and authoritative `limits.queuedInstructions` / `limits.instructionLength` |
 | `workspace.attach`, `snapshot` | Latest bounded run projection, durable cursor, active/queued identities |
+| `project.tasks.list` | Negotiated `project-tasks-v1`; `{offset?, filters?}` applies `is` / `is not` status, owner and tag filters across engine tasks before returning a bounded page with total and next offset; `project.tasks_updated` invalidates the projection |
+| `project.tasks.move` | Negotiated `project-tasks-move-v1`; `{board, id, status, revision}`; rejects stale state and invalid engine transitions, and acknowledges after the board snapshot is durably saved |
 | `task.submit` | `{text, attachments: [], conversation?, continueFrom?: {run, revision}}`; durable acceptance or explicit rejection; continuation requires `task-continuation-v1` and the latest unfinished instruction |
 | `task.edit` | `{run, text, revision}`; change a waiting instruction after a durable write; reject stale versions and runs that have started |
 | `task.lookup` | `{request}`; reconcile the original request ID without scheduling execution |
+| `side.query` | Negotiated `side-query-v1`; `{conversation, question}` sends a bounded copy of recent context to the selected provider without tools, task admission, checkpointing, or changes to the active conversation; one query per workspace at a time |
+| `context.compact` | `{conversation}`; negotiated `context-compact-v1`, requires an idle selected conversation, persists the engine's forced compaction before acknowledging, and retains earlier summaries when their original source is unavailable after reconnect |
 | `task.cancel` | `{run, ifQueued?}`; cancellation request; `ifQueued: true` prevents a stale Remove action from stopping active work |
 | `task.cancelAll` | `{}`; stop admission, include acceptances in progress, cancel active and waiting work, and acknowledge after settlement |
 | `approval.resolve` | `{run, operation, decision: "allow" \| "deny"}`; stale IDs rejected |
@@ -292,7 +296,9 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `files.list` | `{path?, offset?, query?}`; 100 folder entries per page, case-insensitive filter, explicit 20,000-entry scan limit |
 | `files.search` | `{query?, refresh?}`; negotiated `file-search-v1`, up to 50 filename/path matches, explicit Git/plain-folder scope and partial-scan indicator; never searches file content |
 | `activity.list` | `{run}`; bounded retained activity and total observed count for the current conversation |
-| `files.read` | `{path, offset?, revision?}`; complete UTF-8 scalars, revision check, or binary metadata |
+| `workspace.branch` | Negotiated `workspace-branch-v1`; identifies the current Git branch, detached revision, or unversioned workspace for presentation state |
+| `files.read` | `{path, offset?, revision?, branch?}`; complete UTF-8 scalars, revision check, or binary metadata; when supplied, the branch is checked before and after reading |
+| `files.readBinary` | Negotiated `binary-inspection-v1`; `{path, offset?, revision?}` reads revision-checked base64 pages of at most 64 KiB, up to a 64 MiB document limit |
 | `changes.list` | Streamed porcelain v2; up to 500 paths / 128 KiB, staged/untracked/conflict distinctions, branch, HEAD, observed `total`, `totalExact` and explicit `limited` flag |
 | `changes.read` | `{path?, staged?, offset?, revision?}`; paged read-only diff with named baseline |
 | `checkpoint.list` | `{offset?, selected?, query?, filter?}`; negotiated `checkpoints-v1`; query ≤200 UTF-16 units searches message/revision across history, filter is `all`, `flagged`, or `safety`; returns ≤100 summaries, matching `total`, `workspaceTotal`, and resolved page offset; selected ID locates its filtered page or fails explicitly; stale offsets clamp to the last page |
@@ -304,6 +310,13 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `project.start` | `{id, revision}`; revalidate metadata and start the selected local command or built-in HTML preview |
 | `project.status`, `project.stop` | `{}`; bounded console/state/local preview, or stop the owned project process group |
 | `input.select` | Only `{surface:"native"}` is advertised/supported in this preview |
+
+The native inspector saves presentation-only file positions by workspace, branch,
+path, and file type. Reopening a file restores its code selection and scroll, CSV
+scroll, PDF page and zoom, or image zoom and pan. A visible inspector checks for
+external branch switches and reloads the corresponding branch's position. Binary
+previews reject documents over 64 MiB, and image previews reject images over 50
+million pixels; these limits are reported instead of silently approximating a view.
 | `shutdown` | Stop admission, cancel, flush, release ownership and exit |
 
 Durable updates carry increasing `seq`; Swift ignores duplicate cursors and requests a snapshot on a gap. Activity batches have stable action IDs and a monotonic per-run clock. Their bounded projection is persisted by sequenced run.progress checkpoints; transient batches themselves have no durable cursor. This implementation provides snapshot resynchronization, not a paged durable event-replay log. Unknown optional events are ignored; an incompatible major protocol fails visibly and disables input.

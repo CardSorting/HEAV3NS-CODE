@@ -51,6 +51,25 @@ describe("bounded desktop inspection", () => {
 		assert.equal(binary.more, false)
 		assert.equal(binary.size, 3)
 	})
+	it("reads binary documents in bounded, revision-checked pages", async () => {
+		const original = Buffer.from(Array.from({ length: 150_000 }, (_, index) => index % 256))
+		await writeFile(path.join(folder, "image.png"), original)
+		const first = await inspection.readBinary("image.png", 0)
+		assert.ok(first.more); assert.doesNotThrow(() => encodeFrame(first))
+		let page = first, offset = 0
+		const parts: Buffer[] = []
+		while (true) {
+			assert.equal(page.offset, offset)
+			parts.push(Buffer.from(page.data, "base64")); offset = page.nextOffset
+			if (!page.more) break
+			page = await inspection.readBinary("image.png", offset, first.revision)
+		}
+		assert.deepEqual(Buffer.concat(parts), original)
+		await writeFile(path.join(folder, "image.png"), Buffer.from("changed"))
+		await assert.rejects(inspection.readBinary("image.png", first.nextOffset, first.revision), /FILE_CHANGED/)
+		await symlink(tmpdir(), path.join(folder, "outside-binary"))
+		await assert.rejects(inspection.readBinary("outside-binary", 0), /OUTSIDE_WORKSPACE/)
+	})
 	it("pages and filters large folders, with scope checked after resolving aliases", async () => {
 		await Promise.all(
 			Array.from({ length: 205 }, (_, i) => writeFile(path.join(folder, `file-${String(i).padStart(3, "0")}.txt`), "")),

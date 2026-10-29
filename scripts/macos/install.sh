@@ -225,7 +225,8 @@ ditto "$SOURCE_APP" "$STAGED_APP" || fail "HEAV3NS-CODE could not be staged in $
 codesign --verify --deep --strict -R="$SIGNING_REQUIREMENT" "$STAGED_APP" || fail "The staged HEAV3NS-CODE app did not pass signature verification."
 
 if [[ -d "$TARGET" ]]; then
-    BACKUP="$APP_DIR/HEAV3NS-CODE.previous.$(date -u +%Y%m%dT%H%M%SZ).$$.app"
+    # Keep rollback data without registering another application in Finder or Launch Services.
+    BACKUP="$APP_DIR/.HEAV3NS-CODE.rollback.$(date -u +%Y%m%dT%H%M%SZ).$$"
     [[ ! -e "$BACKUP" && ! -L "$BACKUP" ]] || fail "The rollback path already exists: ${BACKUP}."
     mv "$TARGET" "$BACKUP" || fail "The existing HEAV3NS-CODE app could not be moved safely."
 fi

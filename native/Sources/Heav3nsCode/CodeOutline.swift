@@ -24,12 +24,81 @@ enum CodeOutline {
     }
     static func highlight(_ text: String, diff: Bool) -> NSAttributedString {
         let result = NSMutableAttributedString(string: text, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: NSColor.labelColor])
-        let rules: [(String, NSColor)] = diff
-            ? [(#"(?m)^\+[^\n]*"#, .systemGreen), (#"(?m)^-[^\n]*"#, .systemRed), (#"(?m)^@@[^\n]*"#, .systemBlue)]
-            : [(#"\b(?:import|from|class|struct|enum|protocol|func|function|async|await|return|let|var|const|if|else|guard|private|public|export|type|interface|def|self|nil|true|false)\b"#, .systemPurple), (#"\"(?:[^\"\\]|\\.)*\""#, .systemRed), (#"(?m)//[^\n]*"#, .secondaryLabelColor)]
-        for (pattern, color) in rules {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-            for match in regex.matches(in: text, range: NSRange(location: 0, length: result.length)) { result.addAttribute(.foregroundColor, value: color, range: match.range) }
+        if !diff {
+            let rules: [(String, NSColor)] = [
+                (#"\b(?:import|from|class|struct|enum|protocol|func|function|async|await|return|let|var|const|if|else|guard|private|public|export|type|interface|def|self|nil|true|false)\b"#, .systemPurple),
+                (#"\"(?:[^\"\\]|\\.)*\""#, .systemRed),
+                (#"(?m)//[^\n]*"#, .secondaryLabelColor)
+            ]
+            for (pattern, color) in rules {
+                guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+                for match in regex.matches(in: text, range: NSRange(location: 0, length: result.length)) {
+                    result.addAttribute(.foregroundColor, value: color, range: match.range)
+                }
+            }
+            return result
+        }
+
+        // Two-tier diff highlighting: line wash + intra-line word/token highlights
+        let lines = text.components(separatedBy: "\n")
+        var lineOffsets = [Int]()
+        var currentOffset = 0
+        for line in lines {
+            lineOffsets.append(currentOffset)
+            currentOffset += (line as NSString).length + 1
+        }
+
+        var i = 0
+        while i < lines.count {
+            let line = lines[i]
+            let offset = lineOffsets[i]
+            let lineRange = NSRange(location: offset, length: (line as NSString).length)
+
+            if line.hasPrefix("@@") {
+                result.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: lineRange)
+                result.addAttribute(.backgroundColor, value: NSColor.systemBlue.withAlphaComponent(0.08), range: lineRange)
+                i += 1
+            } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                result.addAttribute(.foregroundColor, value: NSColor.systemRed, range: lineRange)
+                result.addAttribute(.backgroundColor, value: NSColor.systemRed.withAlphaComponent(0.09), range: lineRange)
+                // Check if followed by an added line for intra-line highlighting
+                if i + 1 < lines.count && lines[i + 1].hasPrefix("+") && !lines[i + 1].hasPrefix("+++") {
+                    let nextLine = lines[i + 1]
+                    let nextOffset = lineOffsets[i + 1]
+                    let nextLineRange = NSRange(location: nextOffset, length: (nextLine as NSString).length)
+                    result.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: nextLineRange)
+                    result.addAttribute(.backgroundColor, value: NSColor.systemGreen.withAlphaComponent(0.09), range: nextLineRange)
+
+                    let oldSlice = Array(line.dropFirst())
+                    let newSlice = Array(nextLine.dropFirst())
+                    var p = 0
+                    while p < oldSlice.count && p < newSlice.count && oldSlice[p] == newSlice[p] { p += 1 }
+                    var s = 0
+                    while s < (oldSlice.count - p) && s < (newSlice.count - p) && oldSlice[oldSlice.count - 1 - s] == newSlice[newSlice.count - 1 - s] { s += 1 }
+
+                    let oldChangeLen = oldSlice.count - p - s
+                    if oldChangeLen > 0 {
+                        let oldChangeRange = NSRange(location: offset + 1 + p, length: oldChangeLen)
+                        result.addAttribute(.backgroundColor, value: NSColor.systemRed.withAlphaComponent(0.32), range: oldChangeRange)
+                        result.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold), range: oldChangeRange)
+                    }
+                    let newChangeLen = newSlice.count - p - s
+                    if newChangeLen > 0 {
+                        let newChangeRange = NSRange(location: nextOffset + 1 + p, length: newChangeLen)
+                        result.addAttribute(.backgroundColor, value: NSColor.systemGreen.withAlphaComponent(0.35), range: newChangeRange)
+                        result.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold), range: newChangeRange)
+                    }
+                    i += 2
+                } else {
+                    i += 1
+                }
+            } else if line.hasPrefix("+") && !line.hasPrefix("+++") {
+                result.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: lineRange)
+                result.addAttribute(.backgroundColor, value: NSColor.systemGreen.withAlphaComponent(0.09), range: lineRange)
+                i += 1
+            } else {
+                i += 1
+            }
         }
         return result
     }

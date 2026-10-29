@@ -13,6 +13,7 @@ struct WorkspaceDraft: Codable, Equatable {
     let submission: Submission?
     var conversation: String? = nil
     var conversations: [String: String]? = nil
+    var attachments: [String]? = nil
 }
 
 /// Presentation recovery only. A saved submission is looked up, never replayed.
@@ -39,20 +40,20 @@ final class WorkspaceDraftStore {
         let data = try Data(contentsOf: file)
         guard data.count <= Self.byteLimit else { throw DraftError.tooLarge }
         let draft = try JSONDecoder().decode(WorkspaceDraft.self, from: data)
-        guard draft.version == 1, draft.workspace == workspace,
+        guard [1, 2].contains(draft.version), draft.workspace == workspace,
               draft.submission.map({ !$0.id.isEmpty && $0.id.utf8.count <= 128 && !$0.text.isEmpty && $0.text.utf16.count <= 16_000 }) ?? true else { throw DraftError.invalid }
         return draft
     }
 
-    func save(text: String, submission: WorkspaceDraft.Submission?, conversation: String? = nil, conversations: [String: String] = [:]) throws {
-        if text.isEmpty && submission == nil && conversations.values.allSatisfy({ $0.isEmpty }) {
+    func save(text: String, submission: WorkspaceDraft.Submission?, conversation: String? = nil, conversations: [String: String] = [:], attachments: [String] = []) throws {
+        if text.isEmpty && submission == nil && conversations.values.allSatisfy({ $0.isEmpty }) && attachments.isEmpty {
             do { try FileManager.default.removeItem(at: file) }
             catch let error as CocoaError where error.code == .fileNoSuchFile { }
             return
         }
         // Refuse oversized drafts without truncating either the editor or its last backup.
         guard text.utf8.count <= Self.byteLimit else { throw DraftError.tooLarge }
-        let data = try JSONEncoder().encode(WorkspaceDraft(version: 1, workspace: workspace, text: text, submission: submission, conversation: conversation, conversations: conversations.filter { !$0.value.isEmpty }))
+        let data = try JSONEncoder().encode(WorkspaceDraft(version: 2, workspace: workspace, text: text, submission: submission, conversation: conversation, conversations: conversations.filter { !$0.value.isEmpty }, attachments: attachments.isEmpty ? nil : attachments))
         guard data.count <= Self.byteLimit else { throw DraftError.tooLarge }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try data.write(to: file, options: .atomic)

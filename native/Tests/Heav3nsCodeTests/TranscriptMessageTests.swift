@@ -69,4 +69,11 @@ final class TranscriptMessageTests: XCTestCase {
         XCTAssertEqual(toggles, 1); XCTAssertEqual(checkpoints, 1)
         XCTAssertLessThan(try XCTUnwrap(geometry.body).maxY, try XCTUnwrap(geometry.checkpoint).minY)
     }
+    func testSwarmWorkerBundlingChipDisplaysCorrectCountAndTitle() throws {
+        let row = TranscriptRow(id: "run-1-activity", title: "Activity · 5 recorded [Swarm: 3 updates] · Subagent finished", text: "Details below", activity: true)
+        XCTAssertTrue(row.title.contains("[Swarm: 3 updates]"))
+        XCTAssertTrue(row.activity)
+        let layout = TranscriptMessageLayout(row, availableWidth: 400)
+        XCTAssertGreaterThan(layout.height, 20)
+    }
 }

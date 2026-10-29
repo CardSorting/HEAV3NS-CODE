@@ -55,6 +55,8 @@ import { WorkspaceInspection } from "./inspection.js"
 import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
 import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
 import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
+import { projectTasks, projectTaskFilterSchema, type ProjectTaskFilter, validateProjectTaskSnapshot } from "./project-tasks.js"
+import { workspaceBranch } from "./workspace-branch.js"
 import {
 	DESKTOP_QUEUE_LIMIT,
 	type DesktopRequest,
@@ -169,6 +171,9 @@ type DesktopLifecycle = {
 	checkCode?: (input: unknown) => Promise<SpiderPolicyReport>
 	inspectContext?: () => ConversationContextSummary
 	readHistory?: () => readonly SessionMessage[]
+	compactContext?: () => { compacted: boolean; before: number; after: number; inputTokens: number; outputTokens: number }
+	sideQuery?: (question: string, signal: AbortSignal) => Promise<{ response: string; contextLimited: boolean }>
+	projectTasks?: { list: (offset: number, filters: readonly ProjectTaskFilter[]) => ReturnType<typeof projectTasks>; subscribe: (callback: () => void) => () => void; capture?: () => unknown; move?: (board: string, id: string, status: "backlog" | "in_progress" | "review" | "done") => { success: boolean; error?: string } }
 	models?: DesktopModels
 	memories?: { list: () => MemoryEntry[]; replace: (entries: MemoryEntry[]) => void }
 	sessionId: string
@@ -220,6 +225,13 @@ export class DesktopSession {
 	private healing?: HealingEpisode
 	private healingTimer?: ReturnType<typeof setTimeout>
 	private readonly contextHistory = new ContextHistory()
+	private sideQueryController?: AbortController
+	private sideQueryWork?: Promise<{ response: string; contextLimited: boolean }>
+	private taskBoardRevision = 0
+	private unsubscribeTaskBoard?: () => void
+	private taskBoardDirty = false
+	private taskBoardSave?: Promise<void>
+	private taskBoardSaveError?: Error
 	private inspection: WorkspaceInspection
 	private readonly broccoliGit?: BroccoliGit
 	private historyRetention?: { chargedBytes: number; durable: true }
@@ -305,6 +317,10 @@ export class DesktopSession {
 				this.approvals.put(String(approval.operation), { ...approval, decision: "interrupted" })
 		this.metadata.put("session", { session: this.session, seq: this.seq })
 		await this.database.flush()
+		this.unsubscribeTaskBoard = this.lifecycle?.projectTasks?.subscribe(() => {
+			try { if (!this.closing) this.event("project.tasks_updated", { revision: ++this.taskBoardRevision }) }
+			finally { this.saveTaskBoard() }
+		})
 		void this.lifecycle?.models?.renew?.().catch(() => undefined)
 	}
 	private event(type: string, payload: unknown, run?: string, seq?: number) {
@@ -318,6 +334,27 @@ export class DesktopSession {
 			seq,
 			type,
 			payload,
+		})
+	}
+	private saveTaskBoard() {
+		if (!this.lifecycle?.projectTasks?.capture) return
+		this.taskBoardDirty = true
+		if (this.taskBoardSave) return
+		this.taskBoardSave = (async () => {
+			while (this.taskBoardDirty) {
+				this.taskBoardDirty = false
+				const snapshot = validateProjectTaskSnapshot(this.lifecycle!.projectTasks!.capture!())
+				this.metadata.put("project-task-board", { snapshot })
+				await this.database.flush()
+				this.taskBoardSaveError = undefined
+			}
+		})().catch((error) => {
+			this.taskBoardDirty = false
+			this.taskBoardSaveError = error instanceof Error ? error : new Error(String(error))
+			if (!this.closing) this.event("runtime.error", { message: "Project task changes could not be saved. Reconnect to inspect the last saved board.", condition: "task_board_save_failed" })
+		}).finally(() => {
+			this.taskBoardSave = undefined
+			if (this.taskBoardDirty) this.saveTaskBoard()
 		})
 	}
 	private commit(run: Run, type: string): Promise<void> {
@@ -637,6 +674,8 @@ export class DesktopSession {
 				"conversation.delete",
 				"memory.write",
 				"memory.remove",
+				"context.compact",
+				"project.tasks.move",
 				"checkpoint.preview",
 				"checkpoint.restore",
 				"checkpoint.flag",
@@ -661,8 +700,14 @@ export class DesktopSession {
 				capabilities: [
 					...(this.lifecycle?.inspectContext ? ["conversation-context-v1"] : []),
 					...(this.lifecycle?.readHistory ? ["context-history-v1"] : []),
+					...(this.lifecycle?.compactContext && this.lifecycle.readContext && this.lifecycle.restoreContext ? ["context-compact-v1"] : []),
+					...(this.lifecycle?.sideQuery ? ["side-query-v1"] : []),
+					...(this.lifecycle?.projectTasks ? ["project-tasks-v1"] : []),
+					...(this.lifecycle?.projectTasks?.move && this.lifecycle.projectTasks.capture ? ["project-tasks-move-v1"] : []),
 					...(this.lifecycle?.checkCode ? ["spider-check-v1"] : []),
 					"native",
+					"workspace-branch-v1",
+					"binary-inspection-v1",
 					"autonomous-execution-v1",
 					...(this.lifecycle?.models ? ["model-selection-v1", "reasoning-selection-v1"] : []),
 					...(this.lifecycle?.models?.discover ? ["model-discovery-v1"] : []),
@@ -702,6 +747,70 @@ export class DesktopSession {
 			throw new Error("IDENTITY_MISMATCH: attach to this workspace and session before execution")
 		if (this.closing && request.method !== "snapshot") throw new Error("SHUTTING_DOWN: no more work is admitted")
 		switch (request.method) {
+			case "workspace.branch": {
+				z.object({}).strict().parse(request.params)
+				return { branch: await workspaceBranch(this.workspace.path) }
+			}
+			case "side.query": {
+				const { conversation, question } = z.object({ conversation: z.string().min(1).max(128), question: z.string().trim().min(1).max(MAX_INSTRUCTION_LENGTH) }).strict().parse(request.params)
+				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: reopen the selected conversation")
+				if (!this.lifecycle?.sideQuery) throw new Error("UNSUPPORTED: side questions are unavailable")
+				if (this.sideQueryWork) throw new Error("SIDE_QUERY_BUSY: wait for the current side question to finish")
+				const controller = new AbortController()
+				this.sideQueryController = controller
+				let work: Promise<{ response: string; contextLimited: boolean }>
+				try { work = this.lifecycle.sideQuery(question, controller.signal) }
+				catch (error) { this.sideQueryController = undefined; throw error }
+				this.sideQueryWork = work
+				try {
+					const result = await work
+					return { conversation, ...result }
+				} finally {
+					if (this.sideQueryWork === work) { this.sideQueryWork = undefined; this.sideQueryController = undefined }
+				}
+			}
+			case "project.tasks.list": {
+				const { offset, filters } = z.object({ offset: z.number().int().nonnegative().max(1_000_000).default(0), filters: z.array(projectTaskFilterSchema).max(3).default([]) }).strict().parse(request.params)
+				if (new Set(filters.map((filter) => filter.field)).size !== filters.length) throw new Error("INVALID_FILTER: choose one filter per field")
+				if (!this.lifecycle?.projectTasks) throw new Error("UNSUPPORTED: project tasks are unavailable")
+				return { revision: this.taskBoardRevision, ...this.lifecycle.projectTasks.list(offset, filters) }
+			}
+			case "project.tasks.move": {
+				const params = z.object({ board: z.string().min(1).max(128), id: z.string().min(1).max(128), status: z.enum(["backlog", "in_progress", "review", "done"]), revision: z.number().int().nonnegative() }).strict().parse(request.params)
+				const tasks = this.lifecycle?.projectTasks
+				if (!tasks?.move || !tasks.capture) throw new Error("UNSUPPORTED: this runtime cannot move project tasks")
+				if (this.taskBoardSaveError) throw new Error("TASK_BOARD_SAVE_UNCERTAIN: reconnect to inspect saved tasks before moving another task")
+				if (params.revision !== this.taskBoardRevision) throw new Error("TASK_BOARD_CHANGED: refresh tasks before moving this item")
+				const moved = tasks.move(params.board, params.id, params.status)
+				if (!moved.success) throw new Error(`TASK_MOVE_REJECTED: ${moved.error ?? "the task could not be moved"}`)
+				await Promise.resolve() // The board observer publishes and starts the durable save.
+				while (this.taskBoardSave) await this.taskBoardSave
+				if (this.taskBoardSaveError) throw new Error("TASK_BOARD_SAVE_UNCERTAIN: reconnect to inspect whether this move was saved")
+				return { updated: true, revision: this.taskBoardRevision }
+			}
+			case "context.compact": {
+				const { conversation } = z.object({ conversation: z.string().min(1).max(128) }).strict().parse(request.params)
+				if (conversation !== this.conversation) throw new Error("CONVERSATION_CHANGED: reopen the selected conversation")
+				if (!this.lifecycle?.compactContext || !this.lifecycle.readContext || !this.lifecycle.restoreContext)
+					throw new Error("UNSUPPORTED: this runtime cannot compact context")
+				await this.commits
+				if (this.closing) throw new Error("SHUTTING_DOWN: reconnect before compacting context")
+				if (this.active || this.queue.length || this.cancellingAll)
+					throw new Error("WORK_PENDING: finish or stop current work before compacting context")
+				const prior = prepareConversationContext(this.lifecycle.readContext())
+				let report: ReturnType<NonNullable<DesktopLifecycle["compactContext"]>>
+				try {
+					report = this.lifecycle.compactContext()
+					this.lifecycle.saveContext(conversation)
+					await this.database.flush()
+				} catch {
+					this.closing = true
+					try { this.lifecycle.restoreContext(prior) } catch { /* The worker is closing; reconciliation is required. */ }
+					throw new Error("COMPACTION_SAVE_UNCERTAIN: reconnect to inspect saved context before trying again")
+				}
+				this.contextHistory.clear()
+				return { conversation, ...report }
+			}
 			case "state.inspect": {
 				const { conversation } = z
 					.object({ conversation: z.string().min(1).max(128) })
@@ -1626,10 +1735,17 @@ export class DesktopSession {
 			}
 			case "files.read": {
 				const p = z
-					.object({ path: z.string(), offset: z.number().int().min(0).default(0), revision: z.string().optional() })
+					.object({ path: z.string(), offset: z.number().int().min(0).default(0), revision: z.string().optional(), branch: z.string().min(1).max(4105).optional() })
 					.strict()
 					.parse(request.params)
-				return this.inspection.read(p.path, p.offset, p.revision)
+				if (p.branch && await workspaceBranch(this.workspace.path) !== p.branch) throw new Error("BRANCH_CHANGED: reload the file on the current branch")
+				const page = await this.inspection.read(p.path, p.offset, p.revision)
+				if (p.branch && await workspaceBranch(this.workspace.path) !== p.branch) throw new Error("BRANCH_CHANGED: reload the file on the current branch")
+				return page
+			}
+			case "files.readBinary": {
+				const p = z.object({ path: z.string().min(1).max(4096), offset: z.number().int().min(0).max(64 * 1024 * 1024).default(0), revision: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().parse(request.params)
+				return this.inspection.readBinary(p.path, p.offset, p.revision)
 			}
 			case "artifact.read": {
 				await this.submissions
@@ -2141,6 +2257,7 @@ export class DesktopSession {
 	}
 	async stop() {
 		this.closing = true
+		this.sideQueryController?.abort(new Error("Workspace is closing"))
 		cancelGit(this.workspace.path)
 		this.lifecycle?.models?.close?.()
 		this.projectEpoch++
@@ -2166,11 +2283,17 @@ export class DesktopSession {
 		} catch (error) {
 			failure ??= error
 		}
+		try { await this.sideQueryWork } catch { /* Closing cancels the isolated inquiry. */ }
 		try {
 			await this.engine.close?.()
 		} catch (error) {
 			failure ??= error
 		}
+		// Deliver any final coalesced task mutation before detaching the observer.
+		await Promise.resolve()
+		this.unsubscribeTaskBoard?.(); this.unsubscribeTaskBoard = undefined
+		while (this.taskBoardSave) await this.taskBoardSave
+		failure ??= this.taskBoardSaveError
 		try {
 			await this.broccoliGit?.dispose()
 			const chargedBytes = this.broccoliGit?.diagnostics().evidence.charged
@@ -2254,6 +2377,8 @@ export async function runDesktopWorker(): Promise<void> {
 		const saved = metadata.get("session")
 		const sessionId = typeof saved?.session === "string" ? saved.session : randomUUID()
 		engine = new LumiMonolith({ cwd: owner.path, sessionId, databaseKernel: database })
+		const savedTaskBoard = metadata.get("project-task-board")
+		if (savedTaskBoard) engine.kanbanBoardSupervisor.getSubstrate().restoreWorkspaceSnapshot(validateProjectTaskSnapshot(savedTaskBoard.snapshot))
 		const savedSelection = metadata.get("model-selection")
 		if (savedSelection) {
 			const selection = validateModelSelection({
@@ -2424,6 +2549,18 @@ export async function runDesktopWorker(): Promise<void> {
 			},
 			readContext,
 			restoreContext,
+			compactContext: () => {
+				const before = engine!.sessionStore.getMessages().length
+				const report = engine!.sessionStore.compact(engine!.sessionCompactor, { force: true })
+				return { compacted: report.compacted, before, after: engine!.sessionStore.getMessages().length, inputTokens: report.inputTokens, outputTokens: report.outputTokens }
+			},
+			sideQuery: (question, signal) => engine!.agentEngine.askSideQuestion(question, signal),
+			projectTasks: {
+				list: (offset, filters) => projectTasks(engine!.kanbanBoardSupervisor.listBoards(), offset, filters),
+				subscribe: (callback) => engine!.kanbanBoardSupervisor.getSubstrate().subscribeBoardChanges(callback),
+				capture: () => engine!.kanbanBoardSupervisor.getSubstrate().exportSnapshot(),
+				move: (board, id, status) => engine!.kanbanBoardSupervisor.updateTask(board, id, { column: status }),
+			},
 			saveContext: (conversation) => {
 				// Context selection/compaction remains in LUMI. The native client never
 				// rebuilds it from visible messages. Archived output remains separate.
