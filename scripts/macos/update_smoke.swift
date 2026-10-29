@@ -10,6 +10,7 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var native: NativeUpdater?
     private var updater: SPUUpdater?
     private var window: NSWindow?
+    private var statusLabel: NSTextField?
     private let mode = CommandLine.arguments.dropFirst().first ?? "--menus"
 
     private func log(_ value: String) { print(value); fflush(stdout) }
@@ -50,6 +51,17 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 180),
                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window?.title = "HEAV3NS-CODE updater verification"
+        let status = NSTextField(wrappingLabelWithString: "Testing an update in a disposable app copy. The test deliberately does not relaunch or open your workspaces.")
+        status.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel = status
+        if let content = window?.contentView {
+            content.addSubview(status)
+            NSLayoutConstraint.activate([
+                status.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+                status.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
+                status.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            ])
+        }
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         let userDriver = SPUStandardUserDriver(hostBundle: .main, delegate: nil)
@@ -66,6 +78,7 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        statusLabel?.stringValue = "Found version \(item.displayVersionString). Follow the update dialog to test replacement of this disposable copy."
         log("FOUND: \(item.displayVersionString) build \(item.versionString)")
         if mode != "--apply" { exit(0) }
     }
@@ -73,8 +86,8 @@ final class UpdaterSmoke: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         log("PASS: signed public feed checked; app is up to date")
         if mode != "--apply" { exit(0) }
     }
-    func updater(_ updater: SPUUpdater, didDownloadUpdate item: SUAppcastItem) { log("DOWNLOADED: \(item.versionString)") }
-    func updater(_ updater: SPUUpdater, didExtractUpdate item: SUAppcastItem) { log("VERIFIED AND EXTRACTED: \(item.versionString)") }
+    func updater(_ updater: SPUUpdater, didDownloadUpdate item: SUAppcastItem) { statusLabel?.stringValue = "Update downloaded. Verifying the disposable installation…"; log("DOWNLOADED: \(item.versionString)") }
+    func updater(_ updater: SPUUpdater, didExtractUpdate item: SUAppcastItem) { statusLabel?.stringValue = "Update verified. After installation this test will close without relaunching."; log("VERIFIED AND EXTRACTED: \(item.versionString)") }
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) { log("INSTALLING: \(item.versionString)") }
     // The replacement is real, but do not relaunch the production app into user data.
     func updaterShouldRelaunchApplication(_ updater: SPUUpdater) -> Bool { false }
