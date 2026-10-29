@@ -1,5 +1,5 @@
 import * as readline from "node:readline"
-import type { EngineProgressEvent } from "../../../core/contracts/agent.contracts.js"
+import type { EngineProgressEvent, EngineTickResult } from "../../../core/contracts/agent.contracts.js"
 import type { GameStateSnapshot } from "../../../core/contracts/session.contracts.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
@@ -35,10 +35,21 @@ import type { Component, OverlayHandle } from "../../../tui/tui.js"
 import { TuiAltScreen } from "../../../tui/tui-alt-screen.js"
 import type { ModelSpecs } from "../resolution/model-catalog.js"
 import type { ReasoningEffortLevel } from "../resolution/reasoning-effort-controller.js"
+import { CliSideQuestion } from "./cli-side-question.js"
+import type { CliProjectTasks } from "./cli-project-tasks.js"
+import { CliSleepGuard } from "./cli-sleep-guard.js"
+import type { CliConversation } from "./cli-conversation.js"
+import { CliApprovals } from "./cli-approvals.js"
+import type { CliGoal, GoalAction } from "./cli-goal.js"
+import { runCliGoal } from "./cli-goal-runner.js"
 
 export interface InteractiveSessionOptions {
 	sessionId?: string
 	enableTelemetry?: boolean
+	projectTasks?: CliProjectTasks
+	conversation?: CliConversation
+	goal?: CliGoal
+	interactiveApprovals?: boolean
 }
 
 const DEFAULT_MARKDOWN_THEME: MarkdownTheme = {
@@ -230,9 +241,10 @@ export class InteractiveModeController {
 	/**
 	 * Starts a rich, differential-rendering Terminal User Interface interactive session.
 	 */
-	async startInteractiveSession(monolith: LumiMonolith): Promise<void> {
+	async startInteractiveSession(monolith: LumiMonolith, options: InteractiveSessionOptions = {}): Promise<void> {
 		if (!process.stdin.isTTY || !process.stdout.isTTY) {
-			return this.startFallbackReadlineSession(monolith)
+			if (options.interactiveApprovals) throw new Error("Interactive approvals require a terminal.")
+			return this.startFallbackReadlineSession(monolith, options)
 		}
 
 		const terminal = new ProcessTerminal()
@@ -310,6 +322,15 @@ export class InteractiveModeController {
 		// 3. Categorized Slash Commands (Mirroring familiar CLI/TUI standards)
 		const slashCommands: SlashCommand[] = [
 			{ name: "help", description: "[Help] Display interactive keyboard shortcuts & usage guide" },
+			{ name: "btw", description: "[Session] Ask an isolated side question without tools or a checkpoint" },
+			{ name: "compact", description: "[Session] Compact the current context while idle" },
+			{ name: "resume", description: "[Session] Resume the most recent saved CLI conversation" },
+			{ name: "sessions", description: "[Session] List saved CLI conversations" },
+			{ name: "history", description: "[Session] Show conversation history (/history [offset])" },
+			...(options.interactiveApprovals ? [{ name: "approve", description: "[Approval] Allow the pending operation once" }, { name: "deny", description: "[Approval] Deny the pending operation" }] : []),
+			{ name: "queue", description: "[Session] Review, remove, clear or resume queued instructions" },
+			{ name: "tasks", description: "[Project] View, filter or move durable project tasks" },
+			{ name: "goal", description: "[Project] Plan and execute an objective; status, pause, resume or clear" },
 			{ name: "agents", description: "[Agents] Inspect delegated tasks, outcomes, and blockers" },
 			{ name: "subagents", description: "[Agents] Alias for /agents" },
 			{ name: "swarm", description: "[Agents] Alias for /agents" },
@@ -408,6 +429,9 @@ export class InteractiveModeController {
 		let activeTurnAbortController: AbortController | null = null
 		let activeTurnStartedAt = 0
 		let activeTurnProgress = "Connecting to model"
+		const sideQuestion = new CliSideQuestion((question, signal) => monolith.agentEngine.askSideQuestion(question, signal))
+		const queuedInstructions: string[] = []
+		let queuePaused = false
 
 		const formatElapsed = (elapsedMs: number): string => {
 			const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
@@ -428,6 +452,7 @@ export class InteractiveModeController {
 			tui.requestRender()
 		}
 
+		let scheduleGoal: () => void = () => {}
 		const closeInlineView = (component?: Component) => {
 			if ((component ?? activeInlineView) instanceof SwarmDashboardModal) {
 				taskMonitorOverlay?.hide()
@@ -445,6 +470,7 @@ export class InteractiveModeController {
 			tui.setFocus(editor)
 			if (activeTurnAbortController) renderTurnProgress()
 			tui.requestRender()
+			scheduleGoal()
 		}
 
 		const openHelpModal = () => {
@@ -1041,20 +1067,172 @@ export class InteractiveModeController {
 				footerText.setText(defaultFooterText)
 			}
 			tui.requestRender()
+			if (!text.trim()) scheduleGoal()
 		}
 
 		return new Promise<void>((resolve) => {
 			let isRunning = true
+			let contextChanging = false
+			let goalBusy = false
+			let goalTimer: ReturnType<typeof setTimeout> | undefined
+			let goalPending: { action: GoalAction; result: EngineTickResult; turnSignal: AbortSignal } | undefined
+			let goalPrepared: GoalAction | undefined
+			const showQueue = (message?: string) => {
+				const card = new Box(1, 0, (value: string) => `\x1b[48;5;236m${value}\x1b[0m`)
+				const rows = queuedInstructions.map((value, index) => `${index + 1}. ${sanitizeProgressText(value, 200)}`)
+				card.addChild(new Text([message, queuedInstructions.length ? `Up next${queuePaused ? " (paused)" : ""}:` : "No queued instructions.", ...rows, "Use /queue remove <number>, /queue clear, or /queue resume."].filter(Boolean).join("\n"), 0, 0))
+				historyContainer.addChild(card); historyScrollView.scrollToEnd(); tui.requestRender()
+			}
+			const showTasks = (value: string) => {
+				const card = new Box(1, 0, (text: string) => `\x1b[48;5;236m${text}\x1b[0m`)
+				card.addChild(new Text(value, 0, 0)); historyContainer.addChild(card); historyScrollView.scrollToEnd(); tui.requestRender()
+			}
+			const approvals = options.interactiveApprovals ? new CliApprovals(() => activeTurnAbortController?.signal, showTasks) : undefined
+			if (approvals) monolith.toolRegistry.requireInteractiveHost((request) => approvals.request(request))
+			const sleepGuard = new CliSleepGuard((message) => { if (isRunning) showTasks(message) })
+			if (options.projectTasks) options.projectTasks.onError = (message) => { if (isRunning) showTasks(message); else console.error(message) }
+			if (options.conversation && monolith.sessionStore.getTranscript().length) showTasks(options.conversation.history())
+			if (options.goal?.hasGoal) showTasks(options.goal.status())
 
 			stopTui = () => {
 				if (!isRunning) return
+				if (activeTurnAbortController || contextChanging || goalBusy) { showTasks("Finish or stop the active work before exiting."); return }
+				if (queuedInstructions.length) { showQueue("Clear queued instructions before exiting, or resume them."); return }
 				isRunning = false
+				if (goalTimer) clearTimeout(goalTimer)
+				approvals?.close()
+				sleepGuard.stop()
 				tui.stop()
-				resolve()
+				void (async () => {
+					try { if (options.goal?.active) await options.goal.pause("Session closed. Use /goal resume to continue.") }
+					catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					await sideQuestion.close()
+				})().finally(resolve)
 			}
 
-			editor.onSubmit = async (text: string) => {
+			const submitInput = async (text: string, fromQueue = false, goalAction?: GoalAction): Promise<void> => {
 				const input = text.trim()
+				if (/^\/(?:approve|deny)(?:\s|$)/.test(input)) {
+					const decision = /^\/(approve|deny)\s+(\d+)$/.exec(input)
+					if (!decision) { showTasks("Include the displayed approval number: /approve <number> or /deny <number>."); return }
+					if (!approvals?.decide(Number(decision[2]), decision[1] === "approve" ? "allow" : "deny")) showTasks("That approval is no longer pending. Review the current request before deciding.")
+					return
+				}
+				if (contextChanging) { if (!fromQueue) editor.setText(text); showTasks("Wait for the context change to finish. Your input is preserved."); return }
+				if (!goalAction && (input === "/goal" || input.startsWith("/goal "))) {
+					const goal = options.goal
+					editor.addToHistory(input)
+					if (!goal || !options.conversation) { showTasks("Goal workflow is unavailable in this session."); return }
+					const command = input.slice(5).trim()
+					if (!command || command === "status") { showTasks(goal.status()); return }
+					if (command === "pause") {
+						try { if (goalBusy) activeTurnAbortController?.abort(new Error("Goal paused by user")); await goal.pause(); goalPending = undefined; goalPrepared = undefined; showTasks(goal.status()) }
+						catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+						return
+					}
+					if (activeTurnAbortController || goalBusy || queuedInstructions.length || queuePaused) { editor.setText(text); showTasks("Finish or clear current work before changing the goal. Your input is preserved."); return }
+					if (command === "clear") { try { await goal.clear(); goalPending = undefined; goalPrepared = undefined; showTasks(goal.status()) } catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }; return }
+					goalBusy = true
+					const controller = new AbortController()
+					activeTurnAbortController = controller
+					sleepGuard.start()
+					showTasks(command === "resume" ? "Resuming goal…" : "Creating goal plan and board…")
+					try {
+						if (command === "resume") {
+							if (goal.sessionId && !options.conversation.belongsTo(goal.sessionId)) options.conversation.resume(goal.sessionId)
+							await options.conversation.save()
+							await goal.resume(monolith.sessionContext.sessionId)
+							if (controller.signal.aborted && goal.active) await goal.pause("Goal paused by the user.")
+						} else {
+							await options.conversation.save()
+							await goal.create(command, monolith.sessionContext.sessionId)
+						}
+						if (goal.needsPlan) await goal.plan(controller.signal)
+						showTasks(goal.status())
+					} catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					finally {
+						if (activeTurnAbortController === controller) activeTurnAbortController = null
+						goalBusy = false; sleepGuard.stop()
+						if (isRunning && queuedInstructions.length && !queuePaused) void submitInput(queuedInstructions.shift()!, true)
+						else scheduleGoal()
+					}
+					return
+				}
+				if (input === "/sessions") {
+					try { showTasks(options.conversation?.list() ?? "Session recovery is unavailable in this session.") }
+					catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					return
+				}
+				if (input === "/history" || input.startsWith("/history ")) {
+					try { showTasks(options.conversation?.historyCommand(input) ?? "Session history is unavailable in this session.") }
+					catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					return
+				}
+				if (input === "/compact" || input === "/resume" || input.startsWith("/resume ")) {
+					if (activeTurnAbortController || queuedInstructions.length) {
+						editor.setText(text); showTasks("Finish or clear queued work before changing context. Your input is preserved."); return
+					}
+					if (!options.conversation) { showTasks("Session recovery is unavailable in this session."); return }
+					contextChanging = true
+					try {
+						if (input === "/compact") showTasks(await options.conversation.compact())
+						else showTasks(`${options.conversation.resume(input.slice(7).trim() || undefined)}\n\n${options.conversation.history()}`)
+					}
+					catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					finally { contextChanging = false; scheduleGoal() }
+					return
+				}
+				if (input === "/tasks" || input.startsWith("/tasks ")) {
+					if (!options.projectTasks) { showTasks("Project tasks are unavailable in this session."); return }
+					try { showTasks(await options.projectTasks.command(input)) }
+					catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					return
+				}
+				const question = CliSideQuestion.parse(input)
+				if (question !== undefined) {
+					let work: Promise<{ response: string; contextLimited: boolean }>
+					try { work = sideQuestion.start(question) }
+					catch (error) {
+						editor.setText(text)
+						footerText.setText(`\x1b[33m${sanitizeProgressText(error instanceof Error ? error.message : String(error), 200)}\x1b[0m`)
+						tui.requestRender()
+						return
+					}
+					editor.addToHistory(input)
+					const card = new Box(1, 0, (value: string) => `\x1b[48;5;236m${value}\x1b[0m`)
+					const clean = (value: string) => value.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "")
+					card.addChild(new Markdown(`### Side question\n\n${clean(question)}\n\n_Asking without tools or a checkpoint…_`, 0, 0, DEFAULT_MARKDOWN_THEME))
+					historyContainer.addChild(card); historyScrollView.scrollToEnd(); tui.requestRender()
+					void work.then((result) => {
+						if (!isRunning) return
+						card.clear()
+						card.addChild(new Markdown(`### Side question\n\n${clean(question)}\n\n${clean(result.response)}\n\n_${result.contextLimited ? "Recent context was incomplete. " : ""}This exchange is not added to the conversation._`, 0, 0, DEFAULT_MARKDOWN_THEME))
+						historyScrollView.scrollToEnd(); tui.requestRender()
+					}, (error) => {
+						if (!isRunning) return
+						card.clear()
+						card.addChild(new Markdown(`### Side question\n\n${clean(question)}\n\nUnable to answer: ${sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)}`, 0, 0, DEFAULT_MARKDOWN_THEME))
+						historyScrollView.scrollToEnd(); tui.requestRender()
+					})
+					return
+				}
+				if (input === "/queue" || input.startsWith("/queue ")) {
+					const command = input.slice(6).trim()
+					if (command === "clear") { queuedInstructions.length = 0; queuePaused = false; showQueue("Cleared queued instructions.") }
+					else if (command.startsWith("remove ")) {
+						const number = command.slice(7).trim()
+						const index = /^\d+$/.test(number) ? Number(number) - 1 : -1
+						if (index < 0 || index >= queuedInstructions.length) showQueue("No queued instruction has that number.")
+						else { queuedInstructions.splice(index, 1); if (!queuedInstructions.length) queuePaused = false; showQueue("Removed queued instruction.") }
+					} else if (command === "resume") {
+						if (activeTurnAbortController) showQueue("The current turn is still running.")
+						else if (!queuedInstructions.length) showQueue()
+						else { queuePaused = false; const next = queuedInstructions.shift()!; showQueue("Resuming queued instructions."); void submitInput(next, true) }
+					} else if (command) showQueue("Usage: /queue [remove <number> | clear | resume]")
+					else showQueue()
+					scheduleGoal()
+					return
+				}
 
 				// Monitoring is read-only navigation and must remain available while
 				// the parent owns the execution turn.
@@ -1065,16 +1243,21 @@ export class InteractiveModeController {
 					return
 				}
 
-				if (activeTurnAbortController) {
-					activeTurnProgress = "Turn running; /agents to inspect workers, Esc to stop"
-					renderTurnProgress()
+				if (!fromQueue && (activeTurnAbortController || goalBusy || queuePaused)) {
+					if (!input) return
+					if (input.startsWith("/")) {
+						editor.setText(text)
+						showQueue("That command requires an idle turn. Your input is preserved.")
+					} else if (queuedInstructions.length >= 10) {
+						editor.setText(text); showQueue("The queue is full. Your input is preserved.")
+					} else {
+						queuedInstructions.push(input); editor.addToHistory(input); showQueue("Instruction queued.")
+					}
 					return
 				}
 
-				editor.setText("")
-
 				if (!input) return
-				editor.addToHistory(input)
+				if (!fromQueue) editor.addToHistory(input)
 
 				if (input === "/help" || input === "?") {
 					openHelpModal()
@@ -1599,6 +1782,11 @@ export class InteractiveModeController {
 
 					if (targetSnapshot) {
 						monolith.rewindToSnapshot(targetSnapshot)
+						try { await options.conversation?.save() }
+						catch (error) {
+							showTasks(`The session was rewound in memory, but could not be saved: ${sanitizeProgressText(error instanceof Error ? error.message : String(error), 500)}`)
+							return
+						}
 						updateHeader()
 						cardBox.addChild(
 							new Markdown(
@@ -1665,7 +1853,7 @@ export class InteractiveModeController {
 				const userBox = new Box(1, 0, (str: string) => `\x1b[48;5;235m${str}\x1b[0m`)
 				userBox.addChild(
 					new Markdown(
-						`\x1b[1;36m❯ User [Frame #${monolith.sessionContext.turnCount + 1}]\x1b[0m\n${input}`,
+						goalAction ? `\x1b[1;36m❯ Goal · ${goalAction.kind === "audit" ? "Final audit" : "Next task"}\x1b[0m` : `\x1b[1;36m❯ User [Frame #${monolith.sessionContext.turnCount + 1}]\x1b[0m\n${input}`,
 						0,
 						0,
 						DEFAULT_MARKDOWN_THEME,
@@ -1675,6 +1863,7 @@ export class InteractiveModeController {
 
 				autocompleteProvider.setDynamicSuggestions([])
 				const turnAbortController = new AbortController()
+				sleepGuard.start()
 				activeTurnAbortController = turnAbortController
 				activeTurnStartedAt = Date.now()
 				activeTurnProgress = "Connecting to model"
@@ -1692,9 +1881,13 @@ export class InteractiveModeController {
 				renderTurnProgress()
 				tui.requestRender()
 
+				let completed = false
+				let saveAttempted = false
 				try {
 					const tickResult = await monolith.tick({
 						prompt: input,
+						verifyWorkspace: goalAction?.verifyWorkspace,
+						...(goalAction?.verifyWorkspace ? { workspaceCheckScope: "workspace" as const } : {}),
 						signal: turnAbortController.signal,
 						onProgress: (event: EngineProgressEvent) => {
 							activityTimeline.update(event)
@@ -1702,6 +1895,10 @@ export class InteractiveModeController {
 							renderTurnProgress()
 						},
 					})
+					if (options.conversation) { saveAttempted = true; await options.conversation.save() }
+					if (goalAction && options.goal?.active) await options.goal.recordSession(goalAction, monolith.sessionContext.sessionId)
+					completed = tickResult.outcome === "completed"
+					if (goalAction && options.goal?.active) goalPending = { action: goalAction, result: tickResult, turnSignal: turnAbortController.signal }
 					activityTimeline.settleIfNeeded(tickResult.outcome, tickResult.response, Date.now() - activeTurnStartedAt)
 					autocompleteProvider.setDynamicSuggestions(activityTimeline.getFollowUpSuggestions())
 					const toolSection = formatUniversalToolSection(tickResult.toolResults ?? [])
@@ -1720,6 +1917,12 @@ export class InteractiveModeController {
 					updateHeader()
 					historyScrollView.scrollToEnd()
 				} catch (err: unknown) {
+					if (goalAction && options.goal?.active) {
+						try { await options.goal.pause(`Turn stopped: ${sanitizeProgressText(err instanceof Error ? err.message : String(err), 500)}`) } catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					}
+					if (!saveAttempted && options.conversation) {
+						try { await options.conversation.save() } catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					}
 					const errorMsg = err instanceof Error ? err.message : String(err)
 					const safeErrorMsg = sanitizeProgressText(errorMsg, 700) || "Unknown engine error"
 					activityTimeline.failIfNeeded(safeErrorMsg, Date.now() - activeTurnStartedAt)
@@ -1768,18 +1971,64 @@ export class InteractiveModeController {
 					footerText.setText(defaultFooterText)
 					historyScrollView.scrollToEnd()
 					tui.requestRender()
+					if (!goalAction && options.goal?.active && (!completed || turnAbortController.signal.aborted)) {
+						try { await options.goal.pause("A follow-up turn stopped. Review it, then use /goal resume."); goalPending = undefined; goalPrepared = undefined; showTasks(options.goal.status()) }
+						catch (error) { showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					}
+					if (isRunning && queuedInstructions.length) {
+						if (completed && !turnAbortController.signal.aborted) {
+							const next = queuedInstructions.shift()!
+							void submitInput(next, true)
+						} else { sleepGuard.stop(); queuePaused = true; showQueue("The turn stopped; queued instructions are paused.") }
+					} else sleepGuard.stop()
+					if (goalAction) goalBusy = false
+					scheduleGoal()
 				}
 			}
+			scheduleGoal = () => {
+				if (!isRunning || !options.goal?.active || goalTimer || goalBusy || activeTurnAbortController || contextChanging || queuedInstructions.length || queuePaused || editor.getText().trim() || activeInlineView || isLoadingInlineView) return
+				goalTimer = setTimeout(() => {
+					goalTimer = undefined
+					if (!isRunning || !options.goal?.active || goalBusy || activeTurnAbortController || contextChanging || queuedInstructions.length || queuePaused || editor.getText().trim() || activeInlineView || isLoadingInlineView) return
+					goalBusy = true
+					void (async () => {
+						try {
+							if (goalPending) {
+								const pending = goalPending; goalPending = undefined
+								const controller = new AbortController(); activeTurnAbortController = controller; sleepGuard.start()
+								try { await options.goal!.settle(pending.action, pending.result, monolith.sessionContext.sessionId, AbortSignal.any([pending.turnSignal, controller.signal])) }
+								finally { if (activeTurnAbortController === controller) activeTurnAbortController = null; sleepGuard.stop() }
+								showTasks(options.goal!.status())
+							} else {
+								const action = goalPrepared ?? await options.goal!.next()
+								if (action && options.goal!.active) {
+									if (queuedInstructions.length || queuePaused || editor.getText().trim() || activeInlineView || isLoadingInlineView) goalPrepared = action
+									else { goalPrepared = undefined; await submitInput(action.prompt, true, action); return }
+								}
+							}
+						} catch (error) {
+							showTasks(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700))
+							try { if (options.goal?.active) await options.goal.pause("Goal execution stopped. Review the error, then resume.") } catch (pauseError) { showTasks(sanitizeProgressText(pauseError instanceof Error ? pauseError.message : String(pauseError), 700)) }
+						} finally {
+							goalBusy = false
+							if (isRunning && !activeTurnAbortController && queuedInstructions.length && !queuePaused) void submitInput(queuedInstructions.shift()!, true)
+							else scheduleGoal()
+						}
+					})()
+				}, 250)
+			}
+			editor.onSubmit = (text) => { void submitInput(text) }
 
 			tui.start()
 		})
 	}
 
-	private async startFallbackReadlineSession(monolith: LumiMonolith): Promise<void> {
+	private async startFallbackReadlineSession(monolith: LumiMonolith, options: InteractiveSessionOptions): Promise<void> {
 		console.log("\x1b[1;36m========================================================\x1b[0m")
 		console.log("\x1b[1;36m   HEAV3NS Agent CLI - Interactive REPL                 \x1b[0m")
-		console.log("\x1b[90m   Commands: /agents, /skills, /login, /model, /doctor, /help, /exit\x1b[0m")
+		console.log("\x1b[90m   Commands: /goal, /tasks, /btw, /compact, /agents, /skills, /help, /exit\x1b[0m")
 		console.log("\x1b[1;36m========================================================\x1b[0m\n")
+		if (options.conversation && monolith.sessionStore.getTranscript().length) console.log(options.conversation.history())
 
 		const rl = readline.createInterface({
 			input: process.stdin,
@@ -1789,8 +2038,32 @@ export class InteractiveModeController {
 
 		rl.prompt()
 
+		const sideQuestion = new CliSideQuestion((question, signal) => monolith.agentEngine.askSideQuestion(question, signal))
+		const sleepGuard = new CliSleepGuard((message) => console.error(message))
+		let activeTurns = 0
+		let turnTail = Promise.resolve()
+		let contextChanging = false
+		let contextBarrier = Promise.resolve()
+		let goalController: AbortController | undefined
 		return new Promise<void>((resolve) => {
-			rl.on("line", async (line) => {
+			const pending = new Set<Promise<unknown>>()
+			let inputClosed = false
+			let requestedExit = false
+			const track = (work: Promise<unknown>) => {
+				pending.add(work)
+				void work.finally(() => pending.delete(work)).catch(() => {})
+			}
+			rl.once("close", () => {
+				inputClosed = true
+				if (requestedExit) goalController?.abort(new Error("Session closed"))
+				if (requestedExit) void sideQuestion.close()
+				void (async () => {
+					while (pending.size) await Promise.allSettled([...pending])
+					await sideQuestion.close()
+					resolve()
+				})()
+			})
+			const handleLine = async (line: string) => {
 				const input = line.trim()
 				if (!input) {
 					rl.prompt()
@@ -1799,15 +2072,107 @@ export class InteractiveModeController {
 
 				if (input === "/exit" || input === "/quit") {
 					console.log("\x1b[33mGoodbye!\x1b[0m")
+					requestedExit = true
 					rl.close()
-					resolve()
 					return
+				}
+				if (input === "/goal" || input.startsWith("/goal ")) {
+					const goal = options.goal, conversation = options.conversation
+					if (!goal || !conversation) { console.error("Goal workflow is unavailable in this session."); rl.prompt(); return }
+					const command = input.slice(5).trim()
+					if (!command || command === "status") { console.log(goal.status()); rl.prompt(); return }
+					if (command === "pause") {
+						try { goalController?.abort(new Error("Goal paused by user")); await goal.pause(); console.log(goal.status()) }
+						catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+						rl.prompt(); return
+					}
+					if (goalController || activeTurns || contextChanging) { console.error("Finish the current work before changing the goal."); rl.prompt(); return }
+					if (command === "clear") {
+						try { await goal.clear(); console.log(goal.status()) } catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+						rl.prompt(); return
+					}
+					const controller = new AbortController(); goalController = controller
+					const admit = async (work: () => Promise<void>) => {
+						if (++activeTurns === 1) sleepGuard.start()
+						const previous = turnTail
+						let release: () => void = () => undefined
+						turnTail = new Promise<void>((done) => { release = done })
+						try { await previous; await contextBarrier; await work() }
+						finally { release(); if (--activeTurns === 0) sleepGuard.stop() }
+					}
+					try {
+						await admit(async () => {
+							if (command === "resume") {
+								if (goal.sessionId && !conversation.belongsTo(goal.sessionId)) conversation.resume(goal.sessionId)
+								await conversation.save()
+								await goal.resume(monolith.sessionContext.sessionId)
+								if (controller.signal.aborted && goal.active) await goal.pause("Goal paused by the user.")
+							} else { await conversation.save(); await goal.create(command, monolith.sessionContext.sessionId) }
+							if (goal.needsPlan) await goal.plan(controller.signal)
+						})
+						console.log(goal.status()); if (!inputClosed) rl.prompt()
+						await runCliGoal(goal, monolith, conversation, controller.signal, { report: (value) => console.log(value), admit })
+					} catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					finally { if (goalController === controller) goalController = undefined; if (!inputClosed) rl.prompt() }
+					return
+				}
+
+				const question = CliSideQuestion.parse(input)
+				if (question !== undefined) {
+					try {
+						const work = sideQuestion.start(question)
+						console.log("Asking a side question without tools or a checkpoint…")
+						track(work.then((result) => {
+							console.log(`\nSide answer${result.contextLimited ? " (recent context was incomplete)" : ""}:\n${result.response.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "")}\n`)
+							if (!inputClosed) rl.prompt(true)
+						}, (error) => {
+							console.error(`\nSide question failed: ${sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)}`)
+							if (!inputClosed) rl.prompt(true)
+						}))
+					} catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 200)) }
+					rl.prompt()
+					return
+				}
+				if ((activeTurns > 0 || contextChanging) && input.startsWith("/") &&
+					!/^\/(?:tasks|agents|subagents|swarm|skills|sessions|history|help)(?:\s|$)/.test(input)) {
+					console.error("That command requires idle work; it was not run.")
+					rl.prompt(); return
 				}
 
 				if (input === "/clear") {
 					console.clear()
 					rl.prompt()
 					return
+				}
+				if (input === "/tasks" || input.startsWith("/tasks ")) {
+					try { console.log(options.projectTasks ? await options.projectTasks.command(input) : "Project tasks are unavailable in this session.") }
+					catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					rl.prompt(); return
+				}
+				if (input === "/sessions") {
+					try { console.log(options.conversation?.list() ?? "Session recovery is unavailable in this session.") }
+					catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					rl.prompt(); return
+				}
+				if (input === "/history" || input.startsWith("/history ")) {
+					try { console.log(options.conversation?.historyCommand(input) ?? "Session history is unavailable in this session.") }
+					catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					rl.prompt(); return
+				}
+				if (input === "/compact" || input === "/resume" || input.startsWith("/resume ")) {
+					if (activeTurns > 0 || contextChanging) console.error("Finish the current work before changing context.")
+					else if (!options.conversation) console.error("Session recovery is unavailable in this session.")
+					else {
+						contextChanging = true
+						const change = (async () => {
+							try { console.log(input === "/compact" ? await options.conversation!.compact() : `${options.conversation!.resume(input.slice(7).trim() || undefined)}\n\n${options.conversation!.history()}`) }
+							catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+							finally { contextChanging = false }
+						})()
+						contextBarrier = change
+						await change
+					}
+					rl.prompt(); return
 				}
 
 				if (input === "/login" || input === "/auth login" || input === "/setup" || input === "/wizard") {
@@ -1873,6 +2238,13 @@ export class InteractiveModeController {
 					console.log("  \x1b[35m/whoami\x1b[0m       : Display current identity & token status")
 					console.log("  \x1b[35m/model [name]\x1b[0m : Switch active LLM model")
 					console.log("  \x1b[35m/agents\x1b[0m       : Inspect delegated tasks, outcomes, and blockers")
+					console.log("  \x1b[35m/btw <question>\x1b[0m: Ask an isolated side question without tools or a checkpoint")
+					console.log("  \x1b[35m/compact\x1b[0m      : Compact the current context")
+					console.log("  \x1b[35m/sessions\x1b[0m     : List saved CLI conversations")
+					console.log("  \x1b[35m/history [offset]\x1b[0m: View a page of conversation history")
+					console.log("  \x1b[35m/resume [id]\x1b[0m  : Resume a saved CLI conversation")
+					console.log("  \x1b[35m/tasks\x1b[0m        : View, filter or move project tasks")
+					console.log("  \x1b[35m/goal <objective>\x1b[0m: Plan, track and execute a goal (/goal status|pause|resume|clear)")
 					console.log("  \x1b[35m/skills [term]\x1b[0m: Search skills (/skills refresh to rescan)")
 					console.log("  \x1b[35m/doctor\x1b[0m       : Run connectivity & health diagnostics")
 					console.log("  \x1b[35m/settings\x1b[0m     : View active engine configuration")
@@ -1975,6 +2347,11 @@ export class InteractiveModeController {
 
 					if (targetSnapshot) {
 						monolith.rewindToSnapshot(targetSnapshot)
+						try { await options.conversation?.save() }
+						catch (error) {
+							console.error(`The session was rewound in memory, but could not be saved: ${sanitizeProgressText(error instanceof Error ? error.message : String(error), 500)}`)
+							rl.prompt(); return
+						}
 						console.log(
 							`\x1b[1;32m[✓] State rewound to Frame #${targetSnapshot.frameIndex} (Snapshot: '${targetSnapshot.snapshotId}')\x1b[0m`,
 						)
@@ -2000,6 +2377,14 @@ export class InteractiveModeController {
 				}
 
 				try {
+					if (++activeTurns === 1) sleepGuard.start()
+					const previous = turnTail
+					let release: () => void = () => undefined
+					turnTail = new Promise<void>((done) => { release = done })
+					await previous
+					await contextBarrier
+					let saveAttempted = false
+					try {
 					const printedActivities = new Map<string, string>()
 					const result = await monolith.tick({
 						prompt: input,
@@ -2037,6 +2422,11 @@ export class InteractiveModeController {
 							console.error(`  ${icon}${phaseBadge} ${event.message}${detail}${duration}`)
 						},
 					})
+					if (options.conversation) { saveAttempted = true; await options.conversation.save() }
+					if (result.outcome !== "completed" && options.goal?.active) {
+						goalController?.abort(new Error("Follow-up turn stopped"))
+						await options.goal.pause("A follow-up turn stopped. Review it, then use /goal resume.")
+					}
 					const outcomeColor =
 						result.outcome === "completed"
 							? "\x1b[1;32m"
@@ -2048,16 +2438,27 @@ export class InteractiveModeController {
 					)
 					console.log(result.response)
 					console.log()
+					} catch (error) {
+						if (!saveAttempted && options.conversation) {
+							try { await options.conversation.save() } catch (saveError) { console.error(sanitizeProgressText(saveError instanceof Error ? saveError.message : String(saveError), 700)) }
+						}
+						throw error
+					} finally { release() }
 				} catch (err: unknown) {
+					if (options.goal?.active) {
+						goalController?.abort(new Error("Follow-up turn failed"))
+						try { await options.goal.pause("A follow-up turn failed. Review it, then use /goal resume.") } catch (error) { console.error(sanitizeProgressText(error instanceof Error ? error.message : String(error), 700)) }
+					}
 					const message = err instanceof Error ? err.message : String(err)
 					console.error(
 						"\x1b[31mError during tick:\x1b[0m",
 						sanitizeProgressText(message, 700) || "Unknown engine error",
 					)
-				}
+				} finally { if (--activeTurns === 0) sleepGuard.stop() }
 
 				rl.prompt()
-			})
+			}
+			rl.on("line", (line) => { track(handleLine(line)) })
 		})
 	}
 }

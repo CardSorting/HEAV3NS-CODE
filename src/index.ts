@@ -5104,11 +5104,10 @@ if (isDirectCliExecution) {
 	const modelFlagIndex = args.indexOf("--model")
 	const modelFlagValue = modelFlagIndex >= 0 ? args[modelFlagIndex + 1] : undefined
 	const positionalArgs = args.filter(
-		(_arg, index) =>
-			index !== providerFlagIndex &&
-			index !== providerFlagIndex + 1 &&
-			index !== modelFlagIndex &&
-			index !== modelFlagIndex + 1,
+		(arg, index) =>
+			arg !== "--resume" && arg !== "--interactive-approvals" &&
+			(providerFlagIndex < 0 || (index !== providerFlagIndex && index !== providerFlagIndex + 1)) &&
+			(modelFlagIndex < 0 || (index !== modelFlagIndex && index !== modelFlagIndex + 1)),
 	)
 	const configuredProviderValue = providerFlagValue || process.env.LUMI_PROVIDER
 	const configuredProvider = normalizeAgentProvider(configuredProviderValue)
@@ -5167,6 +5166,8 @@ if (isDirectCliExecution) {
   heav3ns                     Start interactive terminal TUI session
   heav3ns --provider <id>    Select provider (codex/openai, claude-code, or opencode)
   heav3ns --model <name>      Start with an active route (e.g. ${modelExample})
+  heav3ns --resume            Resume the latest saved CLI conversation
+  heav3ns --interactive-approvals  Review operations without blocking the composer
 
 \x1b[1;34mModel Swapping & Catalog:\x1b[0m
 ${modelCommands}
@@ -5191,6 +5192,7 @@ ${modelCommands}
 
 \x1b[1;34mWorkload & Benchmarks:\x1b[0m
   heav3ns "your prompt"       Execute a single non-interactive prompt turn
+  heav3ns "/goal your task"   Plan and execute a tracked objective
   heav3ns benchmark (-b)      Run automated engine throughput and latency benchmark suite
   heav3ns baseline            Run smoke + benchmark + guardrails to update live baseline
   heav3ns smoke (-s)          Run runtime capability smoke verification suite
@@ -5312,12 +5314,38 @@ ${modelCommands}
 		return writeResult.passed
 	}
 
-	const startRepl = async (lumi: LumiMonolith) => {
-		await lumi.interactiveController.startInteractiveSession(lumi)
-	}
-
 	let stateManagerInitialized = false
 	let runtime: LumiMonolith | undefined
+	let cliDatabase: BroccoliDatabaseKernel | undefined
+	let cliTasks: import("./agents/extensions/execution/cli-project-tasks.js").CliProjectTasks | undefined
+	let cliConversation: import("./agents/extensions/execution/cli-conversation.js").CliConversation | undefined
+	let cliGoal: import("./agents/extensions/execution/cli-goal.js").CliGoal | undefined
+	const projectTasksFor = async (lumi: LumiMonolith) => {
+		if (!cliTasks) {
+			const { CliProjectTasks } = await import("./agents/extensions/execution/cli-project-tasks.js")
+			const tasks = new CliProjectTasks(lumi.databaseKernel, lumi.kanbanBoardSupervisor)
+			tasks.start()
+			cliTasks = tasks
+		}
+		return cliTasks
+	}
+	const conversationFor = async (lumi: LumiMonolith) => {
+		if (!cliConversation) {
+			const { CliConversation } = await import("./agents/extensions/execution/cli-conversation.js")
+			cliConversation = new CliConversation(lumi)
+			if (args.includes("--resume")) console.error(cliConversation.resume())
+		}
+		return cliConversation
+	}
+	const goalFor = async (lumi: LumiMonolith) => {
+		if (!cliGoal) {
+			const { CliGoal } = await import("./agents/extensions/execution/cli-goal.js")
+			const goal = new CliGoal(lumi.databaseKernel, lumi.kanbanBoardSupervisor, await projectTasksFor(lumi), (question, signal) => lumi.agentEngine.askSideQuestion(question, signal), process.cwd())
+			await goal.load()
+			cliGoal = goal
+		}
+		return cliGoal
+	}
 	let workspaceOwner: Awaited<ReturnType<typeof import("./desktop/workspace-owner.js").acquireWorkspace>> | undefined
 	;(async () => {
 		if (primaryCmd === "--desktop-account") {
@@ -5348,7 +5376,11 @@ ${modelCommands}
 			)
 		}
 		workspaceOwner = await (await import("./desktop/workspace-owner.js")).acquireWorkspace(process.cwd())
-		const lumi = new LumiMonolith(configuredProviderValue ? { provider: configuredProvider } : {})
+		if (args.includes("--interactive-approvals") && (!process.stdin.isTTY || !process.stdout.isTTY || positionalArgs.length > 0))
+			throw new Error("--interactive-approvals requires an interactive terminal session without a one-shot prompt")
+		cliDatabase = new BroccoliDatabaseKernel({ workspaceRoot: process.cwd() })
+		await cliDatabase.start()
+		const lumi = new LumiMonolith({ ...(configuredProviderValue ? { provider: configuredProvider } : {}), databaseKernel: cliDatabase })
 		runtime = lumi
 		if (configuredModelValue) {
 			lumi.setModel(configuredModelValue)
@@ -5525,7 +5557,68 @@ ${modelCommands}
 			if (!smoke.passed) throw new Error("Runtime smoke suite failed")
 		} else if (positionalArgs.length > 0 && !positionalArgs[0].startsWith("-")) {
 			const prompt = positionalArgs.join(" ")
-			const result = await lumi.tick({ prompt })
+			const tasks = await projectTasksFor(lumi)
+			const conversation = await conversationFor(lumi)
+			if (prompt.trim() === "/goal" || prompt.trim().startsWith("/goal ")) {
+				const goal = await goalFor(lumi)
+				const command = prompt.trim().slice(5).trim()
+				if (!command || command === "status" || command === "pause") { console.log(goal.status()); return }
+				if (command === "clear") { await goal.clear(); console.log(goal.status()); return }
+				const controller = new AbortController()
+				const onInterrupt = () => controller.abort(new Error("Interrupted by user"))
+				process.on("SIGINT", onInterrupt)
+				const { CliSleepGuard } = await import("./agents/extensions/execution/cli-sleep-guard.js")
+				const sleepGuard = new CliSleepGuard((message) => console.error(message)); sleepGuard.start()
+				try {
+					if (command === "resume") {
+						if (goal.sessionId && !conversation.belongsTo(goal.sessionId)) conversation.resume(goal.sessionId)
+						await conversation.save()
+						await goal.resume(lumi.sessionContext.sessionId)
+						if (controller.signal.aborted && goal.active) await goal.pause("Goal stopped by the user.")
+					} else { await conversation.save(); await goal.create(command, lumi.sessionContext.sessionId) }
+					if (goal.needsPlan) await goal.plan(controller.signal)
+					console.log(goal.status())
+					const { runCliGoal } = await import("./agents/extensions/execution/cli-goal-runner.js")
+					await runCliGoal(goal, lumi, conversation, controller.signal, { report: (value) => console.log(value) })
+					if (!goal.completed) process.exitCode = 1
+				} finally { process.off("SIGINT", onInterrupt); sleepGuard.stop() }
+				return
+			}
+			if (prompt.trim() === "/sessions") { console.log(conversation.list()); return }
+			if (prompt.trim() === "/history" || prompt.trim().startsWith("/history ")) {
+				console.log(conversation.historyCommand(prompt.trim())); return
+			}
+			if (prompt.trim() === "/tasks" || prompt.trim().startsWith("/tasks ")) {
+				console.log(await tasks.command(prompt))
+				return
+			}
+			if (prompt.trim() === "/compact") { console.log(await conversation.compact()); return }
+			const { CliSideQuestion } = await import("./agents/extensions/execution/cli-side-question.js")
+			const question = CliSideQuestion.parse(prompt)
+			if (question !== undefined) {
+				const side = new CliSideQuestion((value, signal) => lumi.agentEngine.askSideQuestion(value, signal))
+				try {
+					const result = await side.start(question)
+					console.log(result.response.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""))
+					if (result.contextLimited) console.error("Note: recent conversation context was incomplete.")
+				} finally { await side.close() }
+				return
+			}
+			const { CliSleepGuard } = await import("./agents/extensions/execution/cli-sleep-guard.js")
+			const sleepGuard = new CliSleepGuard((message) => console.error(message))
+			sleepGuard.start()
+			let result: EngineTickResult
+			let saveAttempted = false
+			try {
+				result = await lumi.tick({ prompt })
+				saveAttempted = true
+				await conversation.save()
+			} catch (error) {
+				if (!saveAttempted) {
+					try { await conversation.save() } catch (saveError) { console.error("Could not retain the CLI conversation:", saveError) }
+				}
+				throw error
+			} finally { sleepGuard.stop() }
 			const color =
 				result.outcome === "completed" ? "\x1b[1;32m" : result.outcome === "cancelled" ? "\x1b[1;33m" : "\x1b[1;31m"
 			console.log(
@@ -5533,7 +5626,7 @@ ${modelCommands}
 			)
 			console.log(result.response)
 		} else {
-			await startRepl(lumi)
+			await lumi.interactiveController.startInteractiveSession(lumi, { projectTasks: await projectTasksFor(lumi), conversation: await conversationFor(lumi), goal: await goalFor(lumi), interactiveApprovals: args.includes("--interactive-approvals") })
 		}
 	})()
 		.catch((err) => {
@@ -5542,9 +5635,19 @@ ${modelCommands}
 		})
 		.finally(async () => {
 			try {
+				await cliTasks?.close()
+			} catch (error) {
+				console.error("Could not save project task changes:", error)
+				process.exitCode = 1
+			}
+			try {
 				await runtime?.close()
 			} catch (error) {
 				console.error("Could not close HEAV3NS request queue during shutdown:", error)
+				process.exitCode = 1
+			}
+			try { await cliDatabase?.stop() } catch (error) {
+				console.error("Could not flush the workspace database:", error)
 				process.exitCode = 1
 			}
 			if (stateManagerInitialized) {

@@ -43,7 +43,7 @@ export function highlightTerminalCode(code: string, lang?: string): string[] {
   switch (normalizedLang) {
     case "diff":
     case "patch":
-      return rawLines.map(highlightDiffLine);
+      return highlightDiff(rawLines);
 
     case "json":
     case "jsonc":
@@ -79,10 +79,42 @@ export function highlightTerminalCode(code: string, lang?: string): string[] {
     default:
       // If code starts with diff markers (+/-), treat as diff automatically
       if (rawLines.some((l) => l.startsWith("+ ") || l.startsWith("- ") || l.startsWith("@@ "))) {
-        return rawLines.map(highlightDiffLine);
+        return highlightDiff(rawLines);
       }
       return rawLines.map((line) => `\x1b[37m${line}\x1b[0m`);
   }
+}
+
+/** Add a stronger highlight to changed characters in paired diff lines. */
+function highlightDiff(lines: string[]): string[] {
+  const result = lines.map(highlightDiffLine);
+  for (let index = 0; index < lines.length;) {
+    if (!lines[index].startsWith("-") || lines[index].startsWith("---")) { index++; continue; }
+    const deleted = index;
+    while (index < lines.length && lines[index].startsWith("-") && !lines[index].startsWith("---")) index++;
+    const added = index;
+    while (index < lines.length && lines[index].startsWith("+") && !lines[index].startsWith("+++")) index++;
+    const pairs = Math.min(added - deleted, index - added, 200);
+    for (let pair = 0; pair < pairs; pair++) {
+      const before = Array.from(lines[deleted + pair].slice(1));
+      const after = Array.from(lines[added + pair].slice(1));
+      // Keep work bounded even for generated files with huge single lines.
+      if (before.length + after.length > 20_000) continue;
+      let prefix = 0;
+      while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix++;
+      let suffix = 0;
+      while (suffix < before.length - prefix && suffix < after.length - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix++;
+      const render = (characters: string[], marker: string, color: string, emphasis: string) => {
+        const middleEnd = characters.length - suffix;
+        const middle = characters.slice(prefix, middleEnd).join("");
+        const strong = middle ? `${emphasis}${middle}\x1b[0;${color}m` : "";
+        return `\x1b[${color}m${marker}${characters.slice(0, prefix).join("")}${strong}${characters.slice(middleEnd).join("")}\x1b[0m`;
+      };
+      result[deleted + pair] = render(before, "-", "31", "\x1b[1;41m");
+      result[added + pair] = render(after, "+", "32", "\x1b[1;42m");
+    }
+  }
+  return result;
 }
 
 function highlightDiffLine(line: string): string {

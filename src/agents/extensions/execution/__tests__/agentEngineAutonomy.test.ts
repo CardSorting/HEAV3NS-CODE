@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { gunzipSync } from "node:zlib"
 import sinon from "sinon"
 import type { EngineProgressEvent } from "../../../../core/contracts/agent.contracts.js"
 import type { IToolRegistry, ToolDefinition } from "../../../../core/contracts/tooling.contracts.js"
@@ -890,7 +891,10 @@ describe("native engine OpenRouter routing", () => {
 			async (url, init) => {
 				assert.equal(String(url), "https://openrouter.ai/api/v1/chat/completions")
 				assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-openrouter-key")
-				const body = JSON.parse(String(init?.body))
+				const bytes = new Headers(init?.headers).get("content-encoding") === "gzip"
+					? gunzipSync(Buffer.from(init!.body as Uint8Array)).toString("utf8")
+					: String(init?.body)
+				const body = JSON.parse(bytes)
 				requests.push(body)
 				const chunk =
 					requests.length === 1

@@ -22,6 +22,78 @@ This guide describes the interactive CLI in `src/agents/extensions/execution/int
 
 Type `/` to see command completions. Press `Esc` to dismiss the completion menu.
 
+## Conversation and follow-ups
+
+While a turn runs, submit another instruction to place it in the in-memory queue
+(up to ten). `/queue` lists it; `/queue remove <number>` removes an entry and
+`/queue clear` removes all entries. A cancelled or failed turn pauses the queue;
+use `/queue resume` to continue. Clear or resume pending instructions before
+exiting. The queue is not recovered if the process terminates unexpectedly.
+
+To review operations that require confirmation, start the full-screen CLI with
+`heav3ns --interactive-approvals`. Requests appear in the transcript without
+disabling the composer; type `/approve <number>` or `/deny <number>` using the
+number shown on the current operation. Stale numbers cannot approve a later request.
+You can still ask `/btw` questions and queue follow-ups while a request waits.
+Cancelling the active turn denies its unanswered requests. This option requires
+a TTY and does not change the default execution policy when it is omitted.
+
+`/btw <question>` asks the current provider using a bounded copy of recent
+context. It can run during a turn, has no tools, and does not add the exchange to
+the conversation or create a checkpoint. Only one side question can run at once.
+`/compact` compresses the active context while work is idle and retains the full
+transcript. CLI conversation state is saved in the workspace after turns and
+successful compaction. Start `heav3ns --resume`, or use `/resume` before starting
+a new conversation, to restore the most recently saved CLI conversation. Use
+`/sessions` to list up to 256 recent conversations and `/resume <session-id>`
+to select one before starting a new turn. CLI
+conversation selection is separate from the desktop's selected conversation.
+`/history [offset]` shows pages of the transcript; long messages are previewed
+with an explicit truncation marker. Use `/history message <number> [offset]` to
+read a long message in full, one chunk at a time.
+
+On macOS, active coordinator work holds an idle-sleep assertion until the work
+and any immediately following queued instructions settle. The CLI reports if it
+cannot hold the assertion. Other platforms do not use this macOS-specific guard.
+
+## Project task board
+
+`/tasks` displays the same workspace task board as the native client. Use
+`/tasks list` or `/tasks board`, then `/tasks next` and `/tasks previous` to page
+through results. Filter across all tasks before paging with commands such as
+`/tasks filter owner is Ada`, `/tasks filter tag is not documentation`, or
+`/tasks filter status is in progress`; `/tasks filter clear` removes filters.
+Move a task with `/tasks move <board-id> <task-id> <backlog|in_progress|review|done>`.
+The engine validates transitions and the CLI waits for the board to be saved
+before reporting success. `/tasks` also works during a running turn and in the
+non-TTY fallback.
+
+## Autonomous goals
+
+Use `/goal <objective>` to plan and work toward a multi-step objective. The CLI
+creates an itemized plan and a dedicated project board, then runs one item at a
+time. It reviews each turn against recorded tool results, adds newly discovered
+required work to the plan, and runs a separate final audit with workspace
+verification. Use `/goal status` for progress and the roadmap path, or `/tasks
+board` to inspect the shared board. The roadmap is saved under
+`.broccolidb/goal-roadmaps/`; it does not overwrite a project roadmap.
+
+`/goal pause` stops continuation and requests cancellation of the current goal
+turn. `/goal resume` restores the goal's saved CLI conversation and continues
+after inspecting the workspace. A process interruption reopens the goal paused;
+it never silently replays an interrupted action. `/goal clear` clears the active
+goal without deleting the board or workspace edits. Start a new goal after the
+previous one is completed or cleared. Goal work uses the normal tool permissions
+and respects interactive approval requests when that option is enabled.
+
+Queued instructions take precedence over the next automatic goal turn in the
+full-screen interface. Missing tool evidence, repeated lack of progress, failed
+verification, or a blocked assessment pauses the goal for review instead of
+claiming completion. Model-generated plans and assessments can still be wrong;
+inspect the recorded work and checks. A one-shot invocation is also available as
+`heav3ns "/goal <objective>"`; it exits unsuccessfully when the goal pauses.
+Ordinary prompts continue to run as normal turns.
+
 ## Agent tasks
 
 Use `/agents` to open the task dashboard. `/subagents` and `/swarm` are aliases. In the non-TTY fallback, the same commands print task status and any recorded blocker.
@@ -54,6 +126,12 @@ The model receives a compact metadata catalog and loads a matching skill's instr
 | `/agents` | Inspect delegated task status, results, and blockers |
 | `/skills` | Browse skills currently available to the agent |
 | `/skills refresh` | Refresh skill discovery |
+| `/btw <question>` | Ask an isolated side question without tools or a checkpoint |
+| `/compact` / `/sessions` / `/resume [id]` | Compact active context, list saved CLI conversations, or resume one |
+| `/history [offset]` | Show a page of the current conversation transcript |
+| `/queue` | Review and manage queued follow-up instructions in the TUI |
+| `/tasks` | View, filter, page, or move durable project tasks |
+| `/goal <objective>` | Plan, track, and execute an objective; `/goal status`, `pause`, `resume`, or `clear` |
 | `/login` / `/logout` / `/whoami` | Manage and inspect authentication |
 | `/model [name]` / `/models` | View or switch the active model |
 | `/providers` / `/setup` | Configure or diagnose providers |

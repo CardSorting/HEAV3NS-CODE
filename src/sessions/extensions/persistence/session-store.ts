@@ -113,6 +113,27 @@ export class PersistentSessionStore extends AbstractSessionStore {
     }
   }
 
+  /** Restore provider context and its independent full transcript atomically. */
+  restoreHistory(activeJsonl: string, transcriptJsonl: string): void {
+    if (Buffer.byteLength(transcriptJsonl) > 32 * 1024 * 1024) throw new Error("CONTEXT_LIMIT: saved transcript exceeds 32 MiB");
+    const lines = transcriptJsonl.split("\n").filter((line) => line.trim().length > 0);
+    if (lines.length > 100_000) throw new Error("CONTEXT_LIMIT: too many saved transcript messages");
+    const transcript = lines.map((line, index) => {
+      try { return this.parseMessage(JSON.parse(line) as unknown, index + 1); }
+      catch (error) {
+        if (error instanceof SyntaxError) throw new Error(`Invalid session JSONL syntax at line ${index + 1}`, { cause: error });
+        throw error;
+      }
+    });
+    const active = new PersistentSessionStore([], this.arena.getCapacityBytes());
+    active.importJsonl(activeJsonl);
+    this.messages = active.messages.map((message) => ({ ...message }));
+    this.transcript = transcript;
+    this.rebuildTranscriptIndex();
+    this.contextGeneration += 1;
+    this.rebuildArena();
+  }
+
   async saveToFile(filePath: string): Promise<void> {
     const parentDir = path.dirname(filePath);
     await fs.mkdir(parentDir, { recursive: true });

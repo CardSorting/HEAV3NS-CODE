@@ -60,6 +60,14 @@ export class HelpModal implements Component, Focusable {
 				`- \`?\` or \`/help\` : Display this Help & Shortcuts Reference\n\n` +
 				`### Slash Commands Reference\n` +
 				modelGuide +
+				`- **[Session]** \`/btw <question>\` : Ask an isolated side question without tools or checkpoints\n` +
+				`- **[Session]** \`/compact\` : Compact the current context while idle\n` +
+				`- **[Session]** \`/sessions\` / \`/resume [id]\` : List or resume saved CLI conversations\n` +
+				`- **[Session]** \`/history [offset]\` : View conversation messages\n` +
+				`- **[Session]** \`/queue\` : Review follow-ups; use \`/queue remove <number>\`, \`clear\`, or \`resume\`\n` +
+				`- **[Approval]** \`/approve <number>\` / \`/deny <number>\` : Decide the displayed operation\n` +
+				`- **[Project]** \`/tasks\` : View, filter, and move project tasks\n` +
+				`- **[Project]** \`/goal <objective>\` : Plan and execute a goal; use \`/goal status|pause|resume|clear\` to manage it\n` +
 				`- **[Model]**   \`/model [name]\` : Switch active LLM model or open catalog picker\n` +
 				`- **[Session]** \`/snapshot\` : Create immutable state snapshot checkpoint\n` +
 				`- **[Session]** \`/snapshots\` : List all snapshot checkpoints in session\n` +
