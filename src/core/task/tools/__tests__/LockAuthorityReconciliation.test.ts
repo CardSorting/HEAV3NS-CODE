@@ -327,6 +327,21 @@ describe("LockAuthorityReconciliation", () => {
 			await authority.release(acquired.claim)
 		})
 
+		it("renews a durable lease only for its current owner and fencing identity", async () => {
+			const resourceKey = "governed-lane:renewal:0"
+			const lease = await SwarmMutexService.acquireLease(resourceKey, "owner-renew", 30_000)
+			const renewed = await SwarmMutexService.renewLease(lease, 60_000)
+			renewed.expiresAt.should.be.greaterThan(lease.expiresAt)
+			let lostOwnershipRejected = false
+			try {
+				await SwarmMutexService.renewLease({ ...renewed, fencingToken: "forged-token" }, 60_000)
+			} catch {
+				lostOwnershipRejected = true
+			}
+			lostOwnershipRejected.should.be.true()
+			await SwarmMutexService.release(resourceKey, renewed.ownerId, renewed.leaseEpoch, renewed.fencingToken)
+		})
+
 		it("fails closed when persistent BroccoliDB authority is unavailable", async () => {
 			const resourceKey = "governed-lane:db-outage:0"
 			await acquireGovernedFileLock(tmpDir, resourceKey, "owner-retained", "1", "1")

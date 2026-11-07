@@ -273,6 +273,27 @@ describe("TerminalProcess (Integration Tests)", () => {
 
 	// The following tests require shell integration and controlled terminal output
 	describe("Shell integration tests", () => {
+		it("routes multiline heredocs through supervised capture instead of interactive shell integration", async () => {
+			const terminal = TerminalRegistry.createTerminal().terminal
+			createdTerminals.push(terminal)
+			const executeCommand = sandbox.stub().returns({ read: () => createMockStream(["unexpected"]) })
+			sandbox.stub(terminal, "shellIntegration").get(() => ({ executeCommand }))
+			const fallback = sandbox
+				.stub(
+					process as unknown as {
+						runWithoutShellIntegration: (...args: unknown[]) => Promise<void>
+					},
+					"runWithoutShellIntegration",
+				)
+				.resolves()
+			const command = "python3 <<'PY'\nprint('safe fallback')\nPY"
+
+			await process.run(terminal, command)
+
+			sinon.assert.notCalled(executeCommand)
+			sinon.assert.calledWithExactly(fallback, terminal, command, undefined, true)
+		})
+
 		// We'll mock the terminal run process and TerminalProcess for these tests
 		it("should emit completed and continue events when command finishes", async () => {
 			// Create a terminal to ensure proper interface, but we'll use mocking under the hood
@@ -612,6 +633,38 @@ describe("TerminalProcess (Integration Tests)", () => {
 		await runPromise
 		sinon.assert.calledOnce(completedSpy)
 		assert.match(process.getUnretrievedOutput(), /background output/)
+	})
+
+	it("does not redispatch a command when shell output observation fails", async () => {
+		const terminal = TerminalRegistry.createTerminal().terminal
+		createdTerminals.push(terminal)
+		let onClosed: ((closed: vscode.Terminal) => unknown) | undefined
+		const executeCommand = sandbox.stub().returns({
+			read: () => ({
+				next: async () => {
+					throw new Error("shell output stream disconnected")
+				},
+				[Symbol.asyncIterator]() {
+					return this
+				},
+			}),
+		})
+		sandbox.stub(terminal, "shellIntegration").get(() => ({ executeCommand }))
+		sandbox.stub(vscode.window, "onDidCloseTerminal").callsFake((listener) => {
+			onClosed = listener
+			return { dispose: () => undefined }
+		})
+		const sendText = sandbox.spy(terminal, "sendText")
+
+		const runPromise = process.run(terminal, "npm run migrate")
+		await sandbox.clock.tickAsync(0)
+		onClosed?.(terminal)
+		await runPromise
+
+		sinon.assert.calledOnce(executeCommand)
+		sinon.assert.notCalled(sendText)
+		assert.equal(process.getCompletionDetails().exitCode, undefined)
+		assert.match(process.getCompletionDetails().observationError ?? "", /stream disconnected/)
 	})
 
 	it("should abort command and emit warnings on password prompt timeout", async () => {

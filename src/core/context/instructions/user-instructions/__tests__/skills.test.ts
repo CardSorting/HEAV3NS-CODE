@@ -10,6 +10,7 @@ import * as sinon from "sinon"
 import { setImmediate } from "node:timers/promises"
 
 import { diskRuntime } from "@/core/storage/disk"
+import { getSkillsSection } from "@/core/prompts/system-prompt/components/skills"
 import { roadmapSkillRuntime } from "@/services/roadmap/RoadmapSkillInstall"
 import { Logger } from "@/shared/services/Logger"
 import { fsRuntime } from "@/utils/fs"
@@ -546,6 +547,85 @@ description: Test
 			const content = await getSkillContent("my-skill", availableSkills)
 
 			expect(content?.instructions).to.equal("Instructions with whitespace")
+		})
+
+		it("should reject activation when SKILL.md frontmatter name or description is mutated or mismatched on disk", async () => {
+			const skillDir = path.join(GLOBAL_SKILLS_DIR, "integrity-skill")
+			const skillMdPath = path.join(skillDir, "SKILL.md")
+
+			const availableSkills = [
+				{
+					name: "integrity-skill",
+					description: "Valid discovery description",
+					path: skillMdPath,
+					source: "global" as const,
+				},
+			]
+
+			readFileStub.withArgs(skillMdPath, "utf-8").resolves(`---
+name: tampered-name
+description: Valid discovery description
+---
+Body instructions`)
+
+			const mismatched = await getSkillContent("integrity-skill", availableSkills, { mode: "full" })
+			expect(mismatched).to.be.null
+
+			readFileStub.withArgs(skillMdPath, "utf-8").resolves(`---
+name: integrity-skill
+description: "   "
+---
+Body instructions`)
+
+			const missingDesc = await getSkillContent("integrity-skill", availableSkills, { mode: "full" })
+			expect(missingDesc).to.be.null
+		})
+
+		it("should clamp oversized descriptions to 1000 characters and frame catalog as untrusted metadata", async () => {
+			const longDescription = "A".repeat(1500)
+			const skillDir = path.join(GLOBAL_SKILLS_DIR, "long-desc-skill")
+			const skillMdPath = path.join(skillDir, "SKILL.md")
+
+			fileExistsStub.withArgs(GLOBAL_SKILLS_DIR).resolves(true)
+			fileExistsStub.withArgs(skillMdPath).resolves(true)
+			isDirectoryStub.withArgs(GLOBAL_SKILLS_DIR).resolves(true)
+			readdirStub.withArgs(GLOBAL_SKILLS_DIR).resolves(["long-desc-skill"])
+			statStub.withArgs(skillDir).resolves({ isDirectory: () => true })
+			readFileStub.withArgs(skillMdPath, "utf-8").resolves(`---
+name: long-desc-skill
+description: ${longDescription}
+---
+Instructions`)
+
+			const discovered = await discoverSkills(TEST_CWD)
+			expect(discovered).to.have.lengthOf(1)
+			expect(discovered[0].description.length).to.be.at.most(1000)
+
+			const promptSection = await getSkillsSection({} as any, { skills: discovered } as any)
+			expect(promptSection).to.include("<available_skills>")
+			expect(promptSection).to.include("untrusted catalog metadata")
+			expect(promptSection).to.not.include("A".repeat(1005))
+		})
+
+		it("should reject activation when skill.path contains '..' traversal segments or does not point to SKILL.md", async () => {
+			const traversalSkill = {
+				name: "valid-name",
+				description: "Valid description",
+				path: "/mock/home/.dietcode/skills/other/../../valid-name/SKILL.md",
+				source: "global" as const,
+			}
+			const nonSkillMd = {
+				name: "valid-name",
+				description: "Valid description",
+				path: "/mock/home/.dietcode/skills/valid-name/OTHER.md",
+				source: "global" as const,
+			}
+
+			const resTraversal = await getSkillContent("valid-name", [traversalSkill], { mode: "full" })
+			expect(resTraversal).to.be.null
+
+			const resNonSkillMd = await getSkillContent("valid-name", [nonSkillMd], { mode: "full" })
+			expect(resNonSkillMd).to.be.null
 		})
 	})
 })

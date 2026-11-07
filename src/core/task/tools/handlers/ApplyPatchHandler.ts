@@ -8,6 +8,7 @@ import { fileExistsAtPath } from "@utils/fs"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import { BASH_WRAPPERS, DiffError, PATCH_MARKERS, type Patch, PatchActionType, type PatchChunk } from "@/shared/Patch"
 import { preserveEscaping } from "@/shared/string"
+import { EnvironmentIntegrity } from "../../../integrity/EnvironmentIntegrity"
 import type { ToolValidator } from "../ToolValidator"
 import type { TaskConfig } from "../types/TaskConfig"
 import { declareApprovalIntent, type IPartialBlockHandler, type IToolHandler, type ToolResponse } from "../types/ToolContracts"
@@ -182,6 +183,9 @@ export class ApplyPatchHandler implements IToolHandler, IPartialBlockHandler {
 				// Save the changes for this file after approval
 				const fileResult = await this.saveFileChange(change, operationPath)
 				if (fileResult) {
+					if (EnvironmentIntegrity.isManifest(operationPath) || EnvironmentIntegrity.isManifest(originalPath)) {
+						EnvironmentIntegrity.invalidateCache()
+					}
 					// For move operations, we need to handle both old and new paths
 					if (change.type === PatchActionType.UPDATE && change.movePath) {
 						applyResults[change.movePath] = fileResult

@@ -30,6 +30,64 @@ import {
 } from "./common";
 import { Settings } from "./state";
 
+export enum CommandExecutionOutcome {
+  COMMAND_EXECUTION_OUTCOME_UNSPECIFIED = 0,
+  COMMAND_EXECUTION_OUTCOME_COMPLETED = 1,
+  COMMAND_EXECUTION_OUTCOME_FAILED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function commandExecutionOutcomeFromJSON(object: any): CommandExecutionOutcome {
+  switch (object) {
+    case 0:
+    case "COMMAND_EXECUTION_OUTCOME_UNSPECIFIED":
+      return CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_UNSPECIFIED;
+    case 1:
+    case "COMMAND_EXECUTION_OUTCOME_COMPLETED":
+      return CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_COMPLETED;
+    case 2:
+    case "COMMAND_EXECUTION_OUTCOME_FAILED":
+      return CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return CommandExecutionOutcome.UNRECOGNIZED;
+  }
+}
+
+export function commandExecutionOutcomeToJSON(object: CommandExecutionOutcome): string {
+  switch (object) {
+    case CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_UNSPECIFIED:
+      return "COMMAND_EXECUTION_OUTCOME_UNSPECIFIED";
+    case CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_COMPLETED:
+      return "COMMAND_EXECUTION_OUTCOME_COMPLETED";
+    case CommandExecutionOutcome.COMMAND_EXECUTION_OUTCOME_FAILED:
+      return "COMMAND_EXECUTION_OUTCOME_FAILED";
+    case CommandExecutionOutcome.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export interface UnresolvedCommandAction {
+  actionId: string;
+  commandFingerprint: string;
+  status: string;
+  detail: string;
+  updatedAt: number;
+  ownerActive: boolean;
+}
+
+export interface UnresolvedCommandActionArray {
+  actions: UnresolvedCommandAction[];
+}
+
+export interface ReconcileCommandActionRequest {
+  actionId: string;
+  outcome: CommandExecutionOutcome;
+  confirmation: string;
+}
+
 /** Request message for creating a new task */
 export interface NewTaskRequest {
   metadata: Metadata1 | undefined;
@@ -124,6 +182,349 @@ export interface ExplainChangesRequest {
   /** Timestamp of the completion message to explain changes for */
   messageTs: number;
 }
+
+function createBaseUnresolvedCommandAction(): UnresolvedCommandAction {
+  return { actionId: "", commandFingerprint: "", status: "", detail: "", updatedAt: 0, ownerActive: false };
+}
+
+export const UnresolvedCommandAction: MessageFns<UnresolvedCommandAction> = {
+  encode(message: UnresolvedCommandAction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.actionId !== "") {
+      writer.uint32(10).string(message.actionId);
+    }
+    if (message.commandFingerprint !== "") {
+      writer.uint32(18).string(message.commandFingerprint);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    if (message.detail !== "") {
+      writer.uint32(34).string(message.detail);
+    }
+    if (message.updatedAt !== 0) {
+      writer.uint32(40).int64(message.updatedAt);
+    }
+    if (message.ownerActive !== false) {
+      writer.uint32(48).bool(message.ownerActive);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnresolvedCommandAction {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUnresolvedCommandAction();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.actionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.commandFingerprint = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.detail = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.updatedAt = longToNumber(reader.int64());
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.ownerActive = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UnresolvedCommandAction {
+    return {
+      actionId: isSet(object.actionId)
+        ? globalThis.String(object.actionId)
+        : isSet(object.action_id)
+        ? globalThis.String(object.action_id)
+        : "",
+      commandFingerprint: isSet(object.commandFingerprint)
+        ? globalThis.String(object.commandFingerprint)
+        : isSet(object.command_fingerprint)
+        ? globalThis.String(object.command_fingerprint)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      detail: isSet(object.detail) ? globalThis.String(object.detail) : "",
+      updatedAt: isSet(object.updatedAt)
+        ? globalThis.Number(object.updatedAt)
+        : isSet(object.updated_at)
+        ? globalThis.Number(object.updated_at)
+        : 0,
+      ownerActive: isSet(object.ownerActive)
+        ? globalThis.Boolean(object.ownerActive)
+        : isSet(object.owner_active)
+        ? globalThis.Boolean(object.owner_active)
+        : false,
+    };
+  },
+
+  toJSON(message: UnresolvedCommandAction): unknown {
+    const obj: any = {};
+    if (message.actionId !== "") {
+      obj.actionId = message.actionId;
+    }
+    if (message.commandFingerprint !== "") {
+      obj.commandFingerprint = message.commandFingerprint;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.detail !== "") {
+      obj.detail = message.detail;
+    }
+    if (message.updatedAt !== 0) {
+      obj.updatedAt = Math.round(message.updatedAt);
+    }
+    if (message.ownerActive !== false) {
+      obj.ownerActive = message.ownerActive;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UnresolvedCommandAction>, I>>(base?: I): UnresolvedCommandAction {
+    return UnresolvedCommandAction.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UnresolvedCommandAction>, I>>(object: I): UnresolvedCommandAction {
+    const message = createBaseUnresolvedCommandAction();
+    message.actionId = object.actionId ?? "";
+    message.commandFingerprint = object.commandFingerprint ?? "";
+    message.status = object.status ?? "";
+    message.detail = object.detail ?? "";
+    message.updatedAt = object.updatedAt ?? 0;
+    message.ownerActive = object.ownerActive ?? false;
+    return message;
+  },
+};
+
+function createBaseUnresolvedCommandActionArray(): UnresolvedCommandActionArray {
+  return { actions: [] };
+}
+
+export const UnresolvedCommandActionArray: MessageFns<UnresolvedCommandActionArray> = {
+  encode(message: UnresolvedCommandActionArray, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.actions) {
+      UnresolvedCommandAction.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnresolvedCommandActionArray {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUnresolvedCommandActionArray();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.actions.push(UnresolvedCommandAction.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UnresolvedCommandActionArray {
+    return {
+      actions: globalThis.Array.isArray(object?.actions)
+        ? object.actions.map((e: any) => UnresolvedCommandAction.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: UnresolvedCommandActionArray): unknown {
+    const obj: any = {};
+    if (message.actions?.length) {
+      obj.actions = message.actions.map((e) => UnresolvedCommandAction.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UnresolvedCommandActionArray>, I>>(base?: I): UnresolvedCommandActionArray {
+    return UnresolvedCommandActionArray.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UnresolvedCommandActionArray>, I>>(object: I): UnresolvedCommandActionArray {
+    const message = createBaseUnresolvedCommandActionArray();
+    message.actions = object.actions?.map((e) => UnresolvedCommandAction.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseReconcileCommandActionRequest(): ReconcileCommandActionRequest {
+  return { actionId: "", outcome: 0, confirmation: "" };
+}
+
+export const ReconcileCommandActionRequest: MessageFns<ReconcileCommandActionRequest> = {
+  encode(message: ReconcileCommandActionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.actionId !== "") {
+      writer.uint32(10).string(message.actionId);
+    }
+    if (message.outcome !== 0) {
+      writer.uint32(16).int32(message.outcome);
+    }
+    if (message.confirmation !== "") {
+      writer.uint32(26).string(message.confirmation);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReconcileCommandActionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseReconcileCommandActionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.actionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.outcome = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.confirmation = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ReconcileCommandActionRequest {
+    return {
+      actionId: isSet(object.actionId)
+        ? globalThis.String(object.actionId)
+        : isSet(object.action_id)
+        ? globalThis.String(object.action_id)
+        : "",
+      outcome: isSet(object.outcome) ? commandExecutionOutcomeFromJSON(object.outcome) : 0,
+      confirmation: isSet(object.confirmation) ? globalThis.String(object.confirmation) : "",
+    };
+  },
+
+  toJSON(message: ReconcileCommandActionRequest): unknown {
+    const obj: any = {};
+    if (message.actionId !== "") {
+      obj.actionId = message.actionId;
+    }
+    if (message.outcome !== 0) {
+      obj.outcome = commandExecutionOutcomeToJSON(message.outcome);
+    }
+    if (message.confirmation !== "") {
+      obj.confirmation = message.confirmation;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ReconcileCommandActionRequest>, I>>(base?: I): ReconcileCommandActionRequest {
+    return ReconcileCommandActionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ReconcileCommandActionRequest>, I>>(
+    object: I,
+  ): ReconcileCommandActionRequest {
+    const message = createBaseReconcileCommandActionRequest();
+    message.actionId = object.actionId ?? "";
+    message.outcome = object.outcome ?? 0;
+    message.confirmation = object.confirmation ?? "";
+    return message;
+  },
+};
 
 function createBaseNewTaskRequest(): NewTaskRequest {
   return { metadata: undefined, text: "", images: [], files: [], taskSettings: undefined, requestId: "" };
@@ -1604,6 +2005,24 @@ export const TaskServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** Lists background command actions whose outcome needs operator reconciliation */
+    listUnresolvedCommandActions: {
+      name: "listUnresolvedCommandActions",
+      requestType: EmptyRequest as typeof EmptyRequest,
+      requestStream: false,
+      responseType: UnresolvedCommandActionArray as typeof UnresolvedCommandActionArray,
+      responseStream: false,
+      options: {},
+    },
+    /** Records an operator-confirmed outcome for a command action without replaying it */
+    reconcileCommandAction: {
+      name: "reconcileCommandAction",
+      requestType: ReconcileCommandActionRequest as typeof ReconcileCommandActionRequest,
+      requestStream: false,
+      responseType: Empty as typeof Empty,
+      responseStream: false,
+      options: {},
+    },
     /** Clears the current task */
     clearTask: {
       name: "clearTask",
@@ -1752,6 +2171,28 @@ export const TaskServiceService = {
     responseStream: false as const,
     requestSerialize: (value: EmptyRequest): Buffer => Buffer.from(EmptyRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer): EmptyRequest => EmptyRequest.decode(value),
+    responseSerialize: (value: Empty): Buffer => Buffer.from(Empty.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Empty => Empty.decode(value),
+  },
+  /** Lists background command actions whose outcome needs operator reconciliation */
+  listUnresolvedCommandActions: {
+    path: "/dietcode.TaskService/listUnresolvedCommandActions" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: EmptyRequest): Buffer => Buffer.from(EmptyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): EmptyRequest => EmptyRequest.decode(value),
+    responseSerialize: (value: UnresolvedCommandActionArray): Buffer =>
+      Buffer.from(UnresolvedCommandActionArray.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UnresolvedCommandActionArray => UnresolvedCommandActionArray.decode(value),
+  },
+  /** Records an operator-confirmed outcome for a command action without replaying it */
+  reconcileCommandAction: {
+    path: "/dietcode.TaskService/reconcileCommandAction" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ReconcileCommandActionRequest): Buffer =>
+      Buffer.from(ReconcileCommandActionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ReconcileCommandActionRequest => ReconcileCommandActionRequest.decode(value),
     responseSerialize: (value: Empty): Buffer => Buffer.from(Empty.encode(value).finish()),
     responseDeserialize: (value: Buffer): Empty => Empty.decode(value),
   },
@@ -1906,6 +2347,10 @@ export interface TaskServiceServer extends UntypedServiceImplementation {
   cancelTask: handleUnaryCall<EmptyRequest, Empty>;
   /** Cancels the currently running background command */
   cancelBackgroundCommand: handleUnaryCall<EmptyRequest, Empty>;
+  /** Lists background command actions whose outcome needs operator reconciliation */
+  listUnresolvedCommandActions: handleUnaryCall<EmptyRequest, UnresolvedCommandActionArray>;
+  /** Records an operator-confirmed outcome for a command action without replaying it */
+  reconcileCommandAction: handleUnaryCall<ReconcileCommandActionRequest, Empty>;
   /** Clears the current task */
   clearTask: handleUnaryCall<EmptyRequest, Empty>;
   /** Gets the total size of all tasks */
@@ -1962,6 +2407,38 @@ export interface TaskServiceClient extends Client {
   ): ClientUnaryCall;
   cancelBackgroundCommand(
     request: EmptyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Empty) => void,
+  ): ClientUnaryCall;
+  /** Lists background command actions whose outcome needs operator reconciliation */
+  listUnresolvedCommandActions(
+    request: EmptyRequest,
+    callback: (error: ServiceError | null, response: UnresolvedCommandActionArray) => void,
+  ): ClientUnaryCall;
+  listUnresolvedCommandActions(
+    request: EmptyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UnresolvedCommandActionArray) => void,
+  ): ClientUnaryCall;
+  listUnresolvedCommandActions(
+    request: EmptyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UnresolvedCommandActionArray) => void,
+  ): ClientUnaryCall;
+  /** Records an operator-confirmed outcome for a command action without replaying it */
+  reconcileCommandAction(
+    request: ReconcileCommandActionRequest,
+    callback: (error: ServiceError | null, response: Empty) => void,
+  ): ClientUnaryCall;
+  reconcileCommandAction(
+    request: ReconcileCommandActionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Empty) => void,
+  ): ClientUnaryCall;
+  reconcileCommandAction(
+    request: ReconcileCommandActionRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: Empty) => void,

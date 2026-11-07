@@ -144,3 +144,13 @@ Scrolling away from an output tail holds the displayed excerpt stable, including
 Disconnected live summaries are labeled **Last recorded**. Expanded rows distinguish connection loss, paused work, and a terminal instruction with no recorded action completion; their earlier detail is explicitly a last update. The stream never promotes stale text to a fresh execution confirmation.
 
 These adaptations use native controls and the existing semantic colors. Reference patterns are inspectable steps, explicit outcomes and durations in [GitHub Actions logs](https://docs.github.com/en/actions/how-tos/monitor-workflows/use-workflow-run-logs), and deliberate scrollback/navigation in [VS Code's terminal](https://code.visualstudio.com/docs/terminal/basics#_navigating-the-buffer). They are interaction references, not claims of feature parity.
+
+## Agent Swarm, Sovereign Swarm Radar, and Command Recovery
+
+Native Walkthrough and workspace navigation integrate directly with **Agent Swarm & The Legion** (`agent-swarm-defer-v1`, `agentSwarm.*`) and **Command Recovery** (`command.actionsList`, `command.actionReconcile`):
+
+- **`Workspace` Menu Bar & Shortcuts**: The macOS `Workspace` menu and **Workspace Actions** (`⌘⇧P`) expose **Engage Specialist Team…**, **Formation Status…**, **Formation History…**, **Inspect Latest Specialist Stream…**, **Review Latest Completion…**, **Defer Agent Work** / **Resume Agent Work**, **Command Recovery…**, **Agent Swarm Settings…**, and **Toggle Swarm Radar** (`⌥⌘R`).
+- **Status Bar `· Deferred` Badge**: When cooperative defer is active or pending a `safe_boundary` / `before_turn` yield, the workspace status bar appends ` · Deferred` (`Running · Deferred` or `Ready · Deferred`).
+- **HIG Modal Hierarchy & Saved Stream Inspection**: In the Formation Status sheet, primary recovery/resume actions (`Resume Formation`, `Reconcile Interrupted Work…`, `Review Recovery…`) appear first with default-button semantics (`alertFirstButtonReturn`), **`Inspect Saved Stream…`** remains accessible across active, deferred, reconcilable, and completed formations whenever saved specialist transcripts exist, and `Close` is always placed last.
+- **Sovereign Swarm Radar (`⌥⌘R`)**: Heartbeat sharing with HEAV3NS is **off by default** (`"⚪ APP HEARTBEAT OFF (SHARING DISABLED)"` / `"Not connected"` / `"Unavailable while sharing is off"`) unless the user explicitly checks `"Share app heartbeat with HEAV3NS"` (and is permanently disabled if `HEAV3NS_NO_HEARTBEAT=1` is set), accompanied by an explicit non-anonymous installation ID disclosure badge.
+- **See Also**: [`../AGENT_SWARM_GUIDE.md`](../AGENT_SWARM_GUIDE.md) and [`INTEGRATION.md`](INTEGRATION.md#agent-swarm-sovereign-swarm-radar-and-command-recovery-adr-0001adr-0020).

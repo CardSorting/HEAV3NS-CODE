@@ -187,6 +187,71 @@ export class SwarmMutexService {
 		}
 	}
 
+	/** Rejects stale formation owners before they publish progress or settlement. */
+	static async assertLease(lease: DurableSwarmLease): Promise<DurableSwarmLease> {
+		const current = await SwarmMutexService.getLease(lease.resource)
+		if (
+			!current ||
+			current.ownerId !== lease.ownerId ||
+			current.leaseEpoch !== lease.leaseEpoch ||
+			current.fencingToken !== lease.fencingToken ||
+			current.expiresAt <= Date.now()
+		) {
+			throw new CoordinationError(
+				CoordinationErrorCode.LEASE_RENEWAL_FAILED,
+				`Lease for '${lease.resource}' is no longer owned by this formation.`,
+				"fail_closed",
+			)
+		}
+		return current
+	}
+
+	static async renewLease(lease: DurableSwarmLease, timeoutMs = 60_000): Promise<DurableSwarmLease> {
+		let rawDb: RawDatabase
+		try {
+			rawDb = await getCoordinationRawDb()
+		} catch (error) {
+			throw asDatabaseUnavailable(error, "lease renewal")
+		}
+		try {
+			return withImmediateTransaction(rawDb, () => {
+				const now = Date.now()
+				const current = getCachedStatement(rawDb, "SELECT * FROM swarm_locks WHERE resource = ?").get(lease.resource) as
+					| Record<string, unknown>
+					| undefined
+				if (
+					!current ||
+					current.ownerId !== lease.ownerId ||
+					String(current.leaseEpoch) !== lease.leaseEpoch ||
+					String(current.fencingToken) !== lease.fencingToken ||
+					Number(current.expiresAt) <= now
+				) {
+					throw new CoordinationError(
+						CoordinationErrorCode.LEASE_RENEWAL_FAILED,
+						`Lease for '${lease.resource}' was lost before renewal.`,
+						"fail_closed",
+					)
+				}
+				const expiresAt = now + Math.max(1_000, timeoutMs)
+				const updated = getCachedStatement(
+					rawDb,
+					"UPDATE swarm_locks SET expiresAt = ? WHERE resource = ? AND ownerId = ? AND leaseEpoch = ? AND fencingToken = ? AND expiresAt > ?",
+				).run(expiresAt, lease.resource, lease.ownerId, lease.leaseEpoch, lease.fencingToken, now)
+				if (updated.changes !== 1) {
+					throw new CoordinationError(
+						CoordinationErrorCode.LEASE_RENEWAL_FAILED,
+						`Lease for '${lease.resource}' changed during renewal.`,
+						"fail_closed",
+					)
+				}
+				return { ...lease, expiresAt }
+			})
+		} catch (error) {
+			if (error instanceof CoordinationError) throw error
+			throw asDatabaseUnavailable(error, "lease renewal")
+		}
+	}
+
 	static async release(
 		key: string,
 		ownerId: string,

@@ -25,6 +25,7 @@ const PRIMARY_KEYS: Record<string, readonly string[]> = {
 	task_rejections: ["decisionId"],
 	completion_attempts: ["completionAttemptId"],
 	task_lifecycle_records: ["taskId", "generationId"],
+	command_execution_actions: ["taskId", "actionId"],
 	task_lifecycle_events: ["eventId"],
 	task_lifecycle_sequence: ["id"],
 	compressed_chunks: ["chunk_hash"],

@@ -1,3 +1,4 @@
+import * as fsSync from "node:fs"
 import { exec } from "child_process"
 import { createHash } from "crypto"
 import * as fs from "fs/promises"
@@ -11,6 +12,7 @@ const execAsync = promisify(exec)
 
 export interface EnvironmentLease {
 	fingerprint: string
+	manifestFingerprint?: string
 	timestamp: number
 	success: boolean
 	error?: string
@@ -37,8 +39,10 @@ export interface EnvironmentLease {
  * multi-language discovery, binary integrity, and machine-anchored fingerprints.
  */
 export class EnvironmentIntegrity {
+	private static readonly activeInstances = new Set<WeakRef<EnvironmentIntegrity>>()
 	private lease: EnvironmentLease | null = null
 	private probePromise: Promise<EnvironmentLease> | null = null
+	private generation = 0
 	private readonly LEASE_DURATION = 1000 * 60 * 60 // 1 hour lease
 
 	private static readonly PROJECT_MARKERS: Record<string, { manifest: string; probe: string }> = {
@@ -53,7 +57,58 @@ export class EnvironmentIntegrity {
 	constructor(
 		private readonly cwd: string,
 		private readonly stateManager?: StateManager,
-	) {}
+	) {
+		EnvironmentIntegrity.activeInstances.add(new WeakRef(this))
+	}
+
+	private static readonly MANIFESTS = new Set([
+		"package.json",
+		"package-lock.json",
+		"npm-shrinkwrap.json",
+		"yarn.lock",
+		"pnpm-lock.yaml",
+		"Cargo.toml",
+		"Cargo.lock",
+		"rust-toolchain",
+		"rust-toolchain.toml",
+		"requirements.txt",
+		"Pipfile",
+		"Pipfile.lock",
+		"pyproject.toml",
+		"setup.py",
+		"poetry.lock",
+		"pom.xml",
+		"build.gradle",
+		"build.gradle.kts",
+		"settings.gradle",
+		"settings.gradle.kts",
+		"go.mod",
+		"go.sum",
+		"pubspec.yaml",
+		"pubspec.lock",
+		"Gemfile",
+		"Gemfile.lock",
+		".nvmrc",
+		".node-version",
+		".python-version",
+		".ruby-version",
+		".tool-versions",
+	])
+
+	public static isManifest(filePath: string): boolean {
+		return EnvironmentIntegrity.MANIFESTS.has(path.basename(filePath))
+	}
+
+	public static invalidateCache(): void {
+		for (const reference of EnvironmentIntegrity.activeInstances) {
+			const instance = reference.deref()
+			if (!instance) {
+				EnvironmentIntegrity.activeInstances.delete(reference)
+				continue
+			}
+			instance.revokeLease()
+		}
+	}
 
 	public getFingerprint(): string {
 		const env = process.env
@@ -65,9 +120,24 @@ export class EnvironmentIntegrity {
 			process.platform,
 			process.arch,
 			process.version,
-			"v2",
+			"v3",
 		].join("|")
 		return createHash("sha256").update(data).digest("hex")
+	}
+
+	/** Fingerprints manifest presence and stat metadata without hashing manifest contents. */
+	public getManifestFingerprint(): string {
+		const root = path.resolve(this.cwd)
+		const metadata = [...EnvironmentIntegrity.MANIFESTS].sort().map((name) => {
+			const filePath = path.join(root, name)
+			try {
+				const stat = fsSync.statSync(filePath)
+				return `${name}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`
+			} catch {
+				return `${name}:missing`
+			}
+		})
+		return createHash("sha256").update(metadata.join("\n")).digest("hex")
 	}
 
 	private getL0Lease(): EnvironmentLease | null {
@@ -85,6 +155,7 @@ export class EnvironmentIntegrity {
 		if (!lease) return false
 		if (Date.now() - lease.timestamp > this.LEASE_DURATION) return false
 		if (lease.fingerprint !== this.getFingerprint()) return false
+		if (!lease.manifestFingerprint || lease.manifestFingerprint !== this.getManifestFingerprint()) return false
 		return true
 	}
 
@@ -93,6 +164,7 @@ export class EnvironmentIntegrity {
 		if (this.stateManager) {
 			this.stateManager.setGlobalState("environmentalLease", undefined)
 		}
+		this.generation++
 		Logger.warn("[EnvironmentIntegrity] Environmental Lease revoked.")
 	}
 
@@ -123,13 +195,33 @@ export class EnvironmentIntegrity {
 			return cachedLease as EnvironmentLease
 		}
 
-		this.probePromise = this.performFullProbe()
+		this.probePromise = this.performStableProbe()
 		try {
 			const result = await this.probePromise
 			return result
 		} finally {
 			this.probePromise = null
 		}
+	}
+
+	private async performStableProbe(): Promise<EnvironmentLease> {
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			const generation = this.generation
+			const manifestFingerprint = this.getManifestFingerprint()
+			const lease = await this.performFullProbe(manifestFingerprint)
+			if (generation === this.generation && manifestFingerprint === this.getManifestFingerprint()) return lease
+			Logger.warn(`[EnvironmentIntegrity] Manifest state changed during validation probe (${attempt}/3); retrying.`)
+		}
+		const lease: EnvironmentLease = {
+			fingerprint: this.getFingerprint(),
+			manifestFingerprint: this.getManifestFingerprint(),
+			timestamp: Date.now(),
+			success: false,
+			error: "Workspace manifests changed repeatedly during environment validation; retry after edits settle.",
+		}
+		this.lease = lease
+		if (this.stateManager) this.stateManager.setGlobalState("environmentalLease", lease)
+		return lease
 	}
 
 	private static readonly VERSION_MANIFESTS: Record<string, string[]> = {
@@ -146,11 +238,12 @@ export class EnvironmentIntegrity {
 		asdf: "asdf --version",
 	}
 
-	private async performFullProbe(): Promise<EnvironmentLease> {
+	private async performFullProbe(manifestFingerprint: string): Promise<EnvironmentLease> {
 		Logger.info("[EnvironmentIntegrity] Performing Structural Forensic Probe (L2)...")
 		const fingerprint = this.getFingerprint()
 		const lease: EnvironmentLease = {
 			fingerprint,
+			manifestFingerprint,
 			timestamp: Date.now(),
 			success: true,
 			details: {
@@ -287,10 +380,16 @@ export class EnvironmentIntegrity {
 			if (details.toolchain?.node?.status === "found") {
 				const execPath = process.execPath
 				const nodeBinPath = details.toolchain.node.path
-				if (nodeBinPath && !execPath.includes(path.basename(nodeBinPath))) {
-					details.shadowingAlerts?.push(
-						`⚠️ INTEGRITY: Active Node binary (${execPath}) differs from PATH Node (${nodeBinPath}).`,
-					)
+				if (nodeBinPath) {
+					const [activeCanonicalPath, pathCanonicalPath] = await Promise.all([
+						fs.realpath(execPath).catch(() => path.resolve(execPath)),
+						fs.realpath(nodeBinPath.split(/\r?\n/)[0]!).catch(() => path.resolve(nodeBinPath.split(/\r?\n/)[0]!)),
+					])
+					if (activeCanonicalPath !== pathCanonicalPath) {
+						details.shadowingAlerts?.push(
+							`⚠️ INTEGRITY: Active Node binary differs from PATH Node (${activeCanonicalPath} vs ${pathCanonicalPath}).`,
+						)
+					}
 				}
 				details.nodeVersion = details.toolchain.node.version
 				details.nodePath = nodeBinPath

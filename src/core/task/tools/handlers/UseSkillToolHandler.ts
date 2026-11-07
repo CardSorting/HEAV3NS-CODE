@@ -74,7 +74,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		const stateManager = config.services.stateManager
 		const globalSkillsToggles = stateManager.getGlobalSettingsKey("globalSkillsToggles") ?? {}
 		const localSkillsToggles = stateManager.getWorkspaceStateKey("localSkillsToggles") ?? {}
-		const resolvedSkills = await getResolvedSkillsForCwd(config.cwd)
+		const signal = config.taskSignal
+		signal?.throwIfAborted()
+		const resolvedSkills = await getResolvedSkillsForCwd(config.cwd, false, signal)
 		const cacheHit = wasLastSkillsCacheHit()
 		const availableSkills = filterEnabledSkills(resolvedSkills, globalSkillsToggles, localSkillsToggles)
 		const requestedGoldenCartridge =
@@ -104,9 +106,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 		try {
 			const loadMode = fullReference ? "full" : "digest"
-			const skillContent = await getSkillContent(skillName, availableSkills, { mode: loadMode })
+			const skillContent = await getSkillContent(skillName, availableSkills, { mode: loadMode, signal })
 
-			if (!skillContent) {
+			if (!skillContent?.name?.trim() || !skillContent.description?.trim()) {
 				const availableNames = availableSkills.map((s: SkillMetadata) => s.name).join(", ")
 				return `Error: Skill "${skillName}" not found. Available skills: ${availableNames || "none"}`
 			}
@@ -143,8 +145,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 ${skillContent.instructions}
 
 ---
-IMPORTANT: The skill is now loaded. Do NOT call use_skill again for this task. Simply follow the instructions above to complete the user's request. You may access other files in the skill directory at: ${skillDirHint}`
+IMPORTANT: The skill is now loaded. Do NOT call use_skill again for this task. Simply follow the instructions above to complete the user's request. You may access other files in the skill directory using the read_file tool at: ${skillDirHint}`
 		} catch (error) {
+			signal?.throwIfAborted()
 			return `Error loading skill "${skillName}": ${(error as Error)?.message}`
 		}
 	}

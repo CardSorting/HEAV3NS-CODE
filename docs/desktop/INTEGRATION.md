@@ -309,6 +309,16 @@ Every request contains `v`, `kind`, `id`, `workspace`, `session`, `method`, and 
 | `project.configure` | `{command, cwd?, preview?}`; save a custom command without execution |
 | `project.start` | `{id, revision}`; revalidate metadata and start the selected local command or built-in HTML preview |
 | `project.status`, `project.stop` | `{}`; bounded console/state/local preview, or stop the owned project process group |
+| `task.defer` | Negotiated `agent-swarm-defer-v1` (when `hierarchicalDefer` is effectively enabled); `{}` cooperatively suspends the Agent Swarm hierarchy (`deferHierarchy`), persists `deferred: true`, and requests yield at the configured boundary (`safe_boundary` or `before_turn`) |
+| `task.resume` | `{}` rejects with `AGENT_SWARM_RECONCILIATION_REQUIRED` if an interrupted instruction or formation requires reconciliation, otherwise clears `deferred`, resumes the hierarchy, and kicks the held run queue |
+| `task.deferStatus` | `{}` returns `{enabled, deferred, activeRun, queued, boundary, hierarchy}` |
+| `agentSwarm.settings` | `{action: "get" \| "set", enabled?, criticalCompletionReview?, hierarchicalDefer?, legion?, autoDeferOnCompletionReview?, deferBoundary?, maxSpecialists?, maxInitialReviews?, maxCorrectivePasses?, strategy?}` reads or atomically updates `~/.heav3ns/agent-swarm.json`, returning `{...config, environmentOverrides}` and refusing to disable `hierarchicalDefer` while reconciliation is required or deferred work is queued |
+| `agentSwarm.classify` | `{objective, targetFiles?, strategy?, preferredRoles?, excludedRoles?}` runs deterministic model-free Legion classification without launching child specialists |
+| `agentSwarm.form` | `{objective, assignments: [{id, role, objective, dependsOn?}]}` acquires a two-phase BroccoliDB formation lease, runs specialists with live activity updates, and persists child streams and checkpoints |
+| `agentSwarm.formReconcile` | `{formationId, confirmation, confirmedStopped: true, decisions: [{specialistId, outcome: "completed" \| "retry" \| "resume", summary?}]}` validates operator confirmation (`confirmation` 20–1,000 chars), verifies checkpoints for `"resume"` decisions, records the recovery receipt, and transitions the formation to `"deferred"` |
+| `agentSwarm.formResume` | `{formationId}` validates saved child checkpoints (`FORMATION_CHECKPOINT_MISSING` / `FORMATION_CHECKPOINT_MISMATCH`), acquires a new BroccoliDB lease before marking `"running"`, and resumes remaining/deferred specialists |
+| `agentSwarm.formStatus`, `agentSwarm.formHistory`, `agentSwarm.formStream` | Inspect the latest formation (`formStatus` `{}`), list up to 50 formations (`formHistory` `{limit?: 1..50}`), or read a saved specialist transcript (`formStream` `{formationId, specialistId}`) |
+| `command.actionsList`, `command.actionReconcile` | List unresolved (`running` or `unconfirmed`) command action fences (`actionsList` `{}`) or record operator confirmation (`{actionId, outcome: "completed" \| "failed", confirmation, confirmedStopped: true}`, `confirmation` 12–1,000 chars) to release an `unconfirmed` command fence (`actionReconcile`) |
 | `input.select` | Only `{surface:"native"}` is advertised/supported in this preview |
 
 The native inspector saves presentation-only file positions by workspace, branch,
@@ -441,3 +451,26 @@ registry cache, per-turn ownership, file-content validation, bounded retention,
 approval enforcement and cancellation cleanup. It includes packaged-runtime
 evidence and measured limits; command/verification and scratch reuse remain
 outside the enabled runtime surface.
+
+### Agent Swarm, Sovereign Swarm Radar, and Command Recovery (`ADR-0001`–`ADR-0020`)
+
+The native macOS client (`WorkspaceWindow.swift`, `App.swift`, `SwarmRadarWindow.swift`, `SwarmRadarManager.swift`) and Desktop Worker (`src/desktop/worker.ts`) integrate the full **Agent Swarm & The Legion** lifecycle (see [`../AGENT_SWARM_GUIDE.md`](../AGENT_SWARM_GUIDE.md)):
+
+1. **`Workspace` Menu Bar & Actions Navigation**:
+   - **Workspace $\rightarrow$ Engage Specialist Team…**: Classifies an objective, previews the proposed specialist roster and stages, and dispatches `agentSwarm.form`.
+   - **Workspace $\rightarrow$ Formation Status…**, **Formation History…**, **Inspect Latest Specialist Stream…**, and **Review Latest Completion…**: Inspect active/historical formations, read saved specialist transcripts (`agentSwarm.formStream`), or review completion audits.
+   - **Workspace $\rightarrow$ Defer Agent Work** *(dynamically titled **Resume Agent Work** while deferred)*: Toggles cooperative suspension (`agent-swarm-defer-v1`) at `safe_boundary` or `before_turn`.
+   - **Workspace $\rightarrow$ Command Recovery…**: Opens the unresolved command action recovery sheet (`command.actionsList` / `command.actionReconcile`), allowing operators to inspect `unconfirmed` commands (where a terminal closed or disconnected without a numeric exit code, `ADR-0019`) and reconcile them with `confirmedStopped: true` and a 12–1,000 character confirmation note.
+   - **Workspace $\rightarrow$ Agent Swarm Settings…**: Opens the native Agent Swarm settings sheet (`agentSwarm.settings`).
+   - **Workspace $\rightarrow$ Toggle Swarm Radar** (`⌥⌘R`, also in **HEAV3NS-CODE $\rightarrow$ Sovereign Swarm Radar…** and **Window $\rightarrow$ Sovereign Swarm Radar**): Toggles the floating **Sovereign Swarm Radar** window. All actions are also registered in **Workspace Actions** (`⌘⇧P`) and the toolbar overflow menu.
+2. **Sovereign Swarm Radar Truthfulness & Explicit Opt-In Consent**:
+   - Heartbeat sharing is **off by default** (`isHeartbeatDisabled = true` unless the user explicitly checks `"Share app heartbeat with HEAV3NS"`, and permanently disabled when `HEAV3NS_NO_HEARTBEAT=1` is set).
+   - When disabled or offline, the window truthfully displays `"⚪ APP HEARTBEAT OFF (SHARING DISABLED)"`, `"Not connected"`, and `"Unavailable while sharing is off"`, with an explicit disclosure badge: *"Not anonymous: sends a stable installation ID, app version, architecture, source, and action. Code and prompts are not included."*
+3. **Effective vs. Saved Settings Checkboxes**:
+   - In `showAgentSwarmSettings()`, checking `Enable Agent Swarm` visually checks and disables the three individual capability checkboxes (`Critical completion review`, `Hierarchical defer and resume`, `Legion specialist delegation`) so the UI never displays "Off" when the master switch has enabled them (`PM-004`), while preserving their underlying saved preferences (`savedReviewState`, `savedDeferState`, `savedLegionState`).
+   - Unchecking `Enable Agent Swarm` restores each individual checkbox to its saved preference and re-enables independent customization. Environment-locked settings are disabled with an inline warning naming the active environment variable overrides.
+4. **HIG Modal Button Hierarchy & Stream Inspection**:
+   - When a formation is `deferred` (`Resume Formation`) or `needs_reconciliation` (`Reconcile Interrupted Work…` / `Review Recovery…`), the recovery or resume button is registered first as the primary action (`NSApplication.ModalResponse.alertFirstButtonReturn`), while `Close` is always placed last.
+   - **`Inspect Saved Stream…`** is presented across all formation states (`running`, `deferred`, `needs_reconciliation`, `completed`, `partial_failure`) whenever one or more specialists have saved transcript streams (`inspectableSpecialists`).
+5. **Status Bar `· Deferred` Indicator**:
+   - When the workspace hierarchy is deferred or awaiting a safe-boundary yield, the native status bar appends ` · Deferred` (`Running · Deferred` or `Ready · Deferred`).

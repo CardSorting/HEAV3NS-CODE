@@ -16,6 +16,8 @@ import {
 import { Logger } from "@shared/services/Logger"
 import { arePathsEqual } from "@utils/path"
 import { getSanitizerMode } from "@/integrations/terminal/commandSanitizer"
+import { detectHeredocFileRedirection } from "@/integrations/terminal/heredocPolicy"
+import { detectTerminalFileRead } from "@/integrations/terminal/terminalFileReadPolicy"
 import { telemetryService } from "@/services/telemetry"
 import { DietCodeDefaultTool } from "@/shared/tools"
 import { executionFunnel } from "../execution/ExecutionFunnel"
@@ -123,6 +125,14 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 
 		config.taskState.consecutiveMistakeCount = 0
 
+		const heredocWrite = detectHeredocFileRedirection(command)
+		const terminalRead = detectTerminalFileRead(command)
+		const terminalPolicyError = heredocWrite.isHeredocFileWrite ? heredocWrite.reason : terminalRead.reason
+		if (terminalPolicyError) {
+			await config.callbacks.say("command_permission_denied", terminalPolicyError)
+			return evidenceResponse(formatResponse.toolError(terminalPolicyError), { approvalStatus: "denied" })
+		}
+
 		// Handling of timeout while in yolo mode
 		timeoutSeconds = resolveCommandTimeoutSeconds(command, timeoutParam, config.yoloModeToggled)
 
@@ -212,7 +222,7 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 					commandStarted = true
 					config.latencyTracker?.recordIoClassStarted(ioClass)
 					try {
-						return await config.callbacks.executeCommandTool(finalCommand, timeoutSeconds)
+						return await config.callbacks.executeCommandTool(finalCommand, timeoutSeconds, block.call_id ? { actionId: block.call_id } : undefined)
 					} finally {
 						if (config.taskState.abort) config.latencyTracker?.recordIoClassCancelled(ioClass, "active")
 						else config.latencyTracker?.recordIoClassCompleted(ioClass)

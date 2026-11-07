@@ -1630,7 +1630,7 @@ export class MonolithFactory {
 			localEnvironmentAdapter,
 			dockerEnvironmentAdapter,
 		])
-		const environmentToolSuite = new EnvironmentToolSuite(environmentSupervisorEngine, broccoliEnvironmentSubstrate)
+		const environmentToolSuite = new EnvironmentToolSuite(environmentSupervisorEngine, broccoliEnvironmentSubstrate, sessionId)
 
 		const jitteredBackoffGovernor = new JitteredBackoffGovernor()
 		const deterministicErrorClassifier = new DeterministicErrorClassifier(jitteredBackoffGovernor)
@@ -2258,7 +2258,14 @@ export class MonolithFactory {
 
 		// Bind supervisor in-process tool calling
 		codeExecutionSupervisor.setToolDispatcher(
-			async (name, args) => toolRegistry.executeTool(name, args, cwd),
+			async (name, args, options) => {
+				// Mutating sandbox dispatch is permitted only when execute_code_sandbox
+				// supplied a host-derived child action identity.
+				if (toolRegistry.getTool(name)?.isMutating && !options?.actionId) {
+					return { success: false, error: "Mutating tools from the sandbox require a scheduler-owned action identity." }
+				}
+				return toolRegistry.executeTool(name, args, cwd, options)
+			},
 			toolRegistry.listTools().map((t) => t.name),
 		)
 

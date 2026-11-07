@@ -290,7 +290,25 @@ The `MonolithGatewayServer` exposes JSON-RPC 2.0 endpoints for all operations:
 
 ---
 
-## 7. Performance SLAs & Repository Guardrails
+## 7. Runtime Skill Discovery & Activation Hardening (`ADR-0016` & `ADR-0020`)
+
+In addition to the Drop Vault creation flows, the runtime skill loader ([`src/core/context/instructions/user-instructions/skills.ts`](../src/core/context/instructions/user-instructions/skills.ts) and [`src/core/task/tools/handlers/UseSkillToolHandler.ts`](../src/core/task/tools/handlers/UseSkillToolHandler.ts)) enforces strict security and reliability invariants across both parent conductors and Legion specialists (see [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md)):
+
+1. **Bounded & Untrusted Catalog Framing (`clampDescription`)**:
+   - Skill descriptions are normalized to single-line text and clamped to **1,000 characters** in conductor prompts (`MAX_SKILL_DESCRIPTION_LENGTH = 1000`) and **300 characters** (up to 50 skills) in specialist prompts (`LegionAgentHost.formatAvailableSkills`).
+   - Catalog listings are explicitly framed as untrusted metadata so adversarial text inside a skill description cannot override system or user instructions.
+2. **End-to-End `AbortSignal` Propagation & Bounded Single-Flight Reads**:
+   - `discoverSkills`, `discoverSkillsWithDiagnostics`, `scanSkillsDirectoryWithDiagnostics`, `loadSkillMetadataWithDiagnostic`, and `getSkillContent` propagate `AbortSignal` (`signal?.throwIfAborted()`) and use `BoundedSingleFlight` (`maxActive: 16`, `maxWaiters: 256`, 5-second timeout) so cancelled turns detach immediately without hanging on slow disk I/O.
+3. **Activation-Time Path & Frontmatter Integrity Validation (`getSkillContent`)**:
+   - Rejects skill directory names or paths containing `.` prefixes, `..` traversal segments, path separators, or null bytes (`isValidSkillDirName`).
+   - Enforces a **512 KB** file size cap (`MAX_SKILL_FILE_SIZE_BYTES = 512 * 1024`) and rejects binary/null-byte corruption or unclosed YAML frontmatter.
+   - Re-verifies on every activation that the `SKILL.md` frontmatter `name` matches the directory/skill name and that both `name` and `description` are non-empty, preventing time-of-check to time-of-use (TOCTOU) drift after initial discovery.
+4. **Explicit `read_file` Tool Guidance (`UseSkillToolHandler`)**:
+   - Upon activating a skill, `UseSkillToolHandler` explicitly instructs the model: *"You may access other files in the skill directory using the read_file tool at: `<skillDirHint>`"*, preventing models from dumping skill files into the interactive terminal via `cat` (`ADR-0016`).
+
+---
+
+## 8. Performance SLAs & Repository Guardrails
 
 The entire system is continuously validated against strict enterprise performance invariants:
 

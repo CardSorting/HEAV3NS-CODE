@@ -4,6 +4,7 @@
 
 import type { DietCodeToolResponseContent } from "@shared/messages"
 import type { EventEmitter } from "events"
+import type { ActionExecutionLedger } from "./ActionExecutionRegistry"
 
 // =============================================================================
 // Terminal Process Types
@@ -17,6 +18,8 @@ export interface TerminalCompletionDetails {
 	exitCode?: number | null
 	/** Termination signal when available */
 	signal?: NodeJS.Signals | null
+	/** Why terminal output could not be observed, without implying the process stopped. */
+	observationError?: string
 }
 
 export interface TerminalProcessEvents {
@@ -290,6 +293,8 @@ export interface CommandExecutionOptions {
 	suppressUserInteraction?: boolean
 	/** Ownership scope used for targeted cancellation of concurrent commands. */
 	ownerId?: string
+	/** Stable provider/tool invocation identity used to prevent command replay. */
+	actionId?: string
 }
 
 /**
@@ -306,6 +311,8 @@ export interface CommandExecutorConfig {
 	terminalExecutionMode: "vscodeTerminal"
 	/** The primary VS Code terminal manager */
 	terminalManager: ITerminalManager
+	/** Optional durable receipt ledger for cross-restart command replay fencing. */
+	actionRegistry?: ActionExecutionLedger
 }
 
 /** Alias for backwards compatibility */
@@ -354,4 +361,6 @@ export interface OrchestrationResult {
 	exitCode?: number | null
 	/** Process termination signal when available */
 	signal?: NodeJS.Signals | null
+	/** Why terminal output could not be observed, without implying the process stopped. */
+	observationError?: string
 }

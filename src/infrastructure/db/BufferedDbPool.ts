@@ -45,6 +45,13 @@ export type WriteOp = {
 	dedupKey?: string
 }
 
+export class ShadowCommitError extends Error {
+	constructor(public readonly agentIds: string[]) {
+		super(`Cannot stop the database pool while ${agentIds.length} uncommitted transaction shadow(s) remain: ${agentIds.join(", ")}`)
+		this.name = "ShadowCommitError"
+	}
+}
+
 export function createMonomorphicWriteOp(
 	type: WriteOp["type"],
 	table: keyof Schema,
@@ -112,6 +119,7 @@ export class BufferedDbPool {
 	private totalTransactions = 0
 	private started = false
 	private stopped = false
+	private stopping = false
 	private enqueueLatencies: number[] = []
 	private processingLatencies: number[] = []
 	/** Compatibility buffer retained for callers that inspect flush allocation pressure. */
@@ -138,6 +146,7 @@ export class BufferedDbPool {
 	}
 
 	private ensureStarted(): void {
+		if (this.stopping) throw new Error("DB_POOL_STOPPING: database pool is draining and no new work can be accepted")
 		if (!this.started || this.stopped) this.startFlushLoop()
 	}
 
@@ -154,7 +163,10 @@ export class BufferedDbPool {
 		const release = await this.stateMutex.acquire()
 		try {
 			const cutoff = Date.now() - 5 * 60 * 1000
-			for (const [agentId, shadow] of this.agentShadows) if (shadow.lastUpdated < cutoff) this.agentShadows.delete(agentId)
+			// Age is not evidence that an owner abandoned its only copy of uncommitted work.
+			for (const [agentId, shadow] of this.agentShadows) {
+				if (shadow.ops.length === 0 && shadow.lastUpdated < cutoff) this.agentShadows.delete(agentId)
+			}
 		} finally {
 			release()
 		}
@@ -323,7 +335,7 @@ export class BufferedDbPool {
 				return conflictFields.every((field) => row[field] !== undefined && row[field] === values[field])
 			})
 			if (existing) database.putRow(table, applyValues(existing, values))
-			else database.putRow(table, values)
+			else database.putRow(table, applyValues({}, values))
 		}
 	}
 
@@ -343,7 +355,7 @@ export class BufferedDbPool {
 				const conflictFields = op.conflictTarget ? (Array.isArray(op.conflictTarget) ? op.conflictTarget : [op.conflictTarget]) : ["id"]
 				const index = rows.findIndex((row) => (conditions.length > 0 ? matches(row, conditions) : conflictFields.every((field) => row[field] === values[field])))
 				if (index >= 0) rows[index] = applyValues(rows[index]!, values)
-				else rows.push(values)
+				else rows.push(applyValues({}, values))
 			}
 		}
 		return rows as Schema[T][]
@@ -421,23 +433,53 @@ export class BufferedDbPool {
 
 	public async stop(): Promise<void> {
 		if (this.stopped && !this.started) return
+		if (this.stopping) throw new Error("DB_POOL_STOPPING: another shutdown is already in progress")
+		this.stopping = true
+		const release = await this.stateMutex.acquire()
+		try {
+			const pendingAgents = [...this.agentShadows.keys()]
+			if (pendingAgents.length > 0) throw new ShadowCommitError(pendingAgents)
+		} catch (error) {
+			this.stopping = false
+			throw error
+		} finally {
+			release()
+		}
+		try {
+			await this.flush()
+		} catch (error) {
+			this.stopping = false
+			throw error
+		}
 		if (this.flushInterval) clearInterval(this.flushInterval)
 		if (this.cleanupInterval) clearInterval(this.cleanupInterval)
 		if (this.flushTimeout) clearTimeout(this.flushTimeout)
 		this.flushInterval = null
 		this.cleanupInterval = null
 		this.flushTimeout = null
+		// Synchronize with interval flushes that were already queued before the timers stopped.
 		try {
 			await this.flush()
-		} catch {}
+		} catch (error) {
+			this.started = false
+			this.stopping = false
+			this.startFlushLoop()
+			throw error
+		}
 		broccoliMaintenanceEngine.stop()
-		this.activeOps = []
-		this.inFlightOps = []
-		this.agentShadows.clear()
-		this.db = null
-		this.started = false
-		this.stopped = true
-		await destroyDb()
+		try {
+			await destroyDb()
+			this.db = null
+			this.started = false
+			this.stopped = true
+		} catch (error) {
+			this.started = false
+			this.stopped = false
+			this.startFlushLoop()
+			throw error
+		} finally {
+			this.stopping = false
+		}
 	}
 }
 

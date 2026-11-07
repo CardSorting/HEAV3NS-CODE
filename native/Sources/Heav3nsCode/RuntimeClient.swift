@@ -51,9 +51,9 @@ final class RuntimeClient {
     private let sleepAssertion: RunSleepAssertion
     private var runSequence = -1
     static let runEvents: Set<String> = ["run.state", "run.progress", "run.accepted", "approval.requested", "approval.resolved"]
-    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "snapshot", "shutdown", "project.stop", "project.healing"]
+    private static let controls: Set<String> = ["task.cancel", "task.cancelAll", "approval.resolve", "command.actionReconcile", "snapshot", "shutdown", "project.stop", "project.healing"]
     private static let discoveries: Set<String> = ["models.discover", "files.search", "project.discover", "changes.list", "spider.check"]
-    private static let inspections: Set<String> = ["workspace.branch", "models.list", "models.discover", "files.list", "files.search", "files.read", "files.readBinary", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "project.tasks.list", "task.lookup", "side.query", "memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"]
+    private static let inspections: Set<String> = ["workspace.branch", "models.list", "models.discover", "files.list", "files.search", "files.read", "files.readBinary", "changes.list", "changes.read", "artifact.read", "history.read", "history.list", "conversation.list", "activity.list", "checkpoint.list", "checkpoint.preview", "project.discover", "project.status", "project.tasks.list", "task.lookup", "task.deferStatus", "command.actionsList", "agentSwarm.formStatus", "agentSwarm.formHistory", "agentSwarm.formStream", "agentSwarm.classify", "side.query", "memory.list", "memory.read", "context.inspect", "context.history", "spider.check", "state.inspect"]
     private var pendingWrites = 0
     private let nodeOverride: URL?
     private let cliOverride: URL?
@@ -319,6 +319,10 @@ final class RuntimeClient {
         case "task.lookup":
             guard let found = result["found"] as? Bool else { return false }
             return !found || (result["run"] as? [String: Any]).map(validRun) == true
+        case "command.actionsList":
+            guard let actions = result["actions"] as? [[String: Any]], actions.count <= 100, let total = result["total"] as? Int, total >= actions.count, result["truncated"] as? Bool == (total > actions.count) else { return false }
+            return actions.allSatisfy { ($0["actionId"] as? String).map { !$0.isEmpty && $0.utf8.count <= 256 } == true && ($0["commandFingerprint"] as? String).map { $0.count == 64 && $0.allSatisfy(\.isHexDigit) } == true && ["running", "unconfirmed"].contains($0["status"] as? String ?? "") && $0["updatedAt"] is NSNumber && $0["ownerActive"] is Bool }
+        case "command.actionReconcile": return result["reconciled"] as? Bool == true && result["actionId"] is String && ["completed", "failed"].contains(result["outcome"] as? String ?? "")
         case "snapshot", "history.list":
             guard let runs = result["runs"] as? [[String: Any]], runs.count <= 64, runs.allSatisfy(validRun),
                   Set(runs.compactMap { $0["id"] as? String }).count == runs.count else { return false }
@@ -346,6 +350,16 @@ final class RuntimeClient {
         case "files.readBinary": return result["data"] is String && result["revision"] is String && result["offset"] is NSNumber && result["nextOffset"] is NSNumber && result["size"] is NSNumber && result["more"] is Bool
         case "files.read", "artifact.read", "changes.read", "context.history": return result["text"] is String && result["revision"] is String && result["nextOffset"] is NSNumber && result["size"] is NSNumber
         case "files.list", "changes.list": return result["entries"] is [[String: Any]]
+        case "agentSwarm.form", "agentSwarm.formResume":
+            guard result["objective"] is String, ["completed", "deferred", "partial_failure"].contains(result["status"] as? String ?? ""), let reports = result["reports"] as? [[String: Any]], reports.count <= 8 else { return false }
+            return reports.allSatisfy { ($0["id"] as? String).map { !$0.isEmpty && $0.utf8.count <= 64 } == true && ["completed", "failed", "skipped", "deferred"].contains($0["status"] as? String ?? "") }
+        case "agentSwarm.formReconcile": return result["id"] is String && result["status"] as? String == "deferred" && result["reconciledAt"] is NSNumber
+        case "agentSwarm.formStatus": return result["status"] is String && (result["id"] == nil || result["id"] is String)
+        case "agentSwarm.formHistory": return (result["formations"] as? [[String: Any]]).map { $0.count <= 50 && $0.allSatisfy { ($0["id"] as? String) != nil && ($0["status"] as? String) != nil } } == true
+        case "agentSwarm.formStream": return result["formationId"] is String && result["specialistId"] is String && result["childSessionId"] is String && result["messageCount"] is NSNumber && result["excerpt"] is String
+        case "agentSwarm.classify": return result["intent"] is String && result["strategy"] is String && result["complexity"] is NSNumber && (result["assignments"] as? [[String: Any]]).map { !$0.isEmpty && $0.count <= 8 } == true
+        case "task.deferStatus": return result["enabled"] is Bool && result["deferred"] is Bool && result["queued"] is NSNumber
+        case "agentSwarm.settings": return result["enabled"] is Bool && result["criticalCompletionReview"] is Bool && result["hierarchicalDefer"] is Bool && result["legion"] is Bool && result["maxSpecialists"] is NSNumber
         default: return true
         }
     }

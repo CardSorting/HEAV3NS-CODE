@@ -16,6 +16,7 @@ import {
 	PROCESS_HOT_TIMEOUT_NORMAL,
 	TRUNCATE_KEEP_LINES,
 } from "@/integrations/terminal/constants"
+import { isMultilineHeredocCommand } from "@/integrations/terminal/heredocPolicy"
 import type { ITerminalProcess, TerminalCompletionDetails, TerminalProcessEvents } from "@/integrations/terminal/types"
 import { Logger } from "@/shared/services/Logger"
 import { getShell } from "@/utils/shell"
@@ -28,6 +29,7 @@ const FALLBACK_MAX_DURATION_MS = 2 * 60 * 60 * 1_000
 const FALLBACK_INTERRUPT_GRACE_MS = 5_000
 const FALLBACK_READ_CHUNK_BYTES = 64 * 1_024
 const FALLBACK_MAX_BYTES_PER_POLL = 512 * 1_024
+const OBSERVATION_RECOVERY_TIMEOUT_MS = 30_000
 
 type ShellKind = "cmd" | "csh" | "fish" | "posix" | "powershell"
 
@@ -52,6 +54,7 @@ type StreamRaceResult =
 	| { type: "execution_end"; exitCode?: number }
 	| { type: "prompt_timeout" }
 	| { type: "stream_error"; error: Error }
+	| { type: "observation_timeout" }
 	| { type: "terminal_closed"; exitCode?: number }
 
 interface FallbackPaths {
@@ -142,7 +145,9 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 	private detachedBeforeStart = false
 	private cancelledBeforeStart = false
 	private executionStarted = false
+	private shellCommandDispatched = false
 	private didObserveShellExecution = false
+	private observationError?: string
 	private hasRun = false
 	private cwd?: string
 
@@ -165,7 +170,15 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 				this.emitContinue()
 				return
 			}
-			if (terminal.shellIntegration?.executeCommand) {
+			if (isMultilineHeredocCommand(command)) {
+				Logger.info("[TerminalProcess] Routing multiline heredoc through supervised output capture")
+				await this.runWithoutShellIntegration(terminal, command, shellHint, true)
+				telemetryService.captureTerminalExecution(
+					this.fullOutput.trim().length > 0,
+					"vscode",
+					this.fullOutput.trim() ? "file_redirection" : "none",
+				)
+			} else if (terminal.shellIntegration?.executeCommand) {
 				try {
 					await this.runWithShellIntegration(terminal, command)
 					const outputMethod =
@@ -174,15 +187,23 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 							: await this.captureTerminalSnapshotWhenEmpty()
 					telemetryService.captureTerminalExecution(outputMethod !== "none", "vscode", outputMethod)
 				} catch (shError) {
-					Logger.error("Error during shell integration command execution, trying fallback:", shError)
-					telemetryService.captureTerminalOutputFailure(TerminalOutputFailureReason.NO_SHELL_INTEGRATION, "vscode")
-					await this.runWithoutShellIntegration(terminal, command, shellHint)
-					telemetryService.captureTerminalExecution(
-						this.fullOutput.trim().length > 0,
-						"vscode",
-						this.fullOutput.trim() ? "file_redirection" : "none",
-					)
-					this.emit("no_shell_integration")
+					if (this.shellCommandDispatched) {
+						this.observationError = toError(shError).message.slice(0, 500)
+						Logger.error(
+							"Terminal output observation failed after command dispatch; refusing to execute it again:",
+							shError,
+						)
+					} else {
+						Logger.error("Error during shell integration setup, trying fallback:", shError)
+						telemetryService.captureTerminalOutputFailure(TerminalOutputFailureReason.NO_SHELL_INTEGRATION, "vscode")
+						await this.runWithoutShellIntegration(terminal, command, shellHint)
+						telemetryService.captureTerminalExecution(
+							this.fullOutput.trim().length > 0,
+							"vscode",
+							this.fullOutput.trim() ? "file_redirection" : "none",
+						)
+						this.emit("no_shell_integration")
+					}
 				}
 			} else {
 				telemetryService.captureTerminalOutputFailure(TerminalOutputFailureReason.NO_SHELL_INTEGRATION, "vscode")
@@ -219,6 +240,8 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 			this.didEmitCompleted = false
 		}
 		this.executionStarted = false
+		this.shellCommandDispatched = false
+		this.observationError = undefined
 		this.didObserveShellExecution = false
 		if (!preservePreStartCancellation) {
 			this.exitCode = undefined
@@ -298,6 +321,7 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 			shellEndDisposable?.dispose()
 			throw new Error("VS Code shell integration disappeared before command execution")
 		}
+		this.shellCommandDispatched = true
 
 		// VS Code only captures bytes written after read() is first called, so this must
 		// remain immediately adjacent to executeCommand().
@@ -381,7 +405,7 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 
 				switch (raceResult.type) {
 					case "terminal_closed":
-						this.exitCode = raceResult.exitCode ?? -1
+						this.exitCode = raceResult.exitCode
 						return
 					case "continue":
 						detached = true
@@ -398,7 +422,31 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 						this.abortInteractivePrompt()
 						return
 					case "stream_error":
-						throw raceResult.error
+						this.observationError = raceResult.error.message.slice(0, 500)
+						Logger.error(
+							"Terminal output stream failed after command dispatch; waiting for process evidence:",
+							raceResult.error,
+						)
+						{
+							let observationTimeout: NodeJS.Timeout | undefined
+							const timeoutPromise = new Promise<StreamRaceResult>((resolve) => {
+								observationTimeout = setTimeout(
+									() => resolve({ type: "observation_timeout" }),
+									OBSERVATION_RECOVERY_TIMEOUT_MS,
+								)
+							})
+							const processEvidence = await Promise.race([
+								executionEndPromise,
+								terminalClosedPromise,
+								timeoutPromise,
+							])
+							if (observationTimeout) clearTimeout(observationTimeout)
+							if (processEvidence.type === "execution_end" || processEvidence.type === "terminal_closed")
+								this.exitCode = processEvidence.exitCode
+						}
+						return
+					case "observation_timeout":
+						return
 					case "data":
 						break
 				}
@@ -554,7 +602,12 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 		this.activeTerminal?.sendText("\u0003", false)
 	}
 
-	private async runWithoutShellIntegration(terminal: vscode.Terminal, command: string, shellHint?: string): Promise<void> {
+	private async runWithoutShellIntegration(
+		terminal: vscode.Terminal,
+		command: string,
+		shellHint?: string,
+		requireManagedCapture = false,
+	): Promise<void> {
 		this.executionStarted = true
 		const { kind, shell } = this.detectShell(terminal, shellHint)
 		let paths = this.createFallbackPaths(kind)
@@ -580,6 +633,11 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 					Logger.error(
 						`[TerminalProcess] Failed to write fallback script to both temp and CWD: ${secondError}. Falling back to direct terminal sendText.`,
 					)
+					if (requireManagedCapture) {
+						throw new Error(
+							"Command execution blocked: multiline heredoc commands require supervised output capture. Use a structured file tool for file changes or configure a writable managed terminal temp directory.",
+						)
+					}
 					useFileRedirection = false
 					invocation = command
 				}
@@ -991,6 +1049,7 @@ export class VscodeTerminalProcess extends EventEmitter<TerminalProcessEvents> i
 		return {
 			exitCode: this.exitCode,
 			signal: this.signal,
+			...(this.observationError ? { observationError: this.observationError } : {}),
 		}
 	}
 

@@ -94,7 +94,7 @@ inspect the recorded work and checks. A one-shot invocation is also available as
 `heav3ns "/goal <objective>"`; it exits unsuccessfully when the goal pauses.
 Ordinary prompts continue to run as normal turns.
 
-## Agent tasks
+## Agent tasks, Agent Swarm & The Legion
 
 Use `/agents` to open the task dashboard. `/subagents` and `/swarm` are aliases. In the non-TTY fallback, the same commands print task status and any recorded blocker.
 
@@ -113,6 +113,47 @@ Use `/agents` to open the task dashboard. `/subagents` and `/swarm` are aliases.
 
 The CLI runs delegated work in isolated provider, session, and file-overlay contexts with a four-child concurrency limit. Children can inspect files and stage requested edits; successful changes become an uncommitted parent diff for review with `/diff [file]` and application with `/commit [file]`. Paths can be relative to the workspace; omit the path to review or apply all staged files. Child edits retain a disk baseline, so `/commit` blocks and preserves a stale edit if another process changed that file during review. Cancelling the parent turn also cancels its active child and discards that child’s branch. Children cannot run shell commands or delegate more work. Parallel edits to a file changed by another lane are rejected as conflicts. `/agents` shows status, results, modified files, and blockers. Git-worktree delegation is rejected clearly because this runtime does not provision worktrees.
 
+### `/agentswarm` & `/queue` controls (TUI & Readline)
+
+Use `/agentswarm` to configure, inspect, defer/resume, review, or reconcile **Agent Swarm & The Legion** formations across both the full-screen TUI and the Readline session. See [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md) for the complete architecture and ADR reference.
+
+| Command & Aliases | Action | Safe While Deferred? |
+|---|---|---|
+| `/agentswarm` or `/agentswarm status` | Show effective config, `effectiveFeatures`, `environmentOverrides`, CLI defer/reconciliation state, review cycle, latest formation, and BroccoliDB worker status | Yes |
+| `/agentswarm settings` | Show effective `AgentSwarmConfig`, `effectiveFeatures`, and active `LUMI_AGENT_SWARM_*` / `DIETCODE_AGENT_SWARM_*` environment overrides | Yes |
+| `/agentswarm help` or `/agentswarm ?` | Display the operator quick-guide for checking, controlling, reviewing, and reconciling swarm work | Yes |
+| `/agentswarm enable` \| `/agentswarm disable` | Enable or disable all Agent Swarm capabilities (`disable` is blocked if an interrupted instruction requires reconciliation) | Idle & Reconciled |
+| `/agentswarm <review\|defer\|legion> <on\|off>` | Toggle a single capability while preserving the effective state of the remaining two capabilities | Idle & Reconciled |
+| `/agentswarm boundary <safe_boundary\|before_turn>` | Set whether defer yields at the next safe tool boundary (`safe_boundary`) or only before a turn starts (`before_turn`) | Idle |
+| `/agentswarm strategy <name>` | Set classifier strategy: `adaptive`, `tactical_strike`, `balanced_squad`, `full_legion`, or `verification_heavy` | Idle |
+| `/agentswarm specialists <1-8>` | Set maximum concurrent specialists per formation (`1..8`) | Idle |
+| `/agentswarm review-limits <1-5> <1-5>` | Set `maxInitialReviews` (`1..5`) and `maxCorrectivePasses` (`1..5`) | Idle |
+| `/agentswarm auto-defer-review <on\|off>` | Toggle automatic hierarchy suspension during Critical Completion Review | Idle |
+| `/agentswarm defer` *(alias: `/agentswarm pause`)* | Cooperatively suspend the active parent turn and specialist hierarchy at the configured safe boundary (`safe_boundary` or `before_turn`) | Yes |
+| `/agentswarm resume` | Resume the suspended hierarchy and dispatch held instructions in FIFO order (requires prior reconciliation if `needsReconciliation` is set) | Yes |
+| `/agentswarm reconcile --confirm-stopped <note>` | Clear an interrupted-instruction fence (`needsReconciliation: true`) after inspecting terminal/workspace state with a 20–1,000 char redacted evidence note | While `needsReconciliation` |
+| `/agentswarm classify <objective>` | Preview the deterministic Legion specialist roster, complexity score, and 3-stage DAG without executing | Yes |
+| `/agentswarm form <objective>` *(alias: `/agentswarm team <objective>`)* | Classify, acquire a durable BroccoliDB formation lease, and run a specialist formation with saved child streams and checkpoints | Idle |
+| `/agentswarm formation [status]` | Inspect the latest saved formation receipt and specialist roadmap | Yes |
+| `/agentswarm formation history [1-50]` *(alias: `/agentswarm history [1-50]`)* | List up to 50 recent specialist formations in the active conversation | Yes |
+| `/agentswarm formation stream <id> <specialist-id>` | Read the last 80 saved transcript messages (up to 48 KB) for a specialist in formation `<id>` | Yes |
+| `/agentswarm formation reconcile <id> --confirm-stopped --note "<note>" --decisions '<json>'` | Reconcile an interrupted formation (`needs_reconciliation`) with a 20–1,000 char note and per-specialist decisions (`completed`, `retry`, or `resume`), transitioning it to `deferred` | Idle / Reconcilable |
+| `/agentswarm formation resume <id>` | Validate saved child checkpoints (`FORMATION_CHECKPOINT_MISSING` / `FORMATION_CHECKPOINT_MISMATCH`) and resume a `deferred` formation | Idle & Resumed |
+| `/agentswarm review [initial\|again\|corrective\|dispatch\|reconcile]` | Run a bounded read-only Critical Completion Review (`initial`), re-review within bounds (`again`), verify repairs (`corrective`), dispatch saved `REMEDIATE` tasks (`dispatch`), or escalate an interrupted review (`reconcile`) | Idle |
+
+#### Settings Modal (`Ctrl+S` / `/settings`) In-Place Synchronization & CLI Subcommands
+The interactive `SettingsModal` (`Ctrl+S` or `/settings`) exposes `swarm_enabled`, `swarm_legion`, `swarm_strategy`, `swarm_max_specialists`, `swarm_review`, `swarm_defer`, and `swarm_boundary`:
+- Changes serialize onto an atomic write queue (`~/.heav3ns/agent-swarm.json` via a `0o600` `.agent-swarm-<uuid>.tmp` rename), re-read effective settings, and update all `swarm_*` rows in-place via `settingsModal.updateValue(...)`.
+- Turning off a single capability while the master switch (`swarm_enabled`) is `on` automatically clears `swarm_enabled` while preserving the other two enabled capabilities.
+- Settings locked by `LUMI_*` / `DIETCODE_*` environment variables (`LUMI_AGENT_SWARM_ENABLED`, `LUMI_CRITICAL_COMPLETION_REVIEW_ENABLED`, `LUMI_HIERARCHICAL_DEFER_ENABLED`, `LUMI_AGENT_SWARM_LEGION_ENABLED`, etc.) display a lock description and restrict selectable values to the locked state.
+- Disabling `swarm_enabled` or `swarm_defer` is refused while `needsReconciliation` is true.
+- Non-interactive one-shot CLI configuration is also available via `heav3ns agentswarm status|enable|disable|review|defer|legion|auto-defer-review|boundary|strategy|specialists|review-limits` (see [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md#62-non-interactive-cli-subcommands-heav3ns-agentswarm-)).
+
+#### Read-Only Commands & Held Queue (`/queue`) While Deferred
+While `agentSwarmDeferred` or `agentSwarmDeferPending` is active:
+- Non-command prompts (up to **10 instructions** of **20,000 characters** each) are held in the persistent queue and managed via `/queue`, `/queue remove <number>`, `/queue clear`, and `/queue resume`.
+- Read-only commands remain available in both TUI and Readline modes without resuming the hierarchy: `?`, `/help`, `/btw`, `/tasks`, `/agents`, `/subagents`, `/swarm`, `/skills`, `/sessions`, `/history`, `/doctor`, `/health`, `/status`, `/diagnostics`, `/whoami`, `/auth`, `/settings`, `/config`, `/model`, `/models`, `/providers`, `/about`, `/clear`, `/snapshots`, `/memory`, `/facts`, `/queue`, and read-only `/agentswarm` subcommands (`status`, `settings`, `help`, `?`, `classify`, `formation status|history|stream`).
+
 ## Skills
 
 Use `/skills` to browse skill names, descriptions, and sources. Run `/skills <term>` to search names and descriptions, or `/skills refresh [term]` to rescan and optionally search in one step. Discovery checks project folders `.dietcoderules/skills`, `.dietcode/skills`, `.claude/skills`, and `.agents/skills`, plus `skills/` under the configured DietCode home (default `~/.dietcode`) and `~/.agents/skills`.
@@ -129,9 +170,10 @@ The model receives a compact metadata catalog and loads a matching skill's instr
 | `/btw <question>` | Ask an isolated side question without tools or a checkpoint |
 | `/compact` / `/sessions` / `/resume [id]` | Compact active context, list saved CLI conversations, or resume one |
 | `/history [offset]` | Show a page of the current conversation transcript |
-| `/queue` | Review and manage queued follow-up instructions in the TUI |
+| `/queue` | Review and manage queued follow-up instructions (`/queue remove <n>`, `clear`, `resume`) |
 | `/tasks` | View, filter, page, or move durable project tasks |
 | `/goal <objective>` | Plan, track, and execute an objective; `/goal status`, `pause`, `resume`, or `clear` |
+| `/agentswarm [action]` | Manage Agent Swarm & The Legion (`status`, `settings`, `defer`/`pause`, `resume`, `reconcile`, `classify`, `form`/`team`, `formation`, `review`) |
 | `/login` / `/logout` / `/whoami` | Manage and inspect authentication |
 | `/model [name]` / `/models` | View or switch the active model |
 | `/providers` / `/setup` | Configure or diagnose providers |

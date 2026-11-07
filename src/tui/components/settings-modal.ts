@@ -48,6 +48,11 @@ export class SettingsModal implements Component, Focusable {
     this.container.addChild(vstack);
   }
 
+  updateValue(id: string, newValue: string): void {
+    this.settingsList.updateValue(id, newValue);
+    this.invalidate();
+  }
+
   invalidate(): void {
     this.container.invalidate();
     this.settingsList.invalidate();

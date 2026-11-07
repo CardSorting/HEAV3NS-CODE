@@ -120,6 +120,19 @@ describe("CommandOrchestrator exit status messaging", () => {
 		assert.match(result.result as string, /^Command executed successfully \(exit code 0\)\./)
 	})
 
+	it("does not describe a missing exit status as successful execution", async () => {
+		const process = new FakeTerminalProcess()
+		const pending = orchestrateCommandExecution(process.asResultPromise(), createTerminalManager(), createCallbacks(), {
+			command: "npm run migrate",
+		})
+		await new Promise((resolve) => setImmediate(resolve))
+		process.complete()
+		const result = await pending
+		assert.equal(result.completed, true)
+		assert.match(String(result.result), /exit status could not be confirmed/i)
+		assert.match(String(result.result), /Inspect the terminal before retrying/)
+	})
+
 	it("serializes final output before assembling the completion result", async () => {
 		const process = new FakeTerminalProcess()
 		const callbacks = createCallbacks()
@@ -169,6 +182,49 @@ describe("CommandExecutor structured evidence", () => {
 		assert.equal(evidence?.exitCode, 0)
 		assert.equal(evidence?.started, true)
 		assert.equal(evidence?.timedOut, false)
+	})
+
+	it("replays a settled action without launching the command twice", async () => {
+		const process = new FakeTerminalProcess()
+		let launches = 0
+		const manager = {
+			...createTerminalManager(),
+			getOrCreateTerminal: async () => terminalInfo,
+			runCommand: () => {
+				launches++
+				return process.asResultPromise()
+			},
+		} as unknown as ITerminalManager
+		const executor = new CommandExecutor(executorConfig(manager), createCallbacks())
+		const pending = executor.execute("npm test", undefined, { actionId: "call-settled" })
+		await new Promise((resolve) => setImmediate(resolve))
+		process.complete({ exitCode: 0, signal: null })
+		const firstResult = await pending
+		const replay = await executor.execute("npm test", undefined, { actionId: "call-settled" })
+		assert.equal(launches, 1)
+		assert.deepEqual(replay, [false, firstResult[1]])
+	})
+
+	it("keeps an action fenced when the terminal supplies no exit code", async () => {
+		const process = new FakeTerminalProcess()
+		let launches = 0
+		const manager = {
+			...createTerminalManager(),
+			getOrCreateTerminal: async () => terminalInfo,
+			runCommand: () => {
+				launches++
+				return process.asResultPromise()
+			},
+		} as unknown as ITerminalManager
+		const executor = new CommandExecutor(executorConfig(manager), createCallbacks())
+		const pending = executor.execute("npm test", undefined, { actionId: "call-unconfirmed" })
+		await new Promise((resolve) => setImmediate(resolve))
+		process.complete()
+		await pending
+		const fenced = await executor.execute("npm test", undefined, { actionId: "call-unconfirmed" })
+		assert.equal(launches, 1)
+		assert.match(String(fenced[1]), /reconcile its outcome before retrying/)
+		assert.equal((await executor.getUnresolvedActions())[0]?.status, "unconfirmed")
 	})
 
 	it("rejects known interactive blockers before allocating a terminal", async () => {

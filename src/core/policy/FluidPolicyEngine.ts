@@ -14,6 +14,8 @@ import { AnomalyRegistry } from "../integrity/AnomalyRegistry"
 import { AuditRecorder } from "../integrity/AuditRecorder"
 import { DashboardGenerator } from "../integrity/DashboardGenerator"
 import { EnvironmentIntegrity, EnvironmentLease } from "../integrity/EnvironmentIntegrity"
+import { detectTerminalFileRead } from "@/integrations/terminal/terminalFileReadPolicy"
+import { detectHeredocFileRedirection } from "@/integrations/terminal/heredocPolicy"
 import { StabilityMonitor } from "../integrity/StabilityMonitor"
 import { StateManager } from "../storage/StateManager"
 import { ForensicDiagnostic, RefactorHealer } from "../task/tools/RefactorHealer"
@@ -403,6 +405,15 @@ export class FluidPolicyEngine {
 	 */
 	public async validatePreExecution(block: ToolUse): Promise<PolicyResult> {
 		const result: PolicyResult = { success: true }
+		if (block.name === DietCodeDefaultTool.BASH) {
+			const command = (block.params as { command?: unknown })?.command
+			if (typeof command === "string") {
+				const heredocWrite = detectHeredocFileRedirection(command)
+				if (heredocWrite.isHeredocFileWrite) return { success: false, error: heredocWrite.reason }
+				const detection = detectTerminalFileRead(command)
+				if (detection.isTerminalFileRead) return { success: false, error: detection.reason }
+			}
+		}
 
 		// Step -2: Plan Mode Write Restriction (V290)
 		// In PLAN mode, modifying the filesystem (except scratchpad.md) is strictly prohibited.

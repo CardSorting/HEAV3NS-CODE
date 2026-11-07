@@ -1,4 +1,7 @@
 import assert from "node:assert/strict"
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import sinon from "sinon"
 import type { EngineTickInput, EngineTickResult } from "../../../../core/contracts/agent.contracts.js"
 import type { SwarmTaskManifest } from "../../../../core/contracts/delegation.contracts.js"
@@ -36,7 +39,7 @@ function task(id: string): SwarmTaskManifest {
 	}
 }
 
-async function startSession(options: InteractiveSessionOptions = {}) {
+async function startSession(options: InteractiveSessionOptions = {}, multiTurn = false) {
 	const sandbox = sinon.createSandbox()
 	const ttyDescriptors = [process.stdin, process.stdout].map((stream) => ({
 		stream,
@@ -72,10 +75,11 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 	delegator.getSubstrate().storeTask(task("worker-one"))
 	delegator.getSubstrate().storeTask(task("worker-two"))
 	let resolveTurn: (result: EngineTickResult) => void = () => undefined
-	const turn = new Promise<EngineTickResult>((resolve) => {
-		resolveTurn = resolve
-	})
-	const tick = sandbox.stub<[EngineTickInput], Promise<EngineTickResult>>().returns(turn)
+	const turn = new Promise<EngineTickResult>((resolve) => { resolveTurn = resolve })
+	const pendingTurns: Array<(result: EngineTickResult) => void> = []
+	const tick = multiTurn
+		? sandbox.stub<[EngineTickInput], Promise<EngineTickResult>>().callsFake(() => new Promise((resolve) => pendingTurns.push(resolve)))
+		: sandbox.stub<[EngineTickInput], Promise<EngineTickResult>>().returns(turn)
 	let resolveSide: (result: { response: string; contextLimited: boolean }) => void = () => undefined
 	const side = new Promise<{ response: string; contextLimited: boolean }>((resolve) => { resolveSide = resolve })
 	const askSideQuestion = sandbox.stub().callsFake((_question: string, signal: AbortSignal) => {
@@ -83,6 +87,10 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 		return side
 	})
 	const config = AgentConfig.createDefault()
+	const swarmDispatcher = {
+		deferHierarchy: sandbox.stub().resolves({ deferred: true, boundary: "safe_boundary", activeChildren: 0 }),
+		resumeHierarchy: sandbox.stub().returns({ deferred: false, resumed: true }),
+	}
 	let approvalHook: ConfirmationHook | undefined
 	const monolith = {
 		config,
@@ -91,11 +99,19 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 		sessionStore: { getTranscript: () => [] },
 		setupWizard: { getWhoAmI: () => ({ authenticated: false, configuredProviders: [] }) },
 		monolithSwarmDelegator: delegator,
+		swarmDispatcher,
 		agentEngine: { askSideQuestion },
 		toolRegistry: { requireInteractiveHost: (hook: ConfirmationHook) => { approvalHook = hook } },
 		tick,
 	} as unknown as LumiMonolith
+	if (options.conversation) {
+		const conversation = options.conversation as any
+		conversation.reconcileInterruptedAgentSwarmFormations ??= async () => []
+		conversation.getAgentSwarmState ??= () => ({ version: 1, deferred: false, deferredInputs: [], needsReconciliation: false, updatedAt: 0 })
+		conversation.setAgentSwarmState ??= async (state: any) => ({ ...state, version: 1, updatedAt: Date.now() })
+	}
 	const session = new InteractiveModeController().startInteractiveSession(monolith, options)
+	for (let attempt = 0; attempt < 20 && !input; attempt++) await flushInput()
 	const send = async (data: string) => {
 		assert.ok(input, "ProcessTerminal.start must install the real TUI input handler")
 		input(data)
@@ -104,9 +120,10 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 	const submit = async (text: string) => {
 		await send(`\x1b[200~${text}\x1b[201~`)
 		await send("\r")
+		await new Promise((resolve) => setTimeout(resolve, 10))
 	}
 	const finishTurn = async (outcome: EngineTickResult["outcome"] = "completed") => {
-		resolveTurn({
+		const result = {
 			frameIndex: 1,
 			outcome,
 			activeModel: config.modelName,
@@ -114,8 +131,11 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 			composedPrompt: "Inspect the project",
 			response: outcome === "cancelled" ? "Turn cancelled." : "Requested result verified.",
 			toolResults: [],
-		})
+		}
+		if (multiTurn) pendingTurns.shift()?.(result)
+		else resolveTurn(result)
 		await flushInput()
+		await new Promise((resolve) => setTimeout(resolve, 10))
 	}
 	const latestMonitor = () => {
 		const call = overlays.lastCall
@@ -137,6 +157,8 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 		sleepStop,
 		overlays,
 		delegator,
+		swarmDispatcher,
+		pendingTurns,
 		send,
 		submit,
 		finishTurn,
@@ -161,6 +183,87 @@ async function startSession(options: InteractiveSessionOptions = {}) {
 }
 
 describe("Interactive agent monitor routing", () => {
+	it("does not persist a deferred hierarchy when the CLI defer barrier fails", async () => {
+		const root = await mkdtemp(path.join(tmpdir(), "cli-defer-barrier-failure-"))
+		const previousHome = process.env.HOME
+		process.env.HOME = root
+		await mkdir(path.join(root, ".heav3ns"))
+		await writeFile(path.join(root, ".heav3ns", "agent-swarm.json"), JSON.stringify({ enabled: false, criticalCompletionReview: false, hierarchicalDefer: true, legion: false, deferBoundary: "safe_boundary", maxSpecialists: 4 }))
+		let persistedState = JSON.stringify({ version: 1, deferred: false, deferredInputs: [], needsReconciliation: false, updatedAt: 0 })
+		const conversation = {
+			save: async () => {}, belongsTo: () => true, history: () => "", reconcileInterruptedAgentSwarmFormations: async () => [],
+			getAgentSwarmState: () => JSON.parse(persistedState),
+			setAgentSwarmState: async (next: any) => { persistedState = JSON.stringify({ ...next, version: 1, updatedAt: Date.now() }); return JSON.parse(persistedState) },
+		} as unknown as NonNullable<InteractiveSessionOptions["conversation"]>
+		const session = await startSession({ conversation }, true)
+		try {
+			await session.submit("Inspect whether the requested change is safe")
+			session.swarmDispatcher.deferHierarchy.rejects(new Error("descendant acknowledgment failed"))
+			await session.submit("/agentswarm defer")
+			await session.finishTurn("completed")
+			await new Promise((resolve) => setTimeout(resolve, 50))
+			const state = JSON.parse(persistedState)
+			assert.equal(state.deferred, false)
+			assert.equal(state.needsReconciliation, false)
+			assert.equal(state.activeInstruction, undefined)
+		} finally {
+			try { await session.close() } finally {
+				if (previousHome === undefined) delete process.env.HOME
+				else process.env.HOME = previousHome
+				await rm(root, { recursive: true, force: true })
+			}
+		}
+	})
+
+	it("persists and resumes a deferred parent instruction without replaying its original prompt", async () => {
+		const root = await mkdtemp(path.join(tmpdir(), "cli-deferred-parent-host-"))
+		const previousHome = process.env.HOME
+		process.env.HOME = root
+		await mkdir(path.join(root, ".heav3ns"))
+		await writeFile(path.join(root, ".heav3ns", "agent-swarm.json"), JSON.stringify({ enabled: false, criticalCompletionReview: false, hierarchicalDefer: true, legion: false, deferBoundary: "safe_boundary", maxSpecialists: 4 }))
+		let persistedState = JSON.stringify({ version: 1, deferred: false, deferredInputs: [], needsReconciliation: false, updatedAt: 0 })
+		const conversation = {
+			save: async () => {}, belongsTo: () => true, history: () => "", reconcileInterruptedAgentSwarmFormations: async () => [],
+			getAgentSwarmState: () => JSON.parse(persistedState),
+			setAgentSwarmState: async (next: any) => { persistedState = JSON.stringify({ ...next, version: 1, updatedAt: Date.now() }); return JSON.parse(persistedState) },
+		} as unknown as NonNullable<InteractiveSessionOptions["conversation"]>
+		let session = await startSession({ conversation }, true)
+		try {
+			const original = "ORIGINAL PARENT PROMPT: implement a durable change"
+			await session.submit(original)
+			await new Promise((resolve) => setTimeout(resolve, 350))
+			assert.equal(session.tick.callCount, 1)
+			assert.equal(session.tick.firstCall.args[0].prompt, original)
+			await session.submit("/agentswarm defer")
+			await session.finishTurn("deferred")
+			await new Promise((resolve) => setTimeout(resolve, 50))
+			let savedState = JSON.parse(persistedState)
+			assert.equal(savedState.deferred, true)
+			assert.equal(savedState.activeInstruction?.text, original)
+			assert.equal(savedState.activeInstruction?.deferred, true)
+			assert.deepEqual(savedState.deferredInputs, [])
+
+			await session.close()
+			session = await startSession({ conversation }, true)
+			await session.submit("/agentswarm resume")
+			await new Promise((resolve) => setTimeout(resolve, 350))
+			assert.equal(session.tick.callCount, 1)
+			const resumedPrompt = session.tick.firstCall.args[0].prompt
+			assert.match(resumedPrompt, /Resume the suspended parent task from the saved conversation/)
+			assert.doesNotMatch(resumedPrompt, /ORIGINAL PARENT PROMPT/)
+			await session.finishTurn("completed")
+			await new Promise((resolve) => setTimeout(resolve, 50))
+			savedState = JSON.parse(persistedState)
+			assert.equal(savedState.deferred, false)
+			assert.equal(savedState.activeInstruction, undefined)
+		} finally {
+			try { await session.close() } finally {
+				if (previousHome === undefined) delete process.env.HOME
+				else process.env.HOME = previousHome
+				await rm(root, { recursive: true, force: true })
+			}
+		}
+	})
 	it("pauses an active goal and cancels its current turn", async () => {
 		let active = false, planned = false, assessments = 0
 		const goal = {

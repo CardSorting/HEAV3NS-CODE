@@ -7,6 +7,7 @@ export type EngineProgressPhase =
   | "verifying"
   | "responding"
   | "completed"
+  | "deferred"
   | "failed"
   | "cancelled";
 
@@ -15,6 +16,7 @@ export type EngineProgressStatus =
   | "started"
   | "in_progress"
   | "completed"
+  | "deferred"
   | "failed"
   | "cancelled";
 
@@ -92,6 +94,10 @@ export interface EngineTickInput {
   executionAuthority?: import("./tooling.contracts.js").ExecutionAuthorityLevel;
   /** Cancels an in-flight local provider turn. */
   signal?: AbortSignal;
+  /** Cooperative safe-boundary defer request; unlike signal, this never interrupts an operation. */
+  shouldDefer?: () => boolean;
+  /** Controls whether an active turn yields between rounds or only before admission. */
+  deferBoundary?: "before_turn" | "safe_boundary";
   /** Receives structured lifecycle updates without exposing raw model reasoning. */
   onProgress?: (event: EngineProgressEvent) => void;
 }
@@ -107,7 +113,7 @@ export interface WorkspaceRuntimeObservation {
   outputLimited: boolean;
 }
 
-export type EngineTickOutcome = "completed" | "failed" | "cancelled";
+export type EngineTickOutcome = "completed" | "failed" | "cancelled" | "deferred";
 
 /** Evidence for detected checks at a specific revision, never a claim of full correctness. */
 export interface WorkspaceVerificationSummary {
@@ -130,6 +136,8 @@ export interface EngineTickResult {
   composedPrompt: string;
   response: string;
   toolResults: Array<{ name: string; output: unknown }>;
+  /** Explicitly confirms that retrying a failed turn cannot replay tool effects. */
+  safeToRetry?: boolean;
   workspaceVerification?: WorkspaceVerificationSummary;
   durationMs?: number;
 }

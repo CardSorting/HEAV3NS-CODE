@@ -3,6 +3,7 @@ import { DietCodeIgnoreController } from "@core/ignore/DietCodeIgnoreController"
 import { DietCodeDefaultTool } from "@shared/tools"
 import { UniversalGuard } from "../../policy/UniversalGuard"
 import type { PathAuthorityRecord } from "./io/TaskPathAuthorityCache"
+import { detectHeredocFileRedirection } from "@/integrations/terminal/heredocPolicy"
 
 export type ValidationResult = { ok: true } | { ok: false; error: string; hint?: string }
 
@@ -87,6 +88,8 @@ export class ToolValidator {
 	 * Real-world command validation using .dietcodeignore patterns.
 	 */
 	public validateCommand(command: string): ValidationResult {
+		const heredocWrite = detectHeredocFileRedirection(command)
+		if (heredocWrite.isHeredocFileWrite) return { ok: false, error: heredocWrite.reason }
 		const ignoredFile = this.ignoreController.validateCommand(command)
 		if (ignoredFile) {
 			return {

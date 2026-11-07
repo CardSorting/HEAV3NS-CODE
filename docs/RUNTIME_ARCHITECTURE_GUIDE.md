@@ -185,6 +185,8 @@ The monolith supports full-spectrum state checkpoints:
 | `/providers` | — | Tests latency and authentication for all configured LLM providers. |
 | `/setup` | — | Launches the guided provider API key configuration wizard. |
 | `/about` | — | Displays monolith specifications, slab capacity, and active repository guardrails. |
+| `/agentswarm [action]` | — | Controls Agent Swarm & The Legion (`status`, `defer`/`pause`, `resume`, `reconcile`, `classify`, `form`/`team`, `formation`, `review`). |
+| `/queue [action]` | — | Inspects, removes, clears, or resumes held instructions (`remove <n>`, `clear`, `resume`). |
 | `/clear` | `Ctrl+L` | Clears the TUI message output history container. |
 | `/exit` | `Ctrl+C` / `Ctrl+D` | Exits the interactive TUI or fallback readline session cleanly. |
 
@@ -336,5 +338,27 @@ LUMI incorporates a multi-pass tool calling and execution substrate intended to 
 12. **Topological Dependency DAG Execution Planner (ADR-141)**: Analyzes parameter pipelines (e.g. `$node1.result.path`) and constructs topological DAGs to execute independent branches concurrently while chaining dependent stages sequentially.
 13. **Model-Facing Discovery & Introspection DSL (ADR-141)**: Exposes `search_tools_catalog` (BM25 semantic tool discovery across all 1,600+ tools) and `explain_tool_parameters` (full schema and constraint introspection on demand).
 14. **Deterministic Mock Sandbox Harness (ADR-141)**: Enables offline testing, benchmark evaluations, and recorded fixture replay without modifying physical workspace files.
+
+---
+
+## 11. Agent Swarm, The Legion & Cross-Runtime Safety Hardening (`ADR-0001` – `ADR-0020`)
+
+The monolith runtime integrates **Agent Swarm & The Legion** across CLI (`TUI` & `Readline`), Desktop Worker (`src/desktop/worker.ts`), and Native macOS (`native/Sources/Heav3nsCode/`). See [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md) for the complete architectural reference:
+
+1. **Three Auxiliary Capabilities (`ADR-0001`–`ADR-0013`)**:
+   - **Critical Completion Review**: Bounded 1+1 read-only completion verification (`ACCEPT`, `REMEDIATE`, `ESCALATE`, `ACCEPT WITH DISCLOSED LIMITATIONS`) with prioritized `CORRECTIVE_TASKS_JSON` dispatch to Legion specialists.
+   - **Hierarchical Defer & Resume**: Cooperative suspension (`safe_boundary` or `before_turn`) with durable child checkpoints (`activeJsonl` + `transcriptJsonl`) and held instruction queues (up to 10 instructions of 20,000 characters each).
+   - **The Legion Specialist Formations**: Deterministic model-free classifier (`classifyTaskForLegion`) across 5 strategies (`adaptive`, `tactical_strike`, `balanced_squad`, `full_legion`, `verification_heavy` / tactical profiles `balanced`, `parallel_audit`, `divide_and_conquer`, `red_team_hardening`, `rapid_delivery`) and 7 specialist personas (`legion_architect`, `legion_researcher`, `legion_implementer`, `legion_ux_ergonomics` / `legion_Trends_ux`, `legion_data_steward`, `legion_hardener`, `legion_verifier`) executing in a 3-stage DAG with bounded 1-retry failover and the `engage_swarm` conductor tool.
+2. **Streaming Tool-Argument Deduplication (`ADR-0014`)**:
+   - `accumulateStreamingToolName`, `computeStreamingArgumentsDelta` (with single-brace `{` prefix slicing and formatted snapshot suppression), `normalizeCompletedToolCallArguments`, `handleResponsesApiStreamResponse` interleaved/late-name state tracking, and `StreamResponseHandler` `extractJsonRoots` / `ToolArgumentError` / `assertCompleteToolUses` wired across `Task`, `AgentEngine`, and all native streaming providers (`OpenRouter`, `Cline Pass`, `Nous Research`, `OpenCode`, `OpenAI Codex`, `OpenAI Native`, and `ToolCallProcessor`).
+3. **Terminal Heredoc & File-Read Defense + Skills Hardening (`ADR-0015`, `ADR-0016`)**:
+   - Token-aware shell heredoc file-write interception (`heredocPolicy.ts`), supervised output capture for non-file heredocs (`CommandExecutor.ts`), terminal file-dump prevention (`terminalFileReadPolicy.ts`), specialist token budget decoupling, and `UseSkillToolHandler` / `skills.ts` hardening (`clampDescription`, untrusted catalog framing, frontmatter/path integrity validation on activation, and `AbortSignal` propagation).
+4. **Workspace-Scoped Knowledge Blackboard & Environment Integrity (`ADR-0017`, `ADR-0018`)**:
+   - SHA-256 workspace digest scoping (`agent-swarm-knowledge.ts`), multi-pattern credential sanitization (`CREDENTIAL_PATTERNS`), 30-day TTL, and `<workspace_heuristics trust="untrusted">` XML framing.
+   - SHA-256 stat fingerprinting across 26 project/version manifests (`EnvironmentIntegrity.ts`), `WeakRef` instance tracking, generational probe retries, reactive cache invalidation on file writes/patches, and canonical `realpath` PATH shadowing alerts.
+5. **Command Action Fencing, Shadow Commit Retention & Two-Phase BroccoliDB Formation Leases (`ADR-0019`, `ADR-0020`)**:
+   - `ActionExecutionRegistry` and `DurableActionExecutionRegistry` fence commands whose terminal stream disconnects without a numeric exit code (`unconfirmed`), requiring operator-confirmed recovery (`listUnresolvedCommandActions.ts`, `reconcileCommandAction.ts`).
+   - `BufferedDbPool` retains failed transaction shadows (`ShadowCommitError`) and refuses graceful `stop()` while uncommitted shadows exist.
+   - `agent-swarm-handoff.ts` enforces surrogate-safe 12 KB UTF-8 XML escaping, while `SwarmMutexService` and `BroccoliDbTaskCoordinator` enforce two-phase formation reservation leases with PID + process start-time fencing, 20-second lease heartbeats, `FORMATION_CHECKPOINT_MISSING` validation, and `needs_reconciliation` operator workflows.
 
 ---

@@ -46,6 +46,8 @@ import { createLockAuthority } from "@/core/governance/LockAuthority"
 import type { SpiderEngine } from "@/core/policy/spider/SpiderEngine"
 import { getTaskLifecycleAuthority } from "@/core/task/lifecycle/TaskLifecycleFunnel"
 import { processFilesIntoText } from "@/integrations/misc/extract-text"
+import { detectTerminalFileRead } from "@/integrations/terminal/terminalFileReadPolicy"
+import { detectHeredocFileRedirection } from "@/integrations/terminal/heredocPolicy"
 import { Logger } from "@/shared/services/Logger"
 import { getLayer, getTargetPath } from "@/utils/joy-zoning"
 import type { TaskState } from "../../TaskState"
@@ -1747,6 +1749,10 @@ export class ExecutionFunnel {
 		}
 		for (const rawCommand of commands) {
 			const command = rawCommand.match(/^@\w+:(.+)$/)?.[1]?.trim() ?? rawCommand
+			const heredocWrite = detectHeredocFileRedirection(command)
+			if (heredocWrite.isHeredocFileWrite) return heredocWrite.reason
+			const terminalRead = detectTerminalFileRead(command)
+			if (terminalRead.isTerminalFileRead) return terminalRead.reason
 			const permission = config.services.commandPermissionController.validateCommand(command)
 			if (permission.allowed) continue
 			const segment = permission.failedSegment ? ` Segment '${permission.failedSegment}' was rejected.` : ""

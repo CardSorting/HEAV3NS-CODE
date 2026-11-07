@@ -214,3 +214,6 @@ ADRs preserve decision-time context and acceptance evidence; their embedded comm
 - **[ADR-004](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-004-osmosis-evolution-vfs-slash-routing-telemetry.md)**: Virtual File System diff overlays, interactive slash command routing, and microsecond telemetry.
 - **[ADR-005](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-005-osmosis-evolution-memory-store-tool-chaining-knowledge-persistence.md)**: Long-term memory store, autonomous multi-step tool chaining, and knowledge persistence.
 - **[ADR-006](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-006-osmosis-evolution-monorepo-package-absorption.md)**: Line-anchored delta edits (`hashline`), schema parameter validation (`omptype`), file session backends (`session-backends`), and protocol envelope formatting (`protocol`).
+
+### Agent Swarm & The Legion (`ADR-0001` through `ADR-0020`)
+See [`../../docs/AGENT_SWARM_GUIDE.md`](../../docs/AGENT_SWARM_GUIDE.md) for the complete Agent Swarm & The Legion decision log (`ADR-0001`–`ADR-0020`), postmortems (`PM-001`–`PM-019`), and operational playbooks (`PB-01`–`PB-08`).

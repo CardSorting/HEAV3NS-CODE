@@ -7,6 +7,8 @@ import { ACTIVITY_LIMIT } from "./activity.js"
 export interface InspectableRun {
 	id: string
 	state: string
+	review?: string
+	criticalReviewDecision?: string
 	verification: string
 	workspaceVerification?: WorkspaceVerificationSummary
 	activities: EngineProgressEvent[]
@@ -39,6 +41,8 @@ export function explainRun(run: InspectableRun) {
 			"This action may have completed before the session stopped. It has not been replayed; review the current result before repeating it.",
 		timed_out: "This instruction reached its time limit. Existing changes may still be present.",
 	}
+	if (run.criticalReviewDecision === "REMEDIATE") outcomes.failed = "Critical review found issues that need correction before this work is complete."
+	else if (run.criticalReviewDecision === "ESCALATE" || run.criticalReviewDecision === "undetermined") outcomes.failed = "Critical review could not approve completion. Review the findings before continuing."
 	const reasons: Record<string, string> = {
 		permission_denied: "A required check did not receive permission to run.",
 		repair_limit: "The repair attempt limit was reached before checks passed.",
@@ -60,7 +64,11 @@ export function explainRun(run: InspectableRun) {
 	if (verification?.scope === "changes") checks += " Scope: detected checks for changed files."
 	if (verification?.reason && reasons[verification.reason]) checks += ` ${reasons[verification.reason]}`
 	const nextStep =
-		run.state === "awaiting_approval"
+		run.criticalReviewDecision === "REMEDIATE"
+			? "Review the confirmed findings and correct them before treating this work as complete."
+			: run.criticalReviewDecision === "ESCALATE" || run.criticalReviewDecision === "undetermined"
+				? "Review the report and resolve the uncertainty before treating this work as complete."
+				: run.state === "awaiting_approval"
 			? "Open this instruction’s activity to review the pending operation."
 			: ["queued", "running", "cancelling"].includes(run.state)
 				? "Open this instruction’s activity to follow its progress."

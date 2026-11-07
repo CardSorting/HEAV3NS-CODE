@@ -26,6 +26,7 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
     private var visible = [ConversationSummary]()
     private var selected: String?
     private var navigationMessage = ""
+    private var hasEarlierConversations = false
     private var suppress = false
     private lazy var create = JourneyButton("New conversation", symbol: "plus.bubble") { [weak self] in self?.onNew?() }
     private lazy var more = JourneyButton("Earlier conversations") { [weak self] in self?.onMore?() }
@@ -60,6 +61,7 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     func show(_ conversations: [ConversationSummary], selected: String?, canSwitch: Bool, more: Bool, earlierPage: Bool = false, message: String = "") {
         all = conversations; self.selected = selected
+        hasEarlierConversations = more
         create.isEnabled = canSwitch; table.isEnabled = canSwitch
         create.toolTip = canSwitch ? "Start with a fresh conversation" : "Finish or stop current work before switching conversations"
         self.more.isHidden = !more; self.more.isEnabled = canSwitch
@@ -79,7 +81,13 @@ final class ConversationSidebar: NSVisualEffectView, NSTableViewDataSource, NSTa
         suppress = true; table.deselectAll(nil); table.reloadData()
         if let index = visible.firstIndex(where: { $0.id == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
         suppress = false
-        message.stringValue = visible.isEmpty && !query.isEmpty ? "No matching conversations on this page." : navigationMessage
+        if visible.isEmpty && !query.isEmpty && navigationMessage.isEmpty {
+            message.stringValue = hasEarlierConversations
+                ? "No match on this page. Choose Earlier conversations to keep searching."
+                : "No matching conversations on this page."
+        } else {
+            message.stringValue = navigationMessage
+        }
         message.isHidden = message.stringValue.isEmpty
     }
     func controlTextDidChange(_ obj: Notification) { render() }

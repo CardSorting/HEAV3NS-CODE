@@ -152,6 +152,8 @@ import { testPromptUploading } from "@core/controller/state/testPromptUploading"
 // Task Service
 import { cancelTask } from "@core/controller/task/cancelTask"
 import { cancelBackgroundCommand } from "@core/controller/task/cancelBackgroundCommand"
+import { listUnresolvedCommandActions } from "@core/controller/task/listUnresolvedCommandActions"
+import { reconcileCommandAction } from "@core/controller/task/reconcileCommandAction"
 import { clearTask } from "@core/controller/task/clearTask"
 import { getTotalTasksSize } from "@core/controller/task/getTotalTasksSize"
 import { deleteTasksWithIds } from "@core/controller/task/deleteTasksWithIds"
@@ -365,6 +367,8 @@ const StateServiceHandlers: serviceTypes.StateServiceHandlers = {
 const TaskServiceHandlers: serviceTypes.TaskServiceHandlers = {
     cancelTask: cancelTask,
     cancelBackgroundCommand: cancelBackgroundCommand,
+    listUnresolvedCommandActions: listUnresolvedCommandActions,
+    reconcileCommandAction: reconcileCommandAction,
     clearTask: clearTask,
     getTotalTasksSize: getTotalTasksSize,
     deleteTasksWithIds: deleteTasksWithIds,

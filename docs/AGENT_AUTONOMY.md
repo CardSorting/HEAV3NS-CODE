@@ -107,3 +107,12 @@ navigation patterns described in [VS Code's terminal integration](https://code.v
 and task isolation/handoff patterns in [Claude Code's subagent documentation](https://code.claude.com/docs/en/sub-agents).
 These are design references, not claims of product equivalence. Cancellation
 uses the runtime's [AbortSignal API](https://nodejs.org/api/globals.html#class-abortsignal).
+
+## Agent Swarm & The Legion orchestration
+
+For multi-specialist formations (`The Legion`), cooperative hierarchy suspension
+(`Hierarchical Defer & Resume` with `safe_boundary` and `before_turn`), bounded
+1+1 read-only `Critical Completion Review`, two-phase BroccoliDB formation
+reservation leases (`ADR-0020`), command action execution fencing (`ADR-0019`),
+workspace knowledge blackboards (`ADR-0017`), and streaming tool-argument
+deduplication (`ADR-0014`), see [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md).

@@ -1421,7 +1421,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         }
 
         const scheduledCalls = rawCalls.map((c, i) => ({
-          id: String(c.id || `call_${i + 1}_${Date.now()}`),
+          id: String(c.id || `call_${i + 1}`),
           name: String(c.name || c.tool || ""),
           args: c.args || {},
         }));
@@ -1429,6 +1429,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         const allowDisjoint = typeof args.allowDisjointMutations === "boolean" ? args.allowDisjointMutations : true;
         const result = await this.scheduler.executeBatch(scheduledCalls, this, cwd, {
           ...options,
+          actionNamespace: options?.actionId,
           onToolOutput: options?.onOutput ? (_call, chunk) => options.onOutput?.(chunk) : undefined,
           allowParallelDisjointMutations: allowDisjoint,
           executionAuthority: options?.executionAuthority ?? this.currentAuthority,
@@ -1480,6 +1481,7 @@ export class ValidatingToolRegistry extends AbstractToolRegistry {
         const streamResults: PipelinedStreamChunk[] = [];
         for await (const chunk of this.scheduler.executePipelinedStream(scheduledCalls, this, cwd, {
           ...options,
+          actionNamespace: options?.actionId,
           onToolOutput: options?.onOutput ? (_call, output) => options.onOutput?.(output) : undefined,
           executionAuthority: options?.executionAuthority ?? this.currentAuthority,
           bypassConfirmation: options?.bypassConfirmation ?? ["autonomous", "high_throughput"].includes(options?.executionAuthority ?? this.currentAuthority),

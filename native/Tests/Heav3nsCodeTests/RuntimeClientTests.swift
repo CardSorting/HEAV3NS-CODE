@@ -32,6 +32,8 @@ final class RuntimeClientTests: XCTestCase {
             const end = buffer.indexOf('\\n'); if (end < 0) break;
             const request = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
             \(behavior)
+            if (request.method === 'agentSwarm.settings') { reply(request, { enabled: false, criticalCompletionReview: false, autoDeferOnCompletionReview: true, hierarchicalDefer: false, legion: false, deferBoundary: 'safe_boundary', strategy: 'adaptive', maxSpecialists: 4, environmentOverrides: [] }); continue; }
+            if (request.method === 'task.deferStatus') { reply(request, { enabled: false, deferred: false, queued: 0 }); continue; }
           }
         });
         """
@@ -41,6 +43,21 @@ final class RuntimeClientTests: XCTestCase {
     }
     private let hello = "if (request.method === 'hello') { reply(request, { protocol: 1, workspace: 'ws', session: 'session', runtime: 'runtime' }); continue; }"
     private let snapshot = "if (request.method === 'snapshot') { reply(request, { workspace: 'ws', session: 'session', runtime: 'runtime', seq: 0, runs: [] }); continue; }"
+    func testAgentDeferStatusAcceptsHierarchyBarrierState() throws {
+        let client = try peer(hello + snapshot + "if (request.method === 'task.deferStatus') { reply(request, { enabled: true, deferred: true, queued: 2, activeRun: 'run-1', boundary: 'safe_boundary', hierarchy: { deferred: true, activeChildren: 0, boundary: 'safe_boundary' } }); continue; }")
+        let finished = expectation(description: "validated hierarchy defer status")
+        client.onConnection = { _ in
+            guard client.isReady else { return }
+            client.request("task.deferStatus") { result in
+                guard case .success(let value) = result else { XCTFail("Expected valid defer status: \\(result)"); finished.fulfill(); return }
+                XCTAssertEqual(value["deferred"] as? Bool, true)
+                XCTAssertEqual(value["queued"] as? Int, 2)
+                finished.fulfill()
+            }
+        }
+        client.start(folder: directory)
+        wait(for: [finished], timeout: 3)
+    }
     func testSleepAssertionFollowsConfirmedRunStateAndWorkerExit() throws {
         let node = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"].first { FileManager.default.isExecutableFile(atPath: $0) }
         guard let node else { throw XCTSkip("Node is needed for the protocol peer") }
@@ -825,8 +842,9 @@ final class RuntimeClientTests: XCTestCase {
         defer { client.onEvent = nil; client.onConnection = nil; workspace.window?.close() }
         let checked = expectation(description: "old cancellation deadline cannot change the next run")
         let originalConnection = client.onConnection, originalEvent = client.onEvent
-        var sent = false, replaced = false
+        var sent = false, replaced = false, lastConnection = "Not started"
         client.onConnection = { value in
+            lastConnection = value
             originalConnection?(value)
             if client.isReady && !sent { sent = true; workspace.submitProbe("first") }
         }
@@ -838,7 +856,7 @@ final class RuntimeClientTests: XCTestCase {
                 replaced = true; workspace.submitProbe("replacement")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) {
                     XCTAssertTrue(workspace.hasWork)
-                    XCTAssertTrue(client.isReady)
+                    XCTAssertTrue(client.isReady, lastConnection)
                     XCTAssertEqual(workspace.probeLayout["forceStopAvailable"] as? Bool, false)
                     checked.fulfill()
                 }

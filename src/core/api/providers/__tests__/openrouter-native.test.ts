@@ -124,4 +124,103 @@ describe("native OpenRouter transport", () => {
 		assert.equal(f.payload.model, "org/custom:free")
 		assert.equal(f.aborted, true)
 	})
+	it("deduplicates cumulative tool name and argument snapshots and self-heals identical JSON roots", async () => {
+		const f = fixture([
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{ index: 0, id: "call-snap", function: { name: "view_", arguments: '{"path":' } },
+								{ index: 1, id: "call-dup", function: { name: "read_file", arguments: '{"path":"b.ts"}' } },
+							],
+						},
+					},
+				],
+			},
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{ index: 0, function: { name: "view_file", arguments: '{"path":"a.ts"}' } },
+								{ index: 1, function: { name: "read_file", arguments: '{"path":"b.ts"}' } },
+							],
+						},
+						finish_reason: "tool_calls",
+					},
+				],
+			},
+		])
+		const result = await completeOpenRouter({ ...options(), client: f.client })
+		assert.deepEqual(result.choices[0].message.tool_calls, [
+			{
+				id: "call-snap",
+				type: "function",
+				function: { name: "view_file", arguments: '{"path":"a.ts"}' },
+			},
+			{
+				id: "call-dup",
+				type: "function",
+				function: { name: "read_file", arguments: '{"path":"b.ts"}' },
+			},
+		])
+
+		const conflicting = fixture([
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{
+									index: 0,
+									id: "call-conflict",
+									function: { name: "view_file", arguments: '{"path":"a.ts"}{"path":"b.ts"}' },
+								},
+							],
+						},
+						finish_reason: "tool_calls",
+					},
+				],
+			},
+		])
+		await assert.rejects(
+			completeOpenRouter({ ...options(), client: conflicting.client }),
+			/concatenated tool arguments/,
+		)
+
+		const singleBracePrefix = fixture([
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{ index: 0, id: "call-brace", function: { name: "read_file", arguments: "{" } },
+							],
+						},
+					},
+				],
+			},
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{ index: 0, function: { name: "read_file", arguments: '{"path":"c.ts"}' } },
+							],
+						},
+						finish_reason: "tool_calls",
+					},
+				],
+			},
+		])
+		const braceResult = await completeOpenRouter({ ...options(), client: singleBracePrefix.client })
+		assert.deepEqual(braceResult.choices[0].message.tool_calls, [
+			{
+				id: "call-brace",
+				type: "function",
+				function: { name: "read_file", arguments: '{"path":"c.ts"}' },
+			},
+		])
+	})
 })

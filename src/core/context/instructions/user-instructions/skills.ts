@@ -51,6 +51,15 @@ export {
 } from "./skillRuntime"
 
 const MAX_SKILL_FILE_SIZE_BYTES = 512 * 1024 // 512 KB safeguard against memory corruption/DoS
+const MAX_SKILL_DESCRIPTION_LENGTH = 1000
+
+function clampDescription(description: string, maxChars = MAX_SKILL_DESCRIPTION_LENGTH): string {
+	const normalized = description.replace(/\s+/g, " ").trim()
+	if (normalized.length <= maxChars) {
+		return normalized
+	}
+	return `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`
+}
 
 export interface SkillDiagnostic {
 	path: string
@@ -266,7 +275,7 @@ async function loadSkillMetadataWithDiagnostic(
 		return {
 			skill: {
 				name: skillName,
-				description,
+				description: clampDescription(description),
 				path: skillMdPath,
 				source,
 			},
@@ -372,10 +381,10 @@ function snapshotSkillMetadata(value: unknown): SkillMetadata | undefined {
 	if (!value || typeof value !== "object" || types.isProxy(value)) return undefined
 	const field = (key: string) => Object.getOwnPropertyDescriptor(value, key)?.value as unknown
 	const name = field("name"), description = field("description"), skillPath = field("path"), source = field("source")
-	if (typeof name !== "string" || !name || typeof description !== "string" || typeof skillPath !== "string" || !skillPath ||
+	if (typeof name !== "string" || !name || typeof description !== "string" || !description.trim() || typeof skillPath !== "string" || !skillPath ||
 		(source !== "bundled" && source !== "global" && source !== "project")) return undefined
 	const defaultEnabled = field("defaultEnabled")
-	return { name, description, path: skillPath, source, ...(typeof defaultEnabled === "boolean" ? { defaultEnabled } : {}) }
+	return { name, description: clampDescription(description), path: skillPath, source, ...(typeof defaultEnabled === "boolean" ? { defaultEnabled } : {}) }
 }
 
 export type SkillLoadMode = "digest" | "full"
@@ -403,6 +412,22 @@ export async function getSkillContent(
 	}
 	if (!skill) return null
 
+	if (!skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX)) {
+		const pathSegments = skill.path.split(/[\\/]/)
+		const fileName = path.basename(skill.path)
+		const dirName = path.basename(path.dirname(skill.path))
+		if (
+			!isValidSkillDirName(skill.name) ||
+			skill.path.includes("\0") ||
+			pathSegments.includes("..") ||
+			fileName !== "SKILL.md" ||
+			(dirName && dirName !== "." && dirName !== skill.name)
+		) {
+			Logger.warn(`Invalid skill path or name mismatch for ${skill.name} at ${skill.path}`)
+			return null
+		}
+	}
+
 	const loadMode = options.mode ?? "digest"
 	const isBundledRoadmap = skill.source === "bundled" && skill.name === BUNDLED_SKILL_NAME && getRoadmapConfig().enabled
 
@@ -414,7 +439,7 @@ export async function getSkillContent(
 	}
 
 	try {
-		const instructions = await pendingSkillContent.run(
+		const loaded = await pendingSkillContent.run(
 			JSON.stringify([skill.path, skill.name, skill.source]),
 			async (signal) => {
 				const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
@@ -430,16 +455,26 @@ export async function getSkillContent(
 					Logger.warn(`Invalid skill instructions for ${skill.name}: ${parsed.parseError ?? "empty body"}`)
 					return null
 				}
+				const fmName = typeof parsed.data.name === "string" ? parsed.data.name.trim() : ""
+				const fmDesc = typeof parsed.data.description === "string" ? parsed.data.description.trim() : ""
+				if (!fmName || fmName !== skill.name) {
+					Logger.warn(`Skill activation rejected for ${skill.name}: frontmatter name "${fmName}" does not match "${skill.name}"`)
+					return null
+				}
+				if (!fmDesc) {
+					Logger.warn(`Skill activation rejected for ${skill.name}: missing required 'description' in frontmatter`)
+					return null
+				}
 				return parsed.body.trim()
 			},
 			signal,
 		)
 		signal?.throwIfAborted()
-		if (instructions === null) return null
+		if (loaded === null) return null
 
 		return {
 			...skill,
-			instructions,
+			instructions: loaded,
 		}
 	} catch (error) {
 		signal?.throwIfAborted()

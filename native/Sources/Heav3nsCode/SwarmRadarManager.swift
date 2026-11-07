@@ -4,8 +4,8 @@ import AppKit
 public struct SwarmRadarState: Equatable {
     public let nodeId: String
     public let displayNodeId: String
-    public let activeNodes: Int
-    public let totalInstalls: Int
+    public let activeNodes: Int?
+    public let totalInstalls: Int?
     public let seatNumber: String
     public let colo: String
     public let region: String
@@ -14,22 +14,22 @@ public struct SwarmRadarState: Equatable {
     public let lastUpdated: Date?
     public let isOnline: Bool
     public let isHeartbeatDisabled: Bool
-    public let privacyGuarantee: String
+    public let dataDisclosure: String
 
     public static let initial = SwarmRadarState(
         nodeId: "local_node",
         displayNodeId: "NODE_LOCAL",
-        activeNodes: 90,
-        totalInstalls: 1421,
-        seatNumber: "Cockpit #1,421",
-        colo: "Anycast",
-        region: "Global Anycast Edge",
+        activeNodes: nil,
+        totalInstalls: nil,
+        seatNumber: "Not assigned",
+        colo: "Not connected",
+        region: "Not reported",
         latencyMs: 0,
-        statusMessage: "Connecting to Sovereign Swarm Radar…",
+        statusMessage: "Heartbeat sharing is off",
         lastUpdated: nil,
         isOnline: false,
-        isHeartbeatDisabled: false,
-        privacyGuarantee: "Zero-Telemetry Guarantee: 0 KB code or prompts transmitted. 100% local execution."
+        isHeartbeatDisabled: true,
+        dataDisclosure: "Not anonymous: when enabled, the heartbeat sends a stable installation ID, app version, architecture, source, and action. Code and prompts are not included."
     )
 
     public var latencyTier: LatencyTier {
@@ -64,7 +64,9 @@ final class SwarmRadarManager {
         if ProcessInfo.processInfo.environment["HEAV3NS_NO_HEARTBEAT"] == "1" {
             return true
         }
-        return UserDefaults.standard.bool(forKey: "DisableHeartbeat")
+        // Sharing is opt-in. Preserve explicit user choice, but do not treat a missing
+        // preference as consent to send the stable installation identifier.
+        return UserDefaults.standard.object(forKey: "DisableHeartbeat") as? Bool ?? true
     }
 
     init() {
@@ -74,17 +76,17 @@ final class SwarmRadarManager {
         _state = SwarmRadarState(
             nodeId: initialID,
             displayNodeId: displayID,
-            activeNodes: 90,
-            totalInstalls: 1421,
-            seatNumber: "Cockpit #1,421",
-            colo: "Anycast",
-            region: "Global Anycast Edge",
+            activeNodes: nil,
+            totalInstalls: nil,
+            seatNumber: "Not assigned",
+            colo: "Not connected",
+            region: "Not reported",
             latencyMs: 0,
-            statusMessage: isHeartbeatDisabled ? "Zero-Telemetry Mode (Heartbeat Disabled by Pilot)" : "Ready to synchronize",
+            statusMessage: isHeartbeatDisabled ? "Heartbeat sharing is off" : "Ready to synchronize",
             lastUpdated: nil,
             isOnline: false,
             isHeartbeatDisabled: isHeartbeatDisabled,
-            privacyGuarantee: "Zero-Telemetry Guarantee: 0 KB code or prompts transmitted. 100% local execution."
+            dataDisclosure: "Not anonymous: when enabled, the heartbeat sends a stable installation ID, app version, architecture, source, and action. Code and prompts are not included."
         )
     }
 
@@ -97,14 +99,14 @@ final class SwarmRadarManager {
                 activeNodes: _state.activeNodes,
                 totalInstalls: _state.totalInstalls,
                 seatNumber: _state.seatNumber,
-                colo: disabled ? "Offline" : (_state.colo == "Offline" ? "Anycast" : _state.colo),
-                region: disabled ? "Zero-Telemetry Sandbox" : (_state.region == "Zero-Telemetry Sandbox" ? "Global Anycast Edge" : _state.region),
+                colo: disabled ? "Offline" : (_state.colo == "Offline" ? "Not connected" : _state.colo),
+                region: disabled ? "Heartbeat disabled" : (_state.region == "Heartbeat disabled" ? "Not reported" : _state.region),
                 latencyMs: disabled ? 0 : _state.latencyMs,
-                statusMessage: disabled ? "Zero-Telemetry Mode (Heartbeat Disabled by Pilot)" : "Connecting to Sovereign Swarm Radar…",
+                statusMessage: disabled ? "Heartbeat sharing is off" : "Connecting to HEAV3NS…",
                 lastUpdated: Date(),
                 isOnline: disabled ? false : _state.isOnline,
                 isHeartbeatDisabled: disabled,
-                privacyGuarantee: _state.privacyGuarantee
+                dataDisclosure: _state.dataDisclosure
             )
         }
         notifyUpdate()
@@ -123,13 +125,13 @@ final class SwarmRadarManager {
                     totalInstalls: _state.totalInstalls,
                     seatNumber: _state.seatNumber,
                     colo: "Offline",
-                    region: "Zero-Telemetry Sandbox",
+                    region: "Heartbeat disabled",
                     latencyMs: 0,
-                    statusMessage: "Zero-Telemetry Mode (Heartbeat Disabled by Pilot)",
+                    statusMessage: "Heartbeat sharing is off",
                     lastUpdated: Date(),
                     isOnline: false,
                     isHeartbeatDisabled: true,
-                    privacyGuarantee: _state.privacyGuarantee
+                    dataDisclosure: _state.dataDisclosure
                 )
                 return _state
             }
@@ -180,22 +182,23 @@ final class SwarmRadarManager {
             guard let self else { return }
             let latency = max(1, Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000))
 
-            var newColo = "PHX"
-            var newRegion = "Salt Lake City (PHX Edge)"
-            var activeCount = 90
-            var totalCount = 1421
+            var newColo = "Not reported"
+            var newRegion = "Not reported"
+            var activeCount: Int?
+            var totalCount: Int?
 
             var isSuccess = false
-            if let data, error == nil,
+            let httpStatus = (response as? HTTPURLResponse)?.statusCode
+            if let data, error == nil, let httpStatus, (200..<300).contains(httpStatus),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 isSuccess = json["success"] as? Bool ?? false
                 if let c = json["colo"] as? String, !c.isEmpty { newColo = c }
                 if let r = json["region"] as? String, !r.isEmpty { newRegion = r }
-                if let a = json["activeNodes"] as? Int, a > 0 { activeCount = a }
-                if let t = json["totalInstalls"] as? Int, t > 0 { totalCount = t }
+                if let a = json["activeNodes"] as? Int, a >= 0 { activeCount = a }
+                if let t = json["totalInstalls"] as? Int, t >= 0 { totalCount = t }
             }
 
-            let seat = "Cockpit #\(NumberFormatter.localizedString(from: NSNumber(value: totalCount), number: .decimal))"
+            let seat = totalCount.map { "Cockpit #\(NumberFormatter.localizedString(from: NSNumber(value: $0), number: .decimal))" } ?? "Not reported"
             let message = isSuccess
                 ? "Synchronized with \(newColo) Edge (\(latency)ms)"
                 : "Edge sync paused (\(error?.localizedDescription ?? "Offline"))"
@@ -214,7 +217,7 @@ final class SwarmRadarManager {
                     lastUpdated: Date(),
                     isOnline: isSuccess,
                     isHeartbeatDisabled: false,
-                    privacyGuarantee: "Zero-Telemetry Guarantee: 0 KB code or prompts transmitted. 100% local execution."
+                    dataDisclosure: "Not anonymous: when enabled, the heartbeat sends a stable installation ID, app version, architecture, source, and action. Code and prompts are not included."
                 )
                 return self._state
             }

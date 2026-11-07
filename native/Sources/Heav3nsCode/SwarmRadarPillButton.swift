@@ -42,12 +42,13 @@ final class SwarmRadarPillButton: NSButton {
 
     private func updateFromState(_ state: SwarmRadarState) {
         if state.isHeartbeatDisabled {
-            title = " ⚪ Radar Off (Private)"
-            toolTip = "Sovereign Swarm Radar is disabled in Privacy settings. Click to open Swarm Radar Cockpit."
+            title = " ⚪ Swarm Radar · Sharing Off"
+            toolTip = "App heartbeat sharing is off. Enable it in Swarm Radar settings to send the disclosed app metadata."
         } else {
             let latencyText = state.latencyMs > 0 ? " (\(state.latencyMs)ms)" : ""
-            title = " 🟢 \(state.activeNodes) Nodes • \(state.colo)\(latencyText)"
-            toolTip = "Sovereign Swarm Radar: \(state.activeNodes) active nodes online across 42 countries. Edge: \(state.colo) (\(state.region)). Click to inspect Anycast telemetry."
+            let connections = state.activeNodes.map { "\($0) Nodes" } ?? "Radar Connected"
+            title = " 🟢 \(connections) • \(state.colo)\(latencyText)"
+            toolTip = "App heartbeat sharing is on. Reported service location: \(state.colo) (\(state.region)). Click to review the data sent and service response."
         }
         setAccessibilityLabel(title)
     }

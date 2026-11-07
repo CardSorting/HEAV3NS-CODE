@@ -20,6 +20,8 @@ import type {
   ProgrammaticToolCall,
   SandboxContext,
 } from "../../../core/contracts/execution.contracts.js";
+import type { ToolExecutionOptions } from "../../../core/contracts/tooling.contracts.js";
+import { createHash } from "node:crypto";
 import { DeterministicCodeExecutor } from "../../../tooling/extensions/execution/deterministic-code-executor.js";
 import { BroccoliExecutionSubstrate } from "../../../sessions/extensions/execution/broccoli-execution-substrate.js";
 
@@ -27,7 +29,7 @@ export class CodeExecutionSupervisor {
   private readonly executor: DeterministicCodeExecutor;
   private readonly substrate: BroccoliExecutionSubstrate;
   private currentFrame: number;
-  private toolDispatcher?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+  private toolDispatcher?: (name: string, args: Record<string, unknown>, options?: ToolExecutionOptions) => Promise<unknown>;
   private availableTools: readonly string[] = [];
 
   constructor(
@@ -40,7 +42,7 @@ export class CodeExecutionSupervisor {
   }
 
   public setToolDispatcher(
-    dispatcher: (name: string, args: Record<string, unknown>) => Promise<unknown>,
+    dispatcher: (name: string, args: Record<string, unknown>, options?: ToolExecutionOptions) => Promise<unknown>,
     tools: readonly string[] = []
   ): void {
     this.toolDispatcher = dispatcher;
@@ -58,9 +60,19 @@ export class CodeExecutionSupervisor {
     code: string,
     language: CodeExecutionLanguage = "javascript",
     context: Partial<SandboxContext> = {},
-    toolHandler?: (name: string, args: Record<string, unknown>) => Promise<unknown>
+    toolHandler?: (name: string, args: Record<string, unknown>, options?: ToolExecutionOptions) => Promise<unknown>,
+    actionId?: string,
   ): Promise<ExecutionRecord> {
-    const record = await this.executor.executeCode(code, language, context, toolHandler || this.toolDispatcher);
+    const dispatcher = toolHandler || this.toolDispatcher;
+    let nestedCallIndex = 0;
+    const fencedDispatcher = dispatcher && (async (name: string, args: Record<string, unknown>) => {
+      const callIndex = nestedCallIndex++;
+      const nestedActionId = actionId
+        ? `lumi-${createHash("sha256").update(`${actionId}:sandbox:${callIndex}`).digest("hex")}`
+        : undefined;
+      return dispatcher(name, args, nestedActionId ? { actionId: nestedActionId } : undefined);
+    });
+    const record = await this.executor.executeCode(code, language, context, fencedDispatcher);
     this.substrate.recordExecution(record);
     return record;
   }

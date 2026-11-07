@@ -116,7 +116,10 @@ export class EnvironmentTracker {
 			})
 		}
 
-		await dbPool.pushBatch(ops, agentId)
+		// Telemetry and its aggregates are shared reporting data, not agent-local
+		// transactional state. Keep agent identity in the rows without placing these
+		// writes in a shadow that no caller commits.
+		await dbPool.pushBatch(ops)
 	}
 
 	static async getStats(

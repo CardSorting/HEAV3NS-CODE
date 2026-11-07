@@ -14,6 +14,10 @@ service TaskService {
   rpc cancelTask(EmptyRequest) returns (Empty);
   // Cancels the currently running background command
   rpc cancelBackgroundCommand(EmptyRequest) returns (Empty);
+  // Lists background command actions whose outcome needs operator reconciliation
+  rpc listUnresolvedCommandActions(EmptyRequest) returns (UnresolvedCommandActionArray);
+  // Records an operator-confirmed outcome for a command action without replaying it
+  rpc reconcileCommandAction(ReconcileCommandActionRequest) returns (Empty);
   // Clears the current task
   rpc clearTask(EmptyRequest) returns (Empty);
   // Gets the total size of all tasks
@@ -42,6 +46,31 @@ service TaskService {
   rpc deleteAllTaskHistory(EmptyRequest) returns (DeleteAllTaskHistoryCount);
   // Explains changes with AI and adds inline comments to the diff view
   rpc explainChanges(ExplainChangesRequest) returns (Empty);
+}
+
+message UnresolvedCommandAction {
+  string action_id = 1;
+  string command_fingerprint = 2;
+  string status = 3;
+  string detail = 4;
+  int64 updated_at = 5;
+  bool owner_active = 6;
+}
+
+message UnresolvedCommandActionArray {
+  repeated UnresolvedCommandAction actions = 1;
+}
+
+enum CommandExecutionOutcome {
+  COMMAND_EXECUTION_OUTCOME_UNSPECIFIED = 0;
+  COMMAND_EXECUTION_OUTCOME_COMPLETED = 1;
+  COMMAND_EXECUTION_OUTCOME_FAILED = 2;
+}
+
+message ReconcileCommandActionRequest {
+  string action_id = 1;
+  CommandExecutionOutcome outcome = 2;
+  string confirmation = 3;
 }
 
 // Request message for creating a new task

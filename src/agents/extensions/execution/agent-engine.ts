@@ -48,7 +48,12 @@ import type { ToolSpeculativePrefetcher } from "../../../tooling/extensions/exec
 import { RoadmapCompletionGate } from "../../../tooling/extensions/policy/roadmap-completion-gate.js"
 import { DynamicToolRouter } from "../../../tooling/extensions/registry/dynamic-tool-router.js"
 import type { SkillManifest } from "../../../tooling/extensions/registry/skills-ingestor.js"
-import { ToolCallArgParser } from "../../../tooling/extensions/registry/tool-call-arg-parser.js"
+import {
+	ToolCallArgParser,
+	accumulateStreamingToolName,
+	computeStreamingArgumentsDelta,
+	normalizeCompletedToolCallArguments,
+} from "../../../tooling/extensions/registry/tool-call-arg-parser.js"
 import { ToolChoicePolicyOrchestrator } from "../../../tooling/extensions/registry/tool-choice-policy-orchestrator.js"
 import type { ValidatingToolRegistry } from "../../../tooling/extensions/registry/tool-registry.js"
 import { ToolSchemaCompressor } from "../../../tooling/extensions/registry/tool-schema-compressor.js"
@@ -66,6 +71,7 @@ import type { BroccoliRuntimeQueue } from "./broccoli-runtime-queue.js"
 import { FlappyBirdProjectSynthesizer } from "./flappy-bird-project-synthesizer.js"
 import { WorkspaceVerification } from "./workspace-verification.js"
 import { sideQueryContext } from "./side-query-context.js"
+import { agentSwarmFeatureEnabled, readAgentSwarmConfig } from "../swarm/agent-swarm-config.js"
 
 interface PreparedProviderContext {
 	messages: SessionMessage[]
@@ -394,7 +400,19 @@ export class AgentEngine extends AbstractAgentEngine {
 	private async executeTurn(input: EngineTickInput): Promise<EngineTickResult> {
 		const sessionStore = this.sessionStore as PersistentSessionStore
 		const promptText = input.prompt?.trim() ?? ""
+		if (input.shouldDefer?.()) {
+			return {
+				frameIndex: this.sessionContext.turnCount,
+				outcome: "deferred",
+				activeModel: this.modelResolver.getActiveModel(),
+				isFallbackModel: this.modelResolver.getActiveModel() !== this.config.modelName,
+				composedPrompt: promptText,
+				response: "Execution deferred before turn admission.",
+				toolResults: [],
+			}
+		}
 		const accumulatedToolResults: ToolExecutionRecord[] = []
+		let toolsAdmitted = false
 		let workspaceVerification: WorkspaceVerification | undefined
 		let runtimeObservation: WorkspaceRuntimeObservation | undefined
 		const runtimeFailureContext = input.workspaceRuntimeFailure
@@ -455,6 +473,7 @@ export class AgentEngine extends AbstractAgentEngine {
 		// 3. Execution Phase
 		let responseText = ""
 		let turnOutcome: EngineTickOutcome = "completed"
+		let safeToRetry = false
 
 		const lowerPrompt = promptText.toLowerCase().trim()
 
@@ -551,6 +570,8 @@ export class AgentEngine extends AbstractAgentEngine {
 				const autonomous =
 					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
+					// Verification can run tools outside the provider's scheduled batch.
+					toolsAdmitted = true
 					workspaceVerification = new WorkspaceVerification(
 						this.sessionContext.cwd,
 						this.toolRegistry,
@@ -635,10 +656,13 @@ export class AgentEngine extends AbstractAgentEngine {
 							metadata: { source: progressSource, scope: "turn", attempt: attempt + 1 },
 						})
 
-						const allRegisteredTools = this.toolRegistry ? this.toolRegistry.listTools() : []
+						const swarmConfig = await readAgentSwarmConfig()
+						const exposeConductor = agentSwarmFeatureEnabled(swarmConfig, "legion") && !this.sessionContext.sessionId.startsWith("subagent-")
+						const allRegisteredTools = this.toolRegistry ? this.toolRegistry.listTools().filter((tool) => tool.name !== "engage_swarm" || exposeConductor) : []
 						const routedTools = this.dynamicToolRouter.selectRelevantTools(allRegisteredTools, promptText)
 						const relevantTools = [...routedTools, ...allRegisteredTools.filter((tool) =>
 							(tool.name === "retrieve_spill_content" ||
+								(tool.name === "engage_swarm" && exposeConductor) ||
 								((preparedContext.hasAvailableSkills || preparedContext.skillDiscoveryFailed) &&
 									(tool.name === "use_skill" || tool.name === "list_skills"))) &&
 							!routedTools.some((routed) => routed.name === tool.name))]
@@ -715,6 +739,13 @@ export class AgentEngine extends AbstractAgentEngine {
 						// provider finishes, the user cancels, or an actual request fails.
 						while (true) {
 							input.signal?.throwIfAborted()
+							// Defer only between provider/tool rounds. The current atomic response
+							// and any admitted tool batch are allowed to settle first.
+							if (input.deferBoundary !== "before_turn" && input.shouldDefer?.()) {
+								turnOutcome = "deferred"
+								responseText = accumulatedResponse
+								break
+							}
 							observeRuntime()
 							if (this.broccoliGit) {
 								const message = { role: "user", content: "Current BroccoliGIT recording coverage (reference data):\n" + this.broccoliGit.context() }
@@ -932,12 +963,16 @@ export class AgentEngine extends AbstractAgentEngine {
 										}
 										entry.callId = chunk.tool_call.call_id ?? entry.callId
 										const name = typeof fn.name === "string" ? fn.name : ""
-										if (name && name !== itemId) entry.name = name
+										if (name && name !== itemId) {
+											entry.name = accumulateStreamingToolName(entry.name, name)
+										}
 										const args =
 											typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? {})
 										if (args) {
-											if (name === itemId) entry.argumentDeltas += args
-											else entry.finalArguments = args
+											const delta = computeStreamingArgumentsDelta(entry.argumentDeltas, args)
+											if (delta) {
+												entry.argumentDeltas += delta
+											}
 										}
 										toolCalls.set(itemId, entry)
 										if (entry.name)
@@ -958,7 +993,10 @@ export class AgentEngine extends AbstractAgentEngine {
 														type: "function" as const,
 														function: {
 															name: call.name,
-															arguments: call.finalArguments || call.argumentDeltas || "{}",
+															arguments: normalizeCompletedToolCallArguments(
+																call.finalArguments || call.argumentDeltas,
+																call.name || call.callId,
+															),
 														},
 													})),
 												},
@@ -1053,9 +1091,11 @@ export class AgentEngine extends AbstractAgentEngine {
 										},
 									})
 
+								toolsAdmitted ||= scheduledCalls.length > 0
 								const { results: batchResults } = await this.scheduler
 									.executeBatch(scheduledCalls, this.toolRegistry, this.sessionContext.cwd, {
 										allowParallelDisjointMutations: autonomous,
+						actionNamespace: `${this.sessionContext.sessionId}:${this.sessionContext.turnCount}:${totalProviderRounds}`,
 										maxConcurrency: autonomous ? 4 : 1,
 										executionAuthority: input.executionAuthority ?? "autonomous",
 										bypassConfirmation: autonomous,
@@ -1277,7 +1317,7 @@ export class AgentEngine extends AbstractAgentEngine {
 						// The next attempt rebuilds the transcript. Never replay completed tool
 						// work from the initial prompt after a later provider failure.
 						const isLastAttempt =
-							liveFailureKind === "budget" || accumulatedToolResults.length > 0 || attempt >= maxAttempts - 1
+							liveFailureKind === "budget" || toolsAdmitted || accumulatedToolResults.length > 0 || attempt >= maxAttempts - 1
 						if (!isLastAttempt) {
 							this.reportProgress(input.onProgress, {
 								activityId: liveProgressActivityId,
@@ -1324,6 +1364,7 @@ export class AgentEngine extends AbstractAgentEngine {
 				responseText = `[Budget exhausted] ${liveError}`
 			} else if (liveFailureKind === "timeout") {
 				turnOutcome = "failed"
+				safeToRetry = !toolsAdmitted && accumulatedToolResults.length === 0
 				responseText = `[Timed out] ${liveError}. You can retry with a narrower request.`
 			} else if (liveError) {
 				turnOutcome = "failed"
@@ -1378,6 +1419,7 @@ export class AgentEngine extends AbstractAgentEngine {
 			composedPrompt: promptText,
 			response: responseText,
 			toolResults: accumulatedToolResults,
+			...(safeToRetry ? { safeToRetry: true } : {}),
 			workspaceVerification: workspaceVerification?.summary,
 		}
 	}

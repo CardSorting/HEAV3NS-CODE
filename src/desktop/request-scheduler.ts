@@ -35,6 +35,8 @@ const discoveryMethods = new Set(["models.discover", "files.search", "project.di
 const controlMethods = new Set([
 	"task.cancel",
 	"task.cancelAll",
+	"command.actionReconcile",
+	"agentSwarm.formReconcile",
 	"approval.resolve",
 	"snapshot",
 	"shutdown",

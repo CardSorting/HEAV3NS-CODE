@@ -54,7 +54,7 @@ import { VerificationEvidenceSupervisor } from "./agents/extensions/evidence/ver
 import { AgentEngine } from "./agents/extensions/execution/agent-engine.js"
 import { AgentLoopHarness } from "./agents/extensions/execution/agent-loop-harness.js"
 import { CodeExecutionSupervisor } from "./agents/extensions/execution/code-execution-supervisor.js"
-import { InteractiveModeController } from "./agents/extensions/execution/interactive-mode-controller.js"
+import { InteractiveModeController, runAgentSwarmCommand, runCliAutomaticLegion } from "./agents/extensions/execution/interactive-mode-controller.js"
 import { LoopPhaseController } from "./agents/extensions/execution/loop-phase-controller.js"
 import { ToolExecutionGuardSupervisor } from "./agents/extensions/execution_guard/tool-execution-guard-supervisor.js"
 import { FaultRecoverySupervisor } from "./agents/extensions/faults/fault-recovery-supervisor.js"
@@ -136,6 +136,9 @@ import { StreamingScrubberSupervisor } from "./agents/extensions/streaming_scrub
 import { DeterministicSubdirHintEngine } from "./agents/extensions/subdir_hints/deterministic-subdir-hint-engine.js"
 import { SubdirHintsSupervisor } from "./agents/extensions/subdir_hints/subdir-hints-supervisor.js"
 import { AgentSwarmDispatcher } from "./agents/extensions/swarm/agent-swarm-dispatcher.js"
+import { agentSwarmFeatureEnabled, disableAgentSwarmFeatures, getAgentSwarmEnvironmentOverrides, readAgentSwarmConfig, writeAgentSwarmConfig } from "./agents/extensions/swarm/agent-swarm-config.js"
+import { LEGION_STRATEGIES } from "./agents/extensions/swarm/agent-swarm-classifier.js"
+import { registerAgentSwarmConductorTool } from "./agents/extensions/swarm/agent-swarm-conductor-tool.js"
 import { DeterministicTerminalCleanerEngine } from "./agents/extensions/terminal_cleaner/deterministic-terminal-cleaner-engine.js"
 import { TerminalCleanerSupervisor } from "./agents/extensions/terminal_cleaner/terminal-cleaner-supervisor.js"
 import { DeterministicThreadContextEngine } from "./agents/extensions/thread_context/deterministic-thread-context-engine.js"
@@ -4912,6 +4915,7 @@ export class LumiMonolith implements IAgentEngine {
 		this.toolRegistry = components.toolRegistry
 		this.promptComposer = components.promptComposer
 		this.agentEngine = components.agentEngine
+		registerAgentSwarmConductorTool(this)
 	}
 
 	/** Primary Game Engine Frame Step (Tick Loop) */
@@ -5070,7 +5074,7 @@ export class LumiMonolith implements IAgentEngine {
 	}
 
 	/** Forks game engine state into a new isolated engine instance */
-	forkSession(newSessionId?: string): LumiMonolith {
+	forkSession(newSessionId?: string, childCheckpoint?: { activeJsonl: string; transcriptJsonl: string }): LumiMonolith {
 		if (this.closing) throw new Error("Cannot fork a closing runtime")
 		const snapshot = this.createSnapshot()
 		const forkedMonolith = new LumiMonolith({
@@ -5080,6 +5084,7 @@ export class LumiMonolith implements IAgentEngine {
 			databaseKernel: this.databaseKernel,
 		})
 		forkedMonolith.rewindToSnapshot(snapshot)
+		if (childCheckpoint) forkedMonolith.sessionStore.restoreHistory(childCheckpoint.activeJsonl, childCheckpoint.transcriptJsonl)
 		this.forks.add(forkedMonolith)
 		return forkedMonolith
 	}
@@ -5123,6 +5128,7 @@ if (isDirectCliExecution) {
 	const isBenchmark = args.includes("--benchmark") || args.includes("-b") || primaryCmd === "benchmark"
 	const isBaseline = args.includes("--baseline") || primaryCmd === "baseline"
 	const isHelp = args.includes("--help") || args.includes("-h") || primaryCmd === "help"
+	const isAgentSwarm = primaryCmd === "agentswarm"
 
 	const isLogin = args.includes("--login") || primaryCmd === "login" || (primaryCmd === "auth" && args[1] === "login")
 	const isLogout = args.includes("--logout") || primaryCmd === "logout" || (primaryCmd === "auth" && args[1] === "logout")
@@ -5189,6 +5195,14 @@ ${modelCommands}
 \x1b[1;34mSystem & Configuration:\x1b[0m
   heav3ns doctor              Run system health, permissions, hardware, and connectivity diagnostic audit
   heav3ns setup               Launch step-by-step interactive configuration wizard
+  heav3ns agentswarm status   Show optional swarm feature settings
+  heav3ns agentswarm enable|disable
+  heav3ns agentswarm review|defer|legion on|off
+  heav3ns agentswarm auto-defer-review on|off
+  heav3ns agentswarm boundary before_turn|safe_boundary
+  heav3ns agentswarm strategy adaptive|tactical_strike|balanced_squad|full_legion|verification_heavy
+  heav3ns agentswarm specialists 1-8
+  heav3ns agentswarm review-limits <initial 1-5> <corrective 1-5>
 
 \x1b[1;34mWorkload & Benchmarks:\x1b[0m
   heav3ns "your prompt"       Execute a single non-interactive prompt turn
@@ -5199,6 +5213,30 @@ ${modelCommands}
   heav3ns help (-h)           Show this help message
 `)
 		process.exit(0)
+	}
+	if (isAgentSwarm) {
+		void (async () => {
+			const config = await readAgentSwarmConfig()
+			const action = args[1]?.toLowerCase() ?? "status"
+			if (action === "status") { console.log(JSON.stringify({ ...config, environmentOverrides: Object.keys(getAgentSwarmEnvironmentOverrides()) }, null, 2)); return }
+			if (action === "enable" || action === "disable") {
+				await writeAgentSwarmConfig(action === "enable" ? { ...config, enabled: true } : disableAgentSwarmFeatures(config))
+			} else if (action === "boundary" && ["before_turn", "safe_boundary"].includes(args[2]?.toLowerCase() ?? "")) {
+				await writeAgentSwarmConfig({ ...config, deferBoundary: args[2].toLowerCase() as "before_turn" | "safe_boundary" })
+			} else if (action === "specialists" && /^\d+$/.test(args[2] ?? "") && Number(args[2]) >= 1 && Number(args[2]) <= 8) {
+				await writeAgentSwarmConfig({ ...config, maxSpecialists: Number(args[2]) })
+			} else if (action === "review-limits" && /^\d+$/.test(args[2] ?? "") && /^\d+$/.test(args[3] ?? "") && Number(args[2]) >= 1 && Number(args[2]) <= 5 && Number(args[3]) >= 1 && Number(args[3]) <= 5) {
+				await writeAgentSwarmConfig({ ...config, maxInitialReviews: Number(args[2]), maxCorrectivePasses: Number(args[3]) })
+			} else if (action === "strategy" && LEGION_STRATEGIES.includes(args[2]?.toLowerCase() as (typeof LEGION_STRATEGIES)[number])) {
+				await writeAgentSwarmConfig({ ...config, strategy: args[2].toLowerCase() as (typeof LEGION_STRATEGIES)[number] })
+			} else if (action === "auto-defer-review" && ["on", "off"].includes(args[2]?.toLowerCase() ?? "")) {
+				await writeAgentSwarmConfig({ ...config, autoDeferOnCompletionReview: args[2].toLowerCase() === "on" })
+			} else if (["review", "defer", "legion"].includes(action) && ["on", "off"].includes(args[2]?.toLowerCase() ?? "")) {
+				const key = action === "review" ? "criticalCompletionReview" : action === "defer" ? "hierarchicalDefer" : "legion"
+				await writeAgentSwarmConfig({ ...config, enabled: false, criticalCompletionReview: agentSwarmFeatureEnabled(config, "criticalCompletionReview"), hierarchicalDefer: agentSwarmFeatureEnabled(config, "hierarchicalDefer"), legion: agentSwarmFeatureEnabled(config, "legion"), [key]: args[2].toLowerCase() === "on" })
+			} else { console.error("Usage: heav3ns agentswarm status|enable|disable|review|defer|legion [on|off] | auto-defer-review on|off | boundary before_turn|safe_boundary | strategy adaptive|tactical_strike|balanced_squad|full_legion|verification_heavy | specialists 1-8 | review-limits <initial 1-5> <corrective 1-5>"); process.exitCode = 2; return }
+			console.log(JSON.stringify({ ...await readAgentSwarmConfig(), environmentOverrides: Object.keys(getAgentSwarmEnvironmentOverrides()) }, null, 2))
+		})().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1 }).finally(() => process.exit(process.exitCode ?? 0))
 	}
 
 	const runSmokeTest = async (lumi: LumiMonolith): Promise<RuntimeSmokeReport> => {
@@ -5580,6 +5618,24 @@ ${modelCommands}
 					console.log(goal.status())
 					const { runCliGoal } = await import("./agents/extensions/execution/cli-goal-runner.js")
 					await runCliGoal(goal, lumi, conversation, controller.signal, { report: (value) => console.log(value) })
+					const swarmConfig = await readAgentSwarmConfig()
+					if (goal.completed && swarmConfig.enabled && swarmConfig.criticalCompletionReview) {
+						const reviewPrompt = [
+							"Perform one bounded critical completion review of the completed goal using the recorded roadmap and conversation as evidence.",
+							"This is read-only: do not use tools, modify files, or create follow-up tasks. Check requirement coverage, architecture and constraint fit, verification quality, and concrete failure modes. Distinguish demonstrated defects from assumptions and optional improvements. Do not invent findings or create speculative work.",
+							"Conclude with exactly one decision: ACCEPT, REMEDIATE, ESCALATE, or ACCEPT WITH DISCLOSED LIMITATIONS. Give concise evidence. This is the sole review pass; do not start another review.",
+							goal.status(),
+						].join("\n\n")
+						let review: { response: string; contextLimited: boolean }
+						try { review = await lumi.agentEngine.askSideQuestion(reviewPrompt, controller.signal) }
+						catch (error) { review = { response: `Review unavailable: ${error instanceof Error ? error.message : String(error)}`, contextLimited: false } }
+						const safeReview = lumi.deterministicSecretRedactor.redact(review.response).sanitizedText
+						lumi.sessionStore.addMessage({ role: "assistant", content: `[CRITICAL COMPLETION REVIEW · ONE PASS]\n${safeReview}` })
+						await conversation.save()
+						console.log("\n[CRITICAL COMPLETION REVIEW · ONE PASS]")
+						console.log(safeReview)
+						if (review.contextLimited) console.error("The review received incomplete recent conversation context.")
+					}
 					if (!goal.completed) process.exitCode = 1
 				} finally { process.off("SIGINT", onInterrupt); sleepGuard.stop() }
 				return
@@ -5593,6 +5649,12 @@ ${modelCommands}
 				return
 			}
 			if (prompt.trim() === "/compact") { console.log(await conversation.compact()); return }
+			if (prompt.trim() === "/agentswarm" || prompt.trim().startsWith("/agentswarm ")) {
+				await conversation.reconcileInterruptedAgentSwarmFormations()
+				const result = await runAgentSwarmCommand(prompt.trim(), lumi, conversation)
+				console.log(result ?? "Agent Swarm action complete.")
+				return
+			}
 			const { CliSideQuestion } = await import("./agents/extensions/execution/cli-side-question.js")
 			const question = CliSideQuestion.parse(prompt)
 			if (question !== undefined) {
@@ -5606,14 +5668,37 @@ ${modelCommands}
 			}
 			const { CliSleepGuard } = await import("./agents/extensions/execution/cli-sleep-guard.js")
 			const sleepGuard = new CliSleepGuard((message) => console.error(message))
+			const swarmState = conversation.getAgentSwarmState()
+			if (swarmState.needsReconciliation) throw new Error("AGENT_SWARM_RECONCILIATION_REQUIRED: inspect the saved instruction and use /agentswarm reconcile before continuing")
+			if (swarmState.deferred) {
+				if ((!swarmState.deferredInputs.includes(prompt) && swarmState.deferredInputs.length >= 10) || prompt.length > 20_000) throw new Error("AGENT_SWARM_QUEUE_LIMIT: the deferred queue is full or this instruction is too long")
+				if (!swarmState.deferredInputs.includes(prompt)) swarmState.deferredInputs.push(prompt)
+				await conversation.setAgentSwarmState({ deferred: true, deferredInputs: swarmState.deferredInputs, needsReconciliation: false, reconciledInstruction: swarmState.reconciledInstruction })
+				console.log("Agent hierarchy is deferred. This instruction was held for the next interactive resume.")
+				return
+			}
+			const heldInstruction = swarmState.deferredInputs.indexOf(prompt)
+			if (heldInstruction < 0 && swarmState.deferredInputs.length >= 10) throw new Error("AGENT_SWARM_QUEUE_LIMIT: resume the ten held instructions before submitting another one-shot task")
+			if (heldInstruction >= 0) swarmState.deferredInputs.splice(heldInstruction, 1)
+			const activeInstruction = { id: `${lumi.sessionContext.sessionId}:${lumi.sessionContext.turnCount + 1}:${Date.now()}`, text: prompt, startedAt: Date.now() }
+			await conversation.setAgentSwarmState({ deferred: false, deferredInputs: swarmState.deferredInputs, activeInstruction, needsReconciliation: false, reconciledInstruction: swarmState.reconciledInstruction })
 			sleepGuard.start()
 			let result: EngineTickResult
 			let saveAttempted = false
 			try {
-				result = await lumi.tick({ prompt })
+				const legion = await runCliAutomaticLegion(prompt, lumi, conversation, undefined)
+				if (legion.deferred) {
+					const current = conversation.getAgentSwarmState()
+					await conversation.setAgentSwarmState({ deferred: true, deferredInputs: [prompt, ...current.deferredInputs].slice(0, 10), activeInstruction: undefined, needsReconciliation: false, reconciledInstruction: current.reconciledInstruction })
+					console.log(`Legion ${legion.formationId} is deferred. The original instruction is held for the next interactive resume.`)
+					return
+				}
+				result = await lumi.tick({ prompt: legion.prompt ?? prompt })
 				saveAttempted = true
 				await conversation.save()
+				await conversation.setAgentSwarmState({ deferred: false, deferredInputs: conversation.getAgentSwarmState().deferredInputs, activeInstruction: undefined, needsReconciliation: false })
 			} catch (error) {
+				try { await conversation.setAgentSwarmState({ deferred: true, deferredInputs: conversation.getAgentSwarmState().deferredInputs, activeInstruction, needsReconciliation: true }) } catch { /* Preserve the original execution error; the active checkpoint remains inspectable. */ }
 				if (!saveAttempted) {
 					try { await conversation.save() } catch (saveError) { console.error("Could not retain the CLI conversation:", saveError) }
 				}
@@ -5625,6 +5710,24 @@ ${modelCommands}
 				`${color}[${result.outcome.toUpperCase()} · HEAV3NS Frame #${result.frameIndex}]\x1b[0m (${result.durationMs}ms)`,
 			)
 			console.log(result.response)
+			const swarmConfig = await readAgentSwarmConfig()
+			if (swarmConfig.enabled && swarmConfig.criticalCompletionReview && result.outcome === "completed") {
+				const reviewPrompt = [
+					"Perform one bounded critical completion review of the task below. This is read-only: do not use tools, modify files, or create follow-up work. Use the recorded conversation as evidence; do not invent defects or create speculative follow-up work.",
+					"Assess requirement coverage, architecture/constraint fit, verification quality, and concrete failure modes. Separate demonstrated defects from unverified assumptions and optional improvements.",
+					"Finish with exactly one decision: ACCEPT, REMEDIATE, ESCALATE, or ACCEPT WITH DISCLOSED LIMITATIONS. Give evidence and concise reasons. This is the only review pass; do not initiate another review.",
+					"Original task:\n" + prompt,
+				].join("\n\n")
+				let review: { response: string; contextLimited: boolean }
+				try { review = await lumi.agentEngine.askSideQuestion(reviewPrompt, new AbortController().signal) }
+				catch (error) { review = { response: `Review unavailable: ${error instanceof Error ? error.message : String(error)}`, contextLimited: false } }
+				const safeReview = lumi.deterministicSecretRedactor.redact(review.response).sanitizedText
+				lumi.sessionStore.addMessage({ role: "assistant", content: `[CRITICAL COMPLETION REVIEW · ONE PASS]\n${safeReview}` })
+				await conversation.save()
+				console.log("\n[CRITICAL COMPLETION REVIEW · ONE PASS]")
+				console.log(safeReview)
+				if (review.contextLimited) console.error("The review received incomplete recent conversation context.")
+			}
 		} else {
 			await lumi.interactiveController.startInteractiveSession(lumi, { projectTasks: await projectTasksFor(lumi), conversation: await conversationFor(lumi), goal: await goalFor(lumi), interactiveApprovals: args.includes("--interactive-approvals") })
 		}

@@ -9,6 +9,7 @@ import { findLastIndex } from "@shared/array"
 import { attachCommandExecutionEvidence } from "@shared/command-execution-evidence"
 import { DietCodeToolResponseContent } from "@shared/messages"
 import { Logger } from "@/shared/services/Logger"
+import { ActionExecutionRegistry, classifyCommandOutcome, isCurrentActionOwner, type ActionExecutionLedger, type UnresolvedCommandAction } from "./ActionExecutionRegistry"
 import { orchestrateCommandExecution } from "./CommandOrchestrator"
 import { getSanitizerMode, validateCommand } from "./commandSanitizer"
 import type {
@@ -35,6 +36,7 @@ export class CommandExecutor {
 	private readonly cancelledOwners = new Set<string>()
 	private nextOwnerSequence = 0
 	private cancellationGeneration = 0
+	private readonly actionRegistry: ActionExecutionLedger
 
 	// Track shell integration warnings to determine when to show the stronger troubleshooting suggestion
 	private shellIntegrationWarningTracker: ShellIntegrationWarningTracker = {
@@ -46,6 +48,7 @@ export class CommandExecutor {
 		this.cwd = config.cwd
 		this.terminalManager = config.terminalManager
 		this.callbacks = callbacks
+		this.actionRegistry = config.actionRegistry ?? new ActionExecutionRegistry()
 	}
 
 	/**
@@ -101,14 +104,48 @@ export class CommandExecutor {
 
 		const manager = this.terminalManager
 		Logger.info("Executing approved command in VS Code terminal")
+		const actionId = options?.actionId
+		if (actionId) {
+			const reservation = await this.actionRegistry.reserve(actionId, sanitizedCommand)
+			if (reservation.kind === "replay") {
+				return [false, reservation.record.result ?? `Command action is already ${reservation.record.status}; saved output is unavailable, and no replay was dispatched.`]
+			}
+			if (reservation.kind === "fenced") {
+				const reason = reservation.reason === "identity_conflict"
+					? "This tool action ID was already used for a different command."
+					: `This action is ${reservation.record.status}; reconcile its outcome before retrying.`
+				return [
+					false,
+					attachCommandExecutionEvidence(reason, {
+						command,
+						approvalStatus: "unknown",
+						started: false,
+					completed: false,
+					exitCode: undefined,
+					signal: undefined,
+					timedOut: false,
+					durationMs: 0,
+					stdoutAvailable: false,
+					stderrAvailable: false,
+					executionError: `ACTION_${reservation.reason.toUpperCase()}`,
+					}),
+				]
+			}
+		}
 
 		const ownerId = options?.ownerId || `command-${++this.nextOwnerSequence}`
 		const startingCancellationGeneration = this.cancellationGeneration
 		// Get terminal and run command
-		const terminalInfo = await manager.getOrCreateTerminal(this.cwd)
-		terminalInfo.terminal.show()
-		const process = manager.runCommand(terminalInfo, sanitizedCommand)
 		const startedAt = Date.now()
+		let process: TerminalProcessResultPromise
+		try {
+			const terminalInfo = await manager.getOrCreateTerminal(this.cwd)
+			terminalInfo.terminal.show()
+			process = manager.runCommand(terminalInfo, sanitizedCommand)
+		} catch (error) {
+			if (actionId) await this.actionRegistry.settle(actionId, "unconfirmed", undefined, error instanceof Error ? error.message : String(error))
+			throw error
+		}
 
 		const processState = { wasCancelledExternally: false }
 		const ownerProcesses = this.activeProcesses.get(ownerId) || new Map()
@@ -147,38 +184,66 @@ export class CommandExecutor {
 				result.outputLines.length > 0
 					? `\nOutput captured before cancellation:\n${manager.processOutput(result.outputLines)}`
 					: ""
-			return [
-				true,
-				attachCommandExecutionEvidence(`Command was cancelled.${outputSoFar}`, {
-					command,
-					approvalStatus: "unknown",
-					started: true,
-					completed: false,
-					exitCode: result.exitCode ?? undefined,
-					signal: result.signal ?? undefined,
-					timedOut: false,
-					durationMs: Date.now() - startedAt,
-					stdoutAvailable: result.outputLines.length > 0,
-					stderrAvailable: false,
-				}),
-			]
-		}
-
-		return [
-			result.userRejected,
-			attachCommandExecutionEvidence(result.result, {
+			const cancelledResult: DietCodeToolResponseContent = attachCommandExecutionEvidence(`Command was cancelled.${outputSoFar}`, {
 				command,
 				approvalStatus: "unknown",
 				started: true,
-				completed: result.completed,
+				completed: false,
 				exitCode: result.exitCode ?? undefined,
 				signal: result.signal ?? undefined,
-				timedOut: result.timedOut === true,
+				timedOut: false,
 				durationMs: Date.now() - startedAt,
 				stdoutAvailable: result.outputLines.length > 0,
 				stderrAvailable: false,
-			}),
+			})
+			if (actionId) await this.actionRegistry.settle(actionId, "unconfirmed", cancelledResult, "Command cancellation did not confirm the process exit code.")
+			return [
+				true,
+				cancelledResult,
+			]
+		}
+
+		const commandResult = attachCommandExecutionEvidence(result.result, {
+			command,
+			approvalStatus: "unknown",
+			started: true,
+			completed: result.completed,
+			exitCode: result.exitCode ?? undefined,
+			signal: result.signal ?? undefined,
+			timedOut: result.timedOut === true,
+			durationMs: Date.now() - startedAt,
+			stdoutAvailable: result.outputLines.length > 0,
+			stderrAvailable: false,
+		})
+		if (actionId) {
+			const outcome = classifyCommandOutcome(result)
+			const detail = outcome === "unconfirmed"
+				? `${result.observationError ? `Terminal observation error: ${result.observationError}. ` : ""}Command outcome lacks a numeric exit code; retries remain fenced until the terminal is inspected.`
+				: undefined
+			await this.actionRegistry.settle(actionId, outcome, commandResult, detail)
+		}
+		return [
+			result.userRejected,
+			commandResult,
 		]
+	}
+
+	public async getUnresolvedActions() {
+		return (await this.actionRegistry.listUnresolved()).map((record): UnresolvedCommandAction => ({
+			actionId: record.actionId,
+			commandFingerprint: record.commandFingerprint,
+			status: record.status === "running" ? "running" : "unconfirmed",
+			detail: record.detail,
+			updatedAt: record.updatedAt,
+			ownerActive: isCurrentActionOwner(record.ownerInstanceId),
+		}))
+	}
+
+	public async reconcileAction(actionId: string, outcome: "completed" | "failed", detail: string): Promise<void> {
+		const confirmation = detail.trim()
+		if (confirmation.length < 12 || confirmation.length > 1000)
+			throw new Error("ACTION_RECONCILIATION_CONFIRMATION_REQUIRED: provide 12–1000 characters describing the verified terminal outcome")
+		await this.actionRegistry.reconcile(actionId, outcome, confirmation)
 	}
 
 	/**

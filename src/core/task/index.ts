@@ -108,6 +108,7 @@ import { getSystemPrompt } from "@/core/prompts/system-prompt"
 import { HostProvider } from "@/hosts/host-provider"
 import { orchestrator } from "@/infrastructure/ai/Orchestrator"
 import { getCoordinationRawDb } from "@/infrastructure/db/Config"
+import { DurableActionExecutionRegistry } from "@/integrations/terminal/ActionExecutionRegistry"
 import { FileEditProvider } from "@/integrations/editor/FileEditProvider"
 import {
 	type CommandExecutionOptions,
@@ -639,6 +640,7 @@ export class Task {
 			terminalManager: this.terminalManager,
 			taskId: this.taskId,
 			ulid: this.ulid,
+			actionRegistry: new DurableActionExecutionRegistry(this.taskId),
 		}
 
 		const commandExecutorCallbacks: CommandExecutorCallbacks = {
@@ -2321,6 +2323,14 @@ export class Task {
 		return this.commandExecutor.cancelBackgroundCommand(ownerId)
 	}
 
+	public async getUnresolvedCommandActions() {
+		return this.commandExecutor.getUnresolvedActions()
+	}
+
+	public async reconcileCommandAction(actionId: string, outcome: "completed" | "failed", confirmation: string): Promise<void> {
+		await this.commandExecutor.reconcileAction(actionId, outcome, confirmation)
+	}
+
 	/**
 	 * Cancel a currently running hook execution
 	 * @returns true if a hook was cancelled, false if no hook was running
@@ -3992,6 +4002,9 @@ export class Task {
 			}
 
 			// Finalize any remaining tool calls at the end of the stream
+			if (this.useNativeToolCalls && !this.taskState.abort && !this.taskState.steeringInterruptRequested) {
+				toolUseHandler.assertCompleteToolUses()
+			}
 			let finalizedNativeToolsEarly = false
 			let earlyNativePresentation: Promise<void> | undefined
 			const finalizedNativeToolBlocks =

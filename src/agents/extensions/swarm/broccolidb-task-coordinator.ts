@@ -13,7 +13,7 @@ export interface ActiveWorkerRecord {
   workerId: string;
   taskId: string;
   lastHeartbeat: number;
-  status: "idle" | "running" | "completed" | "failed";
+  status: "idle" | "running" | "deferred" | "completed" | "failed";
 }
 
 export interface TaskCoordinatorStatus {
@@ -59,6 +59,9 @@ export class BroccoliTaskCoordinator {
    * Dispatches a new task to a registered subagent worker.
    */
   public dispatchTask(taskId: string, workerId: string = randomUUID()): ActiveWorkerRecord {
+    if (this.taskToWorker.has(taskId) || this.activeWorkers.get(workerId)?.status === "running") {
+      throw new Error("Worker or task is already running");
+    }
     const worker: ActiveWorkerRecord = {
       workerId,
       taskId,
@@ -82,19 +85,39 @@ export class BroccoliTaskCoordinator {
     return true;
   }
 
+  /** Reopen an explicitly deferred worker without allocating a second task lease. */
+  public resumeDeferredWorker(workerId: string): ActiveWorkerRecord | undefined {
+    const worker = this.activeWorkers.get(workerId)
+    if (!worker || worker.status !== "deferred") return undefined
+    worker.status = "running"
+    worker.lastHeartbeat = Date.now()
+    return { ...worker }
+  }
+
+  /** Release live coordination state; durable formation reports are stored by the host. */
+  public settleWorker(workerId: string, status: "deferred" | "completed" | "failed"): boolean {
+    const worker = this.activeWorkers.get(workerId)
+    if (!worker || worker.status !== "running") return false
+    worker.status = status
+    worker.lastHeartbeat = Date.now()
+    if (status !== "deferred") {
+      this.taskToWorker.delete(worker.taskId)
+      this.activeWorkers.delete(workerId)
+    }
+    return true
+  }
+
   /**
-   * Checks for and prunes stale workers that haven't sent a heartbeat within the timeout window.
+   * Reports stale workers without inferring that their work has stopped.
    */
   public monitorHeartbeats(): string[] {
     const now = Date.now();
     const staleWorkerIds: string[] = [];
 
     for (const [workerId, worker] of this.activeWorkers.entries()) {
+      if (worker.status !== "running") continue;
       if (now - worker.lastHeartbeat > this.heartbeatTimeoutMs) {
-        worker.status = "failed";
         staleWorkerIds.push(workerId);
-        this.activeWorkers.delete(workerId);
-        this.taskToWorker.delete(worker.taskId);
       }
     }
 
@@ -108,14 +131,17 @@ export class BroccoliTaskCoordinator {
     const now = Date.now();
     let staleCount = 0;
 
+    let activeWorkersCount = 0
     for (const worker of this.activeWorkers.values()) {
+      if (worker.status !== "running") continue
+      activeWorkersCount++
       if (now - worker.lastHeartbeat > this.heartbeatTimeoutMs) {
         staleCount++;
       }
     }
 
     return {
-      activeWorkersCount: this.activeWorkers.size,
+      activeWorkersCount,
       monitoredTasksCount: this.taskToWorker.size,
       staleWorkersCount: staleCount,
     };

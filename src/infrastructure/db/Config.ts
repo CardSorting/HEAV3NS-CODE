@@ -241,6 +241,16 @@ export interface Schema {
 		recordJson: string
 		updatedAt: number
 	}
+	command_execution_actions: {
+		taskId: string
+		actionId: string
+		ownerInstanceId: string
+		commandFingerprint: string
+		status: "running" | "unconfirmed" | "completed" | "failed"
+		resultJson: string | null
+		detail: string | null
+		updatedAt: number
+	}
 	task_lifecycle_events: {
 		monotonicSequence: number
 		eventId: string

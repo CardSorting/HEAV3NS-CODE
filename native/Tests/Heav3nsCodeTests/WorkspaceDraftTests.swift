@@ -113,6 +113,8 @@ final class WorkspaceDraftTests: XCTestCase {
           if(r.method==='hello') reply(r,{protocol:1,workspace:'ws',session:'session',runtime:'runtime',capabilities:['side-query-v1','conversations']});
           else if(r.method==='snapshot') reply(r,{workspace:'ws',session:'session',runtime:'runtime',conversation:'conv',seq:0,runs:[]});
           else if(r.method==='side.query') setTimeout(()=>reply(r,{conversation:'conv',response:'A separate answer',contextLimited:false}),300);
+          else if(r.method==='agentSwarm.settings') reply(r,{enabled:false,criticalCompletionReview:false,autoDeferOnCompletionReview:true,hierarchicalDefer:false,legion:false,deferBoundary:'safe_boundary',strategy:'adaptive',maxSpecialists:4,environmentOverrides:[]});
+          else if(r.method==='task.deferStatus') reply(r,{enabled:false,deferred:false,queued:0});
           else if(r.method==='task.submit') reply(r,{accepted:true,run:{id:'run',text:r.params.text,state:'queued',session:'session',conversation:'conv',createdAt:1}});
           else if(r.method==='project.status') reply(r,{state:'idle',output:''});
           else if(r.method==='files.list') reply(r,{entries:[],more:false,matched:0});

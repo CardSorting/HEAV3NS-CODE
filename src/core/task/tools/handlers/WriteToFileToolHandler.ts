@@ -11,6 +11,7 @@ import { fileExistsAtPath } from "@utils/fs"
 import { arePathsEqual, getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import { telemetryService } from "@/services/telemetry"
 import { Logger } from "@/shared/services/Logger"
+import { EnvironmentIntegrity } from "../../../integrity/EnvironmentIntegrity"
 import { DietCodeDefaultTool } from "@/shared/tools"
 import { executionFunnel } from "../execution/ExecutionFunnel"
 import type { ToolValidator } from "../ToolValidator"
@@ -181,6 +182,9 @@ export class WriteToFileToolHandler implements IToolHandler, IPartialBlockHandle
 						concurrencyGroup: "fs",
 					},
 				)
+			if (EnvironmentIntegrity.isManifest(absolutePath) || EnvironmentIntegrity.isManifest(relPath)) {
+				EnvironmentIntegrity.invalidateCache()
+			}
 
 			// Reset consecutive mistake counter on successful file operation
 			config.taskState.consecutiveMistakeCount = 0

@@ -3,28 +3,28 @@ import AppKit
 final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
     static let shared = SwarmRadarWindow()
 
-    private let statusPill = JourneyStyle.label("🟢 90 NODES ONLINE", size: 12, weight: .bold)
+    private let statusPill = JourneyStyle.label("Checking connection…", size: 12, weight: .bold)
     private let titleLabel = JourneyStyle.label("Sovereign Swarm Radar", size: 22, weight: .bold)
-    private let subtitleLabel = JourneyStyle.label("Live Anycast Edge Mesh • Zero-Telemetry Distributed Network", size: 12, secondary: true)
+    private let subtitleLabel = JourneyStyle.label("Optional service connection · heartbeat details shown below", size: 12, secondary: true)
 
-    private let seatLabel = JourneyStyle.label("Cockpit #1,421", size: 14, weight: .semibold)
+    private let seatLabel = JourneyStyle.label("Not assigned", size: 14, weight: .semibold)
     private let nodeIdLabel = JourneyStyle.label("NODE_LOCAL", size: 13, weight: .bold)
     private let archLabel = JourneyStyle.label("Apple Silicon (arm64)", size: 13)
-    private let privacyBadge = JourneyStyle.label("🛡️ Verified Zero-Telemetry (0 KB code or prompts leave Mac)", size: 12, weight: .medium)
+    private let privacyBadge = JourneyStyle.label("Not anonymous: sends a stable installation ID, app version, architecture, source, and action. Code and prompts are not included.", size: 12, weight: .medium)
 
-    private let coloLabel = JourneyStyle.label("PHX (Salt Lake City PoP)", size: 13, weight: .semibold)
-    private let latencyLabel = JourneyStyle.label("18 ms (Low Jitter)", size: 13, weight: .bold)
-    private let transportLabel = JourneyStyle.label("HTTP/2 TLS 1.3 Anycast Edge", size: 13)
-    private let ttlLabel = JourneyStyle.label("30-Day Sliding KV Renewal Window", size: 12, secondary: true)
+    private let coloLabel = JourneyStyle.label("Not connected", size: 13, weight: .semibold)
+    private let latencyLabel = JourneyStyle.label("Not measured", size: 13, weight: .bold)
+    private let transportLabel = JourneyStyle.label("HTTPS · protocol negotiated by the system", size: 13)
+    private let ttlLabel = JourneyStyle.label("Not reported by service", size: 12, secondary: true)
 
-    private let activeNodesLabel = JourneyStyle.label("90 Online", size: 14, weight: .bold)
-    private let totalInstallsLabel = JourneyStyle.label("1,421 Pilots", size: 14, weight: .semibold)
-    private let geoLabel = JourneyStyle.label("42 Countries • 280+ Edge Cities", size: 13)
+    private let activeNodesLabel = JourneyStyle.label("Not reported", size: 14, weight: .bold)
+    private let totalInstallsLabel = JourneyStyle.label("Not reported", size: 14, weight: .semibold)
+    private let geoLabel = JourneyStyle.label("Not reported", size: 13)
 
     private let copyButton = JourneyButton("Copy ID", symbol: "doc.on.doc") {}
     private let pingButton = JourneyButton("⚡ Ping Nearest Edge", symbol: "bolt.fill") {}
     private let webButton = JourneyButton("🌐 View Global Radar", symbol: "safari") {}
-    private let privacyCheckbox = NSButton(checkboxWithTitle: "Participate in anonymous sovereign swarm radar", target: nil, action: nil)
+    private let privacyCheckbox = NSButton(checkboxWithTitle: "Share app heartbeat with HEAV3NS", target: nil, action: nil)
     private let pingSpinner = NSProgressIndicator()
 
     init() {
@@ -55,6 +55,14 @@ final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
         pingEdge()
     }
 
+    func toggle() {
+        if let win = window, win.isVisible && win.isKeyWindow {
+            win.orderOut(nil)
+        } else {
+            present()
+        }
+    }
+
     private func buildUI() {
         guard let win = window else { return }
 
@@ -68,7 +76,7 @@ final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
         pingSpinner.controlSize = .small
         pingSpinner.isHidden = true
 
-        privacyBadge.textColor = .systemGreen
+        privacyBadge.textColor = .secondaryLabelColor
         nodeIdLabel.font = .monospacedSystemFont(ofSize: 13, weight: .bold)
 
         copyButton.target = self
@@ -98,22 +106,22 @@ final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
             createRow(label: "Cockpit Seat:", value: seatLabel),
             createRow(label: "Anonymous Node ID:", value: JourneyStyle.stack([nodeIdLabel, copyButton], vertical: false, spacing: 8)),
             createRow(label: "Architecture:", value: archLabel),
-            createRow(label: "Privacy Policy:", value: privacyBadge)
+            createRow(label: "Data sent:", value: privacyBadge)
         ])
 
-        // Card 2: Anycast Edge Topology
-        let edgeCard = createCard(title: "ANYCAST EDGE MESH TOPOLOGY", views: [
-            createRow(label: "Nearest Edge PoP:", value: coloLabel),
-            createRow(label: "Roundtrip Latency:", value: latencyLabel),
-            createRow(label: "Edge Transport:", value: transportLabel),
-            createRow(label: "Persistence TTL:", value: ttlLabel)
+        // Card 2: Connection details
+        let edgeCard = createCard(title: "CONNECTION DETAILS", views: [
+            createRow(label: "Service location:", value: coloLabel),
+            createRow(label: "Roundtrip time:", value: latencyLabel),
+            createRow(label: "Connection:", value: transportLabel),
+            createRow(label: "Data retention:", value: ttlLabel)
         ])
 
-        // Card 3: Global Adoption Footprint
-        let swarmCard = createCard(title: "GLOBAL SOVEREIGN SWARM", views: [
-            createRow(label: "Active Swarm Nodes:", value: activeNodesLabel),
-            createRow(label: "Cockpits Installed:", value: totalInstallsLabel),
-            createRow(label: "Geographic Coverage:", value: geoLabel)
+        // Card 3: Service-reported information
+        let swarmCard = createCard(title: "SERVICE-REPORTED INFORMATION", views: [
+            createRow(label: "Active connections:", value: activeNodesLabel),
+            createRow(label: "Installations:", value: totalInstallsLabel),
+            createRow(label: "Coverage:", value: geoLabel)
         ])
 
         // Actions Bar
@@ -192,14 +200,16 @@ final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
 
     private func updateUI(with state: SwarmRadarState) {
         if state.isHeartbeatDisabled {
-            statusPill.stringValue = "⚪ SWARM RADAR DISABLED (PILOT OPT-OUT)"
+            statusPill.stringValue = "⚪ APP HEARTBEAT OFF (SHARING DISABLED)"
             statusPill.textColor = .secondaryLabelColor
-            coloLabel.stringValue = "Offline (Local Sandbox)"
+            coloLabel.stringValue = "Not connected"
             latencyLabel.stringValue = "N/A"
             latencyLabel.textColor = .secondaryLabelColor
             privacyCheckbox.state = .off
         } else {
-            let onlineStatus = state.isOnline ? "🟢 \(state.activeNodes) NODES ONLINE" : "🟡 CONNECTING…"
+            let onlineStatus = state.isOnline
+                ? (state.activeNodes.map { "🟢 \($0) NODES ONLINE" } ?? "🟢 CONNECTED")
+                : "🟡 CONNECTING…"
             statusPill.stringValue = "\(onlineStatus) • \(state.colo) EDGE (\(state.latencyMs)ms)"
             statusPill.textColor = state.isOnline ? .systemGreen : .systemYellow
 
@@ -222,8 +232,8 @@ final class SwarmRadarWindow: NSWindowController, NSWindowDelegate {
 
         seatLabel.stringValue = state.seatNumber
         nodeIdLabel.stringValue = state.displayNodeId
-        activeNodesLabel.stringValue = "\(state.activeNodes) Online"
-        totalInstallsLabel.stringValue = "\(NumberFormatter.localizedString(from: NSNumber(value: state.totalInstalls), number: .decimal)) Pilots"
+        activeNodesLabel.stringValue = state.isHeartbeatDisabled ? "Unavailable while sharing is off" : (state.activeNodes.map { "\(NumberFormatter.localizedString(from: NSNumber(value: $0), number: .decimal)) Online" } ?? "Not reported")
+        totalInstallsLabel.stringValue = state.isHeartbeatDisabled ? "Unavailable while sharing is off" : (state.totalInstalls.map { "\(NumberFormatter.localizedString(from: NSNumber(value: $0), number: .decimal)) reported" } ?? "Not reported")
 
         #if arch(arm64)
         archLabel.stringValue = "Apple Silicon (arm64)"

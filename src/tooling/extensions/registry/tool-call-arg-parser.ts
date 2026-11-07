@@ -1,8 +1,12 @@
+import deepEqual from "fast-deep-equal";
 import type {
   ParameterSchema,
   SchemaValidationResult,
   ToolDefinition,
 } from "../../../core/contracts/tooling.contracts.js";
+import { extractJsonRoots } from "../../../core/task/StreamResponseHandler.js";
+
+const CONCATENATION_ERROR_KEY = "__toolArgumentConcatenationError";
 
 const COMMON_PARAM_ALIASES: Record<string, readonly string[]> = {
   path: ["filePath", "file_path", "file", "targetFile", "target_file", "targetPath", "target_path", "filename", "directory", "dir"],
@@ -22,6 +26,120 @@ export interface ParsedToolArgs {
   readonly rawInput: string | Record<string, unknown>;
   readonly repaired: boolean;
   readonly errors: readonly string[];
+}
+
+/**
+ * Deduplicates streaming tool names when OpenAI-compatible providers emit both
+ * incremental name deltas and a terminal snapshot chunk containing the full name.
+ */
+export function accumulateStreamingToolName(accumulated: string, incoming: string): string {
+  if (!incoming) return accumulated;
+  if (!accumulated) return incoming;
+  if (incoming === accumulated) return accumulated;
+  if (incoming.startsWith(accumulated)) return incoming;
+  return accumulated + incoming;
+}
+
+/**
+ * Computes the incremental argument delta from a streaming tool call chunk (`ADR-0014`),
+ * stripping any already-emitted prefix when a provider sends cumulative argument snapshots.
+ */
+export function computeStreamingArgumentsDelta(
+  accumulated: string,
+  incoming: string
+): { delta: string; nextAccumulated: string } {
+  if (!incoming) {
+    return { delta: "", nextAccumulated: accumulated };
+  }
+  if (!accumulated) {
+    return { delta: incoming, nextAccumulated: incoming };
+  }
+  if (incoming === accumulated) {
+    return { delta: "", nextAccumulated: accumulated };
+  }
+  if (incoming.startsWith(accumulated)) {
+    const canSliceSingleCharPrefix =
+      accumulated.length >= 2 ||
+      (accumulated === "{" &&
+        (() => {
+          const { roots, remainder } = extractJsonRoots(incoming);
+          return (
+            roots.length === 1 &&
+            remainder.trim() === "" &&
+            typeof roots[0].value === "object" &&
+            roots[0].value !== null &&
+            !Array.isArray(roots[0].value)
+          );
+        })());
+    if (canSliceSingleCharPrefix) {
+      const delta = incoming.slice(accumulated.length);
+      return { delta, nextAccumulated: incoming };
+    }
+  }
+  if (accumulated.length >= 2) {
+    const existingExtracted = extractJsonRoots(accumulated);
+    if (
+      existingExtracted.roots.length === 1 &&
+      existingExtracted.remainder.trim() === "" &&
+      typeof existingExtracted.roots[0].value === "object" &&
+      existingExtracted.roots[0].value !== null &&
+      !Array.isArray(existingExtracted.roots[0].value)
+    ) {
+      const incomingExtracted = extractJsonRoots(incoming);
+      if (
+        incomingExtracted.roots.length === 1 &&
+        incomingExtracted.remainder.trim() === "" &&
+        typeof incomingExtracted.roots[0].value === "object" &&
+        incomingExtracted.roots[0].value !== null &&
+        !Array.isArray(incomingExtracted.roots[0].value) &&
+        deepEqual(existingExtracted.roots[0].value, incomingExtracted.roots[0].value)
+      ) {
+        return { delta: "", nextAccumulated: accumulated };
+      }
+    }
+  }
+  return { delta: incoming, nextAccumulated: accumulated + incoming };
+}
+
+/**
+ * Validates and self-heals accumulated streaming tool call arguments (`ADR-0014`).
+ * - Empty or whitespace-only arguments normalize to `"{}"`.
+ * - Single valid JSON object returns normalized string.
+ * - Multiple identical concatenated JSON object roots self-heal to the single canonical JSON string.
+ * - Distinct concatenated JSON roots or invalid JSON throw a descriptive error.
+ */
+export function normalizeCompletedToolCallArguments(rawArguments: string, providerLabel: string): string {
+  const trimmed = rawArguments.trim();
+  if (!trimmed) {
+    return "{}";
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return trimmed;
+    }
+    throw new Error(`${providerLabel} returned non-object tool arguments`);
+  } catch (err) {
+    const { roots, remainder } = extractJsonRoots(trimmed);
+    if (roots.length > 1 && remainder.trim() === "") {
+      const first = roots[0].value;
+      if (
+        typeof first === "object" &&
+        first !== null &&
+        !Array.isArray(first) &&
+        roots.every((r) => typeof r.value === "object" && r.value !== null && !Array.isArray(r.value) && deepEqual(r.value, first))
+      ) {
+        return JSON.stringify(first);
+      }
+      throw new Error(
+        `${providerLabel} returned concatenated tool arguments with ${roots.length} conflicting JSON payloads`
+      );
+    }
+    if (err instanceof Error && err.message.startsWith(providerLabel)) {
+      throw err;
+    }
+    throw new Error(`${providerLabel} returned invalid tool arguments`);
+  }
 }
 
 /**
@@ -58,6 +176,26 @@ export class ToolCallArgParser {
       }
     } catch {
       // Continue to repair passes
+    }
+
+    // Pass 1.5: Check for concatenated JSON roots (ADR-0014)
+    const { roots, remainder } = extractJsonRoots(trimmed);
+    if (roots.length > 1 && remainder.trim() === "") {
+      const first = roots[0].value;
+      if (
+        typeof first === "object" &&
+        first !== null &&
+        !Array.isArray(first) &&
+        roots.every((r) => typeof r.value === "object" && r.value !== null && !Array.isArray(r.value) && deepEqual(r.value, first))
+      ) {
+        return { args: { ...(first as Record<string, unknown>) }, repaired: true };
+      }
+      return {
+        args: {
+          [CONCATENATION_ERROR_KEY]: `Tool arguments contain ${roots.length} distinct concatenated JSON payloads; emit a single JSON object per tool call.`,
+        },
+        repaired: false,
+      };
     }
 
     // Pass 2: Strip Markdown code fences
@@ -282,6 +420,12 @@ export class ToolCallArgParser {
   ): SchemaValidationResult {
     const errors: string[] = [];
     const suggestions: string[] = [];
+
+    if (typeof args[CONCATENATION_ERROR_KEY] === "string") {
+      errors.push(args[CONCATENATION_ERROR_KEY] as string);
+      delete args[CONCATENATION_ERROR_KEY];
+      return { valid: false, errors };
+    }
 
     if (!tool.parameters) {
       return { valid: true, errors: [] };

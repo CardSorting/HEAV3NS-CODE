@@ -48,8 +48,8 @@ export class CodeExecutionToolSuite {
           timeoutMs: { type: "number", description: "Execution timeout limit in milliseconds" },
           securityPolicy: { type: "string", description: "Policy: strict_isolated, standard_ephemeral, read_only" },
         },
-        execute: async (args: Record<string, unknown>, _cwd?: string) => {
-          return this.executeTool("execute_code_sandbox", args);
+        execute: async (args: Record<string, unknown>, _cwd?: string, options?) => {
+          return this.executeTool("execute_code_sandbox", args, _cwd, options);
         },
       },
       {
@@ -334,7 +334,8 @@ export class CodeExecutionToolSuite {
   public async executeTool(
     name: string,
     args: Record<string, unknown>,
-    _cwd?: string
+    _cwd?: string,
+    options?: import("../../../core/contracts/tooling.contracts.js").ToolExecutionOptions,
   ): Promise<{ success: boolean; data?: unknown; [key: string]: unknown; error?: string }> {
     try {
       switch (name) {
@@ -347,7 +348,7 @@ export class CodeExecutionToolSuite {
           const timeoutMs = typeof args.timeoutMs === "number" ? args.timeoutMs : 5000;
           const securityPolicy = (args.securityPolicy as SandboxSecurityPolicy) || "standard_ephemeral";
 
-          const record = await this.supervisor.executeCode(code, language, { timeoutMs, securityPolicy });
+          const record = await this.supervisor.executeCode(code, language, { timeoutMs, securityPolicy }, undefined, options?.actionId);
           return { success: record.result.success, recordId: record.id, result: record.result, output: record.result.output, toolCallsExecuted: record.result.toolCallsExecuted, logs: record.result.logs };
         }
 

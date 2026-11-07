@@ -20,7 +20,7 @@ export class AgentActivityTimeline implements Component {
 	private readonly order: string[] = []
 	private readonly text = new Text("", 0, 0)
 	private elapsedMs = 0
-	private terminalStatus: "completed" | "failed" | "cancelled" | null = null
+	private terminalStatus: "completed" | "failed" | "cancelled" | "deferred" | null = null
 	private highestSequence = -1
 
 	constructor(options: AgentActivityTimelineOptions) {
@@ -73,6 +73,8 @@ export class AgentActivityTimeline implements Component {
 			this.terminalStatus = "failed"
 		} else if (isTurnEvent && safeEvent.status === "cancelled") {
 			this.terminalStatus = "cancelled"
+		} else if (isTurnEvent && safeEvent.status === "deferred") {
+			this.terminalStatus = "deferred"
 		}
 		this.invalidate()
 	}
@@ -128,11 +130,18 @@ export class AgentActivityTimeline implements Component {
 		})
 	}
 
-	settleIfNeeded(outcome: "completed" | "failed" | "cancelled", message: string, elapsedMs: number): void {
+	deferIfNeeded(message: string, elapsedMs: number): void {
+		if (this.terminalStatus) return
+		this.update({ activityId: "lumi:turn", phase: "deferred", status: "deferred", message: "Work safely deferred", detail: message, timestamp: this.startedAt + elapsedMs, elapsedMs, sequence: Number.MAX_SAFE_INTEGER, metadata: { source: "lumi", scope: "turn" } })
+	}
+
+	settleIfNeeded(outcome: "completed" | "failed" | "cancelled" | "deferred", message: string, elapsedMs: number): void {
 		if (outcome === "completed") {
 			this.completeIfNeeded(elapsedMs)
 		} else if (outcome === "cancelled") {
 			this.cancelIfNeeded(message, elapsedMs)
+		} else if (outcome === "deferred") {
+			this.deferIfNeeded(message, elapsedMs)
 		} else {
 			this.failIfNeeded(message, elapsedMs)
 		}
@@ -142,7 +151,7 @@ export class AgentActivityTimeline implements Component {
 		return this.terminalStatus !== null
 	}
 
-	getTerminalStatus(): "completed" | "failed" | "cancelled" | null {
+	getTerminalStatus(): "completed" | "failed" | "cancelled" | "deferred" | null {
 		return this.terminalStatus
 	}
 
@@ -170,6 +179,8 @@ export class AgentActivityTimeline implements Component {
 					? `\x1b[1;31m✗ Failed after ${elapsed}\x1b[0m`
 					: this.terminalStatus === "cancelled"
 						? `\x1b[1;33m■ Cancelled after ${elapsed}\x1b[0m`
+						: this.terminalStatus === "deferred"
+							? `\x1b[1;36mⅡ Deferred safely after ${elapsed}\x1b[0m`
 						: `\x1b[1;33m◐ Working (${elapsed})\x1b[0m`
 		let statsBadge = ""
 		if (this.terminalStatus === "completed") {
@@ -272,6 +283,7 @@ export class AgentActivityTimeline implements Component {
 		if (this.terminalStatus === "failed" || entries.some((entry) => entry.status === "failed")) {
 			return ["Review the failed activity and its diagnostics before retrying."]
 		}
+		if (this.terminalStatus === "deferred") return ["Resume Agent Swarm to continue the held instruction from its saved checkpoint."]
 		if (
 			this.terminalStatus === "cancelled" ||
 			entries.some((entry) => this.isActive(entry) || entry.status === "cancelled")
@@ -366,6 +378,8 @@ export class AgentActivityTimeline implements Component {
 			case "cancelled":
 			case "denied":
 				return { icon: "■", color: "\x1b[33m" }
+			case "deferred":
+				return { icon: "Ⅱ", color: "\x1b[36m" }
 			case "started":
 			case "in_progress":
 				return {

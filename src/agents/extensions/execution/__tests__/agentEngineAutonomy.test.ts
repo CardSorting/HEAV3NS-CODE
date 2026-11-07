@@ -858,6 +858,38 @@ describe("CLI AgentEngine autonomous execution", () => {
 		assert.equal(fetch.callCount, 1)
 	})
 
+	it("defers between provider rounds after the admitted tool operation settles", async () => {
+		let defer = false
+		const { engine, executeTool } = createEngine({ execute: async () => { defer = true; return "Settled tool result" } })
+		const fetch = sinon.stub(globalThis, "fetch").resolves(toolResponse(1))
+		const result = await engine.tick({ prompt: "Inspect and finish", shouldDefer: () => defer })
+		assert.equal(result.outcome, "deferred")
+		assert.equal(executeTool.callCount, 1)
+		assert.equal(fetch.callCount, 1)
+		assert.equal(result.toolResults.length, 1)
+		assert.equal(result.toolResults[0].output, "Settled tool result")
+	})
+
+	it("yields before admitting a turn when defer was already requested", async () => {
+		const { engine, executeTool } = createEngine()
+		const fetch = sinon.stub(globalThis, "fetch")
+		const result = await engine.tick({ prompt: "Do not start this yet", shouldDefer: () => true })
+		assert.equal(result.outcome, "deferred")
+		assert.equal(fetch.callCount, 0)
+		assert.equal(executeTool.callCount, 0)
+		assert.equal(engine.sessionStore.getMessages().length, 0)
+	})
+
+	it("keeps an admitted turn running when the configured boundary is before_turn", async () => {
+		let defer = false
+		const { engine } = createEngine({ execute: async () => { defer = true; return "Settled tool result" } })
+		let requests = 0
+		sinon.stub(globalThis, "fetch").callsFake(async () => ++requests === 1 ? toolResponse(1) : Response.json({ choices: [{ message: { content: "Turn completed" } }] }))
+		const result = await engine.tick({ prompt: "Finish this admitted turn", shouldDefer: () => defer, deferBoundary: "before_turn" })
+		assert.equal(result.outcome, "completed")
+		assert.equal(requests, 2)
+	})
+
 	it("preserves explicitly supplied round budgets and never reports budget exhaustion as completion", async () => {
 		const { engine, executeTool } = createEngine({ maxToolRounds: 2 })
 		let requests = 0

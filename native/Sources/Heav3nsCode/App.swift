@@ -185,6 +185,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let previousRequest = view.addItem(withTitle: "Previous Request in Pods", action: #selector(previousPodRequest), keyEquivalent: "j")
         previousRequest.keyEquivalentModifierMask = [.command, .shift]; previousRequest.target = self
         view.addItem(.separator())
+        view.addItem(withTitle: "Engage Specialist Team…", action: #selector(engageSpecialists), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Formation Status…", action: #selector(showFormationStatus), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Formation History…", action: #selector(showFormationHistory), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Inspect Latest Specialist Stream…", action: #selector(showLatestSpecialistStream), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Review Latest Completion…", action: #selector(requestCriticalReview), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Defer Agent Work", action: #selector(toggleAgentDefer), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Command Recovery…", action: #selector(showCommandRecovery), keyEquivalent: "").target = self
+        view.addItem(withTitle: "Agent Swarm Settings…", action: #selector(showAgentSwarmSettings), keyEquivalent: "").target = self
+        let toggleRadar = view.addItem(withTitle: "Toggle Swarm Radar", action: #selector(toggleSwarmRadar), keyEquivalent: "r")
+        toggleRadar.keyEquivalentModifierMask = [.command, .option]
+        toggleRadar.target = self
+        view.addItem(.separator())
         view.addItem(withTitle: "Back in Inspector", action: #selector(inspectBack), keyEquivalent: "[").target = self
         view.addItem(withTitle: "Forward in Inspector", action: #selector(inspectForward), keyEquivalent: "]").target = self
         let maxContext = view.addItem(withTitle: "Toggle Maximize Task Context", action: #selector(toggleMaximizeContext), keyEquivalent: "m")
@@ -194,14 +206,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         viewItem.submenu = view; main.addItem(viewItem)
         let windowItem = NSMenuItem(); windowItem.title = "Window"; let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        let windowRadar = window.addItem(withTitle: "Sovereign Swarm Radar", action: #selector(showSwarmRadar), keyEquivalent: "r")
-        windowRadar.keyEquivalentModifierMask = [.command, .option]
+        let windowRadar = window.addItem(withTitle: "Sovereign Swarm Radar", action: #selector(showSwarmRadar), keyEquivalent: "")
         windowRadar.target = self
         windowItem.submenu = window; main.addItem(windowItem); NSApp.windowsMenu = window
         NSApp.mainMenu = main
     }
     @objc private func showSwarmRadar() {
         SwarmRadarWindow.shared.present()
+    }
+    @objc private func toggleSwarmRadar() {
+        SwarmRadarWindow.shared.toggle()
     }
     private var current: WorkspaceWindow? { workspaces.values.first { $0.window === NSApp.keyWindow || $0.window === NSApp.keyWindow?.sheetParent || $0.window === NSApp.keyWindow?.parent } }
     private var currentPods: PodsWindow? {
@@ -343,6 +357,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func inspectBack() { current?.inspectBack() }
     @objc private func inspectForward() { current?.inspectForward() }
     @objc private func toggleMaximizeContext() { current?.toggleMaximizeContext() }
+    @objc private func engageSpecialists() { current?.engageSpecialists() }
+    @objc private func showFormationStatus() { current?.showFormationStatus() }
+    @objc private func showFormationHistory() { current?.showFormationHistory() }
+    @objc private func showLatestSpecialistStream() { current?.showLatestSpecialistStream() }
+    @objc private func requestCriticalReview() { current?.requestCriticalReview() }
+    @objc private func toggleAgentDefer() { current?.toggleAgentDefer() }
+    @objc private func showCommandRecovery() { current?.showCommandRecovery() }
+    @objc private func showAgentSwarmSettings() { current?.showAgentSwarmSettings() }
     @objc private func findInInspection() {
         if let currentPods { currentPods.focusSearch() }
         else if let launcher, NSApp.keyWindow === launcher.window { launcher.focusSearch() }
@@ -371,6 +393,15 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if menuItem.action == #selector(newConversation) { return current?.canCreateConversation == true }
         if menuItem.action == #selector(inspectBack) { return current?.canInspectBack == true }
         if menuItem.action == #selector(inspectForward) { return current?.canInspectForward == true }
+        if menuItem.action == #selector(engageSpecialists) { return current?.canEngageSpecialists == true }
+        if menuItem.action == #selector(requestCriticalReview) { return current?.canRequestCriticalReview == true }
+        if menuItem.action == #selector(toggleAgentDefer) {
+            menuItem.title = current?.isSwarmDeferred == true ? "Resume Agent Work" : "Defer Agent Work"
+            return current?.canToggleAgentDefer == true
+        }
+        if [#selector(showFormationStatus), #selector(showFormationHistory), #selector(showLatestSpecialistStream), #selector(showCommandRecovery), #selector(showAgentSwarmSettings)].contains(menuItem.action) {
+            return current?.canAccessAgentSwarm == true
+        }
         if menuItem.action == #selector(findInInspection) {
             if let currentPods { menuItem.title = "Find Project or Task…"; return currentPods.window?.attachedSheet == nil }
             if current?.isMemoryKeyWindow == true { menuItem.title = "Find Conversation Memory…"; return current?.canFindMemory == true }

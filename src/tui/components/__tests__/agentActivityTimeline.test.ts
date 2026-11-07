@@ -38,6 +38,13 @@ describe("Activity timeline evidence", () => {
 		provider.setDynamicSuggestions([])
 		assert.deepEqual(provider.getDynamicSuggestions(), [])
 	})
+	it("renders deferred work as a safe yield and offers the resume action", () => {
+		const timeline = new AgentActivityTimeline({ model: "test", startedAt: 0 })
+		timeline.settleIfNeeded("deferred", "Saved at safe boundary", 1200)
+		assert.equal(timeline.getTerminalStatus(), "deferred")
+		assert.match(output(timeline), /Deferred safely/)
+		assert.deepEqual(timeline.getFollowUpSuggestions(), ["Resume Agent Swarm to continue the held instruction from its saved checkpoint."])
+	})
 	it("does not turn tool activity or URL mentions into verification", () => {
 		const timeline = new AgentActivityTimeline({ model: "test", startedAt: 0 })
 		timeline.update(event({ message: "Tried http://localhost:3000", detail: "screenshot /tmp/proposed.png" }))

@@ -2,6 +2,11 @@ import { consolidateReasoningDetails } from "../transform/openai-format.js"
 import type OpenAI from "openai"
 import type { ModelInfo } from "../../../shared/api.js"
 import { createOpenAIClient } from "../../../shared/net.js"
+import {
+	accumulateStreamingToolName,
+	computeStreamingArgumentsDelta,
+	normalizeCompletedToolCallArguments,
+} from "../../../tooling/extensions/registry/tool-call-arg-parser.js"
 import { StateManager } from "../../storage/StateManager.js"
 import { createOpenRouterStream } from "../transform/openrouter-stream.js"
 import { opencodeOAuthManager } from "../../../integrations/opencode/oauth.js"
@@ -108,8 +113,15 @@ export async function completeOpencode(options: {
 					function: { name: "", arguments: "" },
 				}
 				if (call.id) entry.id = call.id
-				if (call.function?.name) entry.function.name += call.function.name
-				if (call.function?.arguments) entry.function.arguments += call.function.arguments
+				if (call.function?.name) {
+					entry.function.name = accumulateStreamingToolName(entry.function.name, call.function.name)
+				}
+				if (call.function?.arguments) {
+					entry.function.arguments = computeStreamingArgumentsDelta(
+						entry.function.arguments,
+						call.function.arguments,
+					).nextAccumulated
+				}
 				calls.set(call.index, entry)
 			}
 			const reasoning = (delta as { reasoning_details?: unknown[] } | undefined)?.reasoning_details
@@ -123,11 +135,7 @@ export async function completeOpencode(options: {
 	const toolCalls = [...calls.values()]
 	for (const call of toolCalls) {
 		if (!call.id || !call.function.name) throw new Error("OpenCode returned an incomplete tool call")
-		try {
-			JSON.parse(call.function.arguments)
-		} catch {
-			throw new Error("OpenCode returned invalid tool arguments")
-		}
+		call.function.arguments = normalizeCompletedToolCallArguments(call.function.arguments, "OpenCode")
 	}
 	return {
 		choices: [

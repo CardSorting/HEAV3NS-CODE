@@ -83,6 +83,18 @@ When LLMs invoke tools, arguments often contain syntax irregularities. Rather th
 
 If an argument remains invalid after all 4 passes, `ToolErrorAutoHealer` generates an **actionable prompt advisory** detailing the exact schema mismatch and remediation guidance for the model to self-correct on the next tick.
 
+### 3.1 Streaming Tool-Argument Deduplication & Transport Circuit-Breaking (`ADR-0014`)
+When streaming LLM providers (OpenAI Codex SSE/WebSocket, Responses API, OpenAI Native, OpenRouter, Cline Pass, Nous Research, OpenCode) emit incremental tool-argument deltas followed by a terminal `done` snapshot (`{"path":"."}{"path":"."}`), LUMI prevents corruption across three layers (see [`AGENT_SWARM_GUIDE.md`](AGENT_SWARM_GUIDE.md)):
+1. **Provider-Level Snapshot Slicing ([`tool-call-arg-parser.ts`](../src/tooling/extensions/registry/tool-call-arg-parser.ts), [`tool-call-processor.ts`](../src/core/api/transform/tool-call-processor.ts), [`responses_api_support.ts`](../src/core/api/utils/responses_api_support.ts))**:
+   - `accumulateStreamingToolName(existingName, incomingName)`: Prevents duplicated or concatenated tool names (`read_fileread_file` $\rightarrow$ `read_file`).
+   - `computeStreamingArgumentsDelta(accumulated, incoming, { isSnapshot })`: Slices overlapping prefixes, handles **single-brace `{` prefix slicing** (when an initial `{` delta is followed by a full JSON object snapshot), and suppresses **formatted snapshot duplicates** via structural JSON root comparison (`areJsonValuesEqual`).
+   - `normalizeCompletedToolCallArguments(rawArgs)`: Collapses N identical concatenated JSON roots (`{"a":1}{"a":1}` $\rightarrow$ `{"a":1}`) and rejects divergent concatenated roots (`{"a":1}{"a":2}`).
+   - `handleResponsesApiStreamResponse`: Tracks interleaved and late-arriving tool names (`idByItemId`, `nameByItemId`, `nameByCallId`, `argsByKey`, `pendingByKey`) across `output_item.added`, `function_call_arguments.delta`, `function_call_arguments.done`, and `response.completed`.
+2. **State-Machine JSON Root Extraction ([`StreamResponseHandler.ts`](../src/core/task/StreamResponseHandler.ts))**:
+   - `extractJsonRoots(raw)` and `assertCompleteToolUses()` self-heal identical duplicate roots and throw typed `ToolArgumentError` (`kind: "incomplete" | "concatenation" | "syntax" | "invalid_format"`) wired into `Task` and `AgentEngine`.
+3. **Specialist Failover Circuit-Breaking**:
+   - Transport decoding failures (`ToolArgumentError` with `kind: "concatenation"` or `"syntax"`) set `safeToRetry: false`, preventing futile specialist failover retries against a broken stream.
+
 ---
 
 ## 4. ⚡ Parallel Wave Scheduling & In-Memory Caching (ADR-139)
@@ -117,6 +129,18 @@ Tracks tool signatures in a sliding ring buffer. If **3 consecutive calls** shar
 
 ### Multi-File Atomic Patch Orchestrator (`MultiFileAtomicPatchOrchestrator`)
 Pre-validates all search-and-replace target chunks across all files in a single transaction. If any chunk mismatches, **zero files are modified on disk**, preventing broken intermediate states.
+
+### Terminal Heredoc Defense, File-Read Defense & Command Action Fencing (`ADR-0015`, `ADR-0016`, `ADR-0018`, `ADR-0019`)
+1. **Multi-Tier Terminal Heredoc File-Write Defense ([`heredocPolicy.ts`](../src/integrations/terminal/heredocPolicy.ts), `ADR-0015`)**:
+   - `findTopLevelHeredocs(command)` and `detectHeredocFileRedirection(command)` parse shell quotes, escapes, and arithmetic shifts (`$((a << 2))`) to intercept any heredoc that writes or appends to files (`cat <<'EOF' > f`, `cat > f << EOF`, `cat << EOF | sudo tee f`), directing the agent to `write_to_file` or `replace_in_file`.
+   - Non-file multiline heredocs (`isMultilineHeredocCommand`, e.g., `python3 - <<'PY'`) are routed through supervised execution ([`CommandExecutor.ts`](../src/integrations/terminal/CommandExecutor.ts)) with closed stdin so interactive shell integration never deadlocks.
+2. **Terminal File-Read Defense ([`terminalFileReadPolicy.ts`](../src/integrations/terminal/terminalFileReadPolicy.ts), `ADR-0016`)**:
+   - `splitTopLevelStatements(command)` and `detectTerminalFileRead(command)` unwrap `sudo`, `env`, `command`, `nohup`, `xargs`, `find -exec`, and subshells (`bash -c`, `$(...)`) to block terminal file dumps (`cat`, `head`, `tail`, `more`, `less`, `tac`, `bat`, `nl`, `fold`, `pr`, `view`, `pg`, `most`) and paging pipelines (`cat f | head`), while allowing stream filtering (`cat f | grep`, `cat f | jq`, `cat f | wc -l`), `/proc/*`, `/sys/*`, `tail -f`, and here-strings (`<<<`).
+3. **Reactive Environment Manifest Fingerprinting ([`EnvironmentIntegrity.ts`](../src/core/integrity/EnvironmentIntegrity.ts), `ADR-0018`)**:
+   - Computes SHA-256 stat fingerprints across 26 project/version manifests (`package.json`, `Cargo.toml`, `pyproject.toml`, `.nvmrc`, `.tool-versions`, etc.) and automatically invalidates cached environment leases across all `WeakRef<EnvironmentIntegrity>` instances whenever `ApplyPatchHandler`, `WriteToFileToolHandler`, or `disk.ts` mutates a manifest.
+4. **Command Action Semantic Fencing & Operator Recovery ([`ActionExecutionRegistry.ts`](../src/integrations/terminal/ActionExecutionRegistry.ts), `ADR-0019`)**:
+   - Post-spawn stream errors in `CommandExecutor` (`onObservationError`) are isolated from process exit events.
+   - Commands only complete on an observed numeric exit code `0`. Disconnected terminals or missing exit codes transition the command to `"unconfirmed"` and persist a durable fence in the `command_execution_actions` table of the BroccoliDB coordination database (`DurableActionExecutionRegistry`) until reconciled via [`listUnresolvedCommandActions.ts`](../src/core/controller/task/listUnresolvedCommandActions.ts) and [`reconcileCommandAction.ts`](../src/core/controller/task/reconcileCommandAction.ts) (`confirmedStopped: true` + 12–1,000 char confirmation note).
 
 ---
 

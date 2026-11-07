@@ -33,6 +33,8 @@ final class WorkspaceMediaIntegrationTests: XCTestCase {
           else if(r.method==='files.readBinary') {const data=fs.readFileSync(path.join(root,r.params.path)); const start=r.params.offset; const part=data.subarray(start,start+65536); const next=start+part.length; reply(r,{data:part.toString('base64'),size:data.length,offset:start,nextOffset:next,more:next<data.length,revision:'a'.repeat(64)});}
           else if(r.method==='files.read') {const text=fs.readFileSync(path.join(root,r.params.path),'utf8'); const size=Buffer.byteLength(text); reply(r,{text,binary:false,size,offset:0,nextOffset:size,more:false,revision:'a'.repeat(64)});}
           else if(r.method==='files.list') reply(r,{entries:[],more:false,matched:0});
+          else if(r.method==='agentSwarm.settings') reply(r,{enabled:false,criticalCompletionReview:false,autoDeferOnCompletionReview:true,hierarchicalDefer:false,legion:false,deferBoundary:'safe_boundary',strategy:'adaptive',maxSpecialists:4,environmentOverrides:[]});
+          else if(r.method==='task.deferStatus') reply(r,{enabled:false,deferred:false,queued:0});
           else if(r.method==='project.status') reply(r,{state:'idle',output:''}); else reply(r,{});
         }});
         """.write(to: script, atomically: true, encoding: .utf8)

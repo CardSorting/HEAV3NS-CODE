@@ -920,6 +920,9 @@ export class AgentOrchestrator {
 			],
 			streamId,
 		)
+		// completeStream is the terminal owner of this stream's transaction; publish
+		// its final status and summary instead of leaving them in a fresh shadow.
+		await dbPool.commitWork(streamId)
 
 		return taskNotification
 	}
@@ -939,6 +942,9 @@ export class AgentOrchestrator {
 
 		// Auto-release all file reservations for this stream
 		await this.releaseAllReservations(streamId)
+		// Failure handling also closes the stream's write scope. Without this commit,
+		// the failure reason and reservation cleanup remain invisible to other readers.
+		await dbPool.commitWork(streamId)
 	}
 
 	// ── Context-Window Compression ──────────────────────────────────

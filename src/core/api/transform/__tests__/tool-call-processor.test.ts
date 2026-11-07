@@ -56,4 +56,57 @@ describe("ToolCallProcessor", () => {
 		assert.deepEqual(processor.getState(0), { id: "", name: "" })
 		assert.deepEqual(processor.getState(1), { id: "", name: "" })
 	})
+
+	it("deduplicates cumulative argument snapshots and suppresses identical terminal snapshots", () => {
+		const processor = new ToolCallProcessor()
+		const first = [
+			...processor.processToolCallDeltas([
+				{ index: 0, id: "call-1", function: { name: "read_file", arguments: '{"path":' } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(first.length, 1)
+		assert.equal(first[0].tool_call.function.arguments, '{"path":')
+
+		const second = [
+			...processor.processToolCallDeltas([
+				{ index: 0, function: { name: "read_file", arguments: '{"path":"src/app.ts"}' } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(second.length, 1)
+		assert.equal(second[0].tool_call.function.arguments, '"src/app.ts"}')
+		assert.equal(second[0].tool_call.function.name, "read_file")
+
+		const duplicateSnapshot = [
+			...processor.processToolCallDeltas([
+				{ index: 0, function: { name: "read_file", arguments: '{"path":"src/app.ts"}' } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(duplicateSnapshot.length, 0)
+	})
+
+	it("handles single-character '{' prefix chunk followed by full snapshot and formatted duplicate snapshot", () => {
+		const processor = new ToolCallProcessor()
+		const first = [
+			...processor.processToolCallDeltas([
+				{ index: 0, id: "call-brace", function: { name: "read_file", arguments: "{" } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(first.length, 1)
+		assert.equal(first[0].tool_call.function.arguments, "{")
+
+		const second = [
+			...processor.processToolCallDeltas([
+				{ index: 0, function: { name: "read_file", arguments: '{"path":"src/app.ts"}' } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(second.length, 1)
+		assert.equal(second[0].tool_call.function.arguments, '"path":"src/app.ts"}')
+
+		const formattedDuplicate = [
+			...processor.processToolCallDeltas([
+				{ index: 0, function: { name: "read_file", arguments: '{ "path": "src/app.ts" }' } } as ToolCallDelta,
+			]),
+		]
+		assert.equal(formattedDuplicate.length, 0)
+	})
 })

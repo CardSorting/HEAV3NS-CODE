@@ -14,6 +14,8 @@ const EDITING_FILES_TEMPLATE_TEXT = `[FILE_EDITING_CONTRACT]
 // TOOL EXECUTION DIRECTIVES
 - write_to_file: Requires complete final file contents.
 - replace_in_file: Requires exact full line SEARCH blocks ordered top-to-bottom as they appear in the file.
+- INSPECTION: Read source with read_file and discover paths with list_files; do not use terminal cat/head/tail/less to dump workspace files into the user's terminal.
+- TERMINAL WRITES: Do not create or edit files with heredocs, tee, echo redirection, or stdin piping. These bypass workspace file tracking and can hang shell integration.
 - BATCHING RULE: Combine multiple changes for the SAME file into a SINGLE replace_in_file call with stacked SEARCH/REPLACE blocks. DO NOT make sequential replace_in_file calls for the same file.
 
 {{AUTO_FORMATTING_SECTION}}`

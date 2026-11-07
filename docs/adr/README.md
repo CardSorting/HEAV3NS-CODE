@@ -211,3 +211,26 @@ ADRs preserve decision-time context and acceptance evidence; their embedded comm
 - **[ADR-004](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-004-osmosis-evolution-vfs-slash-routing-telemetry.md)**: Virtual File System diff overlays, interactive slash command routing, and microsecond telemetry.
 - **[ADR-005](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-005-osmosis-evolution-memory-store-tool-chaining-knowledge-persistence.md)**: Long-term memory store, autonomous multi-step tool chaining, and knowledge persistence.
 - **[ADR-006](https://github.com/CardSorting/LUMI-VSIX/blob/main/.wiki/adr/ADR-006-osmosis-evolution-monorepo-package-absorption.md)**: Line-anchored delta edits (`hashline`), schema parameter validation (`omptype`), file session backends (`session-backends`), and protocol envelope formatting (`protocol`).
+
+### Agent Swarm & The Legion (`ADR-0001` through `ADR-0020`)
+See [`../AGENT_SWARM_GUIDE.md`](../AGENT_SWARM_GUIDE.md) for the complete Agent Swarm & The Legion decision log, postmortems (`PM-001`–`PM-019`), and operational playbooks (`PB-01`–`PB-08`):
+- **ADR-0001**: Auxiliary, off by default, zero overhead when off *(superseded for Legion by ADR-0012)*.
+- **ADR-0002**: Defer is cooperative suspension, never cancellation.
+- **ADR-0003**: Persist all swarm state in `agent_memory` via `BufferedDbPool`.
+- **ADR-0004**: Parent suspension barrier with ancestor walk and per-pipeline lock.
+- **ADR-0005**: Bounded 1+1 review with strict finding categories (`ACCEPT`, `REMEDIATE`, `ESCALATE`, `ACCEPT WITH DISCLOSED LIMITATIONS`).
+- **ADR-0006**: Config precedence and explicit-vs-default detection (`~/.heav3ns/agent-swarm.json` + `LUMI_AGENT_SWARM_*` / `DIETCODE_AGENT_SWARM_*`).
+- **ADR-0007**: Settings flow through proto with clamping at the controller.
+- **ADR-0008**: Deterministic, model-free Legion classification (`classifyTaskForLegion`).
+- **ADR-0009**: Legion lifecycle: 3-stage DAG, bounded 1-retry failover, final terminal states, per-formation lock.
+- **ADR-0010**: Direct (non-shadow) writes for rows others must read; FK-ordered flush.
+- **ADR-0011**: Keep `legion_Trends_ux` as a legacy alias of `legion_ux_ergonomics`.
+- **ADR-0012**: Automatic Legion formation by default.
+- **ADR-0013**: Orchestrator Conductor tool (`engage_swarm`), progress streaming, auto-approval & hardened gating.
+- **ADR-0014**: Tool argument stream deduplication (`accumulateStreamingToolName`, `computeStreamingArgumentsDelta`, `normalizeCompletedToolCallArguments`), self-healing JSON parser (`extractJsonRoots`, `ToolArgumentError`) & transport circuit-breaking.
+- **ADR-0015**: Multi-tier terminal heredoc defense (`heredocPolicy.ts`), specialist prompt parity (`LEGION_CORE_RULES`) & shell integration circuit-breaking.
+- **ADR-0016**: Terminal file read defense (`terminalFileReadPolicy.ts`), specialist token budget starvation resolution & conductor/skill prompt parity (`UseSkillToolHandler`).
+- **ADR-0017**: Dynamic project knowledge (`agent-swarm-knowledge.ts`), SHA-256 scoped blackboard sharing, 30-day TTL & multi-pattern credential sanitization.
+- **ADR-0018**: Workspace environment integrity (`EnvironmentIntegrity.ts`), 26-manifest SHA-256 fingerprinting & reactive invalidation.
+- **ADR-0019**: Terminal supervision (`CommandExecutor.ts`), action execution fencing (`ActionExecutionRegistry.ts`, `reconcileCommandAction.ts`) & `BufferedDbPool` shadow commit retention (`ShadowCommitError`).
+- **ADR-0020**: Surrogate-safe 12 KB UTF-8 handoff sanitization (`agent-swarm-handoff.ts`), two-phase BroccoliDB formation reservation leases (`SwarmMutexService.ts`) & `needs_reconciliation` operator workflows.

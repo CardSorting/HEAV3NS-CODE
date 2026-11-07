@@ -4,6 +4,7 @@ import type { DietCodeToolSpec } from "../spec"
 
 const APPROVAL_HINT =
 	"Optional legacy risk hint: true for destructive/modifying commands, false for read-only commands. The execution policy determines authorization; omitting this hint does not require a separate confirmation."
+const FILE_IO_HINT = "Use read_file/list_files for workspace inspection and write_to_file/replace_in_file/apply_patch for file changes. Do not dump files with cat/head/tail/less or write files with heredocs, tee, echo redirection, or stdin piping. Use non-interactive commands."
 
 const GENERIC: DietCodeToolSpec = {
 	variant: ModelFamily.GENERIC,
@@ -11,7 +12,8 @@ const GENERIC: DietCodeToolSpec = {
 	name: "execute_command",
 	description: `[EXECUTE_COMMAND_CONTRACT]
 - PURPOSE: Execute CLI commands in working directory ({{CWD}}{{MULTI_ROOT_HINT}}).
-- EXECUTION_RULES: Tailor to OS context | Prefer CLI flags over script files | Prefer non-interactive flags (--no-pager, -y).`,
+- EXECUTION_RULES: Tailor to OS context | Prefer CLI flags over script files | Prefer non-interactive flags (--no-pager, -y).
+- FILE_IO_RULES: ${FILE_IO_HINT}`,
 	parameters: [
 		{
 			name: "command",
@@ -41,7 +43,7 @@ const NATIVE_GPT_5: DietCodeToolSpec = {
 	variant: ModelFamily.NATIVE_GPT_5,
 	id: DietCodeDefaultTool.BASH,
 	name: DietCodeDefaultTool.BASH,
-	description: "[EXECUTE_COMMAND_CONTRACT]\n- PURPOSE: Execute system CLI operations.",
+	description: `[EXECUTE_COMMAND_CONTRACT]\n- PURPOSE: Execute system CLI operations.\n- FILE_IO_RULES: ${FILE_IO_HINT}`,
 	parameters: [
 		{
 			name: "command",
@@ -67,7 +69,7 @@ const GEMINI_3: DietCodeToolSpec = {
 	id: DietCodeDefaultTool.BASH,
 	name: DietCodeDefaultTool.BASH,
 	description:
-		"[EXECUTE_COMMAND_CONTRACT]\n- PURPOSE: Execute CLI commands. Use shell operator && for chaining. Avoid vague search commands.",
+		`[EXECUTE_COMMAND_CONTRACT]\n- PURPOSE: Execute CLI commands. Use shell operator && for chaining. Avoid vague search commands.\n- FILE_IO_RULES: ${FILE_IO_HINT}`,
 	parameters: [
 		{
 			name: "command",

@@ -164,6 +164,8 @@ export interface ResourceConflictAssessment {
 }
 
 export interface ToolExecutionOptions {
+	/** Stable host-generated identity for a mutating tool call; never model-authored. */
+	readonly actionId?: string
 	/** Host opt-in: refuse a supported write unless its before-image is durable. */
 	readonly requireBeforeImage?: boolean;
   /** Internal background read: must be bounded, task-scoped, and never prompt. */

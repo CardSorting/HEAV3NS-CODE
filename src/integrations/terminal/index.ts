@@ -7,6 +7,14 @@ export { findLastIndex } from "@shared/array"
 // Export unified command executor
 export { CommandExecutor } from "./CommandExecutor"
 export { orchestrateCommandExecution } from "./CommandOrchestrator"
+export {
+	detectHeredocFileRedirection,
+	findTopLevelHeredocs,
+	isMultilineHeredocCommand,
+	type HeredocRedirectionDetection,
+	type TopLevelHeredoc,
+} from "./heredocPolicy"
+export { detectTerminalFileRead, isTerminalFileReadCommand, type TerminalFileReadDetection } from "./terminalFileReadPolicy"
 
 // Export all types from types.ts
 export type {

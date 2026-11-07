@@ -1,4 +1,5 @@
 import * as path from "node:path"
+import { createHash } from "node:crypto"
 import type { ExecutionOutputChunk } from "../../../core/contracts/environment.contracts.js"
 import type {
 	ExecutionAuthorityLevel,
@@ -19,6 +20,8 @@ export interface ScheduledToolCall {
 }
 
 export interface SchedulerOptions {
+	/** Stable parent turn/round scope used to derive retry-safe mutating action IDs. */
+	readonly actionNamespace?: string
 	readonly autoHeal?: boolean
 	readonly timeoutMs?: number
 	readonly isDryRun?: boolean
@@ -481,6 +484,7 @@ export class ToolExecutionScheduler {
 		let acceptingOutput = true
 
 		const execOptions: ToolExecutionOptions = {
+			actionId: schedulerOptions.actionNamespace ? `lumi-${createHash("sha256").update(`${schedulerOptions.actionNamespace}:${call.id}`).digest("hex")}` : undefined,
 			autoHeal: schedulerOptions.autoHeal,
 			checkExecutionScope: schedulerOptions.checkExecutionScope,
 			timeoutMs: schedulerOptions.timeoutMs,

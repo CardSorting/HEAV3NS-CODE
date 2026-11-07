@@ -262,6 +262,7 @@ export class ToolDependencyGraphPlanner {
 					const promise = scheduler
 						.executeBatch([call], registry, cwd, {
 							...options,
+							actionNamespace: options.actionId,
 							maxConcurrency: 1,
 							enableOutputGovernance: false,
 							signal,

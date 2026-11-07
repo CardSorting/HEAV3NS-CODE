@@ -23,6 +23,8 @@ final class WorkspaceViewportIntegrationTests: XCTestCase {
           else if(r.method==='workspace.branch') reply(r,{branch:fs.readFileSync('\(branchFile.path)','utf8')});
           else if(r.method==='files.read') {const text=fs.readFileSync('\(sourceFile.path)','utf8'); const size=Buffer.byteLength(text); reply(r,{text,binary:false,size,offset:0,nextOffset:size,more:false,revision:'revision'});}
           else if(r.method==='files.list') reply(r,{entries:[],more:false,matched:0});
+          else if(r.method==='agentSwarm.settings') reply(r,{enabled:false,criticalCompletionReview:false,autoDeferOnCompletionReview:true,hierarchicalDefer:false,legion:false,deferBoundary:'safe_boundary',strategy:'adaptive',maxSpecialists:4,environmentOverrides:[]});
+          else if(r.method==='task.deferStatus') reply(r,{enabled:false,deferred:false,queued:0});
           else if(r.method==='project.status') reply(r,{state:'idle',output:''}); else reply(r,{});
         }});
         """.write(to: script, atomically: true, encoding: .utf8)
@@ -48,7 +50,7 @@ final class WorkspaceViewportIntegrationTests: XCTestCase {
         XCTAssertTrue(waitUntil { client.isReady })
         workspace.inspect(.file("file.swift"))
         let first = try inspector(workspace)
-        XCTAssertTrue(waitUntil { first.string == body })
+        XCTAssertTrue(waitUntil { first.string == body }, "File inspection did not load: \(workspace.probeLayout)")
         first.setSelectedRange(NSRange(location: 150, length: 4))
         workspace.window?.contentView?.layoutSubtreeIfNeeded()
         if let container = first.textContainer { first.layoutManager?.ensureLayout(for: container) }

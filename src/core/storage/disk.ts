@@ -54,6 +54,10 @@ async function atomicWriteFile(filePath: string, data: string, updateChecksum = 
 		await fs.writeFile(tmpPath, data, "utf8")
 		// Rename temp file to target (atomic in most cases)
 		await fs.rename(tmpPath, filePath)
+		if (environmentManifestNames.has(path.basename(filePath))) {
+			const { EnvironmentIntegrity } = await import("../integrity/EnvironmentIntegrity")
+			EnvironmentIntegrity.invalidateCache()
+		}
 
 		if (updateChecksum) {
 			const hash = crypto.createHash("sha256").update(data).digest("hex")
@@ -69,6 +73,13 @@ async function atomicWriteFile(filePath: string, data: string, updateChecksum = 
 const MAX_CHECKSUM_CACHE_SIZE = 50
 const checksumCacheMap = new Map<string, Record<string, string>>()
 const taskSettingsWriteQueues = new Map<string, Promise<void>>()
+const environmentManifestNames = new Set([
+	"package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+	"Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml", "requirements.txt", "Pipfile",
+	"Pipfile.lock", "pyproject.toml", "setup.py", "poetry.lock", "pom.xml", "build.gradle", "build.gradle.kts",
+	"settings.gradle", "settings.gradle.kts", "go.mod", "go.sum", "pubspec.yaml", "pubspec.lock", "Gemfile",
+	"Gemfile.lock", ".nvmrc", ".node-version", ".python-version", ".ruby-version", ".tool-versions",
+])
 
 function setChecksumCache(checksumPath: string, checksums: Record<string, string>): void {
 	checksumCacheMap.delete(checksumPath)

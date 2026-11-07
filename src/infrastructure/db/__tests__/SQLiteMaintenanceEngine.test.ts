@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { dbPool } from "../BufferedDbPool"
+import { dbPool, ShadowCommitError } from "../BufferedDbPool"
 import { destroyDb, getDb, getDbStorageMetrics, setDbPath } from "../Config"
 import { SQLiteMaintenanceEngine, sqliteMaintenanceEngine } from "../SQLiteMaintenanceEngine"
 
@@ -12,6 +12,24 @@ describe("SQLiteMaintenanceEngine & Storage Safety", () => {
 	afterEach(async () => {
 		await dbPool.stop()
 		await destroyDb()
+	})
+
+	it("refuses shutdown while an uncommitted transaction shadow remains", async () => {
+		const agentId = "shutdown-retention-test"
+		await dbPool.beginWork(agentId)
+		try {
+			await dbPool.push({ type: "insert", table: "users", values: { id: "pending-user", createdAt: Date.now() } }, agentId)
+			let shutdownError: unknown
+			try {
+				await dbPool.stop()
+			} catch (error) {
+				shutdownError = error
+			}
+			expect(shutdownError).to.be.instanceOf(ShadowCommitError)
+			expect((shutdownError as ShadowCommitError).agentIds).to.deep.equal([agentId])
+		} finally {
+			await dbPool.rollbackWork(agentId, "test cleanup")
+		}
 	})
 
 	it("retrieves DB storage metrics correctly", async () => {

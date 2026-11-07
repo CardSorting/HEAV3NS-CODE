@@ -76,6 +76,7 @@ export class HelpModal implements Component, Focusable {
 				`- **[Session]** \`/clear\` : Clear message history from TUI view\n` +
 				`- **[Session]** \`/exit\` / \`/quit\` : Terminate interactive REPL session\n` +
 				`- **[Agents]** \`/agents\` : Inspect delegated tasks, results, and blockers\n` +
+				`- **[Swarm]**  \`/agentswarm <action>\` : Configure Agent Swarm, defer/resume, form Legion specialists, inspect streams, or reconcile\n` +
 				`- **[Skills]** \`/skills [term]\` : Search available skill workflows; use \`/skills refresh\` to rescan\n` +
 				`- **[Config]**  \`/settings\` : Configure models, reasoning effort & engine policies\n` +
 				`- **[Config]**  \`/providers\` : Audit & setup LLM provider credentials\n` +
@@ -84,6 +85,7 @@ export class HelpModal implements Component, Focusable {
 				`- **[System]**  \`/setup\` / \`/wizard\` : Launch interactive API key setup wizard\n` +
 				`- **[System]**  \`/about\` : Display monolith memory slab & performance specs\n\n` +
 				`### Agent workflows\n` +
+				`- **Agent Swarm & Legion**: Use \`/agentswarm settings\` (or \`Ctrl + S\`) to configure Legion strategies, specialist caps, completion review, and defer boundaries. Use \`/agentswarm classify <objective>\` or \`/agentswarm form <objective>\` to delegate specialist formations, \`/agentswarm formation status|history|stream|resume\` to inspect or resume them, and \`/agentswarm defer\` / \`/agentswarm resume\` to pause or resume at a safe boundary.\n` +
 				`- **Subagents**: Delegated children can inspect files and stage edits for parent review; they cannot run commands. Use \`/agents\` to review their work, \`/diff [file]\` to inspect changes, and \`/commit [file]\` or \`/discard [file]\` to act on them. Relative paths work; cancelling the parent turn cancels its active child.\n` +
 				`- **Agent dashboard**: Press \`/\` to search task IDs, goals, or context; \`1–6\` still select the six views, grouped as Tasks, Flow, Results, and Insights.\n` +
 				`- **Skills**: Matching workflows are loaded on demand; \`/skills\` shows their names and descriptions.\n\n` +

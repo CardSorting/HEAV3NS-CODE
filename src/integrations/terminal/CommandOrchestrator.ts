@@ -560,7 +560,9 @@ export async function orchestrateCommandExecution(
 				: `Command failed with exit code ${exitCode}.`
 			: signal
 				? `Command terminated by signal ${signal}.`
-				: "Command executed."
+				: completionDetails?.observationError
+					? "Terminal output observation failed before the command's exit status could be confirmed. Inspect the terminal before retrying."
+					: "The command's exit status could not be confirmed. Inspect the terminal before retrying."
 
 		if (hasExitCode && exitCode !== 0) {
 			const diagnostic = analyzeCommandFailure(options.command, exitCode, result)
@@ -577,6 +579,7 @@ export async function orchestrateCommandExecution(
 			logFilePath: largeOutputLogPath || undefined,
 			exitCode,
 			signal,
+			observationError: completionDetails?.observationError,
 		}
 	}
 	const logFileMsg = largeOutputLogPath ? `\nFull output saved to: ${largeOutputLogPath}` : ""
@@ -590,5 +593,6 @@ export async function orchestrateCommandExecution(
 		logFilePath: largeOutputLogPath || undefined,
 		exitCode: completionDetails?.exitCode,
 		signal: completionDetails?.signal,
+		observationError: completionDetails?.observationError,
 	}
 }
