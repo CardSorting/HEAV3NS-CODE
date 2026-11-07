@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.0.0] - 2026-11-07
+
+### Added — Agent Swarm & The Legion Major Release (`ADR-0001`–`ADR-0020`)
+
+- **Agent Swarm & The Legion Orchestration ([`docs/AGENT_SWARM_GUIDE.md`](docs/AGENT_SWARM_GUIDE.md))**:
+  - Added deterministic, model-free task classification ([`src/agents/extensions/swarm/agent-swarm-classifier.ts`](src/agents/extensions/swarm/agent-swarm-classifier.ts)) across 5 strategies (`adaptive`, `tactical_strike`, `balanced_squad`, `full_legion`, `verification_heavy`) and 7 specialist personas (`legion_architect`, `legion_researcher`, `legion_implementer`, `legion_ux_ergonomics`, `legion_data_steward`, `legion_hardener`, `legion_verifier`) with a 3-stage dependency DAG, bounded 1-retry failover, and the `engage_swarm` conductor tool ([`src/agents/extensions/swarm/agent-swarm-conductor-tool.ts`](src/agents/extensions/swarm/agent-swarm-conductor-tool.ts)).
+  - Added cooperative hierarchy defer and resume (`safe_boundary` and `before_turn`) with durable child checkpoints, two-phase BroccoliDB formation reservation leases with PID + process start-time fencing and 20s heartbeats (`ADR-0020`), surrogate-safe 12 KB UTF-8 handoff escaping ([`src/agents/extensions/swarm/agent-swarm-handoff.ts`](src/agents/extensions/swarm/agent-swarm-handoff.ts)), and workspace-scoped SHA-256 knowledge blackboards with credential sanitization (`ADR-0017`).
+  - Added bounded 1+1 Critical Completion Review (`ACCEPT`, `REMEDIATE`, `ESCALATE`, `ACCEPT WITH DISCLOSED LIMITATIONS`) with structured `CORRECTIVE_TASKS_JSON` remedial dispatch.
+  - Added universal `ADR-0014` streaming tool-argument deduplication and self-healing JSON root parsing across [`StreamResponseHandler.ts`](src/core/task/StreamResponseHandler.ts), [`responses_api_support.ts`](src/core/api/utils/responses_api_support.ts), [`tool-call-processor.ts`](src/core/api/transform/tool-call-processor.ts), [`tool-call-arg-parser.ts`](src/tooling/extensions/registry/tool-call-arg-parser.ts), [`agent-engine.ts`](src/agents/extensions/execution/agent-engine.ts), and native streaming providers (`OpenRouter`, `Cline Pass`, `Nous Research`, `OpenCode`).
+  - Added multi-tier terminal heredoc file-write defense ([`heredocPolicy.ts`](src/integrations/terminal/heredocPolicy.ts), `ADR-0015`), terminal file-read defense ([`terminalFileReadPolicy.ts`](src/integrations/terminal/terminalFileReadPolicy.ts), `ADR-0016`), 26-manifest SHA-256 environment integrity fingerprinting ([`EnvironmentIntegrity.ts`](src/core/integrity/EnvironmentIntegrity.ts), `ADR-0018`), command action execution fencing with operator-confirmed recovery ([`ActionExecutionRegistry.ts`](src/integrations/terminal/ActionExecutionRegistry.ts), `ADR-0019`), and `BufferedDbPool` shadow commit retention (`ShadowCommitError`).
+  - Added first-class native macOS `Workspace` menu bar navigation, HIG modal button ordering, saved specialist stream inspection across all formation states, `· Deferred` status bar indicator, and explicit opt-in consent for Sovereign Swarm Radar (`⌥⌘R`) in [`native/Sources/Heav3nsCode/`](native/Sources/Heav3nsCode/).
+
 ### Fixed — rolling QoL pass, 2026-09-29
 
 - Completion attempts retain their evaluated checkpoint through evidence, commit and recovery. Observed content changes invalidate the proposal; incoming record validation and a transactional lifecycle/cancellation check prevent inconsistent terminal success. Blocked saga outcomes no longer report Done.
