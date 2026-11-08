@@ -112,7 +112,7 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
     }
     private func renderSignIn() {
         var views: [NSView] = [JourneyStyle.label(waiting ? "Continue in your browser." : connected ? "Your ChatGPT connection" : "Connect ChatGPT (optional)", size: 30, weight: .semibold)]
-        let detail = waiting ? "Complete the sign-in in your browser, then return here. You can cancel and try again at any time." : connected ? "A ChatGPT connection is saved in LUMI. Model access is checked when you connect and when you start work." : "ChatGPT is one way to connect. You can also use your existing LUMI API key, compatible endpoint, or Claude Code setup. Choose your provider inside a workspace."
+        let detail = waiting ? "Complete the sign-in in your browser, then return here. You can cancel and try again at any time." : connected ? "ChatGPT is connected on this Mac. Add more accounts to switch when one reaches its usage limit; model access is checked when you start work." : "ChatGPT is one way to connect. You can also use your existing LUMI API key, compatible endpoint, or Claude Code setup. Choose your provider inside a workspace."
         views.append(JourneyStyle.label(detail, size: 15, secondary: true))
         if !accountMessage.isEmpty { let notice = JourneyStyle.label(accountMessage, size: 13); notice.isSelectable = true; views.append(notice) }
         if waiting {
@@ -120,18 +120,24 @@ final class LauncherWindow: NSWindowController, NSTableViewDataSource, NSTableVi
             if let browserURL { views.append(JourneyButton("Open Browser", symbol: "arrow.up.right.square") { NSWorkspace.shared.open(browserURL) }) }
             views.append(JourneyButton("Cancel sign-in") { [weak self] in self?.cancelSignIn() })
         } else {
-            let signIn = JourneyButton(connected ? "Reconnect with ChatGPT" : "Sign in with ChatGPT", symbol: "person.crop.circle") { [weak self] in self?.signIn() }
-            signIn.isEnabled = canChangeAccount() && !disconnecting; signIn.bezelColor = .controlAccentColor; views.append(signIn)
+            // Adding or switching accounts is safe while workspaces are open: they pick the active account up on their next request.
+            let signIn = JourneyButton(connected ? "Add another account…" : "Sign in with ChatGPT", symbol: connected ? "plus" : "person.crop.circle") { [weak self] in self?.signIn() }
+            signIn.isEnabled = !disconnecting; signIn.bezelColor = connected ? nil : .controlAccentColor
             if connected {
-                let disconnect = JourneyButton("Disconnect this Mac") { [weak self] in self?.disconnect() }; disconnect.isEnabled = canChangeAccount() && !disconnecting; views.append(disconnect)
+                let manage = JourneyButton("Manage accounts…", symbol: "person.2") { ChatGPTAccountsWindow.shared.present() }
+                manage.bezelColor = .controlAccentColor; manage.isEnabled = !disconnecting; views.append(manage)
             }
-            if !canChangeAccount() { views.append(JourneyStyle.label("Close your workspace windows before changing the account connection.", size: 12, secondary: true)) }
+            views.append(signIn)
+            if connected {
+                let disconnect = JourneyButton("Sign out of all accounts") { [weak self] in self?.disconnect() }; disconnect.isEnabled = canChangeAccount() && !disconnecting; views.append(disconnect)
+                if !canChangeAccount() { views.append(JourneyStyle.label("Close your workspace windows before signing out of every account.", size: 12, secondary: true)) }
+            }
         }
         views.append(JourneyButton("Continue to projects", symbol: "folder") { [weak self] in self?.finishWelcome() })
         centered(views)
     }
     private func signIn() {
-        guard !waiting, !disconnecting, canChangeAccount() else { return }
+        guard !waiting, !disconnecting else { return }
         waiting = true; browserURL = nil; accountMessage = ""; showSignIn()
         account.request("signIn") { [weak self] result in
             guard let self else { return }; self.waiting = false; self.browserURL = nil

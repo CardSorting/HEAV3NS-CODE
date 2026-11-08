@@ -1,4 +1,5 @@
 import { completeOpenRouter } from "../../../core/api/providers/openrouter-native.js"
+import { ACCOUNT_MANAGEMENT_HINT, describeSwitch } from "../../../services/auth/openAiCodexAccounts.js"
 import { completeApplePlayground } from "../../../core/api/providers/apple-playground-native.js"
 import { completeClinePass } from "../../../core/api/providers/cline-pass-native.js"
 import { completeNousResearch } from "../../../core/api/providers/nous-research-native.js"
@@ -904,6 +905,19 @@ export class AgentEngine extends AbstractAgentEngine {
 										reasoningEffort,
 										abortSignal: requestSignal,
 										parallelToolCalls: autonomous,
+										onAccountSwitch: (notice) => {
+											const switched = describeSwitch(notice)
+											this.reportProgress(input.onProgress, {
+												activityId: liveProgressActivityId,
+												phase: "connecting",
+												status: "in_progress",
+												message: switched.message,
+												detail: switched.detail,
+												timestamp: Date.now(),
+												sequence: nextProgressSequence(),
+												metadata: { source: progressSource, scope: "turn", attempt: attempt + 1 },
+											})
+										},
 									})
 									const { instructions, transcript } = toCodexOAuthTranscript(apiMessages)
 									const toolCalls = new Map<
@@ -1337,8 +1351,10 @@ export class AgentEngine extends AbstractAgentEngine {
 
 						// The next attempt rebuilds the transcript. Never replay completed tool
 						// work from the initial prompt after a later provider failure.
+						// A usage limit with no account left to switch to cannot be fixed by running the turn again.
+						const nonRetryable = (error as { retryable?: unknown } | undefined)?.retryable === false
 						const isLastAttempt =
-							liveFailureKind === "budget" || toolsAdmitted || accumulatedToolResults.length > 0 || attempt >= maxAttempts - 1
+							liveFailureKind === "budget" || nonRetryable || toolsAdmitted || accumulatedToolResults.length > 0 || attempt >= maxAttempts - 1
 						if (!isLastAttempt) {
 							this.reportProgress(input.onProgress, {
 								activityId: liveProgressActivityId,
@@ -1396,7 +1412,9 @@ export class AgentEngine extends AbstractAgentEngine {
 					: usesClaudeSubscriptionDirectSdk
 						? `[Check Claude Code: run \`claude auth login\`, verify the official CLI is compatible with your Node runtime, and set ${"LUMI_CLAUDE_SUBSCRIPTION_DIRECTSDK_PLUGIN_DIR"} if the plugin path is not auto-discovered.]`
 						: usesCodexOAuth
-							? "[Check your ChatGPT sign-in with `heav3ns whoami`; reconnect with `heav3ns login` if needed.]"
+							? /usage limit/i.test(liveError)
+								? `[${ACCOUNT_MANAGEMENT_HINT}]`
+								: "[Check your ChatGPT sign-in with `heav3ns whoami`; reconnect with `heav3ns login` if needed. Saved accounts: `heav3ns accounts`.]"
 							: authMethod === "api-key"
 								? "[The selected API key is missing. Configure OPENAI_API_KEY with `heav3ns setup`, or switch to ChatGPT sign-in in Settings.]"
 								: "[Connect your ChatGPT account with `heav3ns login`, or configure an OPENAI_API_KEY with `heav3ns setup`.]"

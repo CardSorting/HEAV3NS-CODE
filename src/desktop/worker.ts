@@ -11,6 +11,8 @@ import { classifyTaskForLegion, LEGION_STRATEGIES } from "../agents/extensions/s
 import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/intelligence/spider-policy-check.js"
 import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
 import { applePlaygroundStatus } from "../core/api/providers/apple-playground-native.js"
+import { describeAccountsLine } from "../services/auth/openAiCodexAccounts.js"
+import { getOpenAiCodexAccountStore } from "../services/auth/OpenAiCodexOAuthService.js"
 import { clineApiKey } from "../core/api/providers/cline-pass-native.js"
 import { nousResearchApiKey } from "../core/api/providers/nous-research-native.js"
 import { opencodeApiKey } from "../core/api/providers/opencode-native.js"
@@ -3414,7 +3416,7 @@ export async function runDesktopWorker(): Promise<void> {
 												engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)
 												? "Compatible endpoint configured. Uses the endpoint and credentials saved in LUMI. Run heav3ns setup to change this connection."
 												: engine!.setupWizard.getOpenAiAuthMethod() === "oauth"
-													? "ChatGPT sign-in selected. Uses the session saved on this Mac; model access is checked when you send."
+													? `${describeAccountsLine(getOpenAiCodexAccountStore()) ?? "ChatGPT sign-in selected. Uses the session saved on this Mac."} Model access is checked when you send.`
 													: engine!.setupWizard.getOpenAiAuthMethod() === "api-key"
 														? "API-key connection selected. Uses your existing LUMI key; model access is checked when you send. Run heav3ns setup to change it."
 														: "No OpenAI connection is configured. Connect ChatGPT from the project library, or run heav3ns setup to use your own API key or compatible endpoint."

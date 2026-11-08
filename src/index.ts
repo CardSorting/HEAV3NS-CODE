@@ -5130,7 +5130,9 @@ if (isDirectCliExecution) {
 	const isHelp = args.includes("--help") || args.includes("-h") || primaryCmd === "help"
 	const isAgentSwarm = primaryCmd === "agentswarm"
 
-	const isLogin = args.includes("--login") || primaryCmd === "login" || (primaryCmd === "auth" && args[1] === "login")
+	const isAccountsAdd = (primaryCmd === "accounts" || primaryCmd === "account") && args[1]?.toLowerCase() === "add"
+	const isLogin =
+		args.includes("--login") || primaryCmd === "login" || isAccountsAdd || (primaryCmd === "auth" && args[1] === "login")
 	const isLogout = args.includes("--logout") || primaryCmd === "logout" || (primaryCmd === "auth" && args[1] === "logout")
 	const isWhoAmI =
 		args.includes("--whoami") ||
@@ -5178,8 +5180,12 @@ if (isDirectCliExecution) {
 \x1b[1;34mModel Swapping & Catalog:\x1b[0m
 ${modelCommands}
 \x1b[1;34mAuthentication & Identity:\x1b[0m
-  heav3ns login               Sign in with ChatGPT / OpenAI (1-Click browser login)
-  heav3ns logout              Sign out and clear local session
+  heav3ns login               Sign in with ChatGPT / OpenAI (1-Click browser login); adds an account, keeps the others
+  heav3ns accounts            List saved ChatGPT accounts, plans and usage-limit status
+  heav3ns accounts switch <n|name>   Make another account active (running sessions follow)
+  heav3ns accounts auto on|off       Switch automatically when the active account hits a usage limit
+  heav3ns accounts rename|remove|clear-limit   Manage saved accounts (heav3ns accounts help)
+  heav3ns logout [--all]      Sign out of the active account (--all: every account and provider)
   heav3ns whoami              Display active account, subscription tier, and model
   heav3ns doctor              Run system health and connectivity check
   heav3ns setup               Interactive account and model settings
@@ -5337,7 +5343,7 @@ ${modelCommands}
 		const benchmark = await runBenchmarkSuite(lumi)
 		const guardrails = await new ArchitectureGuardrailGate().runFullGuardrailAudit(lumi)
 		const writeResult = new LiveBaselineReporter().write(process.cwd(), {
-			repositoryVersion: process.env.npm_package_version ?? "16.2.0",
+			repositoryVersion: process.env.npm_package_version ?? "16.3.0",
 			configuredModel: lumi.modelResolver.getActiveModel(),
 			smoke,
 			benchmark,
@@ -5386,6 +5392,12 @@ ${modelCommands}
 	}
 	let workspaceOwner: Awaited<ReturnType<typeof import("./desktop/workspace-owner.js").acquireWorkspace>> | undefined
 	;(async () => {
+		// Account management is a lightweight vault operation: no workspace lock, so it works while sessions run.
+		if ((primaryCmd === "accounts" || primaryCmd === "account") && !isAccountsAdd) {
+			const { runAccountsCommand } = await import("./cli/accounts-command.js")
+			process.exitCode = await runAccountsCommand(args.slice(1))
+			return
+		}
 		if (primaryCmd === "--desktop-account") {
 			await (await import("./desktop/account.js")).runDesktopAccount()
 			return
@@ -5429,9 +5441,14 @@ ${modelCommands}
 		} else if (isSetup) {
 			await lumi.setupWizard.runInteractiveWizard()
 		} else if (isLogout) {
-			lumi.setupWizard.logout()
-			console.log("\n\x1b[1;32m[✓] Successfully signed out of configured providers.\x1b[0m")
-			console.log("\x1b[90mRun \x1b[36mheav3ns login\x1b[90m anytime to reconnect.\x1b[0m\n")
+			const result = lumi.setupWizard.logoutAccount({ all: args.includes("--all") })
+			if (result.nowActive) {
+				console.log(`\n\x1b[1;32m[✓] Signed out of the active ChatGPT account.\x1b[0m Now using \x1b[1m"${result.nowActive.label}"\x1b[0m.`)
+				console.log("\x1b[90mOther saved accounts were kept. Use \x1b[36mheav3ns logout --all\x1b[90m to sign out of everything, or \x1b[36mheav3ns accounts\x1b[90m to manage them.\x1b[0m\n")
+			} else {
+				console.log("\n\x1b[1;32m[✓] Successfully signed out of configured providers.\x1b[0m")
+				console.log("\x1b[90mRun \x1b[36mheav3ns login\x1b[90m anytime to reconnect.\x1b[0m\n")
+			}
 		} else if (isWhoAmI) {
 			lumi.setupWizard.displayWhoAmI(lumi.modelResolver.getActiveModel())
 		} else if (isDoctor) {

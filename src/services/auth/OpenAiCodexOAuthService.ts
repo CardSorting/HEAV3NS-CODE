@@ -1,11 +1,16 @@
 import { createHash, randomBytes } from "node:crypto"
 import http, { type Server } from "node:http"
+import * as path from "node:path"
 import { StateManager } from "@core/storage/StateManager"
 import type { ModelInfo } from "@shared/api"
 import { ApiFormat } from "@shared/proto/dietcode/models"
+import { getStorageDataDirectory } from "@shared/storage/storage-context"
 import { ExtensionRegistryInfo } from "@/registry"
 import { fetch as configuredFetch } from "@/shared/net"
 import { openExternal } from "@/utils/env"
+import { type CodexAccountBrief, brief } from "./openAiCodexAccounts"
+import { identityKey } from "./openAiCodexIdentity"
+import { OpenAiCodexAccountStore, type StoredCodexAccount } from "./OpenAiCodexAccountStore"
 import { type OpenAiCodexOAuthCallbackPageState, writeOpenAiCodexOAuthCallbackResponse } from "./openAiCodexOAuthCallbackPage"
 
 export const OPENAI_CODEX_OAUTH_CREDENTIALS_KEY = "openaiCodexOauthCredentials" as const
@@ -38,8 +43,55 @@ export interface OpenAiCodexOAuthCredentials {
 	expiresAt?: number
 }
 
-let credentialRefreshInFlight: Promise<OpenAiCodexOAuthCredentials> | undefined
+/** Refreshes are single-flight per account: two accounts must never share (or steal) each other's refresh. */
+const credentialRefreshesInFlight = new Map<string, Promise<OpenAiCodexOAuthCredentials>>()
 let credentialGeneration = 0
+
+let accountStore: OpenAiCodexAccountStore | undefined
+
+/** The shared on-disk vault of signed-in ChatGPT accounts (see `OpenAiCodexAccountStore`). */
+export function getOpenAiCodexAccountStore(): OpenAiCodexAccountStore {
+	accountStore ??= new OpenAiCodexAccountStore(path.join(getStorageDataDirectory(), "accounts"), {
+		legacy: () => {
+			try {
+				return StateManager.get().getSecretKey(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY)
+			} catch {
+				return undefined
+			}
+		},
+		parseLegacy: parseOpenAiCodexOAuthCredentials,
+	})
+	return accountStore
+}
+
+/** Test seam: point the service at an isolated vault. */
+export function setOpenAiCodexAccountStoreForTests(store: OpenAiCodexAccountStore | undefined): void {
+	accountStore = store
+}
+
+/** The token endpoint answered with an HTTP failure. */
+export class OpenAiCodexTokenError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+	) {
+		super(message)
+		this.name = "OpenAiCodexTokenError"
+	}
+}
+
+/**
+ * The provider definitively refused to refresh this sign-in (revoked, expired, or already used elsewhere).
+ * Distinct from a network failure: retrying cannot help, only a new browser login can.
+ */
+export class CodexRefreshRejectedError extends Error {
+	readonly status = 401
+	readonly retryable = false
+	constructor(message: string) {
+		super(message)
+		this.name = "CodexRefreshRejectedError"
+	}
+}
 
 interface OAuthTokenResponse {
 	access_token?: unknown
@@ -264,7 +316,7 @@ async function readTokenResponse(
 	previous?: OpenAiCodexOAuthCredentials,
 ): Promise<OpenAiCodexOAuthCredentials> {
 	if (!response.ok) {
-		throw new Error(`OpenAI Codex OAuth token request failed (${response.status})`)
+		throw new OpenAiCodexTokenError(`OpenAI Codex OAuth token request failed (${response.status})`, response.status)
 	}
 
 	const body = (await response.json()) as OAuthTokenResponse
@@ -322,7 +374,7 @@ export async function refreshOpenAiCodexOAuthCredentials(
 	credentials: OpenAiCodexOAuthCredentials,
 ): Promise<OpenAiCodexOAuthCredentials> {
 	if (!credentials.refreshToken) {
-		throw new Error("OpenAI Codex OAuth session expired. Please sign in again.")
+		throw new CodexRefreshRejectedError("OpenAI Codex OAuth session expired. Please sign in again.")
 	}
 
 	const body = JSON.stringify({
@@ -337,7 +389,14 @@ export async function refreshOpenAiCodexOAuthCredentials(
 		body,
 	})
 
-	return readTokenResponse(response, credentials)
+	try {
+		return await readTokenResponse(response, credentials)
+	} catch (error) {
+		if (error instanceof OpenAiCodexTokenError && [400, 401, 403].includes(error.status)) {
+			throw new CodexRefreshRejectedError(`${error.message}. Sign in again.`)
+		}
+		throw error
+	}
 }
 
 async function bindCallbackServer(expectedState: string, signal?: AbortSignal): Promise<CallbackServerHandle> {
@@ -522,6 +581,13 @@ async function bindCallbackServer(expectedState: string, signal?: AbortSignal): 
 }
 
 function getStoredCredentials(rawFallback?: string): OpenAiCodexOAuthCredentials | undefined {
+	// The vault is authoritative: it is re-read from disk, so a switch made by another process takes effect at once.
+	try {
+		const active = getOpenAiCodexAccountStore().active()
+		if (active) return active.credentials
+	} catch {
+		// An unreadable vault must not lock the user out; fall back to the legacy single-account secret.
+	}
 	try {
 		const stored = StateManager.get().getSecretKey(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY)
 		return parseOpenAiCodexOAuthCredentials(stored) || parseOpenAiCodexOAuthCredentials(rawFallback)
@@ -530,42 +596,106 @@ function getStoredCredentials(rawFallback?: string): OpenAiCodexOAuthCredentials
 	}
 }
 
+/** Finds the saved account these credentials belong to. Identity survives token rotation; the token alone does not. */
+function findAccountFor(credentials: OpenAiCodexOAuthCredentials): StoredCodexAccount | undefined {
+	try {
+		const accounts = getOpenAiCodexAccountStore().list()
+		const key = identityKey(credentials)
+		return (
+			accounts.find((account) => account.credentials.accessToken === credentials.accessToken) ??
+			accounts.find((account) => account.identityKey === key) ??
+			(credentials.accountId ? accounts.find((account) => account.credentials.accountId === credentials.accountId) : undefined)
+		)
+	} catch {
+		return undefined
+	}
+}
+
+/** Keeps the legacy single-account secret equal to the active account for code that still reads it. */
+async function mirrorLegacySecret(credentials: OpenAiCodexOAuthCredentials | undefined): Promise<void> {
+	try {
+		const stateManager = StateManager.get()
+		stateManager.setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, credentials ? serializeOpenAiCodexOAuthCredentials(credentials) : undefined)
+		await stateManager.flushPendingState()
+	} catch {
+		// The vault is authoritative; a failed mirror only affects legacy readers.
+	}
+}
+
+function isExpiring(credentials: OpenAiCodexOAuthCredentials): boolean {
+	return credentials.expiresAt !== undefined && credentials.expiresAt <= Date.now() + REFRESH_GRACE_PERIOD_MS
+}
+
 async function refreshAndPersistCredentials(credentials: OpenAiCodexOAuthCredentials): Promise<OpenAiCodexOAuthCredentials> {
 	if (!credentials.refreshToken) {
-		throw new Error("OpenAI Codex session expired. Sign out and sign in again.")
+		throw new CodexRefreshRejectedError("OpenAI Codex session expired. Sign out and sign in again.")
 	}
-	if (credentialRefreshInFlight) {
-		return credentialRefreshInFlight
+	const flightKey = identityKey(credentials)
+	const inFlight = credentialRefreshesInFlight.get(flightKey)
+	if (inFlight) {
+		return inFlight
 	}
 
-	// A parallel request may already have rotated this token. Reuse its stored
+	// A parallel request (or another process) may already have rotated this account's token. Reuse its stored
 	// credentials instead of submitting a single-use refresh token twice.
-	const latestCredentials = getStoredCredentials()
-	if (latestCredentials && latestCredentials.accessToken !== credentials.accessToken) {
-		return latestCredentials
+	const owner = findAccountFor(credentials)
+	if (owner && owner.credentials.accessToken !== credentials.accessToken && !isExpiring(owner.credentials)) {
+		return owner.credentials
 	}
 
 	const refresh = (async () => {
 		const generation = credentialGeneration
-		const refreshed = await refreshOpenAiCodexOAuthCredentials(credentials)
-		if (generation !== credentialGeneration) {
-			throw new Error("OpenAI Codex sign-in changed while refreshing credentials")
+		const store = getOpenAiCodexAccountStore()
+		// Refresh tokens are single-use, so refreshes of one account are serialised across every HEAV3NS process.
+		// Whoever waited re-reads the vault: if another process rotated the token meanwhile, use that result.
+		const run = async (): Promise<OpenAiCodexOAuthCredentials> => {
+			const current = findAccountFor(credentials)
+			if (current && current.credentials.accessToken !== credentials.accessToken && !isExpiring(current.credentials)) {
+				return current.credentials
+			}
+			const base = current?.credentials ?? credentials
+			let refreshed: OpenAiCodexOAuthCredentials
+			try {
+				refreshed = await refreshOpenAiCodexOAuthCredentials(base)
+			} catch (error) {
+				if (error instanceof CodexRefreshRejectedError && current) {
+					// Definitive: stop routing work to an account that cannot refresh until it is signed in again.
+					try {
+						store.markNeedsSignIn(current.id, error.message)
+					} catch {
+						// The vault is advisory here; the error below still reaches the caller.
+					}
+				}
+				throw error
+			}
+			// Persist to the account that owned the refreshed token, even if another account became active meanwhile.
+			// Single-use refresh tokens are already spent once the server replies, so never discard `refreshed`.
+			const persisted = store.updateCredentials({ id: current?.id, accessToken: base.accessToken, accountId: base.accountId }, refreshed)
+			if (!persisted) {
+				if (generation !== credentialGeneration) {
+					throw new Error("OpenAI Codex sign-in changed while refreshing credentials")
+				}
+				// Legacy single-account install that has not been imported yet.
+				const stateManager = StateManager.get()
+				stateManager.setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, serializeOpenAiCodexOAuthCredentials(refreshed))
+				await stateManager.flushPendingState()
+			} else if (store.active()?.credentials.accessToken === refreshed.accessToken) {
+				await mirrorLegacySecret(refreshed)
+			}
+			if (generation !== credentialGeneration) {
+				throw new Error("OpenAI Codex sign-in changed while refreshing credentials")
+			}
+			return refreshed
 		}
-		const stateManager = StateManager.get()
-		stateManager.setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, serializeOpenAiCodexOAuthCredentials(refreshed))
-		await stateManager.flushPendingState()
-		if (generation !== credentialGeneration) {
-			throw new Error("OpenAI Codex sign-in changed while refreshing credentials")
-		}
-		return refreshed
+		return owner ? store.withExclusive(`refresh-${owner.id}`, run) : run()
 	})()
-	credentialRefreshInFlight = refresh
+	credentialRefreshesInFlight.set(flightKey, refresh)
 
 	try {
 		return await refresh
 	} finally {
-		if (credentialRefreshInFlight === refresh) {
-			credentialRefreshInFlight = undefined
+		if (credentialRefreshesInFlight.get(flightKey) === refresh) {
+			credentialRefreshesInFlight.delete(flightKey)
 		}
 	}
 }
@@ -586,7 +716,9 @@ function getModelRequestError(response: Response): Error {
 		)
 	}
 	if (response.status === 429) {
-		return new Error(`OpenAI Codex rate-limited the model catalog request. Try again shortly.${requestIdSuffix}`)
+		return new Error(
+			`ChatGPT rate-limited the model catalog request. This can also mean the account reached its usage limit; try again shortly or switch accounts with \`heav3ns accounts\`.${requestIdSuffix}`,
+		)
 	}
 	return new Error(`OpenAI Codex model catalog request failed (HTTP ${response.status}).${requestIdSuffix}`)
 }
@@ -596,11 +728,15 @@ export function hasOpenAiCodexOAuthCredentials(raw: string | undefined): boolean
 }
 
 export class OpenAiCodexOAuthService {
+	/**
+	 * Signs in through the browser. The account is added to the vault (or refreshed, when it is a re-login of one that
+	 * is already saved) and becomes active; other saved accounts are never disturbed.
+	 */
 	static async signIn(
 		onManualBrowserOpen?: (authorizationLink: string) => void,
 		signal?: AbortSignal,
 		browser: (url: string) => Promise<boolean> = openExternal,
-	): Promise<void> {
+	): Promise<{ account: CodexAccountBrief; created: boolean }> {
 		const { verifier, challenge } = createOpenAiCodexPkcePair()
 		const state = randomBytes(32).toString("base64url")
 		const callbackServer = await bindCallbackServer(state, signal)
@@ -636,30 +772,71 @@ export class OpenAiCodexOAuthService {
 			if (signal?.aborted) throw new Error("OpenAI Codex sign-in was cancelled.")
 			const credentials = await exchangeAuthorizationCode(code, redirectUri, verifier, signal)
 			if (signal?.aborted) throw new Error("OpenAI Codex sign-in was cancelled.")
-			credentialGeneration += 1
-			credentialRefreshInFlight = undefined
-			const stateManager = StateManager.get()
-			const previousCredentials = stateManager.getSecretKey(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY)
-			stateManager.setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, serializeOpenAiCodexOAuthCredentials(credentials))
-			try {
-				await stateManager.flushPendingState()
-			} catch (error) {
-				// Keep a failed disk write from silently replacing the current session in memory.
-				stateManager.setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, previousCredentials)
-				throw error
-			}
+			// The vault write is atomic: if it fails, nothing about the existing accounts has changed.
+			const { account, created } = getOpenAiCodexAccountStore().upsert(credentials, { activate: true })
+			OpenAiCodexOAuthService.notifyActiveAccountChanged()
+			await mirrorLegacySecret(credentials)
 			callbackServer.complete()
+			return { account: brief(account), created }
 		} catch (error) {
 			callbackServer.cancel(error instanceof Error ? error : new Error(String(error)))
 			throw error
 		}
 	}
 
-	static signOut(): void {
+	/** A different account became active (or none): drop everything derived from the previous one. */
+	static notifyActiveAccountChanged(): void {
 		credentialGeneration += 1
-		credentialRefreshInFlight = undefined
-		StateManager.get().setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, undefined)
+		credentialRefreshesInFlight.clear()
 		cachedOpenAiCodexModels = {}
+	}
+
+	/** Makes another saved account active. Takes effect on the next request in every process. */
+	static switchAccount(reference: string): CodexAccountBrief {
+		const account = getOpenAiCodexAccountStore().activate(reference)
+		OpenAiCodexOAuthService.notifyActiveAccountChanged()
+		void mirrorLegacySecret(account.credentials)
+		return brief(account)
+	}
+
+	/** Removes one saved account. If it was active the next ready account takes over. */
+	static removeAccount(reference: string): { removed: CodexAccountBrief; nowActive?: CodexAccountBrief } {
+		const store = getOpenAiCodexAccountStore()
+		const wasActive = store.active()?.id === store.resolve(reference).id
+		const result = store.remove(reference)
+		if (wasActive) {
+			OpenAiCodexOAuthService.notifyActiveAccountChanged()
+			void mirrorLegacySecret(result.nowActive?.credentials)
+		}
+		return { removed: brief(result.removed), nowActive: result.nowActive ? brief(result.nowActive) : undefined }
+	}
+
+	/**
+	 * Signs out the active account only; with `all`, every saved account. If another account remains it becomes active,
+	 * so signing out of a limited account never leaves the user disconnected by accident.
+	 */
+	static signOut(options: { all?: boolean } = {}): { removed: number; nowActive?: CodexAccountBrief } {
+		const store = getOpenAiCodexAccountStore()
+		let removed = 0
+		let nowActive: StoredCodexAccount | undefined
+		try {
+			if (options.all) {
+				removed = store.removeAll()
+			} else {
+				const active = store.active()
+				if (active) {
+					const result = store.remove(active.id)
+					removed = 1
+					nowActive = result.nowActive
+				}
+			}
+		} catch {
+			// An unusable vault falls through to clearing the legacy secret below.
+		}
+		OpenAiCodexOAuthService.notifyActiveAccountChanged()
+		void mirrorLegacySecret(nowActive?.credentials)
+		if (removed === 0) StateManager.get().setSecret(OPENAI_CODEX_OAUTH_CREDENTIALS_KEY, undefined)
+		return { removed, nowActive: nowActive ? brief(nowActive) : undefined }
 	}
 
 	static async getValidCredentials(rawFallback?: string): Promise<OpenAiCodexOAuthCredentials> {
@@ -724,6 +901,7 @@ export class OpenAiCodexOAuthService {
 			try {
 				refreshedCredentials = await refreshAndPersistCredentials(credentials)
 			} catch (error) {
+				if (error instanceof CodexRefreshRejectedError) throw error
 				throw new Error(
 					`OpenAI Codex rejected the session and token refresh failed. Sign out and sign in again. ${getSafeErrorMessage(error)}`,
 				)

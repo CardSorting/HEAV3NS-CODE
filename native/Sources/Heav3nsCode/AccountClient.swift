@@ -20,13 +20,14 @@ final class AccountClient {
               url.port == nil || url.port == 443, ["/oauth/authorize", "/api/accounts/authorize"].contains(url.path) else { return nil }
         return url
     }
-    func request(_ method: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    /// `params` carries only account identifiers, labels and flags, never credentials.
+    func request(_ method: String, params: [String: Any] = [:], completion: @escaping (Result<[String: Any], Error>) -> Void) {
         let id = UUID().uuidString
         do {
             guard callbacks.count < (method == "cancel" ? 16 : 14) else { throw BridgeError.message("The account service is busy. Try again shortly.") }
             try start()
             callbacks[id] = completion
-            var data = try JSONSerialization.data(withJSONObject: ["v": 1, "id": id, "method": method]); data.append(10)
+            var data = try JSONSerialization.data(withJSONObject: params.merging(["v": 1, "id": id, "method": method]) { _, reserved in reserved }); data.append(10)
             try input?.fileHandleForWriting.write(contentsOf: data)
             deadlines[id] = .now() + (method == "signIn" ? 180 : 15)
             scheduleDeadline()

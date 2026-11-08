@@ -3,9 +3,23 @@ import { ApiFormat } from "@shared/proto/dietcode/models"
 import OpenAI from "openai"
 import type { ChatCompletionTool as OpenAITool } from "openai/resources/chat/completions"
 import { toOpenAIResponsesAPITool } from "@/core/prompts/system-prompt/spec"
-import { getOpenAiCodexModelInfo, OpenAiCodexOAuthService, openAiCodexProvider } from "@/services/auth/OpenAiCodexOAuthService"
+import { surfaceStreamErrors, withUsageLimitNoRetry } from "@/services/auth/openAiCodexLimits"
+import {
+	type CodexAccountSwitchNotice,
+	classifyCodexFailure,
+	recordSignInExpired,
+	recordUsageLimit,
+	switchAwayFromLimitedAccount,
+} from "@/services/auth/openAiCodexAccounts"
+import {
+	CodexRefreshRejectedError,
+	getOpenAiCodexAccountStore,
+	getOpenAiCodexModelInfo,
+	OpenAiCodexOAuthService,
+	openAiCodexProvider,
+} from "@/services/auth/OpenAiCodexOAuthService"
 import { DietCodeStorageMessage } from "@/shared/messages/content"
-import { createOpenAIClient } from "@/shared/net"
+import { fetch as configuredFetch, createOpenAIClient } from "@/shared/net"
 import { DietCodeTool } from "@/shared/tools"
 import { type ReasoningEffort, reasoningEfforts } from "../../providers/reasoning-effort.js"
 import { withRetry } from "../retry"
@@ -21,6 +35,8 @@ export interface OpenAiCodexHandlerOptions extends CommonApiHandlerOptions {
 	thinkingBudgetTokens?: number
 	abortSignal?: AbortSignal
 	parallelToolCalls?: boolean
+	/** Called when the handler moves to another saved ChatGPT account because the active one hit a usage limit. */
+	onAccountSwitch?: (notice: CodexAccountSwitchNotice) => void
 }
 
 function isOpenAiTool(tool: DietCodeTool): tool is OpenAITool {
@@ -70,6 +86,7 @@ export class OpenAiCodexHandler implements ApiHandler {
 			this.client = createOpenAIClient({
 				baseURL: openAiCodexProvider.baseUrl,
 				apiKey: credentials.accessToken,
+				fetch: withUsageLimitNoRetry(configuredFetch),
 				defaultHeaders: {
 					...(credentials.accountId ? { "ChatGPT-Account-ID": credentials.accountId } : {}),
 					originator: openAiCodexProvider.originator,
@@ -94,13 +111,6 @@ export class OpenAiCodexHandler implements ApiHandler {
 		if (!model.id) {
 			throw new Error("No OpenAI Codex model is selected. Sign in and refresh the available models.")
 		}
-		if (!getOpenAiCodexModelInfo(model.id)) {
-			const availableModels = await OpenAiCodexOAuthService.listModels(this.options.openAiCodexOauthCredentials)
-			if (!availableModels[model.id]) {
-				throw new Error(`OpenAI Codex model "${model.id}" is not available in the provider catalog.`)
-			}
-			model = this.getModel()
-		}
 		// Keep Codex turns stateless. The ChatGPT-backed Codex endpoint does not
 		// reliably retain a response when `store` is false, so sending a
 		// `previous_response_id` alongside `store: false` can produce a body-less
@@ -111,53 +121,110 @@ export class OpenAiCodexHandler implements ApiHandler {
 		const { input } = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false })
 		const responseTools = (tools || []).filter(isOpenAiTool).map((tool) => toOpenAIResponsesAPITool(tool))
 
-		const requestParams: OpenAI.Responses.ResponseCreateParamsStreaming = {
-			model: model.id,
-			instructions: systemPrompt,
-			input,
-			stream: true,
-			store: false,
-			include: ["reasoning.encrypted_content"],
-			parallel_tool_calls: this.options.parallelToolCalls ?? false,
-		}
-		if (responseTools.length > 0) {
-			requestParams.tools = responseTools
-		}
-		if (model.info.maxTokens) {
-			requestParams.max_output_tokens = model.info.maxTokens
-		}
-		if (
-			this.options.reasoningEffort &&
-			(model.info.supportsReasoning ||
-				reasoningEfforts("openai-codex", model.id).includes(this.options.reasoningEffort as ReasoningEffort))
-		) {
-			requestParams.reasoning = {
-				effort: this.options.reasoningEffort as "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
-				summary: "auto",
-			}
-		}
+		// Never spend a request on an account already known to be at its limit when another one is ready.
+		this.applySwitch(switchAwayFromLimitedAccount(getOpenAiCodexAccountStore()))
 
 		let unauthorizedRetry = false
+		let accountSwitches = 0
 		while (true) {
 			let yieldedChunk = false
 			try {
+				if (!getOpenAiCodexModelInfo(model.id)) {
+					const availableModels = await OpenAiCodexOAuthService.listModels(this.options.openAiCodexOauthCredentials)
+					if (!availableModels[model.id]) {
+						throw new Error(`OpenAI Codex model "${model.id}" is not available in the provider catalog.`)
+					}
+					model = this.getModel()
+				}
+				const requestParams: OpenAI.Responses.ResponseCreateParamsStreaming = {
+					model: model.id,
+					instructions: systemPrompt,
+					input,
+					stream: true,
+					store: false,
+					include: ["reasoning.encrypted_content"],
+					parallel_tool_calls: this.options.parallelToolCalls ?? false,
+				}
+				if (responseTools.length > 0) {
+					requestParams.tools = responseTools
+				}
+				if (model.info.maxTokens) {
+					requestParams.max_output_tokens = model.info.maxTokens
+				}
+				if (
+					this.options.reasoningEffort &&
+					(model.info.supportsReasoning ||
+						reasoningEfforts("openai-codex", model.id).includes(this.options.reasoningEffort as ReasoningEffort))
+				) {
+					requestParams.reasoning = {
+						effort: this.options.reasoningEffort as "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
+						summary: "auto",
+					}
+				}
 				const stream = await (await this.ensureClient()).responses.create(requestParams, {
 					signal: this.options.abortSignal,
 				})
-				for await (const chunk of handleResponsesApiStreamResponse(stream, model.info, async () => 0)) {
+				for await (const chunk of handleResponsesApiStreamResponse(surfaceStreamErrors(stream), model.info, async () => 0)) {
 					yieldedChunk = true
 					yield chunk
 				}
 				return
 			} catch (error) {
-				if (unauthorizedRetry || yieldedChunk || !isUnauthorized(error) || this.options.abortSignal?.aborted) {
-					throw error
+				if (yieldedChunk || this.options.abortSignal?.aborted) throw error
+				let authFailure = error instanceof CodexRefreshRejectedError ? error : undefined
+				if (!authFailure && !unauthorizedRetry && isUnauthorized(error)) {
+					unauthorizedRetry = true
+					try {
+						await OpenAiCodexOAuthService.refreshAfterUnauthorized(this.options.openAiCodexOauthCredentials)
+						this.client = undefined
+						continue
+					} catch (refreshError) {
+						if (!(refreshError instanceof CodexRefreshRejectedError)) throw refreshError
+						authFailure = refreshError
+					}
 				}
-				unauthorizedRetry = true
-				await OpenAiCodexOAuthService.refreshAfterUnauthorized(this.options.openAiCodexOauthCredentials)
-				this.client = undefined
+				if (authFailure) {
+					// This account's sign-in is over. Flag it and continue on another account if there is one.
+					const store = getOpenAiCodexAccountStore()
+					const failed = store.list().find((account) => account.credentials.accessToken === this.clientAccessToken) ?? store.active()
+					const outcome = recordSignInExpired(store, failed, authFailure.message)
+					if (outcome.switched && accountSwitches < Math.max(1, store.list().length)) {
+						accountSwitches += 1
+						unauthorizedRetry = false
+						OpenAiCodexOAuthService.notifyActiveAccountChanged()
+						this.client = undefined
+						this.options.onAccountSwitch?.(outcome.switched)
+						continue
+					}
+					throw outcome.exhausted ?? authFailure
+				}
+				const failure = classifyCodexFailure(error)
+				if (failure.kind !== "usage_limit") throw error
+
+				// A usage limit lasts hours, so retrying is pointless. Mark the account that actually made this request
+				// (another process may have switched since), then continue on the next available one.
+				const store = getOpenAiCodexAccountStore()
+				const failedAccount =
+					store.list().find((account) => account.credentials.accessToken === this.clientAccessToken) ?? store.active()
+				const outcome = recordUsageLimit(store, failedAccount, failure)
+				if (outcome.switched && accountSwitches < Math.max(1, store.list().length)) {
+					accountSwitches += 1
+					unauthorizedRetry = false
+					OpenAiCodexOAuthService.notifyActiveAccountChanged()
+					this.client = undefined
+					this.options.onAccountSwitch?.(outcome.switched)
+					continue
+				}
+				throw outcome.exhausted ?? error
 			}
 		}
+	}
+
+	private applySwitch(notice: CodexAccountSwitchNotice | undefined): void {
+		if (!notice) return
+		OpenAiCodexOAuthService.notifyActiveAccountChanged()
+		this.client = undefined
+		this.options.onAccountSwitch?.(notice)
 	}
 
 	getModel(): { id: string; info: ModelInfo } {

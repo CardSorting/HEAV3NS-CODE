@@ -21,7 +21,13 @@ import { OpencodeOAuthManager } from "../../../integrations/opencode/oauth.js"
 import type { AuthStorageVault } from "../resolution/auth-storage-vault.js"
 import type { EnvironmentKeyResolver } from "../resolution/environment-key-resolver.js"
 import type { LlmProxyGateway, ProxyEndpointConfig } from "../resolution/llm-proxy-gateway.js"
-import { hasOpenAiCodexOAuthCredentials, OpenAiCodexOAuthService } from "../../../services/auth/OpenAiCodexOAuthService.js"
+import { describeAccountsLine } from "../../../services/auth/openAiCodexAccounts.js"
+import { formatPlan } from "../../../services/auth/openAiCodexLimits.js"
+import {
+	getOpenAiCodexAccountStore,
+	hasOpenAiCodexOAuthCredentials,
+	OpenAiCodexOAuthService,
+} from "../../../services/auth/OpenAiCodexOAuthService.js"
 
 export interface ProviderAuditStatus {
 	provider: string
@@ -197,6 +203,9 @@ export class SetupWizard {
 			console.log(
 				`│    \x1b[90mProvider:\x1b[0m   \x1b[32m${activeProvider ? getAgentProviderLabel(activeProvider.provider) : "Configured"}\x1b[0m`,
 			)
+			const accountsLine = codexSession ? describeAccountsLine(getOpenAiCodexAccountStore()) : undefined
+			if (accountsLine) console.log(`│    \x1b[90mAccount:\x1b[0m    \x1b[32m${accountsLine}\x1b[0m`)
+			if (codexSession) console.log(`│    \x1b[90mManage:\x1b[0m     \x1b[36mheav3ns accounts\x1b[0m`)
 			console.log(`│    \x1b[90mCheck access:\x1b[0m \x1b[36mRun heav3ns doctor\x1b[0m`)
 		} else if (hasClaudeTransport) {
 			console.log(`│  \x1b[1;33m○ Claude subscription transport detected\x1b[0m`)
@@ -222,10 +231,23 @@ export class SetupWizard {
 		this.saveConfigToDisk()
 	}
 
+	/**
+	 * Signs out of the active ChatGPT account. When other accounts remain they stay saved and one becomes active, so
+	 * the user is not disconnected by accident; only when none is left (or with `all`) are provider credentials cleared.
+	 */
+	logoutAccount(options: { all?: boolean } = {}): { removed: number; nowActive?: { id: string; label: string } } {
+		const result = OpenAiCodexOAuthService.signOut(options)
+		if (!result.nowActive) {
+			this.savedOpenAiAuthMethod = undefined
+			this.clearAllCredentials()
+		}
+		return result
+	}
+
 	/** Signs out and clears all stored credentials. */
 	logout(): boolean {
 		try {
-			OpenAiCodexOAuthService.signOut()
+			OpenAiCodexOAuthService.signOut({ all: true })
 			this.savedOpenAiAuthMethod = undefined
 			this.clearAllCredentials()
 			return true
@@ -244,7 +266,7 @@ export class SetupWizard {
 		const onInterrupt = () => abortController.abort()
 		process.once("SIGINT", onInterrupt)
 		try {
-			await this.signInCodexOAuth(
+			const signedIn = await this.signInCodexOAuth(
 				(link) => console.log(`Browser did not open. Open this sign-in link manually:\n\n${link}\n`),
 				abortController.signal,
 			)
@@ -254,7 +276,16 @@ export class SetupWizard {
 			if (!savedModel || savedModel.toLowerCase().startsWith("claude-")) {
 				this.setSavedModel("gpt-5.6-terra")
 			}
-			console.log("\x1b[32m[✓] OpenAI Codex connected with your ChatGPT account.\x1b[0m\n")
+			const saved = getOpenAiCodexAccountStore().list().length
+			const plan = formatPlan(signedIn.account.planType)
+			console.log(
+				`\x1b[32m[✓] ${signedIn.created ? "Added" : "Refreshed"} ChatGPT account "${signedIn.account.label}"${plan ? ` (${plan})` : ""} and made it active.\x1b[0m`,
+			)
+			console.log(
+				saved > 1
+					? `\x1b[90m${saved} accounts are saved. Switch with \x1b[36mheav3ns accounts switch\x1b[90m; rename with \x1b[36mheav3ns accounts rename\x1b[90m.\x1b[0m\n`
+					: "\x1b[90mAdd another account any time with \x1b[36mheav3ns login\x1b[90m to switch when you reach a usage limit.\x1b[0m\n",
+			)
 		} catch (error) {
 			if (abortController.signal.aborted) {
 				console.log("\nOpenAI Codex sign-in cancelled. Your current connection was left unchanged.\n")
@@ -268,8 +299,8 @@ export class SetupWizard {
 		}
 	}
 
-	async signInCodexOAuth(onManualBrowserOpen?: (authorizationLink: string) => void, signal?: AbortSignal): Promise<void> {
-		await OpenAiCodexOAuthService.signIn(onManualBrowserOpen, signal)
+	async signInCodexOAuth(onManualBrowserOpen?: (authorizationLink: string) => void, signal?: AbortSignal) {
+		return OpenAiCodexOAuthService.signIn(onManualBrowserOpen, signal)
 	}
 
 	displayAuditTable(): void {

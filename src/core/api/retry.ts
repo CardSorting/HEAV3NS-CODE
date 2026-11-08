@@ -1,3 +1,4 @@
+import { classifyCodexFailure } from "@/services/auth/openAiCodexLimits"
 import { Logger } from "@/shared/services/Logger"
 
 interface RetryOptions {
@@ -37,6 +38,12 @@ function retryDelay(retryAfter: unknown, attempt: number, baseDelay: number, max
 	return hintedDelay ?? Math.min(maxDelay, baseDelay * 2 ** attempt)
 }
 
+/** A 429 that will not clear on its own for hours (plan usage limit, exhausted quota): retrying only wastes requests. */
+export function isNonRetryableRateLimit(error: unknown): boolean {
+	if ((error as { retryable?: unknown } | undefined)?.retryable === false) return true
+	return classifyCodexFailure(error).kind === "usage_limit"
+}
+
 export class RetriableError extends Error {
 	status = 429
 	retryAfter?: number
@@ -61,7 +68,7 @@ export function withRetry(options: RetryOptions = {}) {
 					yield* originalMethod.apply(this, args)
 					return
 				} catch (error: any) {
-					const isRateLimit = error?.status === 429 || error instanceof RetriableError
+					const isRateLimit = (error?.status === 429 || error instanceof RetriableError) && !isNonRetryableRateLimit(error)
 					const isLastAttempt = attempt === maxRetries - 1
 
 					if ((!isRateLimit && !retryAllErrors) || isLastAttempt) {
@@ -107,7 +114,7 @@ export async function asyncRetry<T>(
 		try {
 			return await fn()
 		} catch (error: any) {
-			const isRateLimit = error?.status === 429 || error instanceof RetriableError
+			const isRateLimit = (error?.status === 429 || error instanceof RetriableError) && !isNonRetryableRateLimit(error)
 			const isLastAttempt = attempt === maxRetries - 1
 
 			if ((!isRateLimit && !retryAllErrors) || isLastAttempt) {

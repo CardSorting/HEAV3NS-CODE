@@ -135,6 +135,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if !ProcessInfo.processInfo.arguments.contains("--integration-probe") { updates.addMenuItems(to: applicationMenu) }
         let swarmRadarItem = applicationMenu.addItem(withTitle: "Sovereign Swarm Radar…", action: #selector(showSwarmRadar), keyEquivalent: "")
         swarmRadarItem.target = self
+        applicationMenu.addItem(withTitle: "ChatGPT Accounts…", action: #selector(showChatGPTAccounts), keyEquivalent: "").target = self
         applicationMenu.addItem(.separator())
         applicationMenu.addItem(withTitle: "Hide HEAV3NS-CODE", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         applicationMenu.addItem(withTitle: "Quit HEAV3NS-CODE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -334,6 +335,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc private func showProjectLibrary() { showLauncher() }
     @objc private func newConversation() { current?.newConversation() }
     @objc private func showModels() { current?.showModels() }
+    @objc private func showChatGPTAccounts() { ChatGPTAccountsWindow.shared.present() }
     @objc private func openFile() { current?.showQuickOpen() }
     @objc private func showWalkthrough() { current?.showWalkthrough() }
     @objc private func showProjectRun() { current?.showProjectRun() }

@@ -18,3 +18,4 @@ Existing installations can use **HEAV3NS-CODE → Check for Updates…**. Sparkl
   - **Fallback**: if guided generation is unavailable the bridge uses the earlier text-tool-call protocol. Set `HEAV3NS_ONDEVICE_ADAPTER=legacy` to force that path when diagnosing.
 
   Expect each tool step to take several model calls (roughly 10-25 seconds). It is best for focused edits, commands and questions; use a cloud provider for large refactors.
+- **ChatGPT Multi-Account Management & Automatic Usage-Limit Failover**: Sign in with multiple ChatGPT accounts (`Plus`, `Pro`, `Team`, `Enterprise`) and switch between them from **HEAV3NS-CODE → ChatGPT Accounts…**, the Model Picker, the Launcher, or `heav3ns accounts`. When an active account hits a ChatGPT usage limit (or its session expires), HEAV3NS records the reset time and automatically continues the request on the next ready account without retrying the exhausted account.

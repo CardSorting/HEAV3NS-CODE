@@ -44,6 +44,8 @@ import { CliSideQuestion } from "./cli-side-question.js"
 import type { CliProjectTasks } from "./cli-project-tasks.js"
 import { CliSleepGuard } from "./cli-sleep-guard.js"
 import type { CliAgentSwarmReviewCycle, CliAgentSwarmState, CliConversation, CliReviewCorrectiveTask } from "./cli-conversation.js"
+import { describeAccountsLine } from "../../../services/auth/openAiCodexAccounts.js"
+import { getOpenAiCodexAccountStore } from "../../../services/auth/OpenAiCodexOAuthService.js"
 import { CliApprovals } from "./cli-approvals.js"
 import type { CliGoal, GoalAction } from "./cli-goal.js"
 import { runCliGoal } from "./cli-goal-runner.js"
@@ -827,7 +829,7 @@ export class InteractiveModeController {
 		const headerBox = new Box(1, 0, headerBg)
 
 		const headerText = new Text(
-			`\x1b[1;35m❖ HEAV3NS v16.2.0\x1b[0m  │  ` +
+			`\x1b[1;35m❖ HEAV3NS v16.3.0\x1b[0m  │  ` +
 				`\x1b[90mProvider:\x1b[0m \x1b[1;35m${getAgentProviderLabel(monolith.config.provider)}\x1b[0m  │  ` +
 				`\x1b[90mModel:\x1b[0m \x1b[1;36m${monolith.config.modelName}\x1b[0m  │  ` +
 				`\x1b[90mHealth:\x1b[0m \x1b[1;32m[OPERATIONAL]\x1b[0m`,
@@ -1493,7 +1495,7 @@ export class InteractiveModeController {
 			const memCount = monolith.sessionMemoryStore.listMemories().length
 			const memSuffix = memCount > 0 ? `  │  \x1b[90mMem:\x1b[0m \x1b[36m${memCount}\x1b[0m` : ""
 			headerText.setText(
-				`\x1b[1;35m❖ HEAV3NS v16.2.0\x1b[0m  │  ` +
+				`\x1b[1;35m❖ HEAV3NS v16.3.0\x1b[0m  │  ` +
 					`\x1b[90mProvider:\x1b[0m \x1b[1;35m${getAgentProviderLabel(monolith.config.provider)}\x1b[0m  │  ` +
 					`\x1b[90mModel:\x1b[0m \x1b[1;36m${monolith.config.modelName}\x1b[0m  │  ` +
 					`\x1b[90mFrame:\x1b[0m \x1b[1;33m#${turnCount}\x1b[0m${memSuffix}  │  ` +
@@ -2428,14 +2430,34 @@ export class InteractiveModeController {
 					return
 				}
 
-				if (input === "/logout" || input === "/auth logout") {
-					const success = monolith.setupWizard.logoutCodexOAuth()
+				if (input === "/accounts" || input.startsWith("/accounts ") || input === "/switch" || input.startsWith("/switch ")) {
+					// Same engine as `heav3ns accounts`, rendered as a card. `/switch 2` is shorthand for `/accounts switch 2`.
+					const words = input.split(/\s+/).filter(Boolean)
+					const argv = words[0] === "/switch" ? ["switch", ...words.slice(1)] : words.slice(1)
+					const lines: string[] = []
+					const { runAccountsCommand } = await import("../../../cli/accounts-command.js")
+					await runAccountsCommand(argv, { log: (line) => lines.push(line), error: (line) => lines.push(line) })
+					// biome-ignore lint/suspicious/noControlCharactersInRegex: strips ANSI colour codes for the card
+					const text = lines.join("\n").replace(/\x1b\[[0-9;]*m/g, "").trim()
+					updateHeader()
+					const cardBox = new Box(1, 0, (str: string) => `\x1b[48;5;236m${str}\x1b[0m`)
+					cardBox.addChild(new Markdown(`\`\`\`\n${text}\n\`\`\``, 0, 0, DEFAULT_MARKDOWN_THEME))
+					historyContainer.addChild(cardBox)
+					tui.requestRender()
+					return
+				}
+
+				if (input === "/logout" || input === "/logout all" || input === "/auth logout") {
+					const result = monolith.setupWizard.logoutAccount({ all: input === "/logout all" })
+					const success = result.removed > 0 || !result.nowActive
 					updateHeader()
 					const cardBox = new Box(1, 0, (str: string) => `\x1b[48;5;236m${str}\x1b[0m`)
 					cardBox.addChild(
 						new Markdown(
 							success
-								? `\x1b[1;32m[✓] Signed out successfully.\x1b[0m\n\nOAuth credentials removed from active session. Type \`/login\` anytime to reconnect.`
+								? result.nowActive
+									? `\x1b[1;32m[✓] Signed out of the active ChatGPT account.\x1b[0m\n\nNow using **${result.nowActive.label}**. Other saved accounts were kept; \`/logout all\` signs out of everything, \`/accounts\` manages them.`
+									: `\x1b[1;32m[✓] Signed out successfully.\x1b[0m\n\nOAuth credentials removed from active session. Type \`/login\` anytime to reconnect.`
 								: `\x1b[1;31m[!] Logout completed with warnings.\x1b[0m`,
 							0,
 							0,
@@ -2463,6 +2485,8 @@ export class InteractiveModeController {
 							lines.push(`- ${getAgentProviderLabel(p.provider)} (via \`${p.source}\`)`)
 						}
 					}
+					const accountsLine = describeAccountsLine(getOpenAiCodexAccountStore())
+					if (accountsLine) lines.push(`- **ChatGPT Account**: ${accountsLine} (\`/accounts\` to manage, \`/switch <n>\` to change)`)
 					lines.push(`\n*Type \`/login\` to connect credentials or \`/logout\` to sign out.*`)
 
 					cardBox.addChild(new Markdown(lines.join("\n"), 0, 0, DEFAULT_MARKDOWN_THEME))
@@ -3177,9 +3201,22 @@ export class InteractiveModeController {
 					return
 				}
 
-				if (input === "/logout" || input === "/auth logout") {
-					monolith.setupWizard.logoutCodexOAuth()
-					console.log("\x1b[32m[✓] Signed out successfully.\x1b[0m")
+				if (input === "/accounts" || input.startsWith("/accounts ") || input === "/switch" || input.startsWith("/switch ")) {
+					const words = input.split(/\s+/).filter(Boolean)
+					const argv = words[0] === "/switch" ? ["switch", ...words.slice(1)] : words.slice(1)
+					const { runAccountsCommand } = await import("../../../cli/accounts-command.js")
+					await runAccountsCommand(argv)
+					rl.prompt()
+					return
+				}
+
+				if (input === "/logout" || input === "/logout all" || input === "/auth logout") {
+					const result = monolith.setupWizard.logoutAccount({ all: input === "/logout all" })
+					console.log(
+						result.nowActive
+							? `\x1b[32m[✓] Signed out of the active ChatGPT account.\x1b[0m Now using "${result.nowActive.label}". /logout all signs out of everything; /accounts manages them.`
+							: "\x1b[32m[✓] Signed out successfully.\x1b[0m",
+					)
 					rl.prompt()
 					return
 				}
@@ -3230,7 +3267,8 @@ export class InteractiveModeController {
 				if (input === "/help" || input === "?") {
 					console.log("\x1b[1;36m--- HEAV3NS REPL Commands ---\x1b[0m")
 					console.log("  \x1b[35m/login\x1b[0m        : Connect OpenAI Codex OAuth or configure API keys")
-					console.log("  \x1b[35m/logout\x1b[0m       : Sign out and clear cached credentials")
+					console.log("  \x1b[35m/logout\x1b[0m       : Sign out of the active ChatGPT account (/logout all: every account)")
+					console.log("  \x1b[35m/accounts\x1b[0m     : List and manage saved ChatGPT accounts (/switch <n> to change)")
 					console.log("  \x1b[35m/whoami\x1b[0m       : Display current identity & token status")
 					console.log("  \x1b[35m/model [name]\x1b[0m : Switch active LLM model")
 					console.log("  \x1b[35m/agents\x1b[0m       : Inspect delegated tasks, outcomes, and blockers")

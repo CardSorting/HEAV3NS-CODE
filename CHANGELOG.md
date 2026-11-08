@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.3.0] - 2026-11-07
+
+### Added
+
+- **ChatGPT (`openai-codex`) multi-account vault, automatic failover, and native/CLI account management**:
+  - **Cross-process account vault** (`src/services/auth/OpenAiCodexAccountStore.ts`): stores multiple ChatGPT sign-ins in `<dataDir>/accounts/openai-codex.json` under a directory lock with atomic rename and exclusive per-account refresh locks so single-use refresh tokens are never spent twice across concurrent workspaces or processes.
+  - **Usage-limit and expired-session failover** (`src/services/auth/openAiCodexLimits.ts`, `src/services/auth/openAiCodexAccounts.ts`, `src/core/api/providers/openai-codex.ts`): classifies HTTP 429 and SSE `error` / `response.failed` quota limits separately from transient rate limits, disables futile SDK/engine retries on usage limits, parses reset timestamps from response bodies and headers, skips known-limited accounts up front, and automatically switches to the least recently used ready account (or explains when the limit resets and how to add/switch accounts).
+  - **CLI & interactive commands** (`src/cli/accounts-command.ts`): `heav3ns accounts [list|switch|add|rename|remove|auto|clear-limit]` with masked emails by default (`--emails` to reveal, `--json` for machine output without secrets), plus `/accounts` in interactive mode and enhanced `heav3ns whoami` / `heav3ns logout [--all]`.
+  - **Native macOS ChatGPT Accounts window** (`native/Sources/Heav3nsCode/ChatGPTAccountsWindow.swift`, `ChatGPTAccountsState.swift`, `AccountClient.swift`): manage saved accounts (`HEAV3NS-CODE → ChatGPT Accounts…`, Model Picker footer, and Launcher status bar) with one-click switching, browser sign-in to add accounts, inline renaming, limit clearing, removal, and an automatic-failover toggle. No tokens, emails, or raw `accountId` values cross the native pipe.
+
 ## [16.2.0] - 2026-11-07
 
 ### Added

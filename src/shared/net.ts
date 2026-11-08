@@ -296,6 +296,7 @@ export function createOpenAIClient(options: OpenAIClientOptions): OpenAI {
 			...externalHeaders,
 			...options.defaultHeaders,
 		},
-		fetch, // Use configured fetch with proxy support
+		// Callers may wrap the configured fetch (for example to mark responses non-retryable); default to it.
+		fetch: options.fetch ?? fetch,
 	})
 }

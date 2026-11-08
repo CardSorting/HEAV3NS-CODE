@@ -16,6 +16,9 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private let appleIntelligenceStatus = JourneyStyle.label("", size: 11, secondary: true)
     private let openAppleIntelligence = NSButton(title: "Open Apple Intelligence Settings…", target: nil, action: nil)
     private let appleIntelligenceRow = NSStackView()
+    private let openChatGPTAccounts = NSButton(title: "Manage ChatGPT accounts…", target: nil, action: nil)
+    private let chatGPTAccountsRow = NSStackView()
+    private var accountsObserver: NSObjectProtocol?
     private var keyPending = false
     private var keySaved = false
     private let supportsCredentials: () -> Bool
@@ -79,6 +82,16 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         appleIntelligenceStatus.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         openAppleIntelligence.setContentCompressionResistancePriority(.required, for: .horizontal)
         appleIntelligenceRow.isHidden = true
+        openChatGPTAccounts.target = self; openChatGPTAccounts.action = #selector(showChatGPTAccounts); openChatGPTAccounts.bezelStyle = .rounded
+        openChatGPTAccounts.toolTip = "See plan and usage-limit status, switch accounts, or add another"
+        chatGPTAccountsRow.orientation = .horizontal; chatGPTAccountsRow.alignment = .centerY; chatGPTAccountsRow.spacing = 8
+        chatGPTAccountsRow.addArrangedSubview(NSView()); chatGPTAccountsRow.addArrangedSubview(openChatGPTAccounts)
+        chatGPTAccountsRow.isHidden = true
+        // Switching an account elsewhere changes the status line shown for this provider; keep it current.
+        accountsObserver = NotificationCenter.default.addObserver(forName: ChatGPTAccountsWindow.didChange, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.window?.isVisible == true else { return }
+            self.load()
+        }
         provider.target = self; provider.action = #selector(changeProvider); provider.setAccessibilityLabel("Provider")
         model.delegate = self; model.setAccessibilityLabel("Custom model ID")
         model.placeholderString = "Exact model ID"; model.target = self; model.action = #selector(save)
@@ -104,7 +117,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             JourneyStyle.label("Choose Model", size: 20, weight: .semibold),
             JourneyStyle.label("Choose a model to switch immediately in this workspace.", size: 12, secondary: true),
             status, JourneyStyle.rule(), JourneyStyle.label("Provider", size: 12, weight: .semibold), provider, detail,
-            credentialsRow, appleIntelligenceRow, modelChoice, customRow, modelInformation,
+            credentialsRow, appleIntelligenceRow, chatGPTAccountsRow, modelChoice, customRow, modelInformation,
             availability, footer
         ], spacing: 10)
         panel.contentView?.addSubview(root)
@@ -145,6 +158,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous" || displayedProvider == "opencode" || displayedProvider == "apple-playground") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
         return nil
     }
+    @objc private func showChatGPTAccounts() { ChatGPTAccountsWindow.shared.present() }
     @objc private func showAppleIntelligenceSettings() {
         OnDevicePlaygroundService.shared.openAppleIntelligenceSettings()
     }
@@ -155,6 +169,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         credentialsRow.isHidden = !hasCredentials || !supportsCredentials()
         let isApplePlayground = displayedProvider == "apple-playground"
         appleIntelligenceRow.isHidden = !isApplePlayground
+        chatGPTAccountsRow.isHidden = displayedProvider != "openai-codex"
         if isApplePlayground {
             let localStatus = OnDevicePlaygroundService.shared.localTextModelStatus()
             appleIntelligenceStatus.stringValue = OnDevicePlaygroundService.shared.statusSummary()
