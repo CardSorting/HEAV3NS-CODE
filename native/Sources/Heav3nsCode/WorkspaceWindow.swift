@@ -2494,6 +2494,7 @@ final class WorkspaceWindow: NSWindowController, NSWindowDelegate, NSTableViewDa
         case "models-cline", "models-cline-pass": modelPicker?.providerProbe("cline-pass")
         case "models-nous", "models-nous-research": modelPicker?.providerProbe("nous")
         case "models-opencode": modelPicker?.providerProbe("opencode")
+        case "models-apple-playground", "models-local", "models-playground": modelPicker?.providerProbe("apple-playground")
         case "models-openai": modelPicker?.providerProbe("openai-codex")
         case "models-disconnect": client.closeInput()
         case "models-reconnect": reconnect()

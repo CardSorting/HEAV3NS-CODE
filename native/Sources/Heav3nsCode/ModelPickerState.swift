@@ -16,11 +16,12 @@ struct WorkspaceModelSelection: Equatable {
         case "cline-pass": return "Cline Pass"
         case "nous": return "Nous Research"
         case "opencode": return "OpenCode"
+        case "apple-playground": return "On this Mac (Playground)"
         case "openai-codex": return "OpenAI Codex"
         default: return "Claude Code"
         }
     }
-    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter", "cline-pass", "nous", "opencode"]
+    static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter", "cline-pass", "nous", "opencode", "apple-playground"]
     static func validModel(_ value: String) -> Bool {
         value.utf8.count <= 200 && value.range(of: "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*\\z", options: .regularExpression) != nil
     }

@@ -1,4 +1,6 @@
 import {
+	APPLE_PLAYGROUND_DEFAULT_MODEL,
+	APPLE_PLAYGROUND_PROVIDER,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
@@ -12,7 +14,7 @@ import {
 	type ClaudeSubscriptionDirectSdkOptions,
 	discoverClaudeSubscriptionDirectSdkModels,
 } from "../../../integrations/claude-subscription-directsdk/provider.js"
-import { opencodeModels } from "../../../shared/api.js"
+import { applePlaygroundModels, opencodeModels } from "../../../shared/api.js"
 import { DeterministicLocalEndpointEngine } from "../../../tooling/extensions/endpoints/deterministic-local-endpoint-engine.js"
 import { DynamicModelCache } from "./dynamic-model-cache.js"
 
@@ -141,6 +143,31 @@ const opencodeCatalogModels: ModelSpecs[] = Object.entries(opencodeModels).map((
 	}
 })
 
+const applePlaygroundCatalogModels: ModelSpecs[] = Object.entries(applePlaygroundModels).map(([id, rawInfo]) => {
+	const info = rawInfo as {
+		name?: string
+		description?: string
+		contextWindow?: number
+		maxTokens?: number
+		supportsImages?: boolean
+		supportsReasoning?: boolean
+	}
+	return {
+		modelName: id,
+		provider: APPLE_PLAYGROUND_PROVIDER,
+		catalogSource: "pinned",
+		contextWindowTokens: info.contextWindow ?? 65_536,
+		maxOutputTokens: info.maxTokens ?? 8_192,
+		inputPricePer1M: 0,
+		outputPricePer1M: 0,
+		supportsVision: info.supportsImages ?? false,
+		supportsReasoning: info.supportsReasoning ?? false,
+		estimatedLatencyMs: 250,
+		description: info.description || info.name || id,
+		isLocal: true,
+	}
+})
+
 type CodexModelResponse = {
 	data?: Array<{
 		id?: string
@@ -185,6 +212,7 @@ export class ModelCatalog {
 		this.registerModel(defaultOpenAiCodexModel)
 		for (const model of claudeSubscriptionModels) this.registerModel(model)
 		for (const model of opencodeCatalogModels) this.registerModel(model)
+		for (const model of applePlaygroundCatalogModels) this.registerModel(model)
 	}
 
 	registerModel(specs: ModelSpecs): void {
@@ -232,7 +260,9 @@ export class ModelCatalog {
 				? `${CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER}::${CLAUDE_SUBSCRIPTION_DIRECTSDK_DEFAULT_MODEL.toLowerCase()}`
 				: normalizedProvider.toLowerCase() === OPENCODE_PROVIDER
 					? `${OPENCODE_PROVIDER}::${OPENCODE_DEFAULT_MODEL.toLowerCase()}`
-					: `${OPENAI_CODEX_PROVIDER}::gpt-5.6-terra`
+					: normalizedProvider.toLowerCase() === APPLE_PLAYGROUND_PROVIDER
+						? `${APPLE_PLAYGROUND_PROVIDER}::${APPLE_PLAYGROUND_DEFAULT_MODEL.toLowerCase()}`
+						: `${OPENAI_CODEX_PROVIDER}::gpt-5.6-terra`
 		return matchingModel ?? this.catalog.get(fallbackKey) ?? defaultOpenAiCodexModel
 	}
 

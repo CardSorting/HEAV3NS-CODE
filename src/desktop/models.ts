@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { REASONING_EFFORTS, reasoningEfforts } from "../core/providers/reasoning-effort.js"
 import {
+	APPLE_PLAYGROUND_PROVIDER,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	CLINE_PASS_PROVIDER,
 	isClaudeSubscriptionDirectSdkModel,
@@ -18,6 +19,7 @@ export const modelSelectionSchema = z
 			CLINE_PASS_PROVIDER,
 			NOUS_RESEARCH_PROVIDER,
 			OPENCODE_PROVIDER,
+			APPLE_PLAYGROUND_PROVIDER,
 		]),
 		reasoningEffort: z.enum(["default", ...REASONING_EFFORTS]).optional(),
 		model: z

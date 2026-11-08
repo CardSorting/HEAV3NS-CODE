@@ -12,6 +12,7 @@ export const CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER = "claude-subscription-direc
 export const CLINE_PASS_PROVIDER = "cline-pass" as const
 export const NOUS_RESEARCH_PROVIDER = "nous" as const
 export const OPENCODE_PROVIDER = "opencode" as const
+export const APPLE_PLAYGROUND_PROVIDER = "apple-playground" as const
 
 export type AgentProviderId =
 	| typeof OPENAI_CODEX_PROVIDER
@@ -19,6 +20,7 @@ export type AgentProviderId =
 	| typeof CLINE_PASS_PROVIDER
 	| typeof NOUS_RESEARCH_PROVIDER
 	| typeof OPENCODE_PROVIDER
+	| typeof APPLE_PLAYGROUND_PROVIDER
 	| typeof OPENROUTER_PROVIDER
 	| (string & {})
 
@@ -99,6 +101,24 @@ const OPENCODE_ALIASES = new Set([
 	"opencode-console",
 ])
 
+export const APPLE_PLAYGROUND_DEFAULT_MODEL = "apple-foundation-model"
+export const APPLE_PLAYGROUND_MODELS = [
+	"apple-foundation-model",
+	"apple-playground-coding",
+	"apple-playground-fast",
+	"apple-image-playground",
+] as const
+
+const APPLE_PLAYGROUND_ALIASES = new Set([
+	APPLE_PLAYGROUND_PROVIDER,
+	"apple-local",
+	"local",
+	"apple-intelligence",
+	"foundation-models",
+	"playground",
+	"on-device",
+])
+
 export const CLINE_PASS_DEFAULT_MODEL = "cline-pass/qwen3.7-max"
 export const CLINE_PASS_MODELS = [
 	"cline-pass/qwen3.7-max",
@@ -149,6 +169,11 @@ export function isOpencodeProvider(provider: string | undefined): boolean {
 	return OPENCODE_ALIASES.has(normalized)
 }
 
+export function isApplePlaygroundProvider(provider: string | undefined): boolean {
+	const normalized = typeof provider === "string" ? provider.trim().toLowerCase() : ""
+	return APPLE_PLAYGROUND_ALIASES.has(normalized)
+}
+
 export function normalizeAgentProvider(provider: string | undefined): AgentProviderId {
 	const normalized = typeof provider === "string" ? provider.trim().toLowerCase() : undefined
 	if (!normalized) return OPENAI_CODEX_PROVIDER
@@ -163,6 +188,9 @@ export function normalizeAgentProvider(provider: string | undefined): AgentProvi
 	}
 	if (isOpencodeProvider(normalized)) {
 		return OPENCODE_PROVIDER
+	}
+	if (isApplePlaygroundProvider(normalized)) {
+		return APPLE_PLAYGROUND_PROVIDER
 	}
 	if (normalized === "openai" || normalized === "codex" || normalized === "codex-oauth") {
 		return OPENAI_CODEX_PROVIDER
@@ -216,6 +244,7 @@ export function getAgentProviderLabel(provider: string | undefined): string {
 	if (normalized === CLINE_PASS_PROVIDER) return "Cline Pass"
 	if (normalized === NOUS_RESEARCH_PROVIDER) return "Nous Research"
 	if (normalized === OPENCODE_PROVIDER) return "OpenCode"
+	if (normalized === APPLE_PLAYGROUND_PROVIDER) return "On this Mac (Playground)"
 
 	return normalized
 		.split(/[-_]+/)

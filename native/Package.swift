@@ -14,7 +14,13 @@ let package = Package(
             dependencies: [
                 .product(name: "Sparkle", package: "Sparkle")
             ],
-            resources: [.copy("Resources/Brand")]
+            resources: [.copy("Resources/Brand")],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-weak_framework", "-Xlinker", "FoundationModels",
+                    "-Xlinker", "-weak_framework", "-Xlinker", "ImagePlayground"
+                ])
+            ]
         ),
         .testTarget(name: "Heav3nsCodeTests", dependencies: ["Heav3nsCode"])
     ]

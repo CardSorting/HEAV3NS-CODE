@@ -10,6 +10,8 @@ import { reasoningEfforts } from "../../core/providers/reasoning-effort.js"
 import type { DesktopRequest } from "../protocol.js"
 import { DesktopModelDiscovery, fetchModelList } from "../model-discovery.js"
 import { DesktopSession } from "../worker.js"
+import { isLoopbackEndpoint } from "../../shared/net.js"
+import { applePlaygroundStatus, completeApplePlayground, extractInlineToolCalls, keepNewestWithinBudget, describeApplePlaygroundError, applePlaygroundSummaryFor } from "../../core/api/providers/apple-playground-native.js"
 
 describe("desktop model selection", () => {
 	let folder: string
@@ -137,6 +139,10 @@ describe("desktop model selection", () => {
 		assert.equal(
 			validateModelSelection({ provider: "nous", model: "Hermes-4-405B" }).model,
 			"Hermes-4-405B",
+		)
+		assert.equal(
+			validateModelSelection({ provider: "apple-playground", model: "apple-foundation-model" }).model,
+			"apple-foundation-model",
 		)
 		for (const value of [
 			{ provider: claude, model: "gpt-4o" },
@@ -344,10 +350,126 @@ describe("desktop model selection", () => {
 		assert.ok(discovery.models("cline-pass").length > 0)
 		assert.ok(discovery.models("nous").length > 0)
 		assert.ok(discovery.models("opencode").length > 0)
+		assert.ok(discovery.models("apple-playground").length > 0)
 		assert.ok(discovery.models(claude).length > 0)
 		const res = await discovery.discover("cline-pass")
 		assert.equal(res.state, "ready")
 		assert.equal(res.models[0].id, "mock-model")
 		discovery.close()
+	})
+	it("selects Apple Playground on-device models and parses inline tool calls", async () => {
+		const selected = await request("models.select", {
+			provider: "apple-playground",
+			model: "apple-foundation-model",
+			revision: 0,
+		})
+		assert.equal(selected.provider, "apple-playground")
+		assert.equal(selected.model, "apple-foundation-model")
+		assert.equal(database.getTable("desktop.metadata.v1").get("model-selection")?.provider, "apple-playground")
+
+		const status = applePlaygroundStatus()
+		assert.equal(typeof status.summary, "string")
+		assert.ok(status.summary.length > 0)
+
+		const inline = extractInlineToolCalls(
+			'Inspecting file.\n<tool_call>{"name":"read_file","arguments":{"path":"src/index.ts"}}</tool_call>',
+		)
+		assert.equal(inline.cleanedContent, "Inspecting file.")
+		assert.equal(inline.toolCalls.length, 1)
+		assert.equal(inline.toolCalls[0].function.name, "read_file")
+		assert.deepEqual(JSON.parse(inline.toolCalls[0].function.arguments), { path: "src/index.ts" })
+
+		const mockClient: any = {
+			chat: {
+				completions: {
+					create: async () =>
+						(async function* () {
+							yield {
+								choices: [
+									{
+										delta: {
+											content:
+												'Running tool.\n<tool_call>{"name":"list_files","arguments":{"directory":"."}}</tool_call>',
+										},
+										finish_reason: null,
+									},
+								],
+							}
+							yield {
+								choices: [{ delta: {}, finish_reason: "stop" }],
+							}
+						})(),
+				},
+			},
+		}
+		const completion = await completeApplePlayground({
+			model: "apple-foundation-model",
+			messages: [{ role: "user", content: "List workspace files" }],
+			tools: [
+				{
+					type: "function",
+					function: { name: "list_files", description: "List files", parameters: { type: "object" } },
+				},
+			],
+			maxTokens: 1024,
+			signal: new AbortController().signal,
+			client: mockClient,
+		})
+		assert.equal(completion.choices[0].message.content, "Running tool.")
+		assert.equal(completion.choices[0].message.tool_calls?.length, 1)
+		assert.equal(completion.choices[0].message.tool_calls?.[0]?.function.name, "list_files")
+	})
+	it("keeps the newest conversation turns within the on-device context budget", () => {
+		const out = keepNewestWithinBudget(["old ".repeat(100), "middle", "newest"], 40)
+		assert.ok(out.endsWith("newest"))
+		assert.ok(out.includes("middle"))
+		assert.ok(!out.includes("old"))
+		assert.ok(keepNewestWithinBudget(["x".repeat(500)], 50).length <= 50)
+	})
+	it("only treats real loopback hosts as loopback endpoints", () => {
+		assert.equal(isLoopbackEndpoint("http://127.0.0.1:8080/v1"), true)
+		assert.equal(isLoopbackEndpoint("http://localhost:1/v1"), true)
+		assert.equal(isLoopbackEndpoint("http://localhost.evil.com/v1"), false)
+		assert.equal(isLoopbackEndpoint("not a url"), false)
+	})
+	it("maps on-device bridge failures to actionable messages", () => {
+		const coded = (code: string, status = 400) => Object.assign(new Error("raw"), { code, status })
+		assert.match(describeApplePlaygroundError(coded("context_length_exceeded")).message, /4,096/)
+		assert.match(describeApplePlaygroundError(coded("content_filter")).message, /guardrails/)
+		assert.match(describeApplePlaygroundError(coded("enable-apple-intelligence", 503)).message, /System Settings/)
+		assert.match(describeApplePlaygroundError(Object.assign(new Error("x"), { status: 429 })).message, /busy/)
+		const plain = new Error("unrelated")
+		assert.equal(describeApplePlaygroundError(plain), plain)
+		assert.match(applePlaygroundSummaryFor("device-not-eligible"), /not eligible/)
+	})
+	it("retries once when the on-device model is busy and does not retry other failures", async () => {
+		let calls = 0
+		const reply = () =>
+			(async function* () {
+				yield { choices: [{ delta: { content: "ok" }, finish_reason: null }] }
+				yield { choices: [{ delta: {}, finish_reason: "stop" }] }
+			})()
+		const client = (failures: unknown[]): any => ({
+			chat: {
+				completions: {
+					create: async () => {
+						calls++
+						const failure = failures.shift()
+						if (failure) throw failure
+						return reply()
+					},
+				},
+			},
+		})
+		const base = { model: "apple-foundation-model", messages: [{ role: "user", content: "hi" }], tools: [], maxTokens: 64, signal: new AbortController().signal }
+		const ok = await completeApplePlayground({ ...base, client: client([Object.assign(new Error("busy"), { status: 429 })]) })
+		assert.equal(ok.choices[0].message.content, "ok")
+		assert.equal(calls, 2)
+		calls = 0
+		await assert.rejects(
+			completeApplePlayground({ ...base, client: client([Object.assign(new Error("bad"), { code: "content_filter", status: 400 })]) }),
+			/guardrails/,
+		)
+		assert.equal(calls, 1)
 	})
 })

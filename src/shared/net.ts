@@ -104,7 +104,19 @@ let mockFetch: typeof globalThis.fetch | undefined
 let gzipLatchedOff = false
 const GZIP_MIN_SIZE_BYTES = 4096 // 4 KB threshold
 
-function isCompressibleEndpoint(urlStr: string): boolean {
+export function isLoopbackEndpoint(urlStr: string): boolean {
+	try {
+		const host = new URL(urlStr).hostname.toLowerCase()
+		return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1" || host === "0.0.0.0"
+	} catch {
+		return false
+	}
+}
+
+export function isCompressibleEndpoint(urlStr: string): boolean {
+	if (isLoopbackEndpoint(urlStr)) {
+		return false
+	}
 	return (
 		urlStr.includes("api.anthropic.com") ||
 		urlStr.includes("api.openai.com") ||

@@ -87,7 +87,8 @@ final class RuntimeClient {
         let child = Process()
         child.executableURL = node; child.arguments = [cli.path, "--desktop-worker"]
         child.currentDirectoryURL = folder
-        child.environment = environment.merging([
+        let onDeviceEnv = OnDevicePlaygroundService.shared.workerEnvironment()
+        child.environment = onDeviceEnv.merging(environment) { _, existing in existing }.merging([
             "NO_COLOR": "1",
             "TERM": "dumb",
             "HEAV3NS_GZIP_REQUEST_BODIES": "1",

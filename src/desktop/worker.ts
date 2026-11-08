@@ -10,6 +10,7 @@ import type { SwarmFormationProgress, SwarmFormationResumeState } from "../agent
 import { classifyTaskForLegion, LEGION_STRATEGIES } from "../agents/extensions/swarm/agent-swarm-classifier.js"
 import { type SpiderPolicyReport, spiderCheckInput } from "../agents/extensions/intelligence/spider-policy-check.js"
 import { openRouterApiKey } from "../core/api/providers/openrouter-native.js"
+import { applePlaygroundStatus } from "../core/api/providers/apple-playground-native.js"
 import { clineApiKey } from "../core/api/providers/cline-pass-native.js"
 import { nousResearchApiKey } from "../core/api/providers/nous-research-native.js"
 import { opencodeApiKey } from "../core/api/providers/opencode-native.js"
@@ -21,6 +22,7 @@ import type {
 } from "../core/contracts/agent.contracts.js"
 import type { SessionMessage } from "../core/contracts/session.contracts.js"
 import {
+	APPLE_PLAYGROUND_PROVIDER,
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 	CLINE_PASS_PROVIDER,
 	getAgentProviderLabel,
@@ -3368,6 +3370,7 @@ export async function runDesktopWorker(): Promise<void> {
 						| typeof CLINE_PASS_PROVIDER
 						| typeof NOUS_RESEARCH_PROVIDER
 						| typeof OPENCODE_PROVIDER
+						| typeof APPLE_PLAYGROUND_PROVIDER
 						| typeof CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
 					model: engine!.modelResolver.getActiveModel(),
 					...(engine!.modelResolver.getReasoningEffort()
@@ -3390,6 +3393,7 @@ export async function runDesktopWorker(): Promise<void> {
 						CLINE_PASS_PROVIDER,
 						NOUS_RESEARCH_PROVIDER,
 						OPENCODE_PROVIDER,
+						APPLE_PLAYGROUND_PROVIDER,
 					].map((id) => ({
 						id,
 						label: getAgentProviderLabel(id),
@@ -3402,6 +3406,8 @@ export async function runDesktopWorker(): Promise<void> {
 										? "Uses Nous Research inference with NOUS_API_KEY or Nous Portal subscription. Connects to inference-api.nousresearch.com."
 										: id === OPENCODE_PROVIDER
 											? "Uses OpenCode Console account or OPENCODE_API_KEY. Connects to opencode.ai with long context and free tier models."
+										: id === APPLE_PLAYGROUND_PROVIDER
+											? applePlaygroundStatus().summary
 										: id === OPENAI_CODEX_PROVIDER
 											? engine!.proxyGateway.getProxyConfig() ||
 												engine!.proxyGateway.getProviderEndpoint(OPENAI_CODEX_PROVIDER)

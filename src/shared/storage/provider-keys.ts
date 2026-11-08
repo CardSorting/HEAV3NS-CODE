@@ -4,6 +4,7 @@ import { Secrets, SettingsKey } from "@shared/storage/state-keys"
 import {
 	ApiProvider,
 	anthropicDefaultModelId,
+	applePlaygroundDefaultModelId,
 	basetenDefaultModelId,
 	bedrockDefaultModelId,
 	clinePassDefaultModelId,
@@ -124,6 +125,7 @@ const ProviderDefaultModelMap: Partial<Record<ApiProvider, string>> = {
 	deepseek: deepSeekDefaultModelId,
 	"qwen-token-plan": qwenTokenPlanDefaultModelId,
 	zai: internationalZAiDefaultModelId,
+	"apple-playground": applePlaygroundDefaultModelId,
 } as const
 
 /**

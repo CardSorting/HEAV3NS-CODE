@@ -5560,3 +5560,64 @@ export const opencodeModels = {
 		description: "Space Bunny free tier model via OpenCode Console.",
 	},
 } as const satisfies Record<string, ModelInfo>
+
+// Apple Playground (On-Device FoundationModels & ImagePlayground)
+// Apple's on-device model has a ~4,096-token context window shared by instructions, tools, prompt and output.
+export type ApplePlaygroundModelId = keyof typeof applePlaygroundModels
+export const applePlaygroundDefaultModelId: ApplePlaygroundModelId = "apple-foundation-model"
+export const applePlaygroundModelInfoSaneDefaults: ModelInfo = {
+	maxTokens: 1_024,
+	contextWindow: 4_096,
+	supportsImages: true,
+	supportsPromptCache: false,
+	supportsReasoning: false,
+	inputPrice: 0,
+	outputPrice: 0,
+	description: "Apple on-device FoundationModels language model running locally on this Mac.",
+}
+export const applePlaygroundModels = {
+	"apple-foundation-model": {
+		name: "Apple Intelligence (On-Device)",
+		maxTokens: 1_024,
+		contextWindow: 4_096,
+		supportsImages: false,
+		supportsPromptCache: false,
+		supportsReasoning: false,
+		inputPrice: 0,
+		outputPrice: 0,
+		description: "Apple on-device FoundationModels LanguageModelSession · Private, zero-cost offline inference on this Mac.",
+	},
+	"apple-playground-coding": {
+		name: "Apple Playground Coding",
+		maxTokens: 1_024,
+		contextWindow: 4_096,
+		supportsImages: false,
+		supportsPromptCache: false,
+		supportsReasoning: false,
+		inputPrice: 0,
+		outputPrice: 0,
+		description: "Apple on-device FoundationModels tuned for code synthesis, debugging, and workspace tool execution.",
+	},
+	"apple-playground-fast": {
+		name: "Apple Playground Fast",
+		maxTokens: 1_024,
+		contextWindow: 4_096,
+		supportsImages: false,
+		supportsPromptCache: false,
+		supportsReasoning: false,
+		inputPrice: 0,
+		outputPrice: 0,
+		description: "Concise low-latency on-device Apple FoundationModels session.",
+	},
+	"apple-image-playground": {
+		name: "Apple Image Playground",
+		maxTokens: 1_024,
+		contextWindow: 4_096,
+		supportsImages: true,
+		supportsPromptCache: false,
+		supportsReasoning: false,
+		inputPrice: 0,
+		outputPrice: 0,
+		description: "Apple on-device ImagePlayground ImageCreator & FoundationModels multimodal assistant.",
+	},
+} as const satisfies Record<string, ModelInfo>

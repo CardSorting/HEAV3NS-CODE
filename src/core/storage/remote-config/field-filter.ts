@@ -22,6 +22,7 @@ export function isProviderAllowed(provider?: ApiProvider, remoteConfiguredProvid
 		provider === "xai-oauth" ||
 		provider === "openai-codex" ||
 		provider === "cline-pass" ||
+		provider === "apple-playground" ||
 		provider === "qwen-token-plan" ||
 		provider === "zai"
 	) {

@@ -1,4 +1,5 @@
 import { completeOpenRouter } from "../../../core/api/providers/openrouter-native.js"
+import { completeApplePlayground } from "../../../core/api/providers/apple-playground-native.js"
 import { completeClinePass } from "../../../core/api/providers/cline-pass-native.js"
 import { completeNousResearch } from "../../../core/api/providers/nous-research-native.js"
 import { completeOpencode } from "../../../core/api/providers/opencode-native.js"
@@ -19,6 +20,7 @@ import type { SessionMessage } from "../../../core/contracts/session.contracts.j
 import type { ToolExecutionRecord } from "../../../core/contracts/tooling.contracts.js"
 import {
 	CLAUDE_SUBSCRIPTION_DIRECTSDK_PROVIDER,
+	isApplePlaygroundProvider,
 	isClaudeSubscriptionDirectSdkProvider,
 	isClinePassProvider,
 	isNousResearchProvider,
@@ -241,6 +243,8 @@ export class AgentEngine extends AbstractAgentEngine {
 			data = await completeNousResearch({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
 		} else if (isOpencodeProvider(provider)) {
 			data = await completeOpencode({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
+		} else if (isApplePlaygroundProvider(provider)) {
+			data = await completeApplePlayground({ model, messages, tools: [], maxTokens: 2048, signal: requestSignal, onText: bounded })
 		} else if (oauth) {
 			const handler = new OpenAiCodexHandler({ openAiCodexModelId: model, reasoningEffort: effort, abortSignal: requestSignal, parallelToolCalls: false })
 			const { instructions, transcript } = toCodexOAuthTranscript(messages)
@@ -531,6 +535,7 @@ export class AgentEngine extends AbstractAgentEngine {
 			const usesClinePass = isClinePassProvider(activeProvider)
 			const usesNousResearch = isNousResearchProvider(activeProvider)
 			const usesOpencode = isOpencodeProvider(activeProvider)
+			const usesApplePlayground = isApplePlaygroundProvider(activeProvider)
 			const hasConfiguredOpenAiProxy = Boolean(
 				this.proxyGateway?.getProxyConfig() || this.proxyGateway?.getProviderEndpoint("openai-codex"),
 			)
@@ -540,6 +545,7 @@ export class AgentEngine extends AbstractAgentEngine {
 				!usesClinePass &&
 				!usesNousResearch &&
 				!usesOpencode &&
+				!usesApplePlayground &&
 				!hasConfiguredOpenAiProxy &&
 				authMethod !== "api-key" &&
 				hasOpenAiCodexOAuthCredentials(undefined)
@@ -553,7 +559,9 @@ export class AgentEngine extends AbstractAgentEngine {
 							? "Nous Research"
 							: usesOpencode
 								? "OpenCode"
-								: "OpenAI Codex"
+								: usesApplePlayground
+									? "On this Mac (Playground)"
+									: "OpenAI Codex"
 			const progressSource = usesOpenRouter
 				? "openrouter"
 				: usesClaudeSubscriptionDirectSdk
@@ -564,9 +572,11 @@ export class AgentEngine extends AbstractAgentEngine {
 							? "nous"
 							: usesOpencode
 								? "opencode"
-								: "openai-codex-api"
+								: usesApplePlayground
+									? "apple-playground"
+									: "openai-codex-api"
 
-			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
+			if (usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || usesApplePlayground || openAiApiKey || usesCodexOAuth || hasConfiguredOpenAiProxy) {
 				const autonomous =
 					!input.executionAuthority || ["autonomous", "high_throughput"].includes(input.executionAuthority)
 				if (input.verifyWorkspace) {
@@ -640,7 +650,7 @@ export class AgentEngine extends AbstractAgentEngine {
 							timeoutMs: 30000,
 						}
 						const providerTimeoutMs =
-							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || usesCodexOAuth
+							usesOpenRouter || usesClaudeSubscriptionDirectSdk || usesClinePass || usesNousResearch || usesOpencode || usesApplePlayground || usesCodexOAuth
 								? (this.config.providerTimeoutMs ?? 180_000)
 								: endpoint.timeoutMs
 						this.reportProgress(input.onProgress, {
@@ -868,6 +878,17 @@ export class AgentEngine extends AbstractAgentEngine {
 									})
 								} else if (usesOpencode) {
 									data = await completeOpencode({
+										model: activeModel,
+										messages: apiMessages,
+										tools: availableTools,
+										maxTokens: preparedContext.budget.reservedOutputTokens,
+										signal: requestSignal,
+										onText: () => {
+											lastProviderActivityAt = Date.now()
+										},
+									})
+								} else if (usesApplePlayground) {
+									data = await completeApplePlayground({
 										model: activeModel,
 										messages: apiMessages,
 										tools: availableTools,
@@ -1370,6 +1391,8 @@ export class AgentEngine extends AbstractAgentEngine {
 				turnOutcome = "failed"
 				const actionHint = usesOpenRouter
 					? "[Open Model & Provider, choose OpenRouter, and check your saved API key and OpenRouter credits.]"
+					: usesApplePlayground
+						? "[Check Apple Intelligence in System Settings > Apple Intelligence & Siri, and ensure this Mac runs macOS 26+ on Apple Silicon.]"
 					: usesClaudeSubscriptionDirectSdk
 						? `[Check Claude Code: run \`claude auth login\`, verify the official CLI is compatible with your Node runtime, and set ${"LUMI_CLAUDE_SUBSCRIPTION_DIRECTSDK_PLUGIN_DIR"} if the plugin path is not auto-discovered.]`
 						: usesCodexOAuth

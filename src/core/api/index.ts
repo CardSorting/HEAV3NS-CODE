@@ -1,8 +1,16 @@
 import { OpenRouterHandler } from "./providers/openrouter"
 import { ApiConfiguration } from "@shared/api"
 import { Mode } from "@shared/storage/types"
-import { isClaudeSubscriptionDirectSdkProvider, isClinePassProvider, isNousResearchProvider, isOpencodeProvider, normalizeAgentProvider } from "@/core/providers/provider-ids"
+import {
+	isApplePlaygroundProvider,
+	isClaudeSubscriptionDirectSdkProvider,
+	isClinePassProvider,
+	isNousResearchProvider,
+	isOpencodeProvider,
+	normalizeAgentProvider,
+} from "@/core/providers/provider-ids"
 import { Logger } from "@/shared/services/Logger"
+import { ApplePlaygroundHandler } from "./providers/apple-playground"
 import { ClaudeSubscriptionDirectSdkHandler } from "./providers/claude-subscription-directsdk"
 import { ClinePassHandler } from "./providers/cline-pass"
 import { NousResearchHandler } from "./providers/nous-research"
@@ -62,6 +70,14 @@ function createHandlerForProvider(
 			onRetryAttempt: options.onRetryAttempt,
 		})
 	}
+	if (isApplePlaygroundProvider(normalizedProvider)) {
+		return new ApplePlaygroundHandler({
+			apiModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
+			reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+			thinkingBudgetTokens: mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
+			onRetryAttempt: options.onRetryAttempt,
+		})
+	}
 	// Unknown persisted provider values are intentionally ignored here so a
 	// stale provider selection can never route a turn to an unsupported transport.
 	return new OpenAiCodexHandler({
@@ -114,7 +130,8 @@ export function buildApiHandler(configuration: ApiConfiguration, mode: Mode): Ap
 			apiProvider === "openrouter" ||
 			isClaudeSubscriptionDirectSdkProvider(apiProvider) ||
 			isClinePassProvider(apiProvider) ||
-			isNousResearchProvider(apiProvider)
+			isNousResearchProvider(apiProvider) ||
+			isApplePlaygroundProvider(apiProvider)
 		)
 			throw error
 		return createHandlerForProvider("openai-codex", options, mode)

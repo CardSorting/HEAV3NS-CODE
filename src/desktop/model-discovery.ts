@@ -4,8 +4,9 @@ import {
 	discoverClaudeSubscriptionDirectSdkModels,
 } from "../integrations/claude-subscription-directsdk/provider.js"
 import { OpenAiCodexOAuthService } from "../services/auth/OpenAiCodexOAuthService.js"
-import { clinePassModels, nousResearchModels, opencodeModels } from "../shared/api.js"
+import { applePlaygroundModels, clinePassModels, nousResearchModels, opencodeModels } from "../shared/api.js"
 import { CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS } from "../core/providers/provider-ids.js"
+import { applePlaygroundLiveStatus } from "../core/api/providers/apple-playground-native.js"
 import { getNousResearchModelInfo } from "../core/api/providers/nous-research.js"
 import { fetch as configuredFetch } from "../shared/net.js"
 import { type ModelSelection, validateModelSelection } from "./models.js"
@@ -49,6 +50,7 @@ export class DesktopModelDiscovery {
 		if (provider === "cline-pass") return Object.keys(clinePassModels)
 		if (provider === "nous") return Object.keys(nousResearchModels)
 		if (provider === "opencode") return Object.keys(opencodeModels)
+		if (provider === "apple-playground") return Object.keys(applePlaygroundModels)
 		if (provider === "claude-subscription-directsdk-experimental") return [...CLAUDE_SUBSCRIPTION_DIRECTSDK_MODELS]
 		return []
 	}
@@ -58,6 +60,7 @@ export class DesktopModelDiscovery {
 			"cline-pass",
 			"nous",
 			"opencode",
+			"apple-playground",
 			"openrouter",
 			"claude-subscription-directsdk-experimental",
 			"openai-codex",
@@ -152,6 +155,8 @@ export class DesktopModelDiscovery {
 										? "Could not load Nous Research models. Check your connection or NOUS_API_KEY, then refresh. Exact model IDs remain available."
 										: provider === "opencode"
 											? "Could not load OpenCode models. Check your connection or sign-in, then refresh. Exact model IDs remain available."
+										: provider === "apple-playground"
+											? "Could not query Apple on-device FoundationModels. Check Apple Intelligence in System Settings, then refresh."
 										: provider === "openai-codex"
 											? "Could not load models. Check your OpenAI connection in the project library or LUMI setup, then refresh. Custom IDs remain available."
 											: "Could not load Claude Code models. Check Claude Code sign-in and the LUMI integration, then refresh. Exact Claude model IDs remain available.",
@@ -403,6 +408,40 @@ export function providerModelLoader(options: {
 						detail: info.description || "OpenCode model",
 					})),
 				}
+			}
+		}
+		if (provider === "apple-playground") {
+			const status = await applePlaygroundLiveStatus()
+			if (status.baseURL) {
+				try {
+					const url = new URL(`${status.baseURL.replace(/\/$/, "")}/models`)
+					const models = await fetchModelList(
+						url,
+						status.token ? { Authorization: `Bearer ${status.token}` } : {},
+						signal,
+					)
+					return {
+						source: "Apple On-Device",
+						models: models.map((m) => {
+							const fallback = applePlaygroundModels[m.id as keyof typeof applePlaygroundModels]
+							return {
+								id: m.id,
+								label: m.label || fallback?.name || m.id,
+								detail: m.detail || fallback?.description || "Apple on-device FoundationModels",
+							}
+						}),
+					}
+				} catch {
+					// Fall back to static on-device catalog below
+				}
+			}
+			return {
+				source: status.textReady ? "Apple On-Device" : `Apple On-Device (${status.textStatus})`,
+				models: Object.entries(applePlaygroundModels).map(([id, info]) => ({
+					id,
+					label: info.name || id,
+					detail: info.description || "Apple on-device FoundationModels",
+				})),
 			}
 		}
 		const custom = options.gateway.getProviderEndpoint(provider) || options.gateway.getProxyConfig()

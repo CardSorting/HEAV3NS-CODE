@@ -13,6 +13,9 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private let saveKey = NSButton(title: "Save Key", target: nil, action: nil)
     private let removeKey = NSButton(title: "Remove Key", target: nil, action: nil)
     private let credentialsRow = NSStackView()
+    private let appleIntelligenceStatus = JourneyStyle.label("", size: 11, secondary: true)
+    private let openAppleIntelligence = NSButton(title: "Open Apple Intelligence Settings…", target: nil, action: nil)
+    private let appleIntelligenceRow = NSStackView()
     private var keyPending = false
     private var keySaved = false
     private let supportsCredentials: () -> Bool
@@ -69,6 +72,13 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
         keyStatus.widthAnchor.constraint(equalTo: credentialsRow.widthAnchor).isActive = true
         keyStatus.maximumNumberOfLines = 2
         credentialsRow.isHidden = true
+        openAppleIntelligence.target = self; openAppleIntelligence.action = #selector(showAppleIntelligenceSettings); openAppleIntelligence.bezelStyle = .rounded
+        appleIntelligenceStatus.maximumNumberOfLines = 2
+        appleIntelligenceRow.orientation = .horizontal; appleIntelligenceRow.alignment = .centerY; appleIntelligenceRow.spacing = 8
+        appleIntelligenceRow.addArrangedSubview(appleIntelligenceStatus); appleIntelligenceRow.addArrangedSubview(NSView()); appleIntelligenceRow.addArrangedSubview(openAppleIntelligence)
+        appleIntelligenceStatus.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        openAppleIntelligence.setContentCompressionResistancePriority(.required, for: .horizontal)
+        appleIntelligenceRow.isHidden = true
         provider.target = self; provider.action = #selector(changeProvider); provider.setAccessibilityLabel("Provider")
         model.delegate = self; model.setAccessibilityLabel("Custom model ID")
         model.placeholderString = "Exact model ID"; model.target = self; model.action = #selector(save)
@@ -94,7 +104,7 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
             JourneyStyle.label("Choose Model", size: 20, weight: .semibold),
             JourneyStyle.label("Choose a model to switch immediately in this workspace.", size: 12, secondary: true),
             status, JourneyStyle.rule(), JourneyStyle.label("Provider", size: 12, weight: .semibold), provider, detail,
-            credentialsRow, modelChoice, customRow, modelInformation,
+            credentialsRow, appleIntelligenceRow, modelChoice, customRow, modelInformation,
             availability, footer
         ], spacing: 10)
         panel.contentView?.addSubview(root)
@@ -132,14 +142,24 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     private var validation: String? {
         if displayedProvider == "openrouter" && !draftModel.contains("/") { return "Enter an OpenRouter model ID, such as anthropic/claude-sonnet-4.5." }
         guard WorkspaceModelSelection.validModel(draftModel) else { return "Enter a model ID of up to 200 characters, without spaces." }
-        if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous" || displayedProvider == "opencode") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
+        if (displayedProvider == "openai-codex" || displayedProvider == "cline-pass" || displayedProvider == "nous" || displayedProvider == "opencode" || displayedProvider == "apple-playground") && draftModel.lowercased().hasPrefix("claude-") { return "Choose Claude Code for a native Claude model, or enter a compatible model ID." }
         return nil
+    }
+    @objc private func showAppleIntelligenceSettings() {
+        OnDevicePlaygroundService.shared.openAppleIntelligenceSettings()
     }
     func refreshAvailability() {
         syncPresentation()
         let editable = !dismissed && !pending && !keyPending && selection != nil
         let hasCredentials = ["openrouter", "cline-pass", "nous", "opencode"].contains(displayedProvider ?? "")
         credentialsRow.isHidden = !hasCredentials || !supportsCredentials()
+        let isApplePlayground = displayedProvider == "apple-playground"
+        appleIntelligenceRow.isHidden = !isApplePlayground
+        if isApplePlayground {
+            let localStatus = OnDevicePlaygroundService.shared.localTextModelStatus()
+            appleIntelligenceStatus.stringValue = OnDevicePlaygroundService.shared.statusSummary()
+            openAppleIntelligence.isHidden = localStatus == "ready"
+        }
         apiKey.isEnabled = connected() && editable && canApply()
         saveKey.isEnabled = apiKey.isEnabled && !apiKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         removeKey.isEnabled = apiKey.isEnabled && keySaved
@@ -222,6 +242,10 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     }
     private static func fallbackModelMetadata(for id: String) -> (label: String, detail: String)? {
         switch id {
+        case "apple-foundation-model": return ("Apple Intelligence (On-Device)", "4k context · On-device FoundationModels LanguageModelSession")
+        case "apple-playground-coding": return ("Apple Playground Coding", "4k context · On-device FoundationModels coding & tool specialist")
+        case "apple-playground-fast": return ("Apple Playground Fast", "4k context · Low-latency concise on-device model")
+        case "apple-image-playground": return ("Apple Image Playground", "32k context · On-device ImagePlayground & FoundationModels")
         case "Hermes-4-405B": return ("Hermes 4 (405B)", "128k context · Advanced reasoning")
         case "Hermes-4-70B": return ("Hermes 4 (70B)", "128k context · Balanced reasoning")
         case "~x-ai/grok-4.5", "~xai/grok-4.5": return ("Grok 4.5", "500k context · xAI reasoning")
@@ -453,7 +477,9 @@ final class ModelPicker: NSWindowController, NSWindowDelegate, NSTextFieldDelega
     func selectProbe(_ id: String) { modelChoice.selectProbe(id) }
     func searchProbe(_ value: String) { modelChoice.searchProbe(value) }
     var diagnostics: [String: Any] {
-        ["credentialsVisible": !credentialsRow.isHidden, "keyStatus": keyStatus.stringValue, "visible": window?.isVisible == true, "draft": model.stringValue, "dirty": dirty,
+        ["credentialsVisible": !credentialsRow.isHidden, "keyStatus": keyStatus.stringValue,
+         "appleIntelligenceVisible": !appleIntelligenceRow.isHidden, "appleIntelligenceStatus": appleIntelligenceStatus.stringValue,
+         "visible": window?.isVisible == true, "draft": model.stringValue, "dirty": dirty,
          "connected": connected(), "pending": pending, "reconciled": reconciled,
          "applyEnabled": apply.isEnabled, "status": status.stringValue, "availability": availability.stringValue,
          "catalogStatus": catalogStatus.stringValue, "modelInformation": modelInformation.stringValue, "modelSuggestions": suggestions, "customVisible": !customRow.isHidden, "list": modelChoice.diagnostics]

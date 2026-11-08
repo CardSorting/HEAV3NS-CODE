@@ -124,6 +124,72 @@ final class ModelPickerTests: XCTestCase {
         XCTAssertEqual(WorkspaceModelSelection(["provider": "opencode", "model": "kimi-k2.6", "revision": 0])?.providerLabel, "OpenCode")
     }
 
+    func testApplePlaygroundOnDeviceModelSelectionAndLoopbackBridge() throws {
+        _ = NSApplication.shared
+        var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
+        var data = state
+        data["providers"] = (state["providers"] as! [[String: Any]]) + [["id": "apple-playground", "label": "On this Mac (Playground)", "detail": "On-device FoundationModels", "models": ["apple-foundation-model", "apple-playground-coding", "apple-image-playground"]]]
+        let picker = ModelPicker(request: { requests.append(($0, $1, $2)) }, connected: { true }, supportsCredentials: { true }, canApply: { true }, onSelection: { _ in })
+        defer { picker.dismiss() }
+        picker.load(); requests[0].2(.success(data)); picker.providerProbe("apple-playground")
+        XCTAssertEqual(picker.diagnostics["credentialsVisible"] as? Bool, false)
+        XCTAssertEqual(picker.diagnostics["appleIntelligenceVisible"] as? Bool, true)
+        XCTAssertFalse((picker.diagnostics["appleIntelligenceStatus"] as? String ?? "").isEmpty)
+        picker.selectProbe("apple-foundation-model")
+        XCTAssertEqual(requests.last?.0, "models.select")
+        XCTAssertEqual(requests.last?.1["provider"] as? String, "apple-playground")
+        XCTAssertEqual(requests.last?.1["model"] as? String, "apple-foundation-model")
+        XCTAssertEqual(WorkspaceModelSelection(["provider": "apple-playground", "model": "apple-foundation-model", "revision": 0])?.providerLabel, "On this Mac (Playground)")
+
+        let env = OnDevicePlaygroundService.shared.workerEnvironment()
+        let baseURL = try XCTUnwrap(env["HEAV3NS_LOCAL_MODEL_URL"])
+        let token = try XCTUnwrap(env["HEAV3NS_LOCAL_MODEL_TOKEN"])
+        XCTAssertEqual(env["HEAV3NS_LOCAL_TEXT_STATUS"], env["NOVA_LOCAL_TEXT_STATUS"])
+        let parsed = OnDevicePlaygroundService.parseToolCalls(from: "Checking workspace\n<tool_call>{\"name\":\"read_file\",\"arguments\":{\"path\":\"README.md\"}}</tool_call>")
+        XCTAssertEqual(parsed.cleanedText, "Checking workspace")
+        XCTAssertEqual(parsed.toolCalls.first?.name, "read_file")
+
+        let fetchedModels = expectation(description: "loopback /v1/models returns on-device models")
+        var req = URLRequest(url: try XCTUnwrap(URL(string: "\(baseURL)/models")))
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { body, response, error in
+            XCTAssertNil(error)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            let json = (try? JSONSerialization.jsonObject(with: body ?? Data())) as? [String: Any]
+            let list = json?["data"] as? [[String: Any]] ?? []
+            XCTAssertTrue(list.contains { ($0["id"] as? String) == "apple-foundation-model" })
+            fetchedModels.fulfill()
+        }.resume()
+        wait(for: [fetchedModels], timeout: 3.0)
+
+        if OnDevicePlaygroundService.shared.localTextModelStatus() == "ready" {
+            let completed = expectation(description: "loopback /v1/chat/completions runs FoundationModels")
+            var chatReq = URLRequest(url: try XCTUnwrap(URL(string: "\(baseURL)/chat/completions")))
+            chatReq.httpMethod = "POST"
+            chatReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            chatReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            chatReq.httpBody = try JSONSerialization.data(withJSONObject: [
+                "model": "apple-foundation-model",
+                "stream": false,
+                "messages": [
+                    ["role": "system", "content": "Reply with the single word READY."],
+                    ["role": "user", "content": "Status check"]
+                ]
+            ])
+            URLSession.shared.dataTask(with: chatReq) { body, response, error in
+                XCTAssertNil(error)
+                XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+                let json = (try? JSONSerialization.jsonObject(with: body ?? Data())) as? [String: Any]
+                let choices = json?["choices"] as? [[String: Any]]
+                let message = choices?.first?["message"] as? [String: Any]
+                let content = (message?["content"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                XCTAssertFalse(content.isEmpty)
+                completed.fulfill()
+            }.resume()
+            wait(for: [completed], timeout: 15.0)
+        }
+    }
+
     func testListSelectionSwitchesOnceWithoutConfirmationAndClosesAfterSuccess() throws {
         _ = NSApplication.shared
         var requests = [(String, [String: Any], (Result<[String: Any], Error>) -> Void)]()
