@@ -478,4 +478,12 @@ final class ModelPickerTests: XCTestCase {
         XCTAssertEqual(model.stringValue, "custom/draft"); XCTAssertFalse(apply.isEnabled)
         XCTAssertFalse(views.compactMap { $0 as? NSTextField }.contains { $0.stringValue.contains("Old connection") })
     }
+
+    func testCatalogAcceptsProviderAliasRoutesWithLeadingTilde() {
+        var data = state
+        data["providers"] = [["id": "openai-codex", "label": "OpenAI Codex", "detail": "x", "models": ["gpt-5.6-terra"]],
+                             ["id": "nous", "label": "Nous Research", "detail": "x", "models": ["~x-ai/grok-4.5", "Hermes-4-405B", "~anthropic/claude-opus-latest"]]]
+        XCTAssertNotNil(WorkspaceModelCatalog(data))
+        for bad in ["~", "~~a", "~/x", "-a", ""] { XCTAssertFalse(WorkspaceModelSelection.validModel(bad), bad) }
+    }
 }

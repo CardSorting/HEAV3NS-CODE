@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.1.1] - 2026-11-07
+
+### Fixed
+
+- **"LUMI sent an invalid response to models.list" disconnect**: the native client rejected Nous alias model IDs that start with `~` (for example `~x-ai/grok-4.5`), which disconnected the runtime and hid every provider. The worker and native client now share one model-ID grammar (single leading `~` allowed), and the worker drops any model ID the client would reject before replying.
+
 ## [16.1.0] - 2026-11-07
 
 ### Added

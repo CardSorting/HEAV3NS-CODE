@@ -10,6 +10,15 @@ import {
 	OPENCODE_PROVIDER,
 } from "../core/providers/provider-ids.js"
 
+/**
+ * The one model-ID grammar shared with the native client (`WorkspaceModelSelection.validModel`).
+ * A single leading `~` is allowed for provider alias routes such as Nous `~anthropic/claude-opus-latest`.
+ */
+export const MODEL_ID_PATTERN = /^~?[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/
+export const MODEL_ID_MAX_LENGTH = 200
+export const isValidModelId = (id: unknown): id is string =>
+	typeof id === "string" && id.length > 0 && Buffer.byteLength(id) <= MODEL_ID_MAX_LENGTH && MODEL_ID_PATTERN.test(id)
+
 export const modelSelectionSchema = z
 	.object({
 		provider: z.enum([
@@ -26,8 +35,8 @@ export const modelSelectionSchema = z
 			.string()
 			.trim()
 			.min(1)
-			.max(200)
-			.regex(/^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/),
+			.max(MODEL_ID_MAX_LENGTH)
+			.regex(MODEL_ID_PATTERN),
 	})
 	.strict()
 export type ModelSelection = z.infer<typeof modelSelectionSchema>

@@ -61,7 +61,7 @@ import {
 import { cancelGit, initializeRepository, withGitInspection } from "./git.js"
 import { WorkspaceInspection } from "./inspection.js"
 import { DesktopModelDiscovery, providerModelLoader } from "./model-discovery.js"
-import { type DesktopModels, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
+import { type DesktopModels, isValidModelId, modelSelectionSchema, recentModelSelections, validateModelSelection } from "./models.js"
 import { type ProjectConfiguration, ProjectRunner, type ProjectTarget } from "./project-runner.js"
 import { projectTasks, projectTaskFilterSchema, type ProjectTaskFilter, validateProjectTaskSnapshot } from "./project-tasks.js"
 import { workspaceBranch } from "./workspace-branch.js"
@@ -777,7 +777,8 @@ export class DesktopSession {
 			...models.current(),
 			reasoningOptions: reasoningEfforts(models.current().provider, models.current().model),
 			revision: this.metadata.get("model-selection")?.revision ?? 0,
-			providers: models.catalog(),
+			// The native client rejects the whole response (and disconnects) on one malformed entry, so never emit any.
+			providers: models.catalog().map((provider) => ({ ...provider, models: provider.models.filter(isValidModelId).slice(0, 1000) })),
 			recent: recentModelSelections(models.current(), this.metadata.get("model-selection")?.recent),
 			busy: Boolean(this.active || this.queue.length || this.cancellingAll),
 			blocked: this.modelStateError,

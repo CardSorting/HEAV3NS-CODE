@@ -10,6 +10,8 @@ import { reasoningEfforts } from "../../core/providers/reasoning-effort.js"
 import type { DesktopRequest } from "../protocol.js"
 import { DesktopModelDiscovery, fetchModelList } from "../model-discovery.js"
 import { DesktopSession } from "../worker.js"
+import { applePlaygroundModels, clinePassModels, nousResearchModels, opencodeModels } from "../../shared/api.js"
+import { isValidModelId } from "../models.js"
 import { isLoopbackEndpoint } from "../../shared/net.js"
 import { applePlaygroundStatus, completeApplePlayground, extractInlineToolCalls, keepNewestWithinBudget, describeApplePlaygroundError, applePlaygroundSummaryFor } from "../../core/api/providers/apple-playground-native.js"
 
@@ -471,5 +473,13 @@ describe("desktop model selection", () => {
 			/guardrails/,
 		)
 		assert.equal(calls, 1)
+	})
+	it("every shipped provider model ID satisfies the grammar the native client enforces", () => {
+		for (const [name, catalog] of Object.entries({ applePlaygroundModels, clinePassModels, nousResearchModels, opencodeModels })) {
+			for (const id of Object.keys(catalog)) assert.ok(isValidModelId(id), `${name} lists an ID the native client rejects: ${id}`)
+		}
+		assert.ok(isValidModelId("~anthropic/claude-opus-latest"))
+		assert.ok(isValidModelId("claude-opus-5[1m]"))
+		for (const bad of ["", "~", "~~a", "-a", "a b", "a".repeat(201), "~/x"]) assert.ok(!isValidModelId(bad), bad)
 	})
 })

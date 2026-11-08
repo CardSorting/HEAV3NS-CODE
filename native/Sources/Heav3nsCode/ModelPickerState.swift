@@ -23,7 +23,7 @@ struct WorkspaceModelSelection: Equatable {
     }
     static let providers: Set<String> = ["openai-codex", "claude-subscription-directsdk-experimental", "openrouter", "cline-pass", "nous", "opencode", "apple-playground"]
     static func validModel(_ value: String) -> Bool {
-        value.utf8.count <= 200 && value.range(of: "^[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*\\z", options: .regularExpression) != nil
+        value.utf8.count <= 200 && value.range(of: "^~?[A-Za-z0-9][A-Za-z0-9._:/\\[\\]-]*\\z", options: .regularExpression) != nil
     }
     init?(_ data: [String: Any]) {
         guard let provider = data["provider"] as? String, Self.providers.contains(provider),
