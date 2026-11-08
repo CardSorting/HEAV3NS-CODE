@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.1.0] - 2026-11-07
+
+### Added
+
+- **On this Mac (Apple Intelligence) provider**: private, zero-cost on-device inference through Apple FoundationModels via an authenticated loopback bridge in the native app, with streaming, timeouts, cancellation, mapped errors, and live readiness. See [`docs/desktop/release-16.0.0.md`](docs/desktop/release-16.0.0.md).
+
 ## [16.0.0] - 2026-11-07
 
 ### Added — Agent Swarm & The Legion Major Release (`ADR-0001`–`ADR-0020`)
