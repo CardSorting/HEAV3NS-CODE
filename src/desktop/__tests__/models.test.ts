@@ -11,6 +11,7 @@ import type { DesktopRequest } from "../protocol.js"
 import { DesktopModelDiscovery, fetchModelList } from "../model-discovery.js"
 import { DesktopSession } from "../worker.js"
 import { applePlaygroundModels, clinePassModels, nousResearchModels, opencodeModels } from "../../shared/api.js"
+import { buildOnDevicePrompt, compactToolSignature, PROMPT_CHAR_BUDGET } from "../../core/api/providers/apple-playground-prompt.js"
 import { isValidModelId } from "../models.js"
 import { isLoopbackEndpoint } from "../../shared/net.js"
 import { applePlaygroundStatus, completeApplePlayground, extractInlineToolCalls, keepNewestWithinBudget, describeApplePlaygroundError, applePlaygroundSummaryFor } from "../../core/api/providers/apple-playground-native.js"
@@ -481,5 +482,67 @@ describe("desktop model selection", () => {
 		assert.ok(isValidModelId("~anthropic/claude-opus-latest"))
 		assert.ok(isValidModelId("claude-opus-5[1m]"))
 		for (const bad of ["", "~", "~~a", "-a", "a b", "a".repeat(201), "~/x"]) assert.ok(!isValidModelId(bad), bad)
+	})
+	describe("on-device prompt assembly", () => {
+		const fn = (name: string, description: string, properties: Record<string, unknown>, required: string[] = []) =>
+			({ type: "function", function: { name, description, parameters: { type: "object", properties, required } } }) as const
+		const long = "Detailed behavior. ".repeat(40)
+		const bloated = [
+			fn("broccoligit_changes", long, { limit: { type: "number", description: long } }),
+			fn("broccoligit_history", long, { cursor: { type: "string", description: long } }),
+			fn("view_file", "Read a file.", { path: { type: "string" } }, ["path"]),
+			fn("write_file", "Create or overwrite a file. " + long, { path: { type: "string" }, content: { type: "string" } }, ["path", "content"]),
+			...Array.from({ length: 30 }, (_, i) => fn(`extra_${i}`, long, { a: { type: "string", description: long } }, ["a"])),
+		]
+		it("always offers write_file and a tool-call format, even behind a huge system prompt and many verbose tools", () => {
+			const built = buildOnDevicePrompt(
+				"apple-playground-coding",
+				[
+					{ role: "system", content: "You are LUMI. ".repeat(10_000) },
+					{ role: "user", content: "Create hello.md with a greeting" },
+				],
+				bloated as never,
+			)
+			assert.ok(built.offeredTools.includes("write_file"), "write_file must survive the budget")
+			assert.ok(built.offeredTools.indexOf("write_file") < built.offeredTools.indexOf("broccoligit_changes"))
+			assert.ok(built.instructions.includes("- write_file(path: string, content: string)"))
+			assert.ok(built.instructions.includes("<tool_call>"))
+			assert.ok(built.instructions.includes("MUST call the matching tool"))
+			assert.ok(built.instructions.length + built.prompt.length <= PROMPT_CHAR_BUDGET + 200)
+		})
+		it("keeps tools already used in the conversation available", () => {
+			const built = buildOnDevicePrompt(
+				"apple-foundation-model",
+				[
+					{ role: "user", content: "go" },
+					{ role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "extra_29", arguments: "{}" } }] },
+					{ role: "tool", content: "ok", name: "extra_29", tool_call_id: "c1" },
+				],
+				bloated as never,
+			)
+			assert.equal(built.offeredTools[0], "extra_29")
+		})
+		it("renders compact signatures with optional markers and enums", () => {
+			const sig = compactToolSignature({
+				name: "run_command",
+				description: "Run a shell command. Extra detail follows.",
+				parameters: { properties: { command: { type: "string" }, mode: { enum: ["a", "b"] }, cwd: { type: "string" } }, required: ["command"] },
+			})
+			assert.equal(sig, '- run_command(command: string, mode?: "a"|"b", cwd?: string) - Run a shell command.')
+		})
+		it("recovers tool calls written in json fences or as bare JSON, and drops empty fences", () => {
+			const known = new Set(["write_file"])
+			const fenced = extractInlineToolCalls('```json\n{"name":"write_file","arguments":{"path":"a.md","content":"hi"}}\n```', known)
+			assert.equal(fenced.toolCalls.length, 1)
+			assert.equal(fenced.cleanedContent, "")
+			const bare = extractInlineToolCalls('{"name":"write_file","arguments":{"path":"a.md","content":"hi"}}', known)
+			assert.equal(bare.toolCalls[0]?.function.name, "write_file")
+			assert.equal(extractInlineToolCalls("```json\n\n```", known).cleanedContent, "")
+			// Unknown names and ordinary JSON answers stay as chat text.
+			const other = extractInlineToolCalls('```json\n{"name":"Ada","age":3}\n```', known)
+			assert.equal(other.toolCalls.length, 0)
+			assert.ok(other.cleanedContent.includes("Ada"))
+			assert.equal(extractInlineToolCalls('```json\n{"name":"write_file","arguments":{}}\n```').toolCalls.length, 0)
+		})
 	})
 })

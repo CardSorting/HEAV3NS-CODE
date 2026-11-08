@@ -436,14 +436,94 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
         let stream: Bool
         let hasTools: Bool
         let imageConcept: String?
+        let offeredTools: Set<String>
     }
 
-    static let maxPromptTools = 12
-    static let maxToolDescriptionChars = 200
+    // Apple's on-device window is ~4,096 tokens shared by instructions, tools, conversation and reply (~3 chars/token).
+    // Each part gets its own budget so a large agent system prompt can never push the tool definitions out of the
+    // window (the model then answers in chat instead of calling a tool). Keep in sync with
+    // src/core/api/providers/apple-playground-prompt.ts.
     static let promptCharBudget = 9_000
+    static let toolBlockCharBudget = 2_800
+    static let systemTextCharBudget = 2_200
+    static let maxPromptTools = 14
+    static let maxToolDescriptionChars = 110
+    static let toolPriority = ["write_file", "replace_file_content", "view_file", "run_command", "list_dir", "grep_search", "find_files",
+                               "delete_file", "search_and_replace", "append_file", "create_directory", "move_file", "batch_write_files",
+                               "multi_replace_file_content", "batch_view_files", "workspace_summary"]
 
     static func truncateHead(_ text: String, limit: Int) -> String {
         text.count <= limit ? text : "…" + String(text.suffix(max(1, limit - 1)))
+    }
+
+    static func truncateTail(_ text: String, limit: Int) -> String {
+        text.count <= limit ? text : String(text.prefix(max(1, limit - 1))) + "…"
+    }
+
+    struct PromptTool { let name: String; let description: String; let parameters: [String: Any] }
+
+    static func promptTools(from rawTools: [[String: Any]], used: Set<String>) -> [PromptTool] {
+        let all: [PromptTool] = rawTools.compactMap { tool in
+            guard let fn = tool["function"] as? [String: Any], let name = fn["name"] as? String, !name.isEmpty else { return nil }
+            return PromptTool(name: name, description: fn["description"] as? String ?? "", parameters: fn["parameters"] as? [String: Any] ?? [:])
+        }
+        func rank(_ name: String) -> Int {
+            if used.contains(name) { return -1 }
+            return toolPriority.firstIndex(of: name) ?? toolPriority.count
+        }
+        let ordered = all.enumerated().sorted { l, r in
+            let lr = rank(l.element.name), rr = rank(r.element.name)
+            return lr != rr ? lr < rr : l.offset < r.offset
+        }.map { $0.element }
+        return Array(ordered.prefix(maxPromptTools))
+    }
+
+    private static func schemaType(_ schema: Any?) -> String {
+        guard let s = schema as? [String: Any] else { return "any" }
+        if let values = s["enum"] as? [Any], !values.isEmpty, values.count <= 6 {
+            return values.map { "\($0)" }.joined(separator: "|")
+        }
+        if let type = s["type"] as? String {
+            if type == "array" { return ((s["items"] as? [String: Any])?["type"] as? String ?? "any") + "[]" }
+            return type
+        }
+        return "any"
+    }
+
+    static func compactToolSignature(_ tool: PromptTool) -> String {
+        let required = Set(tool.parameters["required"] as? [String] ?? [])
+        let props = tool.parameters["properties"] as? [String: Any] ?? [:]
+        let args = props.keys.sorted().prefix(8).map { key in "\(key)\(required.contains(key) ? "" : "?"): \(schemaType(props[key]))" }.joined(separator: ", ")
+        let flat = tool.description.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let firstSentence = flat.range(of: #"[.!?](\s|$)"#, options: .regularExpression).map { String(flat[..<$0.upperBound]).trimmingCharacters(in: .whitespaces) } ?? flat
+        let desc = truncateTail(firstSentence, limit: maxToolDescriptionChars)
+        return "- \(tool.name)(\(args))" + (desc.isEmpty ? "" : " - \(desc)")
+    }
+
+    static func toolInstructions(_ tools: [PromptTool]) -> (text: String, offered: [String]) {
+        guard !tools.isEmpty else { return ("", []) }
+        var lines = [String](), offered = [String](), used = 0
+        for tool in tools {
+            let line = compactToolSignature(tool)
+            if used + line.count + 1 > toolBlockCharBudget { break }
+            lines.append(line); offered.append(tool.name); used += line.count + 1
+        }
+        let first = tools[0]
+        let required = first.parameters["required"] as? [String] ?? []
+        let props = first.parameters["properties"] as? [String: Any] ?? [:]
+        let keys = Array((required.isEmpty ? props.keys.sorted() : required).prefix(3))
+        var exampleArgs = [String: Any]()
+        for key in keys { exampleArgs[key] = schemaType(props[key]) == "string" ? "<\(key)>" : NSNull() }
+        let exampleObject: [String: Any] = ["name": first.name, "arguments": exampleArgs]
+        let example = (try? JSONSerialization.data(withJSONObject: exampleObject, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        let text = (["You are an agent with workspace tools. Available tools:"] + lines + [
+            "",
+            "To use a tool, reply with ONLY a tool call, no other text:",
+            "<tool_call>\(example)</tool_call>",
+            "When asked to create, edit, or delete a file or run a command, you MUST call the matching tool; never paste file contents or commands into chat instead.",
+            "After a Tool Result, call another tool if more work is needed, otherwise answer briefly."
+        ]).joined(separator: "\n")
+        return (text, offered)
     }
 
     static func buildInferencePrompt(from body: [String: Any]) -> InferencePrompt {
@@ -454,10 +534,11 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
 
         var systemParts = [String]()
         var conversationParts = [String]()
+        var usedTools = Set<String>()
         var lastUserText = ""
 
         if model == "apple-playground-coding" {
-            systemParts.append("You are an expert software engineer running on-device via Apple FoundationModels. Focus on accurate code changes, concise explanations, and exact tool arguments.")
+            systemParts.append("You are an expert software engineer. Make accurate code changes with concise explanations and exact tool arguments.")
         } else if model == "apple-playground-fast" {
             systemParts.append("Respond concisely and directly.")
         }
@@ -472,8 +553,10 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
                     let formattedCalls = toolCalls.compactMap { tc -> String? in
                         guard let fn = tc["function"] as? [String: Any],
                               let name = fn["name"] as? String else { return nil }
+                        usedTools.insert(name)
                         let args = fn["arguments"] as? String ?? "{}"
-                        return "<tool_call>{\"name\":\"\(name)\",\"arguments\":\(args)}</tool_call>"
+                        let argsJSON = (try? JSONSerialization.jsonObject(with: Data(args.utf8))) != nil ? args : "{}"
+                        return "<tool_call>{\"name\":\"\(name)\",\"arguments\":\(argsJSON)}</tool_call>"
                     }.joined(separator: "\n")
                     let combined = [content, formattedCalls].filter { !$0.isEmpty }.joined(separator: "\n")
                     conversationParts.append("Assistant:\n\(combined)")
@@ -483,7 +566,7 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
             } else if role == "tool" {
                 let callID = msg["tool_call_id"] as? String ?? "tool"
                 let name = msg["name"] as? String ?? callID
-                conversationParts.append("Tool Result (\(name)):\n\(content)")
+                conversationParts.append("Tool Result (\(name)):\n\(truncateTail(content, limit: 1_500))")
             } else {
                 if !content.isEmpty {
                     lastUserText = content
@@ -492,49 +575,26 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
             }
         }
 
-        if !rawTools.isEmpty {
-            var toolDocs = [String]()
-            for tool in rawTools.prefix(Self.maxPromptTools) {
-                guard let fn = tool["function"] as? [String: Any],
-                      let name = fn["name"] as? String else { continue }
-                let desc = String((fn["description"] as? String ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(Self.maxToolDescriptionChars))
-                let paramsObj = fn["parameters"] ?? [:]
-                let paramsStr: String
-                if let data = try? JSONSerialization.data(withJSONObject: paramsObj),
-                   let str = String(data: data, encoding: .utf8) {
-                    paramsStr = str
-                } else {
-                    paramsStr = "{}"
-                }
-                toolDocs.append("- \(name): \(desc)\n  Parameters JSON Schema: \(paramsStr)")
-            }
-            if !toolDocs.isEmpty {
-                systemParts.append("""
-                You have access to the following workspace tools:
-                \(toolDocs.joined(separator: "\n"))
+        let selected = promptTools(from: rawTools, used: usedTools)
+        let toolBlock = toolInstructions(selected)
+        // Keep the agent system prompt's head (role and core rules) within a fixed share; the tool block the model
+        // cannot act without gets its own guaranteed budget.
+        let systemText = truncateTail(systemParts.isEmpty
+            ? "You are a helpful, accurate coding and workspace assistant on macOS."
+            : systemParts.joined(separator: "\n\n"), limit: systemTextCharBudget)
+        let instructions = [systemText, toolBlock.text].filter { !$0.isEmpty }.joined(separator: "\n\n")
 
-                When you need to invoke a tool, output ONLY a tool call block in this exact format:
-                <tool_call>{"name": "tool_name", "arguments": {"key": "value"}}</tool_call>
-                Wait for the Tool Result before continuing. If no tool is needed, respond normally in plain text or Markdown.
-                """)
-            }
-        }
-
-        let instructions = Self.truncateHead(systemParts.isEmpty
-            ? "You are a helpful, accurate coding and workspace assistant running on-device on macOS."
-            : systemParts.joined(separator: "\n\n"), limit: Self.promptCharBudget / 2)
-
-        // Apple's on-device window is ~4,096 tokens; keep the newest turns and drop the oldest first.
-        let turnBudget = max(1_000, Self.promptCharBudget - instructions.count)
+        // Newest turns survive; oldest are dropped first.
+        let turnBudget = max(1_000, promptCharBudget - instructions.count)
         let prompt: String
         if conversationParts.count <= 1 && !lastUserText.isEmpty {
-            prompt = Self.truncateHead(lastUserText, limit: turnBudget)
+            prompt = truncateHead(lastUserText, limit: turnBudget)
         } else {
             var kept = [String](), used = 0
             for part in conversationParts.reversed() {
                 let remaining = turnBudget - used
                 if remaining <= 0 { break }
-                if part.count > remaining { if kept.isEmpty { kept.insert(Self.truncateHead(part, limit: remaining), at: 0) }; break }
+                if part.count > remaining { if kept.isEmpty { kept.insert(truncateHead(part, limit: remaining), at: 0) }; break }
                 kept.insert(part, at: 0); used += part.count + 2
             }
             prompt = kept.joined(separator: "\n\n") + "\n\nRespond as Assistant:"
@@ -554,7 +614,8 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
             prompt: prompt.isEmpty ? "Hello" : prompt,
             stream: stream,
             hasTools: !rawTools.isEmpty,
-            imageConcept: imageConcept
+            imageConcept: imageConcept,
+            offeredTools: Set(toolBlock.offered)
         )
     }
 
@@ -572,22 +633,36 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
         return ""
     }
 
-    static func parseToolCalls(from text: String) -> (cleanedText: String, toolCalls: [ToolCallPayload]) {
+    /// Extracts tool calls the model wrote as text: `<tool_call>` tags always; ```json fences or a bare JSON object when
+    /// they name an offered tool. Fences left empty (by extraction or by the model) are dropped so they never reach chat.
+    static func parseToolCalls(from text: String, knownTools: Set<String> = []) -> (cleanedText: String, toolCalls: [ToolCallPayload]) {
         var remaining = text
         var calls = [ToolCallPayload]()
 
-        let pattern = "<tool_call>\\s*([\\s\\S]*?)\\s*</tool_call>"
-        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-            let matches = regex.matches(in: text, options: [], range: NSRange(text.startIndex..., in: text))
+        func extract(pattern: String, requireKnown: Bool) {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return }
+            let snapshot = remaining
+            let matches = regex.matches(in: snapshot, options: [], range: NSRange(snapshot.startIndex..., in: snapshot))
             for match in matches.reversed() {
-                guard let innerRange = Range(match.range(at: 1), in: text),
-                      let fullRange = Range(match.range(at: 0), in: remaining) else { continue }
-                let rawJSON = String(text[innerRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if let parsed = decodeToolCallJSON(rawJSON) {
-                    calls.insert(parsed, at: 0)
-                    remaining.removeSubrange(fullRange)
-                }
+                guard let innerRange = Range(match.range(at: 1), in: snapshot),
+                      let fullRange = Range(match.range(at: 0), in: snapshot) else { continue }
+                let rawJSON = String(snapshot[innerRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let parsed = decodeToolCallJSON(rawJSON), !requireKnown || knownTools.contains(parsed.name) else { continue }
+                calls.insert(parsed, at: 0)
+                remaining.replaceSubrange(fullRange, with: "")
             }
+        }
+        extract(pattern: "<tool_call>\\s*([\\s\\S]*?)\\s*</tool_call>", requireKnown: false)
+        extract(pattern: "```(?:tool_call|tool)\\s*\\n([\\s\\S]*?)\\n```", requireKnown: false)
+        if !knownTools.isEmpty {
+            extract(pattern: "```(?:json)?\\s*\\n([\\s\\S]*?)\\n```", requireKnown: true)
+            let trimmed = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
+            if calls.isEmpty, trimmed.hasPrefix("{"), let parsed = decodeToolCallJSON(trimmed), knownTools.contains(parsed.name) {
+                calls.append(parsed); remaining = ""
+            }
+        }
+        if let empty = try? NSRegularExpression(pattern: "```[a-zA-Z_]*\\s*```") {
+            remaining = empty.stringByReplacingMatches(in: remaining, range: NSRange(remaining.startIndex..., in: remaining), withTemplate: "")
         }
         return (remaining.trimmingCharacters(in: .whitespacesAndNewlines), calls)
     }
@@ -659,7 +734,7 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
                 let responseText = try await respondWithTimeout(session, prompt: promptSpec.prompt)
                 try Task.checkCancellation()
                 let rawContent = imageNotice.isEmpty ? responseText : "\(imageNotice)\n\n\(responseText)"
-                let (cleanedText, toolCalls) = promptSpec.hasTools ? Self.parseToolCalls(from: rawContent) : (rawContent, [])
+                let (cleanedText, toolCalls) = promptSpec.hasTools ? Self.parseToolCalls(from: rawContent, knownTools: promptSpec.offeredTools) : (rawContent, [])
 
                 if promptSpec.stream {
                     sendSSECompletion(

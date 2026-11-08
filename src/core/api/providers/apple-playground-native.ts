@@ -8,16 +8,15 @@ import {
 	computeStreamingArgumentsDelta,
 	normalizeCompletedToolCallArguments,
 } from "../../../tooling/extensions/registry/tool-call-arg-parser.js"
+import { buildOnDevicePrompt, keepNewestWithinBudget } from "./apple-playground-prompt.js"
 import { consolidateReasoningDetails } from "../transform/openai-format.js"
 import { createOpenRouterStream } from "../transform/openrouter-stream.js"
 
-/** Apple's on-device model shares ~4,096 tokens across instructions, tools, prompt and output (~3 chars/token). */
-const PROMPT_CHAR_BUDGET = 9_000
-const MAX_PROMPT_TOOLS = 12
-const MAX_TOOL_DESCRIPTION_CHARS = 200
 const DIRECT_RUNNER_TIMEOUT_MS = 120_000
 const DIRECT_RUNNER_MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 const DIRECT_RUNNER_ENV_KEYS = ["PATH", "HOME", "TMPDIR", "USER", "LANG", "LC_ALL", "DEVELOPER_DIR", "SDKROOT"]
+
+export { keepNewestWithinBudget }
 
 export type ApplePlaygroundMessage = {
 	role: string
@@ -121,136 +120,58 @@ export function normalizeApplePlaygroundModelId(model: string): string {
 	return trimmed
 }
 
-export function extractInlineToolCalls(text: string): {
+/**
+ * Extracts tool calls the on-device model wrote as text. Accepts `<tool_call>` tags, ```tool_call fences, and - when the
+ * set of offered tool names is known - ```json fences or a bare JSON object naming one of them. Empty leftover fences
+ * are removed so they never show up in chat.
+ */
+const offeredToolNames = (tools: OpenAI.Chat.ChatCompletionTool[]): Set<string> =>
+	new Set(tools.flatMap((tool) => (tool.type === "function" && tool.function?.name ? [tool.function.name] : [])))
+
+export function extractInlineToolCalls(
+	text: string,
+	knownToolNames?: ReadonlySet<string>,
+): {
 	cleanedContent: string
 	toolCalls: NonNullable<ApplePlaygroundMessage["tool_calls"]>
 } {
 	const toolCalls: NonNullable<ApplePlaygroundMessage["tool_calls"]> = []
-	const tryExtractJson = (_match: string, rawJson: string): string => {
-		try {
-			const parsed = JSON.parse(rawJson.trim()) as {
-				id?: string
-				name?: string
-				arguments?: unknown
-				args?: unknown
+	const tryExtractJson =
+		(requireKnown: boolean) =>
+		(match: string, rawJson: string): string => {
+			try {
+				const parsed = JSON.parse(rawJson.trim()) as { id?: string; name?: string; arguments?: unknown; args?: unknown }
+				const name = typeof parsed?.name === "string" ? parsed.name.trim() : ""
+				if (name && (!requireKnown || knownToolNames?.has(name))) {
+					const rawArgs = parsed.arguments ?? parsed.args ?? {}
+					const argsString = typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs)
+					toolCalls.push({
+						id: typeof parsed.id === "string" && parsed.id ? parsed.id : `call_${randomUUID().replace(/-/g, "").slice(0, 16)}`,
+						type: "function",
+						function: { name, arguments: normalizeCompletedToolCallArguments(argsString, "Apple Playground") },
+					})
+					return ""
+				}
+			} catch {
+				// Keep unparseable text intact
 			}
-			if (typeof parsed?.name === "string" && parsed.name.trim()) {
-				const rawArgs = parsed.arguments ?? parsed.args ?? {}
-				const argsString = typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs)
-				toolCalls.push({
-					id: typeof parsed.id === "string" && parsed.id ? parsed.id : `call_${randomUUID().replace(/-/g, "").slice(0, 16)}`,
-					type: "function",
-					function: {
-						name: parsed.name.trim(),
-						arguments: normalizeCompletedToolCallArguments(argsString, "Apple Playground"),
-					},
-				})
-				return ""
-			}
-		} catch {
-			// Keep unparseable text intact
+			return match
 		}
-		return _match
-	}
 
-	const cleanedContent = text
-		.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi, tryExtractJson)
-		.replace(/```(?:tool_call|tool)\s*\n([\s\S]*?)\n```/gi, tryExtractJson)
-		.trim()
+	let cleanedContent = text
+		.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi, tryExtractJson(false))
+		.replace(/```(?:tool_call|tool)\s*\n([\s\S]*?)\n```/gi, tryExtractJson(false))
+	if (knownToolNames && knownToolNames.size > 0) {
+		cleanedContent = cleanedContent.replace(/```(?:json|JSON)?\s*\n([\s\S]*?)\n```/g, tryExtractJson(true))
+		if (toolCalls.length === 0 && cleanedContent.trim().startsWith("{")) {
+			const bare = tryExtractJson(true)(cleanedContent, cleanedContent)
+			if (bare === "") cleanedContent = ""
+		}
+	}
+	// Fences emptied by extraction (or emitted empty by the model) are noise.
+	cleanedContent = cleanedContent.replace(/```[a-zA-Z_]*\s*```/g, "").trim()
 
 	return { cleanedContent, toolCalls }
-}
-
-/** Drops the oldest conversation turns first so the most recent context always survives the small window. */
-export function keepNewestWithinBudget(parts: string[], budget: number): string {
-	const kept: string[] = []
-	let used = 0
-	for (let i = parts.length - 1; i >= 0; i--) {
-		const remaining = budget - used
-		if (remaining <= 0) break
-		const part = parts[i]
-		if (part.length > remaining) {
-			if (kept.length === 0) kept.unshift(truncateHead(part, remaining))
-			break
-		}
-		kept.unshift(part)
-		used += part.length + 2
-	}
-	return kept.join("\n\n")
-}
-
-function truncateHead(text: string, budget: number): string {
-	return text.length <= budget ? text : `…${text.slice(text.length - Math.max(1, budget - 1))}`
-}
-
-function buildSwiftRunnerTranscript(
-	model: string,
-	messages: ApplePlaygroundMessage[],
-	tools: OpenAI.Chat.ChatCompletionTool[],
-): { instructions: string; prompt: string } {
-	const systemParts: string[] = []
-	const conversationParts: string[] = []
-	let lastUser = ""
-
-	if (model === "apple-playground-coding") {
-		systemParts.push(
-			"You are an expert software engineer running on-device via Apple FoundationModels. Focus on accurate code changes, concise explanations, and exact tool arguments.",
-		)
-	} else if (model === "apple-playground-fast") {
-		systemParts.push("Respond concisely and directly.")
-	}
-
-	for (const msg of messages) {
-		const role = (msg.role || "user").toLowerCase()
-		const content = typeof msg.content === "string" ? msg.content : ""
-		if (role === "system" || role === "developer") {
-			if (content) systemParts.push(content)
-		} else if (role === "assistant") {
-			if (msg.tool_calls?.length) {
-				const calls = msg.tool_calls
-					.map((tc) => `<tool_call>${JSON.stringify({ name: tc.function.name, arguments: tc.function.arguments })}</tool_call>`)
-					.join("\n")
-				conversationParts.push(`Assistant:\n${[content, calls].filter(Boolean).join("\n")}`)
-			} else if (content) {
-				conversationParts.push(`Assistant:\n${content}`)
-			}
-		} else if (role === "tool") {
-			conversationParts.push(`Tool Result (${msg.name || msg.tool_call_id || "tool"}):\n${content}`)
-		} else if (content) {
-			lastUser = content
-			conversationParts.push(`User:\n${content}`)
-		}
-	}
-
-	if (tools.length > 0) {
-		const toolLines = tools.slice(0, MAX_PROMPT_TOOLS).map((tool) => {
-			if (tool.type !== "function") return ""
-			const description = (tool.function.description ?? "").replace(/\s+/g, " ").slice(0, MAX_TOOL_DESCRIPTION_CHARS)
-			return `- ${tool.function.name}: ${description}\n  Parameters JSON Schema: ${JSON.stringify(tool.function.parameters ?? {})}`
-		})
-		systemParts.push(
-			[
-				"You have access to the following workspace tools:",
-				...toolLines.filter(Boolean),
-				"",
-				'When you need to invoke a tool, output ONLY a tool call block in this exact format:',
-				'<tool_call>{"name": "tool_name", "arguments": {"key": "value"}}</tool_call>',
-				"Wait for the Tool Result before continuing. If no tool is needed, respond normally in plain text or Markdown.",
-			].join("\n"),
-		)
-	}
-
-	const instructions = truncateHead(
-		systemParts.join("\n\n") || "You are a helpful, accurate coding and workspace assistant running on-device on macOS.",
-		PROMPT_CHAR_BUDGET / 2,
-	)
-	const instructionsBudget = Math.max(1_000, PROMPT_CHAR_BUDGET - instructions.length)
-	const prompt =
-		conversationParts.length <= 1 && lastUser
-			? truncateHead(lastUser, instructionsBudget)
-			: `${keepNewestWithinBudget(conversationParts, instructionsBudget)}\n\nRespond as Assistant:`
-
-	return { instructions, prompt: prompt || "Hello" }
 }
 
 const DIRECT_RUNNER_EXIT_MESSAGES: Record<number, string> = {
@@ -327,7 +248,7 @@ async function runDirectSwiftFoundationModel(options: {
 	if (process.platform !== "darwin") {
 		throw new Error("Apple Playground on-device models require macOS 26 or newer on Apple Silicon.")
 	}
-	const { instructions, prompt } = buildSwiftRunnerTranscript(options.model, options.messages, options.tools)
+	const { instructions, prompt } = buildOnDevicePrompt(options.model, options.messages, options.tools)
 	const swiftSource = `
 import Foundation
 import FoundationModels
@@ -373,7 +294,9 @@ RunLoop.main.run()
 	const rawContent = stdout.trim()
 	if (rawContent) options.onText?.(rawContent)
 	const { cleanedContent, toolCalls } =
-		options.tools.length > 0 ? extractInlineToolCalls(rawContent) : { cleanedContent: rawContent, toolCalls: [] }
+		options.tools.length > 0
+			? extractInlineToolCalls(rawContent, offeredToolNames(options.tools))
+			: { cleanedContent: rawContent, toolCalls: [] }
 	return {
 		choices: [
 			{
@@ -582,7 +505,7 @@ async function completeApplePlaygroundOnce(options: {
 		options.tools.length > 0 &&
 		(content.includes("<tool_call>") || /```(?:tool_call|tool)\b/i.test(content))
 	) {
-		const inline = extractInlineToolCalls(content)
+		const inline = extractInlineToolCalls(content, offeredToolNames(options.tools))
 		content = inline.cleanedContent
 		toolCalls = inline.toolCalls
 	}

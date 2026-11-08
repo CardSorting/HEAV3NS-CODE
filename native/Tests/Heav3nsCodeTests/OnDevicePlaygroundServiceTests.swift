@@ -48,27 +48,95 @@ final class OnDevicePlaygroundServiceTests: XCTestCase {
         XCTAssertTrue(parsed.cleanedText.contains("{broken"))
     }
 
-    func testPromptBuildingCapsToolsAndHandlesToolRoundTrip() {
-        let tools = (0..<40).map { ["type": "function", "function": ["name": "t\($0)", "description": "d", "parameters": [:]]] as [String: Any] }
+    func testPromptBuildingKeepsWriteFileBehindHugeSystemPromptAndVerboseTools() {
+        let long = String(repeating: "Detailed behavior. ", count: 40)
+        func tool(_ name: String, _ desc: String, _ props: [String: Any], _ required: [String]) -> [String: Any] {
+            ["type": "function", "function": ["name": name, "description": desc, "parameters": ["type": "object", "properties": props, "required": required]]]
+        }
+        var tools: [[String: Any]] = [
+            tool("broccoligit_changes", long, ["limit": ["type": "number", "description": long]], []),
+            tool("view_file", "Read a file.", ["path": ["type": "string"]], ["path"]),
+            tool("write_file", "Create or overwrite a file. " + long, ["path": ["type": "string"], "content": ["type": "string"]], ["path", "content"])
+        ]
+        tools += (0..<30).map { tool("extra_\($0)", long, ["a": ["type": "string", "description": long]], ["a"]) }
         let body: [String: Any] = [
             "model": "apple-playground-coding", "stream": true, "tools": tools,
-            "messages": [
-                ["role": "system", "content": "sys"],
-                ["role": "user", "content": "go"],
-                ["role": "assistant", "content": "", "tool_calls": [["function": ["name": "t1", "arguments": "{}"]]]],
-                ["role": "tool", "tool_call_id": "c1", "name": "t1", "content": "result"]
-            ]
+            "messages": [["role": "system", "content": String(repeating: "You are LUMI. ", count: 10_000)],
+                         ["role": "user", "content": "Create hello.md with a greeting"]]
         ]
         let spec = OnDevicePlaygroundService.buildInferencePrompt(from: body)
         XCTAssertTrue(spec.stream && spec.hasTools)
-        XCTAssertTrue(spec.prompt.contains("Tool Result (t1)"))
-        XCTAssertTrue(spec.instructions.contains("t11:") || spec.instructions.contains("- t11"))
-        XCTAssertFalse(spec.instructions.contains("- t12"))
+        XCTAssertTrue(spec.offeredTools.contains("write_file"))
+        XCTAssertTrue(spec.instructions.contains("- write_file(content: string, path: string)") || spec.instructions.contains("- write_file(path: string, content: string)"))
+        XCTAssertTrue(spec.instructions.contains("<tool_call>"))
+        XCTAssertTrue(spec.instructions.contains("MUST call the matching tool"))
+        XCTAssertLessThanOrEqual(spec.instructions.count + spec.prompt.count, OnDevicePlaygroundService.promptCharBudget + 200)
+        XCTAssertLessThanOrEqual(spec.offeredTools.count, OnDevicePlaygroundService.maxPromptTools)
+    }
+
+    func testPromptKeepsToolsAlreadyUsedAndFormatsToolResults() {
+        let tools = (0..<30).map { ["type": "function", "function": ["name": "extra_\($0)", "description": "d", "parameters": ["type": "object", "properties": ["a": ["type": "string"]], "required": ["a"]]]] as [String: Any] }
+        let body: [String: Any] = [
+            "model": "apple-foundation-model", "tools": tools,
+            "messages": [
+                ["role": "user", "content": "go"],
+                ["role": "assistant", "content": "", "tool_calls": [["function": ["name": "extra_29", "arguments": "{}"]]]],
+                ["role": "tool", "tool_call_id": "c1", "name": "extra_29", "content": "result"]
+            ]
+        ]
+        let spec = OnDevicePlaygroundService.buildInferencePrompt(from: body)
+        XCTAssertTrue(spec.offeredTools.contains("extra_29"))
+        XCTAssertTrue(spec.prompt.contains("Tool Result (extra_29)"))
+    }
+
+    func testToolCallParsingRecoversJsonFencesBareJsonAndDropsEmptyFences() {
+        let known: Set<String> = ["write_file"]
+        let fenced = OnDevicePlaygroundService.parseToolCalls(from: "```json\n{\"name\":\"write_file\",\"arguments\":{\"path\":\"a.md\",\"content\":\"hi\"}}\n```", knownTools: known)
+        XCTAssertEqual(fenced.toolCalls.map(\.name), ["write_file"])
+        XCTAssertEqual(fenced.cleanedText, "")
+        let bare = OnDevicePlaygroundService.parseToolCalls(from: "{\"name\":\"write_file\",\"arguments\":{\"path\":\"a.md\"}}", knownTools: known)
+        XCTAssertEqual(bare.toolCalls.count, 1)
+        XCTAssertEqual(OnDevicePlaygroundService.parseToolCalls(from: "```json\n\n```", knownTools: known).cleanedText, "")
+        let other = OnDevicePlaygroundService.parseToolCalls(from: "```json\n{\"name\":\"Ada\",\"age\":3}\n```", knownTools: known)
+        XCTAssertTrue(other.toolCalls.isEmpty)
+        XCTAssertTrue(other.cleanedText.contains("Ada"))
+        XCTAssertTrue(OnDevicePlaygroundService.parseToolCalls(from: "```json\n{\"name\":\"write_file\",\"arguments\":{}}\n```").toolCalls.isEmpty)
     }
 
     func testFailureClassification() {
         let timeout = OnDevicePlaygroundService.classifyFailure(OnDevicePlaygroundService.InferenceError.timedOut)
         XCTAssertEqual(timeout.status, 504)
         XCTAssertEqual(OnDevicePlaygroundService.classifyFailure(NSError(domain: "x", code: 1)).status, 500)
+    }
+
+    /// Opt-in (slow, needs Apple Intelligence): `HEAV3NS_REAL_MODEL_TESTS=1 swift test --filter testRealModel`.
+    func testRealModelCallsWriteFileThroughBridgeWithBloatedAgentRequest() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["HEAV3NS_REAL_MODEL_TESTS"] == "1", "set HEAV3NS_REAL_MODEL_TESTS=1")
+        try XCTSkipUnless(OnDevicePlaygroundService.shared.localTextModelStatus() == "ready", "Apple Intelligence not ready")
+        let endpoint = try XCTUnwrap(OnDevicePlaygroundService.shared.ensureServerStarted())
+        let long = String(repeating: "Detailed behavior. ", count: 40)
+        func tool(_ name: String, _ desc: String, _ props: [String: Any], _ required: [String]) -> [String: Any] {
+            ["type": "function", "function": ["name": name, "description": desc, "parameters": ["type": "object", "properties": props, "required": required]]]
+        }
+        var tools: [[String: Any]] = [
+            tool("broccoligit_changes", long, ["limit": ["type": "number", "description": long]], []),
+            tool("view_file", "Read a file.", ["path": ["type": "string"]], ["path"]),
+            tool("write_file", "Create or overwrite a file. " + long, ["path": ["type": "string"], "content": ["type": "string"]], ["path", "content"])
+        ]
+        tools += (0..<17).map { tool("extra_\($0)", long, ["a": ["type": "string", "description": long]], ["a"]) }
+        for model in ["apple-playground-coding", "apple-foundation-model"] {
+            let body: [String: Any] = ["model": model, "stream": true, "tools": tools, "messages": [
+                ["role": "system", "content": String(repeating: "You are LUMI, an autonomous coding agent. ", count: 1_500)],
+                ["role": "user", "content": "Create a file called hello.md in the workspace containing a short greeting."]]]
+            var req = URLRequest(url: URL(string: endpoint.baseURL + "/chat/completions")!)
+            req.httpMethod = "POST"; req.timeoutInterval = 120
+            req.setValue("Bearer \(endpoint.token)", forHTTPHeaderField: "Authorization")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession(configuration: .ephemeral).data(for: req)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            let text = String(decoding: data, as: UTF8.self)
+            XCTAssertTrue(text.contains("\"name\":\"write_file\""), "\(model) did not call write_file: \(text.prefix(600))")
+            XCTAssertTrue(text.contains("\"finish_reason\":\"tool_calls\""), "\(model): \(text.prefix(600))")
+        }
     }
 }

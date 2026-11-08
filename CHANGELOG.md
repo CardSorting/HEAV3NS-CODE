@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.1.2] - 2026-11-07
+
+### Fixed
+
+- **On-device models answered in chat instead of creating files**: the agent's large system prompt and verbose tool schemas were squeezed into Apple's ~4,096-token window by cutting the head of the instructions, which silently removed the first tools (`write_file`, `view_file`) while keeping the "call a tool" format, so the model replied with text. Prompts now give the system text and the tool block separate budgets, offer tools by priority (file/edit/shell first, plus any already used) as compact signatures, and explicitly require tool calls for file and command requests. Tool calls written in ```json fences or as bare JSON are recovered, and empty leftover fences no longer appear in chat. Verified against the real on-device model through both the app bridge and the direct runner.
+
 ## [16.1.1] - 2026-11-07
 
 ### Fixed
