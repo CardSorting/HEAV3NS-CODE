@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [16.2.0] - 2026-11-07
+
+### Added
+
+- **Purpose-built adapter for the on-device (Apple Intelligence) model** (`native/Sources/Heav3nsCode/OnDeviceAgentAdapter.swift`): guided-generation route-then-fill tool calling over every tool, a deterministic instruction digest that keeps the agent's MUST/NEVER/ALWAYS rules (applied at the argument step), a pinned-goal progress ledger, a completion verifier, loop and repeat guards, argument validation with one repair attempt, a step cap, and adaptive shrinking on context overflow. Falls back to the text protocol if guided generation is unavailable (`HEAV3NS_ONDEVICE_ADAPTER=legacy` forces it). Covered by 20 deterministic policy tests plus opt-in real-model tests (`HEAV3NS_REAL_MODEL_TESTS=1`).
+
 ## [16.1.2] - 2026-11-07
 
 ### Fixed

@@ -139,4 +139,82 @@ final class OnDevicePlaygroundServiceTests: XCTestCase {
             XCTAssertTrue(text.contains("\"finish_reason\":\"tool_calls\""), "\(model): \(text.prefix(600))")
         }
     }
+
+    // MARK: Real-model scenarios for the purpose-built adapter (opt-in: HEAV3NS_REAL_MODEL_TESTS=1)
+
+    private func realModelTools() -> [[String: Any]] {
+        let long = String(repeating: "Detailed behavior. ", count: 40)
+        func tool(_ name: String, _ desc: String, _ props: [String: Any], _ required: [String]) -> [String: Any] {
+            ["type": "function", "function": ["name": name, "description": desc, "parameters": ["type": "object", "properties": props, "required": required]]]
+        }
+        var tools: [[String: Any]] = [
+            tool("broccoligit_changes", long, ["limit": ["type": "number", "description": long]], []),
+            tool("view_file", "Read a file from the workspace. " + long, ["path": ["type": "string"]], ["path"]),
+            tool("write_file", "Create or overwrite a file. " + long, ["path": ["type": "string"], "content": ["type": "string"]], ["path", "content"]),
+            tool("run_command", "Run a shell command in the workspace. " + long, ["command": ["type": "string"]], ["command"])
+        ]
+        tools += (0..<16).map { tool("extra_\($0)", long, ["a": ["type": "string", "description": long]], ["a"]) }
+        return tools
+    }
+
+    private func realModelRequest(_ endpoint: (baseURL: String, token: String), model: String, messages: [[String: Any]], stream: Bool = false) async throws -> [String: Any] {
+        var req = URLRequest(url: URL(string: endpoint.baseURL + "/chat/completions")!)
+        req.httpMethod = "POST"; req.timeoutInterval = 150
+        req.setValue("Bearer \(endpoint.token)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "stream": stream, "tools": realModelTools(), "messages": messages] as [String: Any])
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: req)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200, String(decoding: data, as: UTF8.self))
+        return try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func firstChoice(_ payload: [String: Any]) -> (message: [String: Any], finish: String?) {
+        let choice = (payload["choices"] as? [[String: Any]])?.first ?? [:]
+        return (choice["message"] as? [String: Any] ?? [:], choice["finish_reason"] as? String)
+    }
+
+    private func realEndpoint() throws -> (baseURL: String, token: String) {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["HEAV3NS_REAL_MODEL_TESTS"] == "1", "set HEAV3NS_REAL_MODEL_TESTS=1")
+        try XCTSkipUnless(OnDevicePlaygroundService.shared.localTextModelStatus() == "ready", "Apple Intelligence not ready")
+        return try XCTUnwrap(OnDevicePlaygroundService.shared.ensureServerStarted())
+    }
+
+    func testRealModelAdapterFinishesWithAGroundedAnswerAfterTheToolSucceeded() async throws {
+        let endpoint = try realEndpoint()
+        let messages: [[String: Any]] = [
+            ["role": "system", "content": "You are LUMI, an autonomous coding agent."],
+            ["role": "user", "content": "Create a file called hello.md containing a short greeting."],
+            ["role": "assistant", "content": "", "tool_calls": [["id": "c1", "type": "function", "function": ["name": "write_file", "arguments": "{\"path\":\"hello.md\",\"content\":\"Hello there!\"}"]]]],
+            ["role": "tool", "tool_call_id": "c1", "name": "write_file", "content": "Wrote 12 bytes to hello.md"]
+        ]
+        let result = firstChoice(try await realModelRequest(endpoint, model: "apple-playground-coding", messages: messages))
+        XCTAssertNil(result.message["tool_calls"], "the task is done; it must not call another tool: \(result.message)")
+        XCTAssertEqual(result.finish, "stop")
+        let text = (result.message["content"] as? String) ?? ""
+        XCTAssertFalse(text.isEmpty)
+        XCTAssertTrue(text.lowercased().contains("hello.md"), "answer should reference the real file: \(text)")
+    }
+
+    func testRealModelAdapterRoutesShellRequestsToRunCommand() async throws {
+        let endpoint = try realEndpoint()
+        let messages: [[String: Any]] = [["role": "system", "content": "You are LUMI, an autonomous coding agent."],
+                                         ["role": "user", "content": "Run `ls -la` in the workspace and show me what is there."]]
+        let result = firstChoice(try await realModelRequest(endpoint, model: "apple-foundation-model", messages: messages))
+        let call = ((result.message["tool_calls"] as? [[String: Any]])?.first?["function"] as? [String: Any]) ?? [:]
+        XCTAssertEqual(call["name"] as? String, "run_command", "\(result.message)")
+        XCTAssertTrue((call["arguments"] as? String ?? "").contains("ls"))
+    }
+
+    func testRealModelAdapterHonoursARuleBuriedDeepInAHugeSystemPrompt() async throws {
+        let endpoint = try realEndpoint()
+        var lines = ["You are LUMI, an autonomous coding agent."]
+        lines += (0..<1_500).map { "Background note \($0): descriptive context that explains how the platform works in some detail." }
+        lines.insert("ALWAYS create new files inside the docs/ directory and never at the workspace root.", at: 900)
+        let messages: [[String: Any]] = [["role": "system", "content": lines.joined(separator: "\n")],
+                                         ["role": "user", "content": "Create a file called notes.md containing a short todo list."]]
+        let result = firstChoice(try await realModelRequest(endpoint, model: "apple-playground-coding", messages: messages))
+        let call = ((result.message["tool_calls"] as? [[String: Any]])?.first?["function"] as? [String: Any]) ?? [:]
+        XCTAssertEqual(call["name"] as? String, "write_file", "\(result.message)")
+        let args = (try? JSONSerialization.jsonObject(with: Data((call["arguments"] as? String ?? "{}").utf8))) as? [String: Any] ?? [:]
+        XCTAssertTrue((args["path"] as? String ?? "").hasPrefix("docs/"), "the buried rule was lost: \(args)")
+    }
 }

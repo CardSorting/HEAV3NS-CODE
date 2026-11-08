@@ -711,7 +711,7 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
         }
         defer { endInference() }
 
-        let promptSpec = Self.buildInferencePrompt(from: json)
+        var promptSpec = Self.buildInferencePrompt(from: json)
         let completionID = "chatcmpl-apple-\(UUID().uuidString.prefix(12))"
         let created = Int(Date().timeIntervalSince1970)
 
@@ -723,18 +723,40 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
                     imageNotice = await generatePlaygroundImageIfAvailable(concept: imageConcept)
                 }
 
+                // Purpose-built path for this small model: guided route-then-fill tool selection (see OnDeviceAgentAdapter).
+                // Any adapter failure that is not a policy/availability error falls back to the text protocol below.
+                var decidedToolCalls: [ToolCallPayload]?
+                if promptSpec.hasTools, Self.adapterEnabled {
+                    do {
+                        let decision = try await OnDeviceAgentRunner(client: FoundationModelsAgentClient()).decide(
+                            model: promptSpec.model, messages: json["messages"] as? [[String: Any]] ?? [], rawTools: json["tools"] as? [[String: Any]] ?? [])
+                        switch decision {
+                        case .toolCall(let name, let arguments):
+                            decidedToolCalls = [ToolCallPayload(
+                                id: "call_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16))",
+                                name: name, argumentsJSON: OnDeviceText.canonicalJSON(arguments))]
+                        case .answer(let instructions, let prompt):
+                            promptSpec = InferencePrompt(model: promptSpec.model, instructions: instructions, prompt: prompt, stream: promptSpec.stream,
+                                                         hasTools: false, imageConcept: promptSpec.imageConcept, offeredTools: [])
+                        }
+                    } catch OnDeviceAgentError.adapterUnavailable {
+                        // Keep the legacy text-protocol prompt in promptSpec.
+                    }
+                }
+
                 let session = LanguageModelSession(instructions: promptSpec.instructions)
-                if promptSpec.stream && !promptSpec.hasTools {
+                if decidedToolCalls == nil && promptSpec.stream && !promptSpec.hasTools {
                     try await streamPlainCompletion(
                         session: session, spec: promptSpec, imageNotice: imageNotice,
                         id: completionID, created: created, on: connection
                     )
                     return
                 }
-                let responseText = try await respondWithTimeout(session, prompt: promptSpec.prompt)
+                let responseText = decidedToolCalls == nil ? try await respondWithTimeout(session, prompt: promptSpec.prompt) : ""
                 try Task.checkCancellation()
-                let rawContent = imageNotice.isEmpty ? responseText : "\(imageNotice)\n\n\(responseText)"
-                let (cleanedText, toolCalls) = promptSpec.hasTools ? Self.parseToolCalls(from: rawContent, knownTools: promptSpec.offeredTools) : (rawContent, [])
+                let rawContent = imageNotice.isEmpty || decidedToolCalls != nil ? responseText : "\(imageNotice)\n\n\(responseText)"
+                let (cleanedText, toolCalls): (String, [ToolCallPayload]) = decidedToolCalls.map { ("", $0) }
+                    ?? (promptSpec.hasTools ? Self.parseToolCalls(from: rawContent, knownTools: promptSpec.offeredTools) : (rawContent, []))
 
                 if promptSpec.stream {
                     sendSSECompletion(
@@ -777,8 +799,8 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
                         ],
                         "usage": [
                             "prompt_tokens": max(1, (promptSpec.instructions.count + promptSpec.prompt.count) / 4),
-                            "completion_tokens": max(1, rawContent.count / 4),
-                            "total_tokens": max(2, (promptSpec.prompt.count + rawContent.count) / 4)
+                            "completion_tokens": max(1, (rawContent.count + toolCalls.reduce(0) { $0 + $1.argumentsJSON.count }) / 4),
+                            "total_tokens": max(2, (promptSpec.prompt.count + rawContent.count + toolCalls.reduce(0) { $0 + $1.argumentsJSON.count }) / 4)
                         ]
                     ]
                     sendJSONResponse(on: connection, status: 200, body: payload)
@@ -806,6 +828,9 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
 
     enum InferenceError: Error { case timedOut }
 
+    /// `HEAV3NS_ONDEVICE_ADAPTER=legacy` forces the text-protocol path (escape hatch for diagnosing the adapter).
+    static var adapterEnabled: Bool { ProcessInfo.processInfo.environment["HEAV3NS_ONDEVICE_ADAPTER"] != "legacy" }
+
     struct ClassifiedFailure: Equatable {
         let status: Int
         let code: String
@@ -814,6 +839,12 @@ final class OnDevicePlaygroundService: @unchecked Sendable {
 
     /// Maps FoundationModels failures onto OpenAI-style HTTP errors so clients can react (shrink context, rephrase, retry).
     static func classifyFailure(_ error: Error) -> ClassifiedFailure {
+        if case OnDeviceAgentError.timedOut = error {
+            return ClassifiedFailure(status: 504, code: "on_device_timeout", message: "Apple on-device model timed out. Try a shorter instruction.")
+        }
+        if case OnDeviceAgentError.contextOverflow = error {
+            return ClassifiedFailure(status: 400, code: "context_length_exceeded", message: "The request exceeds Apple's on-device context window (about 4,096 tokens) even after condensing. Shorten the instruction or start a new session.")
+        }
         if case InferenceError.timedOut = error {
             return ClassifiedFailure(status: 504, code: "on_device_timeout", message: "Apple on-device model timed out. Try a shorter instruction.")
         }
